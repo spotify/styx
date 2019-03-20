@@ -38,6 +38,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -77,6 +78,8 @@ public class Authenticator {
       .maximumSize(VALIDATED_EMAIL_CACHE_SIZE)
       .build();
 
+  private final Collection<String> allowedAudiences;
+
   Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
       CloudResourceManager cloudResourceManager,
       Iam iam,
@@ -88,6 +91,7 @@ public class Authenticator {
     this.iam = Objects.requireNonNull(iam, "iam");
     this.domainWhitelist = configuration.domainWhitelist();
     this.resourceWhitelist = configuration.resourceWhitelist();
+    this.allowedAudiences = configuration.allowedAudiences();
   }
 
   void cacheResources() throws IOException {
@@ -124,6 +128,7 @@ public class Authenticator {
     }
 
     if (googleIdToken == null) {
+      logger.debug("Invalid id token: verifyIdToken returned null");
       return null;
     }
 
@@ -134,23 +139,35 @@ public class Authenticator {
     }
 
     final String domain = getDomain(email);
-    if (domain != null) {
-      if (domainWhitelist.contains(domain)) {
-        logger.debug("Domain {} in whitelist", domain);
-        return googleIdToken;
-      }
-    } else {
+    if (domain == null) {
       logger.warn("Invalid email address {}", email);
       return null;
+    } else if (domainWhitelist.contains(domain)) {
+      logger.debug("Domain {} in whitelist", domain);
+      return googleIdToken;
     }
 
     if (validatedEmailCache.getIfPresent(email) != null) {
+      logger.debug("Cache hit for {}", email);
       return googleIdToken;
     }
 
     // Is this a GCP service account?
     if (!SERVICE_ACCOUNT_PATTERN.matcher(email).matches()) {
+      logger.debug("Not a service account: {}", email);
       return null;
+    }
+
+    // TODO: Also verify audience for user tokens. Currently this would require changing the auth flow in styx
+    //  clients and make users explicitly "log in" to Styx via the OAuth consent screen.
+    // Verify that this ID token was intended for Styx.
+    if (!allowedAudiences.isEmpty()
+        // TODO: Remove this null check and require tokens to have a target audience
+        && googleIdToken.getPayload().getAudience() != null) {
+      if (!googleIdToken.verifyAudience(allowedAudiences)) {
+        logger.warn("ID token wasn't intended for Styx");
+        return null;
+      }
     }
 
     final String projectId;

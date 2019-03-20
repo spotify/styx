@@ -53,6 +53,7 @@ import com.google.api.services.iam.v1.model.ServiceAccount;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.Before;
 import org.junit.Rule;
@@ -83,9 +84,14 @@ public class AuthenticatorTest {
   private static final String DOMAIN1 = "example.com";
   private static final String DOMAIN2 = "test.com";
 
+  private static final String STYX_OAUTH_CLIENT_ID =
+      "123456789012-823nsdf8whq4r4tbsjdhg923nksrgj04.apps.googleusercontent.com";
+  private static final String STYX_API_HOSTNAME = "https://styx.example.net";
+
   private static final AuthenticatorConfiguration CONFIGURATION = AuthenticatorConfiguration.builder()
       .domainWhitelist(DOMAIN1, DOMAIN2)
       .resourceWhitelist(WHITELIST)
+      .allowedAudiences(STYX_API_HOSTNAME, STYX_OAUTH_CLIENT_ID)
       .service("test")
       .build();
 
@@ -112,7 +118,6 @@ public class AuthenticatorTest {
   @Rule public final ExpectedException expectedException = ExpectedException.none();
 
   @Mock private GoogleIdToken idToken;
-  @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock private GoogleIdTokenVerifier verifier;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
@@ -120,8 +125,11 @@ public class AuthenticatorTest {
   @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
 
+  private final GoogleIdToken.Payload idTokenPayload = new GoogleIdToken.Payload();
+
   @Before
   public void setUp() throws IOException, GeneralSecurityException {
+    idTokenPayload.setAudience(STYX_API_HOSTNAME);
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(verifier.verify(anyString())).thenReturn(idToken);
 
@@ -157,7 +165,7 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailExternalProject() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@external.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@external.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
   }
 
@@ -191,7 +199,7 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldBeWhitelisted() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@example.com");
+    idTokenPayload.setEmail("foo@example.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verifyZeroInteractions(projectsGetAncestry);
@@ -200,7 +208,7 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailIfInvalidEmailAddress() {
-    when(idTokenPayload.getEmail()).thenReturn("example.com");
+    idTokenPayload.setEmail("example.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyZeroInteractions(projectsGetAncestry);
@@ -211,12 +219,12 @@ public class AuthenticatorTest {
   public void shouldHitProjectCache() throws IOException {
 
     // Populate cache
-    when(idTokenPayload.getEmail()).thenReturn("foo@foo.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     // Hit cache
     reset(cloudResourceManager.projects());
-    when(idTokenPayload.getEmail()).thenReturn("bar@foo.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("bar@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(cloudResourceManager.projects(), never()).getAncestry(eq("foo"), any());
@@ -229,7 +237,7 @@ public class AuthenticatorTest {
     when(projectsGetAncestry.execute()).thenReturn(
         ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_FOLDER_RESOURCE, ORGANIZATION_RESOURCE));
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@" + UNCACHED_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@" + UNCACHED_PROJECT.getProjectId() + ".iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(cloudResourceManager.projects()).getAncestry(eq(UNCACHED_PROJECT.getProjectId()), any());
@@ -248,7 +256,7 @@ public class AuthenticatorTest {
   public void shouldFailToGetProject() throws IOException {
     when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(new IOException());
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
@@ -259,7 +267,7 @@ public class AuthenticatorTest {
   public void shouldFailForNonExistProject() throws IOException {
     when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(NOT_FOUND);
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
@@ -270,7 +278,7 @@ public class AuthenticatorTest {
   public void shouldFailIfNoPermissionGettingProject() throws IOException {
     when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(PERMISSION_DENIED);
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@barfoo.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
@@ -282,7 +290,7 @@ public class AuthenticatorTest {
     when(projectsGetAncestry.execute()).thenReturn(
         ancestryResponse(resourceId(UNCACHED_PROJECT), UNCACHED_FOLDER_RESOURCE, ORGANIZATION_RESOURCE));
 
-    when(idTokenPayload.getEmail()).thenReturn("foo@uncached.iam.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@uncached.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     // TODO: this is a serious code smell
@@ -299,7 +307,7 @@ public class AuthenticatorTest {
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     when(serviceAccountsGet.execute()).thenReturn(SERVICE_ACCOUNT);
     when(iam.projects().serviceAccounts().get(anyString())).thenReturn(serviceAccountsGet);
-    when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(serviceAccountsGet).execute();
@@ -309,7 +317,7 @@ public class AuthenticatorTest {
   @Test
   public void shouldFailToGetProjectFromIAM() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(new IOException());
-    when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
@@ -319,7 +327,7 @@ public class AuthenticatorTest {
   @Test
   public void shouldFailForNonExistServiceAccount() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(NOT_FOUND);
-    when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
@@ -329,7 +337,7 @@ public class AuthenticatorTest {
   @Test
   public void shouldFailIfNoPermissionGettingServiceAccountFromIAM() throws IOException {
     when(iam.projects().serviceAccounts().get(anyString())).thenThrow(PERMISSION_DENIED);
-    when(idTokenPayload.getEmail()).thenReturn("foo@developer.gserviceaccount.com");
+    idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(iam.projects().serviceAccounts()).get(anyString());
@@ -338,7 +346,7 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailTokenWithNoEmail() {
-    when(idTokenPayload.getEmail()).thenReturn(null);
+    idTokenPayload.setEmail(null);
     assertThat(validator.authenticate("token"), is(nullValue()));
     verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
@@ -346,9 +354,36 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldDenyWhitelistedEmailNonSA() {
-    when(idTokenPayload.getEmail()).thenReturn("foo@bar.com");
+    idTokenPayload.setEmail("foo@bar.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
     verifyZeroInteractions(projectsGetAncestry);
     verifyZeroInteractions(iam);
+  }
+
+  @Test
+  public void shouldDenyIncorrectAudience() {
+    idTokenPayload.setAudience("https://foo.example.net");
+    idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(nullValue()));
+    verifyZeroInteractions(projectsGetAncestry);
+    verifyZeroInteractions(iam);
+  }
+
+  @Test
+  public void shouldAllowIncorrectAudienceIfNoAllowedAudiencesConfigured() {
+    var configurationWithNoAllowedAudiences = AuthenticatorConfigurationBuilder.from(CONFIGURATION)
+        .allowedAudiences(Set.of())
+        .build();
+    validator = new Authenticator(verifier, cloudResourceManager, iam, configurationWithNoAllowedAudiences);
+    idTokenPayload.setAudience("https://foo.example.net");
+    idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(idToken));
+  }
+
+  @Test
+  public void shouldAllowNoAudience() {
+    idTokenPayload.setAudience(null);
+    idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
+    assertThat(validator.authenticate("token"), is(idToken));
   }
 }
