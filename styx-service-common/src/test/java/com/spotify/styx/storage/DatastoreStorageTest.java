@@ -45,13 +45,12 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -441,23 +440,11 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void readActiveStatesShouldNotPropagateIOException() throws Exception {
+  public void readActiveStatesShouldPropagateIOException() throws Exception {
     final IOException cause = new IOException("foobar");
     doThrow(cause).when(datastore).query(any());
-    assertThat(storage.readActiveStates(), is(notNullValue()));
-  }
-
-  @Test
-  public void readActiveStatesPartialShouldIndicateUnavailableWorkflowInstance() throws Exception {
-    final IOException cause = new IOException("foobar");
-    doThrow(cause) // Fail first shard read
-        .doReturn(List.of()) // Succeed all other reads
-        .when(datastore).query(any());
-    var results = storage.readActiveStatesPartial();
-    // 80 maps to first shard
-    final WorkflowInstance unavailableInstance = WorkflowInstance.create(WorkflowId.create("foo", "bar"), "80");
-    assertThat(results._1.test(unavailableInstance), is(true));
-    assertThat(results._1.test(WORKFLOW_INSTANCE1), is(false));
+    exception.expect(is(cause));
+    storage.readActiveStates();
   }
 
   @Test

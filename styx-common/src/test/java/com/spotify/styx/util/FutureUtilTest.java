@@ -23,25 +23,23 @@ package com.spotify.styx.util;
 import static com.spotify.styx.util.FutureUtil.gatherIO;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.delayedExecutor;
+import static java.util.concurrent.CompletableFuture.failedFuture;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toMap;
-import static org.hamcrest.Matchers.both;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.hasEntry;
+import static java.util.stream.Collectors.toList;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.IntStream;
-import javaslang.control.Try;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -51,66 +49,84 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class FutureUtilTest {
 
+  private final CompletableFuture<Void> NO_TIMEOUT = new CompletableFuture<>();
+  private final CompletableFuture<Void> TIMED_OUT = CompletableFuture.completedFuture(null);
+
+  private CompletableFuture<String> future = new CompletableFuture<>();
+
   @Rule public final ExpectedException exception = ExpectedException.none();
 
   @Test
-  public void testExceptionallyCompletedFuture() throws ExecutionException, InterruptedException {
-    final IOException cause = new IOException("foo");
-    final CompletableFuture<Object> future = CompletableFuture.failedFuture(cause);
-    exception.expect(ExecutionException.class);
-    exception.expectCause(is(cause));
-    future.get();
+  public void gatherIOShouldReturnValues() throws IOException {
+    var futures = List.of(completedFuture("foo"), completedFuture("bar"));
+    assertThat(FutureUtil.gatherIO(futures, NO_TIMEOUT), contains("foo", "bar"));
   }
 
   @Test
-  public void gatherIOShouldReturnValues() {
-    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
-    var futures = Map.of(
-        "foo", completedFuture("foo"),
-        "bar", completedFuture("bar"));
-    var results = FutureUtil.gatherIO(futures, timeout);
-    assertThat(results, is(Map.of(
-        "foo", Try.success("foo"),
-        "bar", Try.success("bar"))));
+  public void gatherIOShouldPropagateIOException() throws IOException {
+    var cause = new IOException("foo");
+    var futures = List.of(completedFuture("foo"), failedFuture(cause));
+    exception.expect(is(cause));
+    FutureUtil.gatherIO(futures, NO_TIMEOUT);
   }
 
   @Test
-  public void gatherIOShouldPropagateException() {
-    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
+  public void gatherIOShouldPropagateException() throws IOException {
     var cause = new Exception("foo");
-    var futures = Map.of(
-        "foo", completedFuture("foo"),
-        "bar", CompletableFuture.<String>failedFuture(cause));
-    var results = FutureUtil.gatherIO(futures, timeout);
-    assertThat(results.size(), is(2));
-    assertThat(results, hasEntry("foo", Try.success("foo")));
-    assertThat(results.get("bar").getCause(), instanceOf(ExecutionException.class));
-    assertThat(results.get("bar").getCause().getCause(), is(cause));
+    var futures = List.of(completedFuture("foo"), failedFuture(cause));
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    FutureUtil.gatherIO(futures, NO_TIMEOUT);
   }
 
   @Test
-  public void gatherIOShouldApplyTimeouts() {
+  public void gatherIOShouldPropagateTimeoutAsIOException() throws IOException {
+    var futures = List.of(completedFuture("foo"), future);
+    exception.expect(IOException.class);
+    exception.expectCause(instanceOf(TimeoutException.class));
+    FutureUtil.gatherIO(futures, TIMED_OUT);
+  }
+
+  @Test
+  public void gatherShouldPropagateInterruptedAsIOException() throws Exception {
+    var futures = List.of(completedFuture("foo"), future);
+    Thread.currentThread().interrupt();
+    try {
+      FutureUtil.gatherIO(futures, NO_TIMEOUT);
+      fail();
+    } catch (IOException e) {
+      assertThat(e.getCause(), instanceOf(InterruptedException.class));
+    }
+    // verify that gatherIO interrupts current thread after catching InterruptedException
+    assertThat(Thread.currentThread().isInterrupted(), is(true));
+    exception.expect(InterruptedException.class);
+    Thread.sleep(1000);
+  }
+
+  @Test
+  public void gatherIOShouldApplyTimeouts() throws IOException {
     var executor = Executors.newSingleThreadExecutor();
     // Total execution time for these futures running sequentially is 10 seconds
     var futures = IntStream.range(0, 1000).boxed()
-        .collect(toMap(
-            i -> i,
-            i -> CompletableFuture.supplyAsync(() -> {
-              sleepMillis(10);
-              return i;
-            }, executor)));
+        .map(i -> CompletableFuture.supplyAsync(() -> {
+          sleepMillis(10);
+          return i;
+        }, executor))
+        .collect(toList());
     var start = System.nanoTime();
     // Give enough time for ~ 20 futures to complete
     var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(200, MILLISECONDS));
-    var results = gatherIO(futures, timeout);
+    try {
+      gatherIO(futures, timeout);
+      fail();
+    } catch (IOException e) {
+      assertThat(e.getCause(), instanceOf(TimeoutException.class));
+    }
     var end = System.nanoTime();
     var elapsed = Duration.ofNanos(end - start);
     // Verify that the timeout of 200 ms was properly applied in a non-blocking fashion by checking that the execution
     // duration is well below the expected total of 10 seconds.
     assertThat(elapsed.getSeconds(), is(lessThan(1L)));
-    // Verify that the expected number of futures succeeded
-    var successCount = results.values().stream().filter(Try::isSuccess).count();
-    assertThat(successCount, is(both(greaterThan(10L)).and(lessThan(30L))));
   }
 
   private void sleepMillis(long millis) {

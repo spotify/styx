@@ -28,8 +28,6 @@ import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Predicate;
-import javaslang.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,12 +107,6 @@ public interface StateManager extends Closeable {
    * Get a map of all active {@link WorkflowInstance} states.
    */
   Map<WorkflowInstance, RunState> getActiveStates();
-
-  /**
-   * Get a partial map of all active {@link WorkflowInstance} states with a predicate that indicates if a workflow
-   * instance is unavailable.
-   */
-  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> getActiveStatesPartial();
 
   /**
    * Get the current {@link RunState} of a {@link WorkflowInstance}.
