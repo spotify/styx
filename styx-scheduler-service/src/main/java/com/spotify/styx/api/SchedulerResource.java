@@ -58,8 +58,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 import okio.ByteString;
 
@@ -160,17 +158,13 @@ public class SchedulerResource {
 
   private StatusType eventInjectorHelper(Event event) {
     try {
-      stateManager.receive(event).toCompletableFuture().get();
-    } catch (IsClosedException | InterruptedException e) {
+      stateManager.receive(event);
+    } catch (IsClosedException e) {
       return INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage());
-    } catch (ExecutionException e) {
-      if (e.getCause() instanceof IllegalArgumentException
-          || e.getCause() instanceof IllegalStateException) {
-        return BAD_REQUEST.withReasonPhrase(e.getCause().getMessage());
-      } else {
-        return INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage());
-      }
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      return BAD_REQUEST.withReasonPhrase(e.getMessage());
     }
+
     return OK;
   }
 
@@ -232,16 +226,9 @@ public class SchedulerResource {
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
-    final CompletionStage<Void> triggered = triggerListener.event(
-        workflow, Trigger.adhoc(triggerId), instant, parameters);
-
-    // TODO: return future instead of blocking
     try {
-      triggered.toCompletableFuture().get();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (ExecutionException e) {
+      triggerListener.event(workflow, Trigger.adhoc(triggerId), instant, parameters);
+    } catch (Exception e) {
       return handleException(e);
     }
 
@@ -249,7 +236,7 @@ public class SchedulerResource {
     return Response.forPayload(triggerRequest);
   }
 
-  private Response<TriggerRequest> handleException(final ExecutionException e) {
+  private Response<TriggerRequest> handleException(final Throwable e) {
     Throwable cause;
     if ((cause = findCause(e, IllegalStateException.class)) != null
         || (cause = findCause(e, IllegalArgumentException.class)) != null) {
@@ -259,7 +246,7 @@ public class SchedulerResource {
       return Response.forStatus(CONFLICT.withReasonPhrase(
           "This workflow instance is already triggered. Did you want to `retry` running it instead?"));
     } else {
-      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getCause().getMessage()));
+      return Response.forStatus(INTERNAL_SERVER_ERROR.withReasonPhrase(e.getMessage()));
     }
   }
 }
