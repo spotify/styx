@@ -51,7 +51,6 @@ import com.google.cloud.datastore.DatastoreException;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import com.spotify.styx.RepeatRule;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
@@ -85,7 +84,6 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -120,8 +118,6 @@ public class QueuedStateManagerTest {
   private QueuedStateManager stateManager;
 
   @Captor private ArgumentCaptor<RunState> runStateCaptor;
-
-  @Rule public RepeatRule repeatRule = new RepeatRule();
 
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
