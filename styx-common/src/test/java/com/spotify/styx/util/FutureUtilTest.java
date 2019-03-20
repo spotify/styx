@@ -97,6 +97,7 @@ public class FutureUtilTest {
     } catch (IOException e) {
       assertThat(e.getCause(), instanceOf(InterruptedException.class));
     }
+    // verify that gatherIO interrupts current thread after catching InterruptedException
     assertThat(Thread.currentThread().isInterrupted(), is(true));
     exception.expect(InterruptedException.class);
     Thread.sleep(1000);
