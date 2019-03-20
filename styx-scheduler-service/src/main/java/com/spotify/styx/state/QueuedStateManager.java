@@ -56,7 +56,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
-import java.util.function.Predicate;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.control.Try;
@@ -381,11 +380,6 @@ public class QueuedStateManager implements StateManager {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  public Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> getActiveStatesPartial() {
-    return storage.readActiveStatesPartial();
   }
 
   @Override

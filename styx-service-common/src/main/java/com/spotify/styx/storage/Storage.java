@@ -38,8 +38,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.function.Predicate;
-import javaslang.Tuple2;
 
 /**
  * The interface to the persistence layer.
@@ -162,12 +160,6 @@ public interface Storage extends Closeable {
    * @return The map of workflow instances to sequence counts
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException;
-
-  /**
-   * A version of {@link #readActiveStates()} that allows for partial success. The return predicate can be used
-   * to query whether a WorkflowInstance is unavailable and should be ignored.
-   */
-  Tuple2<Predicate<WorkflowInstance>, Map<WorkflowInstance, RunState>> readActiveStatesPartial();
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their {@link RunState},

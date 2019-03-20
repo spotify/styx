@@ -54,7 +54,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javaslang.Tuple;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -114,8 +113,6 @@ public class KubernetesDockerRunnerPodPollerTest {
     podList = new PodList();
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");
-
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
   }
 
   @Test
@@ -151,7 +148,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryPollPods();
 
-    verify(stateManager).getActiveStatesPartial();
+    verify(stateManager).getActiveStates();
     verifyNoMoreInteractions(stateManager);
   }
 
@@ -177,7 +174,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryPollPods();
 
-    verify(stateManager).getActiveStatesPartial();
+    verify(stateManager).getActiveStates();
     verifyNoMoreInteractions(stateManager);
   }
 
@@ -283,7 +280,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     RunState runState2 = RunState.create(WORKFLOW_INSTANCE_2, state, stateData2);
     map.put(WORKFLOW_INSTANCE, runState);
     map.put(WORKFLOW_INSTANCE_2, runState2);
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, map));
+    when(stateManager.getActiveStates()).thenReturn(map);
   }
 
   private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {

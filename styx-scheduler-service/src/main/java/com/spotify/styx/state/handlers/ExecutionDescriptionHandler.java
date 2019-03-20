@@ -24,6 +24,7 @@ import static com.spotify.styx.state.handlers.HandlerUtil.argsReplace;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
+import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
@@ -35,7 +36,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
-import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;

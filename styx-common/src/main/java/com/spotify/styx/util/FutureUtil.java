@@ -20,13 +20,14 @@
 
 package com.spotify.styx.util;
 
-import static java.util.stream.Collectors.toMap;
-
-import java.util.Map;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import javaslang.control.Try;
 
 public class FutureUtil {
 
@@ -35,17 +36,35 @@ public class FutureUtil {
   }
 
   /**
-   * Gathers results from futures that may fail or time out.
+   * Gathers results from futures that may fail with IOExceptions.
    * @param timeout A global timeout. All futures must have completed before this future completes. Any future
    *                not yet completed will be cancelled.
-   * @return The values or failures of all futures.
+   * @return The values of all futures, in the same order.
+   * @throws IOException if interrupted or any of the futures timed out or failed with an {@link IOException}.
    */
-  public static <K, T> Map<K, Try<T>> gatherIO(
-      final Map<K, ? extends CompletableFuture<T>> futures, CompletionStage<Void> timeout) {
-    return futures.entrySet().stream()
-        // Apply timeout
-        .peek(e -> timeout.thenRun(() -> e.getValue().completeExceptionally(new TimeoutException())))
-        // Collect results
-        .collect(toMap(Map.Entry::getKey, e -> Try.of(() -> e.getValue().get())));
+  public static <T> List<T> gatherIO(List<? extends CompletableFuture<? extends T>> futures,
+                                     CompletionStage<Void> timeout)
+      throws IOException {
+    // Apply timeout
+    timeout.thenRun(() -> futures.forEach(f -> f.completeExceptionally(new TimeoutException())));
+    // Collect results
+    var values = ImmutableList.<T>builder();
+    for (var future : futures) {
+      try {
+        values.add(future.get());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      } catch (ExecutionException e) {
+        final Throwable cause = e.getCause();
+        Throwables.propagateIfPossible(cause, IOException.class);
+        if (cause instanceof TimeoutException) {
+          throw new IOException(cause);
+        } else {
+          throw new RuntimeException(cause);
+        }
+      }
+    }
+    return values.build();
   }
 }

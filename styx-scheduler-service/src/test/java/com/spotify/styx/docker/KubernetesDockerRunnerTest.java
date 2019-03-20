@@ -99,7 +99,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import javaslang.Tuple;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -228,7 +227,7 @@ public class KubernetesDockerRunnerTest {
     StateData stateData = StateData.newBuilder().executionId(POD_NAME).build();
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of(WORKFLOW_INSTANCE, runState)));
+    when(stateManager.getActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(stateManager.getActiveState(WORKFLOW_INSTANCE)).thenReturn(Optional.of(runState));
   }
 
@@ -407,7 +406,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
     kdr.tryPollPods();
 
@@ -426,7 +425,7 @@ public class KubernetesDockerRunnerTest {
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
 
-    when(stateManager.getActiveStatesPartial()).thenReturn(Tuple.of(wfi -> false, Map.of()));
+    when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
     kdr.tryPollPods();
 
