@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state;
 
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.arrayContaining;
@@ -38,11 +37,9 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -66,19 +63,15 @@ import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
-import com.spotify.styx.util.CounterSnapshot;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
-import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
@@ -111,7 +104,7 @@ public class QueuedStateManagerTest {
       StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
-  private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
+  private final ExecutorService executor = Executors.newWorkStealingPool();
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
 
@@ -134,13 +127,13 @@ public class QueuedStateManagerTest {
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new QueuedStateManager(
-        time, eventTransitionExecutor, storage, eventConsumer,
+        time, executor, storage, eventConsumer,
         eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter, logger);
   }
 
   @After
   public void tearDown() {
-    eventTransitionExecutor.shutdownNow();
+    executor.shutdownNow();
     eventConsumerExecutor.shutdownNow();
   }
 
@@ -188,8 +181,7 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
 
     verify(transaction).writeActiveState(INSTANCE, instanceStateFresh);
     verify(storage).writeEvent(SequenceEvent.create(
@@ -202,8 +194,7 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
 
     verify(transaction).writeActiveState(INSTANCE, INSTANCE_NEW_STATE);
     verify(storage).writeEvent(SequenceEvent.create(
@@ -218,8 +209,7 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -233,8 +223,7 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -254,11 +243,9 @@ public class QueuedStateManagerTest {
         a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), is(instanceOf(AlreadyInitializedException.class)));
+    } catch (AlreadyInitializedException ignore) {
     }
   }
 
@@ -277,12 +264,11 @@ public class QueuedStateManagerTest {
     });
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause().getCause(), is(instanceOf(TransactionException.class)));
-      TransactionException cause = (TransactionException) e.getCause().getCause();
+    } catch (Exception e) {
+      assertThat(e.getCause(), is(instanceOf(TransactionException.class)));
+      TransactionException cause = (TransactionException) e.getCause();
       assertTrue(cause.isConflict());
     }
   }
@@ -292,10 +278,9 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
     }
   }
@@ -306,10 +291,9 @@ public class QueuedStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalArgumentException.class)));
     }
   }
@@ -321,10 +305,9 @@ public class QueuedStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
     }
   }
@@ -333,16 +316,15 @@ public class QueuedStateManagerTest {
   public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
-        time, eventTransitionExecutor, storage, eventConsumer,
+        time, executor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
     }
   }
@@ -351,17 +333,16 @@ public class QueuedStateManagerTest {
   public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
     reset(storage);
     stateManager = spy(new QueuedStateManager(
-        time, eventTransitionExecutor, storage, eventConsumer,
+        time, executor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
     }
   }
@@ -379,49 +360,13 @@ public class QueuedStateManagerTest {
   }
 
   @Test
-  public void shouldCloseGracefully() throws Exception {
-    Optional<RunState> runState = Optional.of(
-        RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
-
-    CompletableFuture<Void> barrier = new CompletableFuture<>();
-
-    reset(storage);
-    when(storage.runInTransaction(any())).thenAnswer(a -> {
-      barrier.get();
-      return a.<TransactionFunction>getArgument(0).apply(transaction);
-    });
-
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
-        .toCompletableFuture();
-
-    CompletableFuture.runAsync(() -> {
-      try {
-        stateManager.close();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    verify(storage, timeout(30_000)).runInTransaction(any());
-
-    barrier.complete(null);
-
-    f.get(1, MINUTES);
-
-    verify(outputHandler).transitionInto(any());
-    assertThat(runStateCaptor.getValue().state(), is(State.PREPARE));
-  }
-
-  @Test
   public void shouldWriteEvents() throws Exception {
     Event event = Event.started(INSTANCE);
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
 
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
@@ -434,11 +379,9 @@ public class QueuedStateManagerTest {
         Optional.of(RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17)));
 
     try {
-      stateManager.receive(event, 16)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.receive(event, 16);
       fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), is(instanceOf(StaleEventException.class)));
+    } catch (StaleEventException ignore) {
     }
 
     verify(storage, never()).writeEvent(any());
@@ -452,13 +395,10 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     try {
-      stateManager.receive(event, 18)
-          .toCompletableFuture().get(1, MINUTES);
+      stateManager.receive(event, 18);
       fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), is(instanceOf(RuntimeException.class)));
-      assertThat(e.getCause().getMessage(),
-          startsWith("Unexpected current counter is less than last observed one for"));
+    } catch (RuntimeException e) {
+      assertThat(e.getMessage(), startsWith("Unexpected current counter is less than last observed one for"));
     }
 
     verify(storage, never()).writeEvent(any());
@@ -472,8 +412,7 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.success(INSTANCE);
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -489,8 +428,7 @@ public class QueuedStateManagerTest {
     assertThat(stateManager.queuedEvents(), is(0L));
 
     Event event = Event.success(INSTANCE);
-    stateManager.receive(event)
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
 
     assertThat(stateManager.queuedEvents(), is(0L));
     verify(transaction).deleteActiveState(INSTANCE);
@@ -503,8 +441,7 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
-        .toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
 
     verify(transaction).updateActiveState(INSTANCE, RunState.create(INSTANCE, State.PREPARE,
         StateData.newBuilder().resourceIds(ImmutableSet.of()).build(), NOW, 18));
@@ -516,14 +453,11 @@ public class QueuedStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
-        .toCompletableFuture();
 
     try {
-      f.get(1, MINUTES);
+      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
       fail();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), instanceOf(IllegalStateException.class));
+    } catch (IllegalStateException ignore) {
     }
 
     verify(transaction, never()).updateActiveState(any(), any());
@@ -534,9 +468,9 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.empty());
 
     try {
-      stateManager.receive(Event.terminate(INSTANCE, Optional.empty())).toCompletableFuture().get();
-    } catch (ExecutionException e) {
-      assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
+      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
+      fail();
+    } catch (IllegalArgumentException ignore) {
     }
     verify(transaction, never()).updateActiveState(any(), any());
   }
@@ -590,11 +524,10 @@ public class QueuedStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS).toCompletableFuture();
     try {
-      f.get(1, MINUTES);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
   }
@@ -607,11 +540,10 @@ public class QueuedStateManagerTest {
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
-      f.get(1, MINUTES);
+      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
   }
@@ -624,9 +556,9 @@ public class QueuedStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L).get();
+      stateManager.receive(event, 4711L);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug(
         "Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
@@ -641,9 +573,9 @@ public class QueuedStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L).get();
+      stateManager.receive(event, 4711L);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug(
         "Transaction failure during workflow instance transition: {}, counter={}",
@@ -657,9 +589,9 @@ public class QueuedStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L).get();
+      stateManager.receive(event, 4711L);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug(
         "Failure during workflow instance transition: {}, counter={}",
@@ -674,9 +606,9 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug("Transaction conflict when triggering workflow instance. Aborted: {}",
         INSTANCE);
@@ -690,9 +622,9 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug("Transaction failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
@@ -705,9 +637,9 @@ public class QueuedStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
-    } catch (ExecutionException ignore) {
+    } catch (Exception ignore) {
     }
     verify(logger).debug("Failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
@@ -716,13 +648,11 @@ public class QueuedStateManagerTest {
   @Test
   public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
-    Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
     doThrow(exception).when(storage).runInTransaction(any());
-    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
-      f.get(1, MINUTES);
+      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(exception));
     }
   }
@@ -739,7 +669,6 @@ public class QueuedStateManagerTest {
     givenState(INSTANCE, State.QUEUED);
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
-    final CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
     final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
@@ -750,9 +679,9 @@ public class QueuedStateManagerTest {
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
     try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      spied.receive(dequeueEvent);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       // expected exception
     }
 
@@ -777,9 +706,9 @@ public class QueuedStateManagerTest {
     final QueuedStateManager spied = spy(stateManager);
 
     try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      spied.receive(dequeueEvent);
       fail();
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
       // expected exception
     }
 
@@ -802,14 +731,12 @@ public class QueuedStateManagerTest {
     final QueuedStateManager spied = spy(stateManager);
 
     try {
-      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
+      spied.receive(dequeueEvent);
       fail();
-    } catch (ExecutionException e) {
-      final Throwable cause = e.getCause();
-      assertThat(cause, instanceOf(RuntimeException.class));
-      assertThat(cause.getMessage(), is("Failed to update resource counter for workflow instance: "
+    } catch (RuntimeException e) {
+      assertThat(e.getMessage(), is("Failed to update resource counter for workflow instance: "
           + INSTANCE + ": [resource1]"));
-      assertThat(cause.getSuppressed(), is(arrayContaining(rootCause)));
+      assertThat(e.getSuppressed(), is(arrayContaining(rootCause)));
     }
 
     verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
@@ -939,6 +866,6 @@ public class QueuedStateManagerTest {
   }
 
   public void receiveEvent(Event event) throws Exception {
-    stateManager.receive(event).toCompletableFuture().get(1, MINUTES);
+    stateManager.receive(event);
   }
 }

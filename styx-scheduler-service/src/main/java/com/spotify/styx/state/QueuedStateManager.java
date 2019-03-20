@@ -44,7 +44,6 @@ import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
-import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,8 +53,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
@@ -75,6 +74,7 @@ import org.slf4j.LoggerFactory;
  * <p>All {@link #outputHandler} transitions are also executed on the injected
  * {@link Executor}.
  */
+// TODO: Remove "Queued" from name as there is no longer any queue \o/
 public class QueuedStateManager implements StateManager {
 
   private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
@@ -85,7 +85,7 @@ public class QueuedStateManager implements StateManager {
   private final LongAdder queuedEvents = new LongAdder();
 
   private final Time time;
-  private final StripedExecutorService eventProcessingExecutor;
+  private final ExecutorService executor;
   private final Storage storage;
   private final BiConsumer<SequenceEvent, RunState> eventConsumer;
   private final Executor eventConsumerExecutor;
@@ -96,19 +96,19 @@ public class QueuedStateManager implements StateManager {
 
   public QueuedStateManager(
       Time time,
-      StripedExecutorService eventProcessingExecutor,
+      ExecutorService executor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
       OutputHandler outputHandler,
       ShardedCounter shardedCounter) {
-    this(time, eventProcessingExecutor, storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter,
+    this(time, executor, storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter,
         DEFAULT_LOG);
   }
 
   public QueuedStateManager(
       Time time,
-      StripedExecutorService eventProcessingExecutor,
+      ExecutorService executor,
       Storage storage,
       BiConsumer<SequenceEvent, RunState> eventConsumer,
       Executor eventConsumerExecutor,
@@ -119,7 +119,7 @@ public class QueuedStateManager implements StateManager {
     this.storage = Objects.requireNonNull(storage);
     this.eventConsumer = Objects.requireNonNull(eventConsumer);
     this.eventConsumerExecutor = Objects.requireNonNull(eventConsumerExecutor);
-    this.eventProcessingExecutor = Objects.requireNonNull(eventProcessingExecutor);
+    this.executor = Objects.requireNonNull(executor);
     this.outputHandler = Objects.requireNonNull(outputHandler);
     this.shardedCounter = Objects.requireNonNull(shardedCounter);
     this.log = Objects.requireNonNull(logger, "logger");
@@ -130,61 +130,60 @@ public class QueuedStateManager implements StateManager {
     var shuffledInstances = new ArrayList<>(Try.of(storage::listActiveInstances).get());
     Collections.shuffle(shuffledInstances);
     var futures = shuffledInstances.stream()
-        .map(instance -> Striping.supplyAsyncStriped(() -> {
-          try {
-            var state = storage.readActiveState(instance);
-            state.ifPresent(outputHandler::transitionInto);
-          } catch (Exception e) {
-            LOG.error("Error ticking instance: {}", instance, e);
-          }
-          return null;
-        }, instance, eventProcessingExecutor))
+        .map(instance -> CompletableFuture.runAsync(() -> tickInstance(instance), executor))
         .collect(toList());
-
     CompletableFutures.allAsList(futures).join();
   }
 
+  private void tickInstance(WorkflowInstance instance) {
+    try {
+      var state = storage.readActiveState(instance);
+      state.ifPresent(outputHandler::transitionInto);
+    } catch (Exception e) {
+      LOG.error("Error ticking instance: {}", instance, e);
+    }
+  }
+
   @Override
-  public CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
+  public void trigger(WorkflowInstance workflowInstance, Trigger trigger, TriggerParameters parameters)
       throws IsClosedException {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
 
     // TODO: optional retry on transaction conflict
 
-    return CompletableFuture.runAsync(() -> initialize(workflowInstance), withMDC()).thenCompose((ignore) -> {
-      final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
+    initialize(workflowInstance);
+
+    final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
+    try {
+      receive(event);
+    } catch (IsClosedException isClosedException) {
+      log.warn("Failed to send 'triggerExecution' event", isClosedException);
+      // Best effort attempt to rollback the creation of the NEW state
       try {
-        return receive(event);
-      } catch (IsClosedException isClosedException) {
-        log.warn("Failed to send 'triggerExecution' event", isClosedException);
-        // Best effort attempt to rollback the creation of the NEW state
-        try {
-          storage.deleteActiveState(workflowInstance);
-        } catch (IOException e) {
-          log.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
-        }
-        throw new RuntimeException(isClosedException);
+        storage.deleteActiveState(workflowInstance);
+      } catch (IOException e) {
+        log.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
       }
-    });
+      throw new RuntimeException(isClosedException);
+    }
   }
 
   @Override
-  public CompletableFuture<Void> receive(Event event) throws IsClosedException {
-    return receive(event, Long.MAX_VALUE);
+  public void receive(Event event) throws IsClosedException {
+    receive(event, Long.MAX_VALUE);
   }
 
   @Override
-  public CompletableFuture<Void> receive(Event event, long expectedCounter) throws IsClosedException {
+  public void receive(Event event, long expectedCounter) throws IsClosedException {
     ensureRunning();
     log.info("Received event {}", event);
 
     // TODO: optional retry on transaction conflict
 
     queuedEvents.increment();
-    return Striping.supplyAsyncStriped(() ->
-        transition(event, expectedCounter), event.workflowInstance(), eventProcessingExecutor)
-        .thenAccept((tuple) -> postTransition(tuple._1, tuple._2));
+    var newState = transition(event, expectedCounter);
+    postTransition(newState._1, newState._2);
   }
 
   private void initialize(WorkflowInstance workflowInstance) {

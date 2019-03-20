@@ -189,7 +189,7 @@ public class StyxSchedulerServiceFixture {
   }
 
   void injectEvent(Event event) throws IsClosedException, InterruptedException, ExecutionException, TimeoutException {
-    styxScheduler.receive(event).toCompletableFuture().get(1, MINUTES);
+    styxScheduler.receive(event);
   }
 
   Optional<RunState> getState(WorkflowInstance workflowInstance) {
