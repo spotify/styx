@@ -390,35 +390,35 @@ public class DatastoreStorage implements Closeable {
 
     return workflows;
   }
-    
-    public Set<WorkflowInstance> listActiveInstances() throws IOException {
-        var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
-        return listActiveInstances0(timeout);
-    }
-    
-    private Set<WorkflowInstance> listActiveInstances0(CompletionStage<Void> timeout) throws IOException {
-        // Strongly read active state keys from index shards in parallel
-        return gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
-                        .map(key -> asyncIO(() -> datastore.query(Query.newKeyQueryBuilder()
-                                                                  .setFilter(PropertyFilter.hasAncestor(key))
-                                                                  .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
-                                                                  .build())))
-                        .collect(toList()), timeout)
+
+  public Set<WorkflowInstance> listActiveInstances() throws IOException {
+    var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
+    return listActiveInstances0(timeout);
+  }
+
+  private Set<WorkflowInstance> listActiveInstances0(CompletionStage<Void> timeout) throws IOException {
+    // Strongly read active state keys from index shards in parallel
+    return gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+        .map(key -> asyncIO(() -> datastore.query(Query.newKeyQueryBuilder()
+            .setFilter(PropertyFilter.hasAncestor(key))
+            .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
+            .build())))
+        .collect(toList()), timeout)
         .stream()
         .flatMap(Collection::stream)
         .map(Key::getName)
         .map(WorkflowInstance::parseKey)
         .collect(toSet());
-    }
+  }
 
   /**
    * Strongly consistently read all active states
    */
   Map<WorkflowInstance, RunState> readActiveStates() throws IOException {
     var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
-      
+
     var instances = listActiveInstances0(timeout);
-     
+
     // Strongly consistently read values for the instances in parallel
     var states = gatherIO(Lists.partition(List.copyOf(instances), MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
         .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
@@ -426,7 +426,7 @@ public class DatastoreStorage implements Closeable {
         .stream()
         .flatMap(Collection::stream)
         .collect(toMap(RunState::workflowInstance, Function.identity()));
-      
+
     timeout.cancel(true);
 
     return states;
