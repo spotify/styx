@@ -127,7 +127,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public void tick() {
-    var shuffledInstances = new ArrayList<>(storage.listActiveInstances());
+    var shuffledInstances = new ArrayList<>(Try.of(storage::listActiveInstances).get());
     Collections.shuffle(shuffledInstances);
     var futures = shuffledInstances.stream()
         .map(instance -> Striping.supplyAsyncStriped(() -> {
@@ -388,7 +388,7 @@ public class QueuedStateManager implements StateManager {
 
   @Override
   public Set<WorkflowInstance> listActiveInstances() {
-    return storage.listActiveInstances();
+    return Try.of(storage::listActiveInstances).get();
   }
 
   @Override

@@ -35,6 +35,7 @@ import static java.util.concurrent.CompletableFuture.delayedExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -99,6 +100,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
@@ -418,7 +420,7 @@ public class DatastoreStorage implements Closeable {
     var instances = listActiveInstances0(timeout);
      
     // Strongly consistently read values for the instances in parallel
-    var instances = gatherIO(Lists.partition(instances, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
+    var states = gatherIO(Lists.partition(List.copyOf(instances), MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ).stream()
         .map(batch -> asyncIO(() -> readRunStateBatch(batch)))
         .collect(toList()), timeout)
         .stream()
@@ -427,7 +429,7 @@ public class DatastoreStorage implements Closeable {
       
     timeout.cancel(true);
 
-    return instances;
+    return states;
   }
 
   /**

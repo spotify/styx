@@ -92,7 +92,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public Set<WorkflowInstance> listActiveInstances() {
+  public Set<WorkflowInstance> listActiveInstances() throws IOException {
     return datastoreStorage.listActiveInstances();
   }
 

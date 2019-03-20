@@ -164,7 +164,7 @@ public interface Storage extends Closeable {
   /**
    * Return a set of all active {@link WorkflowInstance} IDs.
    */
-  Set<WorkflowInstance> listActiveInstances();
+  Set<WorkflowInstance> listActiveInstances() throws IOException;
 
   /**
    * Return a map of all active {@link WorkflowInstance}s to their {@link RunState},
