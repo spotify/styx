@@ -35,7 +35,6 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
-import io.fabric8.kubernetes.api.model.ContainerStateWaiting;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
@@ -249,8 +248,8 @@ final class KubernetesPodEventTranslator {
       case "Pending":
         // check if one or more docker contains failed to pull their image, a possible silent error
         return mainContainerStatusOpt
-            .filter(KubernetesPodEventTranslator::hasPullImageError)
-            .map(x -> Event.runError(workflowInstance, "One or more containers failed to pull their image"));
+            .flatMap(KubernetesPodEventTranslator::imageError)
+            .map(msg -> Event.runError(workflowInstance, msg));
 
       case "Succeeded":
       case "Failed":
@@ -273,12 +272,26 @@ final class KubernetesPodEventTranslator {
     }
   }
 
-  static boolean hasPullImageError(ContainerStatus cs) {
-    ContainerStateWaiting waiting = cs.getState().getWaiting();
-    return waiting != null && (
-        "PullImageError".equals(waiting.getReason())
-        || "ErrImagePull".equals(waiting.getReason())
-        || "ImagePullBackOff".equals(waiting.getReason()));
+  static Optional<String> imageError(ContainerStatus cs) {
+    return Optional.ofNullable(cs.getState().getWaiting()).flatMap(waiting ->
+        Optional.ofNullable(waiting.getReason()).flatMap(reason -> {
+          var message = Optional.ofNullable(waiting.getMessage()).orElse("");
+          switch (reason) {
+            // https://github.com/kubernetes/kubernetes/blob/8327e433590f9e867b1e31a4dc32316685695729/pkg/kubelet/images/types.go#L26
+            case "ImageInspectError":
+            case "PullImageError":
+            case "ErrImagePull":
+            case "ErrImageNeverPull":
+            case "ImagePullBackOff":
+            case "RegistryUnavailable":
+              // TODO: Provide more descriptive error messages here
+              return Optional.of("One or more containers failed to pull their image: " + reason + ": " + message);
+            case "InvalidImageName":
+              return Optional.of("One or more container image names were invalid: " + reason + ": " + message);
+            default:
+              return Optional.empty();
+          }
+        }));
   }
 
   static boolean isTerminated(ContainerStatus cs) {

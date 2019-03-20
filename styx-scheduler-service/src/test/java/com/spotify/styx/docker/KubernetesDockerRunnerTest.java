@@ -708,22 +708,22 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldFailOnErrImagePull() throws Exception {
-    setWaiting(createdPod, "Pending", "ErrImagePull");
+    setWaiting(createdPod, "Pending", "ErrImagePull", "foobar");
     receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"),
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image: ErrImagePull: foobar"),
         -1);
   }
 
   @Test
   public void shouldSendStatsOnErrImagePull() throws Exception {
-    setWaiting(createdPod, "Pending", "ErrImagePull");
+    setWaiting(createdPod, "Pending", "ErrImagePull", "foobar");
     receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stats, times(1)).recordPullImageError();
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image"),
+        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image: ErrImagePull: foobar"),
         -1);
   }
 
