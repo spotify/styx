@@ -86,7 +86,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
-public class PersistentStateManagerTest {
+public class QueuedStateManagerTest {
 
   private static final Instant NOW = Instant.parse("2017-01-02T01:02:03Z");
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
@@ -108,7 +108,7 @@ public class PersistentStateManagerTest {
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
 
-  private PersistentStateManager stateManager;
+  private QueuedStateManager stateManager;
 
   @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
@@ -126,7 +126,7 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
-    stateManager = new PersistentStateManager(
+    stateManager = new QueuedStateManager(
         time, executor, storage, eventConsumer,
         eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter, logger);
   }
@@ -315,7 +315,7 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
     reset(storage);
-    stateManager = spy(new PersistentStateManager(
+    stateManager = spy(new QueuedStateManager(
         time, executor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
@@ -332,7 +332,7 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
     reset(storage);
-    stateManager = spy(new PersistentStateManager(
+    stateManager = spy(new QueuedStateManager(
         time, executor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
@@ -675,7 +675,7 @@ public class PersistentStateManagerTest {
     final Event dequeueEvent = Event.dequeue(INSTANCE, ImmutableSet.copyOf(resourceIds));
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resourceIds)));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
     try {
@@ -703,7 +703,7 @@ public class PersistentStateManagerTest {
 
     final Event dequeueEvent = Event.dequeue(INSTANCE,
         resources.stream().map(Resource::id).collect(toSet()));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
 
     try {
       spied.receive(dequeueEvent);
@@ -728,7 +728,7 @@ public class PersistentStateManagerTest {
         resources.stream().map(Resource::id).collect(toSet()));
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resourceIds)));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
 
     try {
       spied.receive(dequeueEvent);
@@ -842,7 +842,7 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldReceiveEventIgnoreClosed() throws IOException, IsClosedException {
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     spied.close();
 
     spied.receiveIgnoreClosed(Event.started(INSTANCE));
@@ -852,7 +852,7 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldReceiveEventIgnoreClosedWithCounter() throws IOException, IsClosedException {
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     spied.close();
 
     spied.receiveIgnoreClosed(Event.started(INSTANCE), 17);

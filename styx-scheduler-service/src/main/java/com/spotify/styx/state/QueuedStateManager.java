@@ -64,8 +64,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An implementation of {@link StateManager} that persists {@link RunState}s and performs transactional
- * state transitions using {@link Storage}.
+ * An implementation of {@link StateManager} that has an internal queue for all the incoming
+ * {@link Event}s that are sent to {@link #receive(Event)}.
  *
  * <p>The events are all processed on an injected {@link Executor}, but sequentially per
  * {@link WorkflowInstance}. This allows event processing to scale across many separate workflow
@@ -74,9 +74,10 @@ import org.slf4j.LoggerFactory;
  * <p>All {@link #outputHandler} transitions are also executed on the injected
  * {@link Executor}.
  */
-public class PersistentStateManager implements StateManager {
+// TODO: Remove "Queued" from name as there is no longer any queue \o/
+public class QueuedStateManager implements StateManager {
 
-  private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(PersistentStateManager.class);
+  private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(QueuedStateManager.class);
   private final Logger log;
 
   private static final long NO_EVENTS_PROCESSED = -1L;
@@ -93,7 +94,7 @@ public class PersistentStateManager implements StateManager {
 
   private volatile boolean running = true;
 
-  public PersistentStateManager(
+  public QueuedStateManager(
       Time time,
       ExecutorService executor,
       Storage storage,
@@ -105,7 +106,7 @@ public class PersistentStateManager implements StateManager {
         DEFAULT_LOG);
   }
 
-  public PersistentStateManager(
+  public QueuedStateManager(
       Time time,
       ExecutorService executor,
       Storage storage,
