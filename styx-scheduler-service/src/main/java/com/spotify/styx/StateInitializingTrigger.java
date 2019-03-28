@@ -31,6 +31,8 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,22 +50,22 @@ final class StateInitializingTrigger implements TriggerListener {
   }
 
   @Override
-  public void event(Workflow workflow, Trigger trigger, Instant instant,
-                    TriggerParameters parameters) {
+  public CompletionStage<Void> event(Workflow workflow, Trigger trigger, Instant instant,
+      TriggerParameters parameters) {
     if (!workflow.configuration().dockerImage().isPresent()) {
       LOG.warn("{} has no docker image, skipping", workflow.id());
-      return;
+      return CompletableFuture.completedFuture(null);
     }
 
     final String parameter = toParameter(workflow.configuration().schedule(), instant);
     final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
 
     try {
-      stateManager.trigger(workflowInstance, trigger, parameters);
+      return stateManager.trigger(workflowInstance, trigger, parameters);
     } catch (IsClosedException isClosedException) {
       LOG.warn("State receiver is closed when processing workflow {} for trigger {} at {}",
                workflow, trigger, instant, isClosedException);
-      throw new RuntimeException(isClosedException);
+      return CompletableFuture.failedFuture(isClosedException);
     }
   }
 }

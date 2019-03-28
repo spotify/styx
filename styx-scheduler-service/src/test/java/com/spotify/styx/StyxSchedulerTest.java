@@ -48,7 +48,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.state.PersistentStateManager;
+import com.spotify.styx.state.QueuedStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -92,7 +92,7 @@ public class StyxSchedulerTest {
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
-  @Mock private PersistentStateManager stateManager;
+  @Mock private QueuedStateManager stateManager;
   @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
   @Mock private RateLimiter submissionRateLimiter;
   @Mock private Stats stats;

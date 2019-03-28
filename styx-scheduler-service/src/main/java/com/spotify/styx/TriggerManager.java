@@ -55,6 +55,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import org.slf4j.Logger;
@@ -143,7 +144,13 @@ class TriggerManager implements Closeable {
     return guard(() -> {
       if (enabledWorkflows.contains(workflow.id())) {
         try {
-          triggerListener.event(workflow, Trigger.natural(), instantSpec.instant(), TriggerParameters.zero());
+          final CompletionStage<Void> processed = triggerListener.event(
+              workflow,
+              Trigger.natural(),
+              instantSpec.instant(),
+              TriggerParameters.zero());
+          // Wait for the event to be processed before proceeding to the next trigger
+          processed.toCompletableFuture().get();
         } catch (Exception e) {
           final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
               toParameter(workflow.configuration().schedule(), instantSpec.instant()));

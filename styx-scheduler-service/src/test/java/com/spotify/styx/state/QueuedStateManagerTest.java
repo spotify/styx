@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.arrayContaining;
@@ -37,9 +38,11 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -63,15 +66,19 @@ import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.CounterCapacityException;
+import com.spotify.styx.util.CounterSnapshot;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
+import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
@@ -86,7 +93,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
-public class PersistentStateManagerTest {
+public class QueuedStateManagerTest {
 
   private static final Instant NOW = Instant.parse("2017-01-02T01:02:03Z");
   private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
@@ -104,11 +111,11 @@ public class PersistentStateManagerTest {
       StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
 
-  private final ExecutorService executor = Executors.newWorkStealingPool();
+  private final StripedExecutorService eventTransitionExecutor = new StripedExecutorService(16);
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
 
-  private PersistentStateManager stateManager;
+  private QueuedStateManager stateManager;
 
   @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
@@ -126,14 +133,14 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
-    stateManager = new PersistentStateManager(
-        time, executor, storage, eventConsumer,
+    stateManager = new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
         eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter, logger);
   }
 
   @After
   public void tearDown() {
-    executor.shutdownNow();
+    eventTransitionExecutor.shutdownNow();
     eventConsumerExecutor.shutdownNow();
   }
 
@@ -181,7 +188,8 @@ public class PersistentStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, instanceStateFresh);
     verify(storage).writeEvent(SequenceEvent.create(
@@ -194,7 +202,8 @@ public class PersistentStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).writeActiveState(INSTANCE, INSTANCE_NEW_STATE);
     verify(storage).writeEvent(SequenceEvent.create(
@@ -209,7 +218,8 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
-    stateManager.receive(event);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -223,7 +233,8 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.halt(INSTANCE);
-    stateManager.receive(event);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -243,9 +254,11 @@ public class PersistentStateManagerTest {
         a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (AlreadyInitializedException ignore) {
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), is(instanceOf(AlreadyInitializedException.class)));
     }
   }
 
@@ -264,11 +277,12 @@ public class PersistentStateManagerTest {
     });
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(instanceOf(TransactionException.class)));
-      TransactionException cause = (TransactionException) e.getCause();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause().getCause(), is(instanceOf(TransactionException.class)));
+      TransactionException cause = (TransactionException) e.getCause().getCause();
       assertTrue(cause.isConflict());
     }
   }
@@ -278,9 +292,10 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
     }
   }
@@ -291,9 +306,10 @@ public class PersistentStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalArgumentException.class)));
     }
   }
@@ -305,9 +321,10 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(new IOException());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
     }
   }
@@ -315,16 +332,17 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
     reset(storage);
-    stateManager = spy(new PersistentStateManager(
-        time, executor, storage, eventConsumer,
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
     }
   }
@@ -332,17 +350,18 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
     reset(storage);
-    stateManager = spy(new PersistentStateManager(
-        time, executor, storage, eventConsumer,
+    stateManager = spy(new QueuedStateManager(
+        time, eventTransitionExecutor, storage, eventConsumer,
         eventConsumerExecutor, outputHandler, shardedCounter));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     doThrow(new IOException()).when(storage).deleteActiveState(any());
     doThrow(new IsClosedException()).when(stateManager).receive(any());
 
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
     }
   }
@@ -360,13 +379,49 @@ public class PersistentStateManagerTest {
   }
 
   @Test
+  public void shouldCloseGracefully() throws Exception {
+    Optional<RunState> runState = Optional.of(
+        RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
+    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
+
+    CompletableFuture<Void> barrier = new CompletableFuture<>();
+
+    reset(storage);
+    when(storage.runInTransaction(any())).thenAnswer(a -> {
+      barrier.get();
+      return a.<TransactionFunction>getArgument(0).apply(transaction);
+    });
+
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
+        .toCompletableFuture();
+
+    CompletableFuture.runAsync(() -> {
+      try {
+        stateManager.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    verify(storage, timeout(30_000)).runInTransaction(any());
+
+    barrier.complete(null);
+
+    f.get(1, MINUTES);
+
+    verify(outputHandler).transitionInto(any());
+    assertThat(runStateCaptor.getValue().state(), is(State.PREPARE));
+  }
+
+  @Test
   public void shouldWriteEvents() throws Exception {
     Event event = Event.started(INSTANCE);
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    stateManager.receive(event);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
   }
@@ -379,9 +434,11 @@ public class PersistentStateManagerTest {
         Optional.of(RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17)));
 
     try {
-      stateManager.receive(event, 16);
+      stateManager.receive(event, 16)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (StaleEventException ignore) {
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), is(instanceOf(StaleEventException.class)));
     }
 
     verify(storage, never()).writeEvent(any());
@@ -395,10 +452,13 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     try {
-      stateManager.receive(event, 18);
+      stateManager.receive(event, 18)
+          .toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (RuntimeException e) {
-      assertThat(e.getMessage(), startsWith("Unexpected current counter is less than last observed one for"));
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), is(instanceOf(RuntimeException.class)));
+      assertThat(e.getCause().getMessage(),
+          startsWith("Unexpected current counter is less than last observed one for"));
     }
 
     verify(storage, never()).writeEvent(any());
@@ -412,7 +472,8 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     Event event = Event.success(INSTANCE);
-    stateManager.receive(event);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).deleteActiveState(INSTANCE);
     verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
@@ -428,7 +489,8 @@ public class PersistentStateManagerTest {
     assertThat(stateManager.queuedEvents(), is(0L));
 
     Event event = Event.success(INSTANCE);
-    stateManager.receive(event);
+    stateManager.receive(event)
+        .toCompletableFuture().get(1, MINUTES);
 
     assertThat(stateManager.queuedEvents(), is(0L));
     verify(transaction).deleteActiveState(INSTANCE);
@@ -441,7 +503,8 @@ public class PersistentStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW, 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()))
+        .toCompletableFuture().get(1, MINUTES);
 
     verify(transaction).updateActiveState(INSTANCE, RunState.create(INSTANCE, State.PREPARE,
         StateData.newBuilder().resourceIds(ImmutableSet.of()).build(), NOW, 18));
@@ -453,11 +516,14 @@ public class PersistentStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
+    CompletableFuture<Void> f = stateManager.receive(Event.terminate(INSTANCE, Optional.empty()))
+        .toCompletableFuture();
 
     try {
-      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
+      f.get(1, MINUTES);
       fail();
-    } catch (IllegalStateException ignore) {
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(IllegalStateException.class));
     }
 
     verify(transaction, never()).updateActiveState(any(), any());
@@ -468,9 +534,9 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.empty());
 
     try {
-      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
-      fail();
-    } catch (IllegalArgumentException ignore) {
+      stateManager.receive(Event.terminate(INSTANCE, Optional.empty())).toCompletableFuture().get();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
     }
     verify(transaction, never()).updateActiveState(any(), any());
   }
@@ -524,10 +590,11 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
+    CompletableFuture<Void> f = stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS).toCompletableFuture();
     try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+      f.get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
   }
@@ -540,10 +607,11 @@ public class PersistentStateManagerTest {
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
-      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
+      f.get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
   }
@@ -556,9 +624,9 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L);
+      stateManager.receive(event, 4711L).get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug(
         "Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
@@ -573,9 +641,9 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L);
+      stateManager.receive(event, 4711L).get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug(
         "Transaction failure during workflow instance transition: {}, counter={}",
@@ -589,9 +657,9 @@ public class PersistentStateManagerTest {
     when(storage.runInTransaction(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
-      stateManager.receive(event, 4711L);
+      stateManager.receive(event, 4711L).get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug(
         "Failure during workflow instance transition: {}, counter={}",
@@ -606,9 +674,9 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug("Transaction conflict when triggering workflow instance. Aborted: {}",
         INSTANCE);
@@ -622,9 +690,9 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug("Transaction failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
@@ -637,9 +705,9 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransaction(any())).thenThrow(cause);
     try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
+      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS).toCompletableFuture().get();
       fail();
-    } catch (Exception ignore) {
+    } catch (ExecutionException ignore) {
     }
     verify(logger).debug("Failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
@@ -648,11 +716,13 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
+    Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
     doThrow(exception).when(storage).runInTransaction(any());
+    CompletableFuture<Void> f = stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())).toCompletableFuture();
     try {
-      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
+      f.get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e), is(exception));
     }
   }
@@ -669,19 +739,20 @@ public class PersistentStateManagerTest {
     givenState(INSTANCE, State.QUEUED);
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
+    final CounterSnapshot counterSnapshot = mock(CounterSnapshot.class);
 
     final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
     final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
     final Event dequeueEvent = Event.dequeue(INSTANCE, ImmutableSet.copyOf(resourceIds));
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resourceIds)));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
     try {
-      spied.receive(dequeueEvent);
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       // expected exception
     }
 
@@ -703,12 +774,12 @@ public class PersistentStateManagerTest {
 
     final Event dequeueEvent = Event.dequeue(INSTANCE,
         resources.stream().map(Resource::id).collect(toSet()));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
 
     try {
-      spied.receive(dequeueEvent);
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (Exception e) {
+    } catch (ExecutionException e) {
       // expected exception
     }
 
@@ -728,15 +799,17 @@ public class PersistentStateManagerTest {
         resources.stream().map(Resource::id).collect(toSet()));
     final Event infoEvent = Event.info(INSTANCE,
         Message.info(String.format("Resource limit reached for: %s", resourceIds)));
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
 
     try {
-      spied.receive(dequeueEvent);
+      spied.receive(dequeueEvent).toCompletableFuture().get(1, MINUTES);
       fail();
-    } catch (RuntimeException e) {
-      assertThat(e.getMessage(), is("Failed to update resource counter for workflow instance: "
+    } catch (ExecutionException e) {
+      final Throwable cause = e.getCause();
+      assertThat(cause, instanceOf(RuntimeException.class));
+      assertThat(cause.getMessage(), is("Failed to update resource counter for workflow instance: "
           + INSTANCE + ": [resource1]"));
-      assertThat(e.getSuppressed(), is(arrayContaining(rootCause)));
+      assertThat(cause.getSuppressed(), is(arrayContaining(rootCause)));
     }
 
     verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
@@ -842,7 +915,7 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldReceiveEventIgnoreClosed() throws IOException, IsClosedException {
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     spied.close();
 
     spied.receiveIgnoreClosed(Event.started(INSTANCE));
@@ -852,7 +925,7 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldReceiveEventIgnoreClosedWithCounter() throws IOException, IsClosedException {
-    final PersistentStateManager spied = spy(stateManager);
+    final QueuedStateManager spied = spy(stateManager);
     spied.close();
 
     spied.receiveIgnoreClosed(Event.started(INSTANCE), 17);
@@ -866,6 +939,6 @@ public class PersistentStateManagerTest {
   }
 
   public void receiveEvent(Event event) throws Exception {
-    stateManager.receive(event);
+    stateManager.receive(event).toCompletableFuture().get(1, MINUTES);
   }
 }

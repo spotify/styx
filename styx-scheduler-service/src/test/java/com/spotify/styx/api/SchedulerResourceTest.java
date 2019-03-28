@@ -33,8 +33,8 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,6 +47,7 @@ import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
@@ -68,6 +69,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import okio.ByteString;
 import org.junit.Before;
@@ -122,6 +124,8 @@ public class SchedulerResourceTest {
   @Before
   public void setUp() throws Exception {
     when(storage.workflow(WFI.workflowId())).thenReturn(Optional.of(FULL_DAILY_WORKFLOW));
+    when(stateManager.receive(any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(triggerListener.event(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
@@ -303,7 +307,8 @@ public class SchedulerResourceTest {
   }
 
   private Response<ByteString> retryFailureResponse(Throwable cause) throws Exception {
-    doThrow(cause).when(stateManager).receive(any());
+    when(stateManager.receive(any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(cause));
 
     ByteString eventPayload = serialize(WFI);
     CompletionStage<Response<ByteString>> post =
@@ -489,7 +494,7 @@ public class SchedulerResourceTest {
 
   @Test
   public void failTriggeringOnUnknownException() throws Exception {
-    final Exception exception = new RuntimeException("unknown exception!");
+    final Exception exception = new Exception("unknown exception!");
     failtriggeringOnException(DAILY_WORKFLOW, exception, Status.INTERNAL_SERVER_ERROR.withReasonPhrase(exception.getMessage()));
   }
 
@@ -548,7 +553,8 @@ public class SchedulerResourceTest {
     when(storage.workflow(wf.id())).thenReturn(Optional.of(wf));
     TriggerRequest toTrigger = TriggerRequest.of(wf.id(), "2015-12-31");
 
-    doThrow(e).when(triggerListener).event(any(), any(), any(), any());
+    when(triggerListener.event(any(), any(), any(), any())).thenReturn(
+        CompletableFutures.exceptionallyCompletedFuture(e));
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 

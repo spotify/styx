@@ -28,6 +28,7 @@ import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,7 @@ public interface StateManager extends Closeable {
    *
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  void trigger(WorkflowInstance workflowInstance, Trigger trigger,
+  CompletionStage<Void> trigger(WorkflowInstance workflowInstance, Trigger trigger,
       TriggerParameters parameters) throws IsClosedException;
 
   /**
@@ -59,7 +60,7 @@ public interface StateManager extends Closeable {
    * @param event The event to receive
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  void receive(Event event) throws IsClosedException;
+  CompletionStage<Void> receive(Event event) throws IsClosedException;
 
   /**
    * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
@@ -69,7 +70,7 @@ public interface StateManager extends Closeable {
    * @param counter The state counter upon which the event must act upon
    * @throws IsClosedException if the state receiver is closed and can not handle events
    */
-  void receive(Event event, long counter) throws IsClosedException;
+  CompletionStage<Void> receive(Event event, long counter) throws IsClosedException;
 
   /**
    * Get a map of all active {@link WorkflowInstance} states filtered by triggerId.
