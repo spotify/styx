@@ -27,6 +27,9 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
+import static com.spotify.styx.util.GuardedRunnable.guard;
+import static java.util.concurrent.CompletableFuture.runAsync;
+import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
@@ -97,7 +100,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -381,7 +383,7 @@ class KubernetesDockerRunner implements DockerRunner {
     env.put(LOGGING, "structured");
     return env.entrySet().stream()
         .map(entry -> envVar(entry.getKey(), entry.getValue()))
-        .collect(Collectors.toList());
+        .collect(toList());
   }
 
   @Override
@@ -532,23 +534,23 @@ class KubernetesDockerRunner implements DockerRunner {
    */
   @VisibleForTesting
   void tryCleanupPods() {
-    var pods = client.pods().list().getItems();
+    client.pods().list().getItems().stream()
+        .map(pod -> runAsync(guard(() -> tryCleanupPod(pod)), eventExecutor))
+        .collect(toList())
+        .forEach(CompletableFuture::join);
+  }
 
-    for (var pod : pods) {
-      var workflowInstance = readPodWorkflowInstance(pod);
-      if (workflowInstance.isEmpty()) {
-        continue;
-      }
-
-      var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
-
-      var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
-                         ? shouldDeletePodWithRunState(workflowInstance.get(), pod, runState.orElseThrow())
-                         : shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
-
-      if (shouldDelete) {
-        client.pods().delete(pod);
-      }
+  private void tryCleanupPod(Pod pod) {
+    var workflowInstance = readPodWorkflowInstance(pod);
+    if (workflowInstance.isEmpty()) {
+      return;
+    }
+    var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
+    var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
+                       ? shouldDeletePodWithRunState(workflowInstance.get(), pod, runState.orElseThrow())
+                       : shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
+    if (shouldDelete) {
+      client.pods().delete(pod);
     }
   }
 
@@ -684,9 +686,9 @@ class KubernetesDockerRunner implements DockerRunner {
           .map(podName -> {
             // Remove from change set before processing in order to not lose updates
             final WorkflowInstance instance = podUpdates.remove(podName);
-            return CompletableFuture.runAsync(() -> processPodUpdate(podName, instance), eventExecutor);
+            return runAsync(() -> processPodUpdate(podName, instance), eventExecutor);
           })
-          .collect(Collectors.toList())
+          .collect(toList())
           .forEach(CompletableFuture::join);
     }
 
