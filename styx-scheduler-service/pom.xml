@@ -46,10 +46,6 @@
       <artifactId>javaslang</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.kabutz</groupId>
-      <artifactId>javaspecialists</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
     </dependency>

@@ -73,7 +73,7 @@ import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.monitoring.TracingProxy;
 import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.OutputHandler;
-import com.spotify.styx.state.QueuedStateManager;
+import com.spotify.styx.state.PersistentStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
@@ -100,7 +100,6 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
-import eu.javaspecialists.tjsn.concurrency.stripedexecutor.StripedExecutorService;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -119,7 +118,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -147,7 +145,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   public static final String STYX_MODE = "styx.mode";
   public static final String STYX_MODE_DEVELOPMENT = "development";
-  public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
+  public static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
   public static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
@@ -155,7 +153,7 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_ENVIRONMENT = "styx.environment";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
-  public static final int DEFAULT_STYX_EVENT_PROCESSING_THREADS = 32;
+  public static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
   public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
   public static final Duration DEFAULT_STATE_MANAGER_TICK_INTERVAL = Duration.ofSeconds(15);
@@ -351,9 +349,9 @@ public class StyxScheduler implements AppInit {
     // TODO: is the shutdown timeout of 1 second here sane?
     final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
     closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
-    final StripedExecutorService eventProcessingExecutor = new StripedExecutorService(
-        optionalInt(config, STYX_EVENT_PROCESSING_THREADS).orElse(DEFAULT_STYX_EVENT_PROCESSING_THREADS));
-    closer.register(closeable(eventProcessingExecutor, "event-processing", Duration.ofSeconds(1)));
+    var stateProcessingExecutor = Executors.newWorkStealingPool(
+        optionalInt(config, STYX_STATE_PROCESSING_THREADS).orElse(DEFAULT_STYX_STATE_PROCESSING_THREADS));
+    closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(1)));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(closeable(eventConsumerExecutor, "event-consumer", Duration.ofSeconds(1)));
     final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
@@ -381,7 +379,7 @@ public class StyxScheduler implements AppInit {
         eventConsumerFactory.apply(environment, stats),
         new PublisherHandler(publisher, stats),
         new TransitionLogger());
-    var queuedStateManager = closer.register(new QueuedStateManager(time, eventProcessingExecutor,
+    var queuedStateManager = closer.register(new PersistentStateManager(time, stateProcessingExecutor,
         storage, eventConsumer, eventConsumerExecutor, fanOutput(outputHandlers),
         shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
@@ -478,8 +476,8 @@ public class StyxScheduler implements AppInit {
   }
 
   @VisibleForTesting
-  CompletionStage<Void> receive(Event event) throws IsClosedException {
-    return stateManager.receive(event);
+  void receive(Event event) throws IsClosedException {
+    stateManager.receive(event);
   }
 
   @VisibleForTesting
@@ -551,7 +549,7 @@ public class StyxScheduler implements AppInit {
 
   @VisibleForTesting
   static void setupMetrics(
-      QueuedStateManager stateManager,
+      PersistentStateManager stateManager,
       Supplier<Map<WorkflowId, Workflow>> workflowCache,
       Storage storage,
       RateLimiter submissionRateLimiter,
