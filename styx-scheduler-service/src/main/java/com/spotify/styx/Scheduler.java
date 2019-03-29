@@ -351,10 +351,4 @@ public class Scheduler {
     var dequeue = Event.dequeue(workflowInstance, resourceIds);
     stateManager.receiveIgnoreClosed(dequeue, state.counter());
   }
-
-  private void sendTimeout(WorkflowInstance workflowInstance, RunState runState) {
-    LOG.info("Found stale state {} since {} for workflow {}; Issuing a timeout",
-        runState.state(), Instant.ofEpochMilli(runState.timestamp()), workflowInstance);
-    stateManager.receiveIgnoreClosed(Event.timeout(workflowInstance), runState.counter());
-  }
 }
