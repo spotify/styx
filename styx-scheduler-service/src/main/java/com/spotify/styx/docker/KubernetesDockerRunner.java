@@ -25,22 +25,12 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslator.imageError;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.isTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
-import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
-import static com.spotify.styx.util.GuardedRunnable.runGuarded;
-import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.rholder.retry.Attempt;
-import com.github.rholder.retry.RetryException;
-import com.github.rholder.retry.Retryer;
-import com.github.rholder.retry.RetryerBuilder;
-import com.github.rholder.retry.StopStrategies;
-import com.github.rholder.retry.WaitStrategies;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.model.Event;
@@ -67,7 +57,6 @@ import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
-import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodSpecBuilder;
 import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.QuantityBuilder;
@@ -93,7 +82,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +91,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -134,7 +121,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final String ENVIRONMENT = "STYX_ENVIRONMENT";
   static final String LOGGING = "STYX_LOGGING";
-  private static final int DEFAULT_POLL_PODS_INTERVAL_SECONDS = 60;
+  private static final int DEFAULT_POD_CLEANUP_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Duration PROCESS_POD_UPDATE_INTERVAL = Duration.ofSeconds(5);
   private static final int K8S_EVENT_PROCESSING_THREADS = 32;
@@ -162,7 +149,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
   private final String styxEnvironment;
-  private final Duration pollPodsInterval;
+  private final Duration cleanupPodsInterval;
   private final Duration podDeletionDelay;
   private final Time time;
   private final ExecutorService eventExecutor;
@@ -172,7 +159,7 @@ class KubernetesDockerRunner implements DockerRunner {
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
-                         int pollPodsIntervalSeconds, int podDeletionDelaySeconds,
+                         int cleanupPodsIntervalSeconds, int podDeletionDelaySeconds,
                          Time time, ScheduledExecutorService executor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
@@ -180,7 +167,7 @@ class KubernetesDockerRunner implements DockerRunner {
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
     this.debug = debug;
     this.styxEnvironment = styxEnvironment;
-    this.pollPodsInterval = Duration.ofSeconds(pollPodsIntervalSeconds);
+    this.cleanupPodsInterval = Duration.ofSeconds(cleanupPodsIntervalSeconds);
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
     this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
@@ -192,7 +179,7 @@ class KubernetesDockerRunner implements DockerRunner {
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
-        DEFAULT_POLL_PODS_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
+        DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
@@ -210,6 +197,20 @@ class KubernetesDockerRunner implements DockerRunner {
         throw new IOException("Failed to create Kubernetes pod", kce);
       }
     }
+  }
+
+  @Override
+  public void poll(RunState runState) {
+    var executionId = runState.data().executionId().orElseThrow(IllegalArgumentException::new);
+    var pod = client.pods().withName(executionId).get();
+    if (pod == null) {
+      // No pod found. Emit an error guarded by the state counter we are basing the error conclusion on.
+      stateManager.receiveIgnoreClosed(
+          Event.runError(runState.workflowInstance(), "No pod associated with this instance"), runState.counter());
+      return;
+    }
+    logEvent(Watcher.Action.MODIFIED, pod, pod.getMetadata().getResourceVersion(), true);
+    emitPodEvents(pod, runState);
   }
 
   @Override
@@ -504,32 +505,8 @@ class KubernetesDockerRunner implements DockerRunner {
     closer.close();
   }
 
-  @Override
-  public void restore() {
-    // Failing here means restarting the styx scheduler and replaying all events again. This is
-    // quite time consuming and distressing when deploying, so try hard.
-    final Retryer<Object> retryer = RetryerBuilder.newBuilder()
-        .retryIfException()
-        .withWaitStrategy(WaitStrategies.exponentialWait(10, TimeUnit.SECONDS))
-        .withStopStrategy(StopStrategies.stopAfterAttempt(10))
-        .withRetryListener(this::onRestorePollPodsAttempt)
-        .build();
-
-    try {
-      retryer.call(Executors.callable(this::tryPollPods));
-    } catch (ExecutionException | RetryException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private <V> void onRestorePollPodsAttempt(Attempt<V> attempt) {
-    if (attempt.hasException()) {
-      LOG.warn("restore: failed polling pods, attempt = {}", attempt.getAttemptNumber(), attempt.getExceptionCause());
-    }
-  }
-
   public void init() {
-    scheduleWithJitter(this::pollPods, executor, pollPodsInterval);
+    scheduleWithJitter(this::cleanupPods, executor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
     scheduleWithJitter(watcher::processPodUpdates, executor, PROCESS_POD_UPDATE_INTERVAL);
@@ -537,91 +514,42 @@ class KubernetesDockerRunner implements DockerRunner {
     watch = client.pods().watch(watcher);
   }
 
-  private void examineRunningWFISandAssociatedPods(Map<WorkflowInstance, RunState> activeStates,
-                                                   PodList podList) {
-
-    final Map<WorkflowInstance, RunState> runningWorkflowInstances = Maps.filterValues(activeStates, runState ->
-        runState.state().equals(RUNNING) && runState.data().executionId().isPresent());
-
-    final Set<WorkflowInstance> workflowInstancesForPods = podList.getItems().stream()
-        .map(pod -> pod.getMetadata().getAnnotations())
-        .filter(Objects::nonNull)
-        .map(annotations -> annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION))
-        .filter(Objects::nonNull)
-        .map(WorkflowInstance::parseKey)
-        .collect(toSet());
-
-    // Emit errors for workflow instances that seem to be missing its pod
-    runningWorkflowInstances.forEach((workflowInstance, runState) -> {
-
-      // Is there a matching pod in the list? Bail.
-      if (workflowInstancesForPods.contains(workflowInstance)) {
-        return;
-      }
-
-      // The pod list might be stale so explicitly look for a pod using the execution ID.
-      final String executionId = runState.data().executionId().get();
-      final Pod pod = client.pods().withName(executionId).get();
-
-      // We found a pod? Bail.
-      if (pod != null) {
-        return;
-      }
-
-      // No pod found. Emit an error guarded by the state counter we are basing the error conclusion on.
-      stateManager.receiveIgnoreClosed(
-          Event.runError(workflowInstance, "No pod associated with this instance"), runState.counter());
-    });
-  }
-
-  private void pollPods() {
+  private void cleanupPods() {
     try {
-      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.pollPods")
+      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.cleanupPods")
           .setRecordEvents(true)
           .setSampler(Samplers.alwaysSample())
           .startScopedSpan()) {
-        tryPollPods();
+        tryCleanupPods();
       }
     } catch (Throwable t) {
-      LOG.warn("Error while polling pods", t);
+      LOG.warn("Error while cleaning pods", t);
     }
   }
 
+  /**
+   * Deletes stale workflow instance execution pods.
+   */
   @VisibleForTesting
-  synchronized void tryPollPods() {
-    // Fetch pods _before_ fetching all active states
-    final PodList list = client.pods().list();
-    final Map<WorkflowInstance, RunState> activeStates = stateManager.getActiveStates();
-      
-    // Note: Avoid blocking during the processing of the above fetched run states in order to prevent them
-    //       from going stale and losing races due to concurrent processing with other schedulers.
-      
-    examineRunningWFISandAssociatedPods(activeStates, list);
+  void tryCleanupPods() {
+    var pods = client.pods().list().getItems();
 
-    var podsToDelete = new ArrayList<String>();
-    for (Pod pod : list.getItems()) {
-      logEvent(Watcher.Action.MODIFIED, pod, list.getMetadata().getResourceVersion(), true);
-      final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
-      if (!workflowInstance.isPresent()) {
+    for (var pod : pods) {
+      var workflowInstance = readPodWorkflowInstance(pod);
+      if (workflowInstance.isEmpty()) {
         continue;
       }
 
-      final RunState runState = activeStates.get(workflowInstance.get());
-      final boolean shouldDeletePod;
-      if (runState != null && isPodRunState(pod, runState)) {
-        emitPodEvents(pod, runState);
-        shouldDeletePod = shouldDeletePodWithRunState(workflowInstance.get(), pod, runState);
-      } else {
-        // The pod is stale as we fetched the active states _after_ listing all pods.
-        shouldDeletePod = shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
-      }
-      if (shouldDeletePod) {
-        podsToDelete.add(pod.getMetadata().getName());
+      var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
+
+      var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
+                         ? shouldDeletePodWithRunState(workflowInstance.get(), pod, runState.orElseThrow())
+                         : shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
+
+      if (shouldDelete) {
+        client.pods().delete(pod);
       }
     }
-
-    // Do blocking pod deletion after emitting events in order to avoid run states going stale. See note above.
-    podsToDelete.forEach(name -> runGuarded(() -> client.pods().withName(name).delete()));
   }
 
   private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {

@@ -27,6 +27,7 @@ import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -702,10 +703,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   }
   }
 
+  // TODO: rewrite
   @RunWith(JUnitParamsRunner.class)
-  public static class RestoresContainerStateWhenStartingTest extends SystemTest {
+  public static class PollsPodStateWhenStartingTest extends SystemTest {
   @Test
-  public void restoresContainerStateWhenStarting() throws Exception {
+  public void pollsPodStateWhenStarting() throws Exception {
     WorkflowInstance workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T14");
 
     givenTheTimeIs("2016-03-14T15:17:45Z");
@@ -719,8 +721,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     styxStarts();
 
-    // Verify that styx tells the runner to restore container state
-    assertThat(dockerRestores.get(), is(1));
+    timePasses(1, MINUTES);
+
+    // Verify that styx polled for execution status
+    assertThat(dockerPolls.size(), is(greaterThanOrEqualTo(1)));
 
     // Simulate the runner emitting a successful termination event
     injectEvent(Event.terminate(workflowInstance, Optional.of(0)));

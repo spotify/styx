@@ -73,7 +73,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -111,7 +110,7 @@ public class StyxSchedulerServiceFixture {
   // captured fields from fakes
   Queue<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = new ConcurrentLinkedQueue();
   Queue<String> dockerCleans = new ConcurrentLinkedQueue();
-  AtomicInteger dockerRestores = new AtomicInteger();
+  Queue<RunState> dockerPolls = new ConcurrentLinkedQueue();
 
   // service and helper
   private StyxScheduler styxScheduler;
@@ -422,14 +421,15 @@ public class StyxSchedulerServiceFixture {
 
   private DockerRunner fakeDockerRunner() {
     return new DockerRunner() {
-      @Override
-      public void restore() {
-        dockerRestores.incrementAndGet();
-      }
 
       @Override
       public void start(WorkflowInstance workflowInstance, RunSpec runSpec) {
         dockerRuns.add(Tuple.of(workflowInstance, runSpec));
+      }
+
+      @Override
+      public void poll(RunState runState) {
+        dockerPolls.add(runState);
       }
 
       @Override

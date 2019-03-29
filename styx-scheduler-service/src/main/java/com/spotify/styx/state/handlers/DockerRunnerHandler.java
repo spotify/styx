@@ -96,6 +96,11 @@ public class DockerRunnerHandler implements OutputHandler {
         }
         break;
 
+      case SUBMITTED:
+      case RUNNING:
+        dockerRunner.poll(state);
+        break;
+
       case TERMINATED:
       case FAILED:
       case ERROR:

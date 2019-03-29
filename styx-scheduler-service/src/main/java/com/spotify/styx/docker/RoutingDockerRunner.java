@@ -23,6 +23,7 @@ package com.spotify.styx.docker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
@@ -47,13 +48,13 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void restore() {
-    runner().restore();
+  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+    runner().start(workflowInstance, runSpec);
   }
 
   @Override
-  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    runner().start(workflowInstance, runSpec);
+  public void poll(RunState runState) {
+    runner().poll(runState);
   }
 
   @Override

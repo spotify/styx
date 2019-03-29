@@ -24,6 +24,7 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
@@ -48,17 +49,18 @@ public interface DockerRunner extends Closeable {
   Logger LOG = LoggerFactory.getLogger(DockerRunner.class);
 
   /**
-   * Fetch workflow instance state from execution engine and emit events as needed. For use when
-   * when booting in order to recover executions that completed while styx was offline.
-   */
-  void restore();
-
-  /**
    * Starts a workflow instance asynchronously.
    * @param workflowInstance The workflow instance that the run belongs to
    * @param runSpec          Specification of what to run
    */
   void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
+
+  /**
+   * Check the status of a workflow instance execution.
+   *
+   * @param runState         The run state of the instance.
+   */
+  void poll(RunState runState);
 
   /**
    * Perform cleanup for resources such as secrets etc. Resources that are not in use by any currently live workflows

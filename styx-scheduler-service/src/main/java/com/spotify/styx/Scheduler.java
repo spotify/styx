@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
-import static com.spotify.styx.state.StateUtil.hasTimedOut;
 import static com.spotify.styx.state.StateUtil.workflowResources;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static java.util.function.Function.identity;
@@ -101,7 +100,6 @@ public class Scheduler {
   private static final Tracer tracer = Tracing.getTracer();
 
   private final Time time;
-  private final TimeoutConfig ttls;
   private final StateManager stateManager;
   private final Storage storage;
   private final WorkflowResourceDecorator resourceDecorator;
@@ -111,11 +109,10 @@ public class Scheduler {
   private final ShardedCounter shardedCounter;
   private final Executor executor;
 
-  public Scheduler(Time time, TimeoutConfig ttls, StateManager stateManager, Storage storage,
-      WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-      WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor) {
+  public Scheduler(Time time, StateManager stateManager, Storage storage,
+                   WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
+                   WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor) {
     this.time = Objects.requireNonNull(time);
-    this.ttls = Objects.requireNonNull(ttls);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
@@ -220,6 +217,19 @@ public class Scheduler {
     }
     var runState = runStateOpt.orElseThrow();
 
+    // Look up the resources that are used by this workflow
+    // Account current resource usage
+    if (StateUtil.isConsumingResources(runState.state())) {
+      runState.data().resourceIds().ifPresent(ids -> ids.forEach(currentResourceUsage::incrementAndGet));
+    }
+
+    // Exit if this instance is not eligible for dequeue
+    if (!shouldExecute(runState)) {
+      return;
+    }
+
+    LOG.debug("Evaluating instance for dequeue: {}", instance);
+
     // Get the workflow configuration
     var workflowOpt = workflows.computeIfAbsent(instance.workflowId(), this::readWorkflow);
     var workflowConfig = workflowOpt
@@ -231,28 +241,9 @@ public class Scheduler {
             .schedule(Schedule.parse(""))
             .build());
 
-    // Check if the instance has timed out
-    if (hasTimedOut(workflowOpt, runState, time.get(), ttls.ttlOf(runState.state()))) {
-      sendTimeout(instance, runState);
-      return;
-    }
-
-    // Look up the resources that are used by this workflow
     var workflowResourceRefs = workflowResources(config.globalConcurrency().isPresent(), workflowOpt);
     var instanceResourceRefs = resourceDecorator.decorateResources(
         runState, workflowConfig, workflowResourceRefs);
-
-    // Account current resource usage
-    if (StateUtil.isConsumingResources(runState.state())) {
-      instanceResourceRefs.forEach(currentResourceUsage::incrementAndGet);
-    }
-
-    // Exit if this instance is not eligible for dequeue
-    if (!shouldExecute(runState)) {
-      return;
-    }
-
-    LOG.debug("Evaluating instance for dequeue: {}", instance);
 
     var unknownResources = instanceResourceRefs.stream()
         .filter(resourceRef -> !resources.containsKey(resourceRef))

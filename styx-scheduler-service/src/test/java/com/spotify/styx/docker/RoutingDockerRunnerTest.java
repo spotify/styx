@@ -30,13 +30,18 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class RoutingDockerRunnerTest {
 
   static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
@@ -50,6 +55,7 @@ public class RoutingDockerRunnerTest {
   Supplier<String> dockerId = mock(Supplier.class);
 
   DockerRunner dockerRunner;
+  @Mock private RunState runState;
 
   @Before
   public void setUp() throws Exception {
@@ -63,6 +69,15 @@ public class RoutingDockerRunnerTest {
 
     assertThat(createdRunners, hasKey("default"));
     verify(createdRunners.get("default")).start(WORKFLOW_INSTANCE, RUN_SPEC);
+  }
+
+  @Test
+  public void testUsesCreatesRunnerOnPoll() throws Exception {
+    when(dockerId.get()).thenReturn("default");
+    dockerRunner.poll(runState);
+
+    assertThat(createdRunners, hasKey("default"));
+    verify(createdRunners.get("default")).poll(runState);
   }
 
   @Test
@@ -81,15 +96,6 @@ public class RoutingDockerRunnerTest {
 
     assertThat(createdRunners, hasKey("default"));
     verify(createdRunners.get("default")).cleanup();
-  }
-
-  @Test
-  public void testUsesDefaultRunnerOnRestore() throws Exception {
-    when(dockerId.get()).thenReturn("default");
-    dockerRunner.restore();
-
-    assertThat(createdRunners, hasKey("default"));
-    verify(createdRunners.get("default")).restore();
   }
 
   @Test

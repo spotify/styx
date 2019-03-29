@@ -46,15 +46,17 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
 import java.time.Instant;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class DockerRunnerHandlerTest {
 
   private static final Instant NOW = Instant.now();
@@ -77,6 +79,7 @@ public class DockerRunnerHandlerTest {
 
   @Before
   public void setUp() {
+    MockitoAnnotations.initMocks(this);
     dockerRunnerHandler = new DockerRunnerHandler(dockerRunner, stateManager);
   }
 
@@ -216,6 +219,21 @@ public class DockerRunnerHandlerTest {
 
     verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
+
+  @Parameters({"SUBMITTED", "RUNNING"})
+  @Test
+  public void shouldPollWhenRunning(State state) {
+    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
+    Workflow workflow = Workflow.create("id", workflowConfiguration);
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    RunState runState = RunState.create(workflowInstance, state,
+        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
+
+    dockerRunnerHandler.transitionInto(runState);
+
+    verify(dockerRunner).poll(runState);
+  }
+
 
   private WorkflowConfiguration configuration(String... args) {
     return WorkflowConfiguration.builder()

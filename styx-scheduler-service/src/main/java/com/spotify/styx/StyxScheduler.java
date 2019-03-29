@@ -82,6 +82,7 @@ import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
 import com.spotify.styx.state.handlers.PublisherHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
+import com.spotify.styx.state.handlers.TimeoutHandler;
 import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.InMemStorage;
@@ -401,12 +402,19 @@ public class StyxScheduler implements AppInit {
         .withMaxRunningTimeoutLimit(runningStateTtl)
         .build();
 
+    // These output handlers will be invoked in order.
     outputHandlers.addAll(List.of(
-        new DockerRunnerHandler(
-            dockerRunner, stateManager),
+        new DockerRunnerHandler(dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
-        new ExecutionDescriptionHandler(storage, stateManager, workflowValidator)));
+        new ExecutionDescriptionHandler(storage, stateManager, workflowValidator),
+
+        // Emit timeouts last in order to not over-eagerly time out an instance that
+        // will be transitioned by another handler. In situations where the styx scheduler comes back up after
+        // an extended downtime, many k8s pods will be completed and would transition the instance into done.
+        // However, many of those instances would _also_ technically have timed out according to wall clock and
+        // the TimeoutHandler would fail them if allowed to run first.
+        new TimeoutHandler(timeoutConfig, time, stateManager, storage)));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -416,7 +424,7 @@ public class StyxScheduler implements AppInit {
     final BackfillTriggerManager backfillTriggerManager =
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
-    final Scheduler scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator, stats,
+    final Scheduler scheduler = new Scheduler(time, stateManager, storage, resourceDecorator, stats,
         dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
@@ -430,7 +438,6 @@ public class StyxScheduler implements AppInit {
     final Duration stateManagerTickInterval = get(config, config::getDuration, STYX_STATE_MANAGER_TICK_INTERVAL)
         .orElse(DEFAULT_STATE_MANAGER_TICK_INTERVAL);
 
-    dockerRunner.restore();
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
     startBackfillTriggerManager(backfillTriggerManager, tickExecutor, triggerTickInterval);
     startScheduler(scheduler, tickExecutor, schedulerTickInterval);
