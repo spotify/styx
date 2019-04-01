@@ -25,7 +25,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import java.time.Duration;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import javaslang.control.Try;
 
@@ -57,10 +56,6 @@ public class CachedSupplier<T> implements Supplier<T> {
 
   @Override
   public T get() {
-    try {
-      return cache.get(Boolean.TRUE);
-    } catch (ExecutionException e) {
-      throw new RuntimeException(e);
-    }
+    return Try.of(() -> cache.get(Boolean.TRUE)).get();
   }
 }
