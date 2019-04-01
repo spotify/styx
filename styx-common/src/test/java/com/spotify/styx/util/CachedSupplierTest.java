@@ -20,6 +20,7 @@
 
 package com.spotify.styx.util;
 
+import static java.time.temporal.ChronoUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -76,12 +77,15 @@ public class CachedSupplierTest {
   public void testCacheTimesOut() throws Throwable {
     int a = sut.get();
     x = 100;
-    instant = Instant.parse("2016-10-17T15:00:11Z");
+    instant = instant.plus(9, SECONDS);
     int b = sut.get();
+    instant = instant.plus(2, SECONDS);
+    int c = sut.get();
 
     verify(delegate, times(2)).get();
     assertThat(a, is(42));
-    assertThat(b, is(100));
+    assertThat(b, is(42));
+    assertThat(c, is(100));
   }
 
   @Test
@@ -119,5 +123,22 @@ public class CachedSupplierTest {
     assertThat(f2.join(), is(17));
 
     verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void defaultTimeout() throws Throwable {
+    sut = new CachedSupplier<>(delegate, time);
+
+    var a = sut.get();
+    x = 100;
+    instant = instant.plus(29, SECONDS);
+    var b = sut.get();
+    instant = instant.plus(2, SECONDS);
+    var c = sut.get();
+
+    verify(delegate, times(2)).get();
+    assertThat(a, is(42));
+    assertThat(b, is(42));
+    assertThat(c, is(100));
   }
 }
