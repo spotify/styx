@@ -547,8 +547,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
     var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
     var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
-                       ? shouldDeletePodWithRunState(workflowInstance.get(), pod, runState.orElseThrow())
-                       : shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
+                       ? shouldDeletePodWithRunState(workflowInstance.orElseThrow(), pod, runState.orElseThrow())
+                       : shouldDeletePodWithoutRunState(workflowInstance.orElseThrow(), pod);
     if (shouldDelete) {
       client.pods().delete(pod);
     }
