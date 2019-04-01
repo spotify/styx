@@ -222,7 +222,7 @@ public class DockerRunnerHandlerTest {
 
   @Parameters({"SUBMITTED", "RUNNING"})
   @Test
-  public void shouldPollWhenRunning(State state) {
+  public void shouldPollWhenStarted(State state) {
     WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
