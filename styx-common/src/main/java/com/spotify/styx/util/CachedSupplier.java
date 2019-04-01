@@ -20,6 +20,7 @@
 
 package com.spotify.styx.util;
 
+import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,6 +31,9 @@ import org.slf4j.LoggerFactory;
 /**
  * A decorator for a supplier function that will cache the returned value during some
  * configurable time.
+ * <p>
+ * Note: This could be replaced with {@link Suppliers#memoizeWithExpiration} if it wasn't for the need
+ *  to be able to inject a synthetic time for test purposes.
  */
 public class CachedSupplier<T> implements Supplier<T> {
 
@@ -41,6 +45,7 @@ public class CachedSupplier<T> implements Supplier<T> {
   private final long timeoutMillis;
 
   private final AtomicReference<T> cachedValue = new AtomicReference<>();
+  private final Object lock = new Object() {};
   private volatile long cacheTime;
 
   public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time) {
@@ -52,6 +57,7 @@ public class CachedSupplier<T> implements Supplier<T> {
     this.time = Objects.requireNonNull(time);
     this.timeoutMillis = timeoutMillis;
 
+    // TODO: use System.nanoTime instead.
     cacheTime = time.get().toEpochMilli();
   }
 
@@ -59,23 +65,38 @@ public class CachedSupplier<T> implements Supplier<T> {
   public T get() {
     T value = cachedValue.get();
 
-    // does not have to guarantee synchronous update, we rely on the atomic reference
-    if (value == null || timedOut()) {
+    if (value != null && !timedOut()) {
+      return value;
+    }
+
+    return getSynchronized();
+  }
+
+  /**
+   * Synchronize on updating the cached value to avoid potentially many redundant and concurrent fetches/computations.
+   * The use of {@link CachedSupplier} is a strong indicator that fetching/computing the value is expensive and hence
+   * it makes sense to try hard to avoid doing it too much.
+   */
+  private T getSynchronized() {
+    synchronized (lock) {
+      final T value = cachedValue.get();
+      if (value != null && !timedOut()) {
+        return value;
+      }
       try {
         final T newValue = delegate.get();
         cachedValue.set(newValue);
         cacheTime = time.get().toEpochMilli();
-        value = newValue;
+        return newValue;
       } catch (Throwable e) {
         if (value == null) {
           throw Throwables.propagate(e);
         } else {
           LOG.warn("Failed to update from delegate supplier, using old value", e);
+          return value;
         }
       }
     }
-
-    return value;
   }
 
   private boolean timedOut() {
