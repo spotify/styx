@@ -74,6 +74,22 @@ public class CachedSupplierTest {
   }
 
   @Test
+  public void testReturnsOldValueIfDelegateFails() throws Throwable {
+    int a = sut.get();
+    instant = instant.plus(20, SECONDS);
+    when(delegate.get()).then(__ -> {
+      throw new RuntimeException("Fail!"); });
+    int b = sut.get();
+    int c = sut.get();
+
+    verify(delegate, times(3)).get();
+
+    assertThat(a, is(42));
+    assertThat(b, is(42));
+    assertThat(c, is(42));
+  }
+
+  @Test
   public void testCacheTimesOut() throws Throwable {
     int a = sut.get();
     x = 100;

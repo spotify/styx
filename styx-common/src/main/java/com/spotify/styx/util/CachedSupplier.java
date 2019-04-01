@@ -44,7 +44,7 @@ public class CachedSupplier<T> implements Supplier<T> {
 
   CachedSupplier(Try.CheckedSupplier<T> delegate, Time time, Duration timeout) {
     this.cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(timeout)
+        .refreshAfterWrite(timeout)
         .ticker(new Ticker() {
           @Override
           public long read() {
