@@ -25,17 +25,18 @@ import static com.spotify.styx.state.StateUtil.hasTimedOut;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
-import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,30 +51,21 @@ public class TimeoutHandler implements OutputHandler {
   private final TimeoutConfig ttls;
   private final Time time;
   private final StateManager stateManager;
-  private final Storage storage;
+  private final Supplier<Map<WorkflowId, Workflow>> workflows;
 
   public TimeoutHandler(TimeoutConfig ttls, Time time, StateManager stateManager,
-                        Storage storage) {
+                        Supplier<Map<WorkflowId, Workflow>> workflows) {
     this.ttls = Objects.requireNonNull(ttls, "ttls");
     this.time = Objects.requireNonNull(time, "time");
     this.stateManager = Objects.requireNonNull(stateManager, "stateManager");
-    this.storage = Objects.requireNonNull(storage, "storage");
+    this.workflows = Objects.requireNonNull(workflows, "workflows");
   }
 
   @Override
   public void transitionInto(RunState runState) {
-    // TODO: cache the workflow ttl configuration
-    var workflowOpt = getWorkflow(runState);
-    if (hasTimedOut(workflowOpt, runState, time.get(), ttls.ttlOf(runState.state()))) {
+    var workflow = Optional.ofNullable(workflows.get().get(runState.workflowInstance().workflowId()));
+    if (hasTimedOut(workflow, runState, time.get(), ttls.ttlOf(runState.state()))) {
       sendTimeout(runState.workflowInstance(), runState);
-    }
-  }
-
-  private Optional<Workflow> getWorkflow(RunState runState) {
-    try {
-      return storage.workflow(runState.workflowInstance().workflowId());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 

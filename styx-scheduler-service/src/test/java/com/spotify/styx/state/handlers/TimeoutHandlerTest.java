@@ -33,15 +33,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
-import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
+import java.util.Map;
+import java.util.function.Supplier;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -58,19 +60,19 @@ public class TimeoutHandlerTest {
   private long counter = 17;
 
   @Mock private StateManager stateManager;
-  @Mock private Storage storage;
+  @Mock private Supplier<Map<WorkflowId, Workflow>> workflows;
 
   private TimeoutHandler timeoutHandler;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    when(storage.workflow(WORKFLOW_ID)).thenReturn(Optional.of(WORKFLOW_WITH_RESOURCES));
+    when(workflows.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
 
   private void setUpWithTimeoutSeconds(int timeoutSeconds) {
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
-    timeoutHandler = new TimeoutHandler(timeoutConfig, time, stateManager, storage);
+    timeoutHandler = new TimeoutHandler(timeoutConfig, time, stateManager, workflows);
   }
 
   @Parameters(source = State.class)
