@@ -20,91 +20,47 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.base.Suppliers;
-import com.google.common.base.Throwables;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
+import com.google.common.base.Ticker;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javaslang.control.Try;
 
 /**
  * A decorator for a supplier function that will cache the returned value during some
  * configurable time.
- * <p>
- * Note: This could be replaced with {@link Suppliers#memoizeWithExpiration} if it wasn't for the need
- *  to be able to inject a synthetic time for test purposes.
  */
 public class CachedSupplier<T> implements Supplier<T> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CachedSupplier.class);
-  private static final long DEFAULT_TIMEOUT_MILLIS = 30_000;
+  private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-  private final ThrowingSupplier<T, Exception> delegate;
-  private final Time time;
-  private final long timeoutMillis;
+  private final LoadingCache<Boolean, T> cache;
 
-  private final AtomicReference<T> cachedValue = new AtomicReference<>();
-  private final Object lock = new Object() {};
-  private volatile long cacheTime;
-
-  public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time) {
-    this(delegate, time, DEFAULT_TIMEOUT_MILLIS);
+  public CachedSupplier(Try.CheckedSupplier<T> delegate, Time time) {
+    this(delegate, time, DEFAULT_TIMEOUT);
   }
 
-  public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time, long timeoutMillis) {
-    this.delegate = Objects.requireNonNull(delegate);
-    this.time = Objects.requireNonNull(time);
-    this.timeoutMillis = timeoutMillis;
-
-    // TODO: use System.nanoTime instead.
-    cacheTime = time.get().toEpochMilli();
+  CachedSupplier(Try.CheckedSupplier<T> delegate, Time time, Duration timeout) {
+    this.cache = CacheBuilder.newBuilder()
+        .expireAfterAccess(timeout)
+        .ticker(new Ticker() {
+          @Override
+          public long read() {
+            return time.nanoTime();
+          }
+        })
+        .build(CacheLoader.from(() -> Try.of(delegate).get()));
   }
 
   @Override
   public T get() {
-    var value = cachedValue.get();
-
-    if (value != null && !timedOut()) {
-      return value;
+    try {
+      return cache.get(Boolean.TRUE);
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
     }
-
-    return getSynchronized();
-  }
-
-  /**
-   * Synchronize on updating the cached value to avoid potentially many redundant and concurrent fetches/computations.
-   * The use of {@link CachedSupplier} is a strong indicator that fetching/computing the value is expensive and hence
-   * it makes sense to try hard to avoid doing it too much.
-   */
-  private T getSynchronized() {
-    synchronized (lock) {
-      var value = cachedValue.get();
-      if (value != null && !timedOut()) {
-        return value;
-      }
-      try {
-        var newValue = delegate.get();
-        cachedValue.set(newValue);
-        cacheTime = time.get().toEpochMilli();
-        return newValue;
-      } catch (Throwable e) {
-        if (value == null) {
-          throw Throwables.propagate(e);
-        } else {
-          LOG.warn("Failed to update from delegate supplier, using old value", e);
-          return value;
-        }
-      }
-    }
-  }
-
-  private boolean timedOut() {
-    return time.get().toEpochMilli() - cacheTime > timeoutMillis;
-  }
-
-  @FunctionalInterface
-  public interface ThrowingSupplier<T, E extends Exception> {
-    T get() throws E;
   }
 }

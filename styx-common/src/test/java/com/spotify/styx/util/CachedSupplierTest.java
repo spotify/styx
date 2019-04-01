@@ -20,6 +20,7 @@
 
 package com.spotify.styx.util;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.timeout;
@@ -28,11 +29,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
+import javaslang.control.Try;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -45,18 +48,20 @@ public class CachedSupplierTest {
   private volatile Instant instant = Instant.parse("2016-10-17T15:00:00Z");
   private volatile int x = 42;
 
-  @Mock private CachedSupplier.ThrowingSupplier<Integer, Exception> delegate;
+  @Mock private Try.CheckedSupplier<Integer> delegate;
 
   private Supplier<Integer> sut;
+  @Mock private Time time;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() throws Throwable {
     when(delegate.get()).then(a -> x);
-    sut = new CachedSupplier<>(delegate, () -> instant, 10_000);
+    when(time.nanoTime()).then(a -> MILLISECONDS.toNanos(instant.toEpochMilli()));
+    sut = new CachedSupplier<>(delegate, time, Duration.ofSeconds(10));
   }
 
   @Test
-  public void testCachesCalls() throws Exception {
+  public void testCachesCalls() throws Throwable {
     int a = sut.get();
     x = 100;
     int b = sut.get();
@@ -68,7 +73,7 @@ public class CachedSupplierTest {
   }
 
   @Test
-  public void testCacheTimesOut() throws Exception {
+  public void testCacheTimesOut() throws Throwable {
     int a = sut.get();
     x = 100;
     instant = Instant.parse("2016-10-17T15:00:11Z");
@@ -80,7 +85,7 @@ public class CachedSupplierTest {
   }
 
   @Test
-  public void testCacheDoesNotTimeOutWithinTimeout() throws Exception {
+  public void testCacheDoesNotTimeOutWithinTimeout() throws Throwable {
     int a = sut.get();
     x = 100;
     instant = Instant.parse("2016-10-17T15:00:09Z");
@@ -92,7 +97,7 @@ public class CachedSupplierTest {
   }
 
   @Test
-  public void shouldOnlyComputeOnceForConcurrentCalls() throws Exception {
+  public void shouldOnlyComputeOnceForConcurrentCalls() throws Throwable {
     var executor = Executors.newCachedThreadPool();
     var queue = new LinkedBlockingQueue<Integer>();
     when(delegate.get()).then(a -> queue.take());
