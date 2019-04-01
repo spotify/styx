@@ -63,7 +63,7 @@ public class CachedSupplier<T> implements Supplier<T> {
 
   @Override
   public T get() {
-    T value = cachedValue.get();
+    var value = cachedValue.get();
 
     if (value != null && !timedOut()) {
       return value;
@@ -79,12 +79,12 @@ public class CachedSupplier<T> implements Supplier<T> {
    */
   private T getSynchronized() {
     synchronized (lock) {
-      final T value = cachedValue.get();
+      var value = cachedValue.get();
       if (value != null && !timedOut()) {
         return value;
       }
       try {
-        final T newValue = delegate.get();
+        var newValue = delegate.get();
         cachedValue.set(newValue);
         cacheTime = time.get().toEpochMilli();
         return newValue;
