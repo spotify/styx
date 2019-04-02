@@ -24,7 +24,11 @@ import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import javaslang.control.Try;
 
@@ -34,7 +38,7 @@ import javaslang.control.Try;
  */
 public class CachedSupplier<T> implements Supplier<T> {
 
-  private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
+  static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
   private final LoadingCache<Boolean, T> cache;
 
@@ -44,6 +48,7 @@ public class CachedSupplier<T> implements Supplier<T> {
 
   CachedSupplier(Try.CheckedSupplier<T> delegate, Time time, Duration timeout) {
     this.cache = CacheBuilder.newBuilder()
+        .maximumSize(1)
         .refreshAfterWrite(timeout)
         .ticker(new Ticker() {
           @Override
@@ -51,11 +56,40 @@ public class CachedSupplier<T> implements Supplier<T> {
             return time.nanoTime();
           }
         })
-        .build(CacheLoader.from(() -> Try.of(delegate).get()));
+        .build(new AsyncLoader<>(delegate));
   }
 
   @Override
   public T get() {
     return Try.of(() -> cache.get(Boolean.TRUE)).get();
+  }
+
+  /**
+   * A {@link CacheLoader} that asynchronously reloads the cached value.
+   */
+  private static class AsyncLoader<T> extends CacheLoader<Boolean, T> {
+
+    private static final ListeningExecutorService EXECUTOR =
+        MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+
+    private final Try.CheckedSupplier<T> delegate;
+
+    private AsyncLoader(Try.CheckedSupplier<T> delegate) {this.delegate = delegate;}
+
+    @Override
+    public T load(Boolean key) throws Exception {
+      try {
+        return delegate.get();
+      } catch (Exception | Error e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new RuntimeException(t);
+      }
+    }
+
+    @Override
+    public ListenableFuture<T> reload(Boolean key, T oldValue) {
+      return EXECUTOR.submit(() -> load(key));
+    }
   }
 }
