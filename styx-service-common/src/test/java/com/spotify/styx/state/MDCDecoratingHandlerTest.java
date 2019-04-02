@@ -28,11 +28,14 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.state.RunState.State;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -42,6 +45,8 @@ import org.slf4j.MDC;
 public class MDCDecoratingHandlerTest {
 
   private static final long COUNTER = 17L;
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock private OutputHandler delegate;
   @Mock private RunState runState;
@@ -77,5 +82,24 @@ public class MDCDecoratingHandlerTest {
     assertThat(id.get(), is(WORKFLOW_INSTANCE.toString()));
     assertThat(stateCounter.get(), is(String.valueOf(COUNTER)));
     assertThat(stateName.get(), is(state.toString()));
+  }
+
+  @Test
+  public void propagatesIOException() {
+    when(runState.state()).thenReturn(State.RUNNING);
+    when(runState.counter()).thenReturn(COUNTER);
+
+    var cause = new IOException("foo!");
+
+    doAnswer(a -> sneakyThrow(cause)).when(delegate).transitionInto(any());
+
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    sut.transitionInto(runState);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> Void sneakyThrow(Throwable e) throws E {
+    throw (E) e;
   }
 }
