@@ -132,8 +132,11 @@ public class QueuedStateManager implements StateManager {
     var futures = shuffledInstances.stream()
         .map(instance -> Striping.supplyAsyncStriped(() -> {
           try {
-            var state = storage.readActiveState(instance);
-            state.ifPresent(outputHandler::transitionInto);
+            var stateOpt = storage.readActiveState(instance);
+            stateOpt.ifPresent(state -> {
+              LOG.info("Ticking instance: {}: #{} {}", instance, state.counter(), state.state());
+              outputHandler.transitionInto(state);
+            });
           } catch (Exception e) {
             LOG.error("Error ticking instance: {}", instance, e);
           }
