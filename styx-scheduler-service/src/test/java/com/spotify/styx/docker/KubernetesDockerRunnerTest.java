@@ -80,6 +80,7 @@ import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
 import io.fabric8.kubernetes.api.model.SecretVolumeSource;
+import io.fabric8.kubernetes.api.model.StatusBuilder;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -199,6 +200,8 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.inNamespace(any(String.class))).thenReturn(k8sClient);
     when(k8sClient.pods()).thenReturn(pods);
 
+    when(pods.withName(any())).thenReturn(namedPod);
+
     when(pods.list()).thenReturn(podList);
     when(podList.getItems()).thenReturn(List.of(createdPod));
     when(podList.getMetadata()).thenReturn(listMeta);
@@ -215,6 +218,9 @@ public class KubernetesDockerRunnerTest {
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
+
+    verify(k8sClient).pods();
+    verify(pods).watch(any());
 
     podWatcher = watchCaptor.getValue();
 
@@ -238,8 +244,23 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldToleratePodAlreadyCreated() throws IOException {
-    when(pods.create(any(Pod.class))).thenThrow(new KubernetesClientException("Already created", 409, null));
+    when(namedPod.get()).thenReturn(null);
+    when(pods.create(any(Pod.class))).thenThrow(
+        new KubernetesClientException("Already created", 409,
+            new StatusBuilder().withReason("AlreadyExists").build()));
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verifyZeroInteractions(stateManager);
+  }
+
+  @Test
+  public void shouldCheckIfPodExistsBeforeCreating() throws IOException {
+    when(pods.withName(any())).thenReturn(namedPod);
+    when(namedPod.get()).thenReturn(createdPod);
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verify(pods).withName(RUN_SPEC.executionId());
+    verify(namedPod).get();
+    verifyNoMoreInteractions(pods);
+    verifyNoMoreInteractions(namedPod);
     verifyZeroInteractions(stateManager);
   }
 

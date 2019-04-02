@@ -195,12 +195,20 @@ class KubernetesDockerRunner implements DockerRunner {
       return;
     }
 
+    // Set up secrets
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
+
+    // Create pod. This might fail with 409 Conflict if the pod already exists as despite the existence
+    // check above it might have been concurrently created. That is fine.
     try {
-      client.pods().create(createPod(workflowInstance, runSpec, secretSpec, styxEnvironment));
+      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment);
+      LOG.info("Creating pod: {}: {}", workflowInstance, pod);
+      var createdPod = client.pods().create(pod);
       stats.recordSubmission(runSpec.executionId());
+      LOG.info("Created pod: {}: {}", workflowInstance, createdPod);
     } catch (KubernetesClientException kce) {
-      if (kce.getCode() == 409) {
+      if (kce.getCode() == 409 && kce.getStatus().getReason().equals("AlreadyExists")) {
+        LOG.info("Pod already existed when creating: {}: {}", workflowInstance, runSpec.executionId());
         // Already launched, success!
         return;
       } else {
