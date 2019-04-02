@@ -44,4 +44,8 @@ public interface OutputHandler {
   static OutputHandler fanOutput(Iterable<OutputHandler> outputHandlers) {
     return new FanOutputHandler(outputHandlers);
   }
+
+  static OutputHandler mdcDecorating(OutputHandler delegate) {
+    return new MDCDecoratingHandler(delegate);
+  }
 }
