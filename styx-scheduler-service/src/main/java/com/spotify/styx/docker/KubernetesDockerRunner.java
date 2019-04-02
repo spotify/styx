@@ -126,7 +126,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private static final int DEFAULT_POD_CLEANUP_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Duration PROCESS_POD_UPDATE_INTERVAL = Duration.ofSeconds(5);
-  private static final int K8S_EVENT_PROCESSING_THREADS = 32;
+  private static final int K8S_POD_PROCESSING_THREADS = 32;
   private static final Time DEFAULT_TIME = Instant::now;
   static final String STYX_WORKFLOW_SA_ENV_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS";
   static final String STYX_WORKFLOW_SA_SECRET_NAME = "styx-wf-sa-keys";
@@ -143,7 +143,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private final Closer closer = Closer.create();
 
-  private final ScheduledExecutorService executor;
+  private final ScheduledExecutorService scheduledExecutor;
 
   private final KubernetesClient client;
   private final StateManager stateManager;
@@ -154,7 +154,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Duration cleanupPodsInterval;
   private final Duration podDeletionDelay;
   private final Time time;
-  private final ExecutorService eventExecutor;
+  private final ExecutorService executor;
 
   private Watch watch;
 
@@ -162,7 +162,7 @@ class KubernetesDockerRunner implements DockerRunner {
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
                          int cleanupPodsIntervalSeconds, int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService executor) {
+                         Time time, ScheduledExecutorService scheduledExecutor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -172,9 +172,10 @@ class KubernetesDockerRunner implements DockerRunner {
     this.cleanupPodsInterval = Duration.ofSeconds(cleanupPodsIntervalSeconds);
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
-    this.executor = register(closer, Objects.requireNonNull(executor), "kubernetes-poll");
-    this.eventExecutor = currentContextExecutorService(
-        register(closer, new ForkJoinPool(K8S_EVENT_PROCESSING_THREADS), "kubernetes-event"));
+    this.scheduledExecutor =
+        register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor");
+    this.executor = currentContextExecutorService(
+        register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
   }
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
@@ -508,10 +509,10 @@ class KubernetesDockerRunner implements DockerRunner {
   }
 
   public void init() {
-    scheduleWithJitter(this::cleanupPods, executor, cleanupPodsInterval);
+    scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
-    scheduleWithJitter(watcher::processPodUpdates, executor, PROCESS_POD_UPDATE_INTERVAL);
+    scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
 
     watch = client.pods().watch(watcher);
   }
@@ -535,7 +536,7 @@ class KubernetesDockerRunner implements DockerRunner {
   @VisibleForTesting
   void tryCleanupPods() {
     client.pods().list().getItems().stream()
-        .map(pod -> runAsync(guard(() -> tryCleanupPod(pod)), eventExecutor))
+        .map(pod -> runAsync(guard(() -> tryCleanupPod(pod)), executor))
         .collect(toList())
         .forEach(CompletableFuture::join);
   }
@@ -547,8 +548,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
     var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
     var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
-                       ? shouldDeletePodWithRunState(workflowInstance.get(), pod, runState.orElseThrow())
-                       : shouldDeletePodWithoutRunState(workflowInstance.get(), pod);
+                       ? shouldDeletePodWithRunState(workflowInstance.orElseThrow(), pod, runState.orElseThrow())
+                       : shouldDeletePodWithoutRunState(workflowInstance.orElseThrow(), pod);
     if (shouldDelete) {
       client.pods().delete(pod);
     }
@@ -721,7 +722,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     private void scheduleReconnect() {
-      executor.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
+      scheduledExecutor.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override
