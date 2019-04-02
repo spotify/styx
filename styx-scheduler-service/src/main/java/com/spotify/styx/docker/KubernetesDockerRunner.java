@@ -188,6 +188,13 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+    // First make cheap check for if pod already exists
+    var existingPod = client.pods().withName(runSpec.executionId()).get();
+    if (existingPod != null) {
+      LOG.info("Pod already exists, not creating: {}: {}", workflowInstance, existingPod);
+      return;
+    }
+
     final KubernetesSecretSpec secretSpec = ensureSecrets(workflowInstance, runSpec);
     try {
       client.pods().create(createPod(workflowInstance, runSpec, secretSpec, styxEnvironment));
