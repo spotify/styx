@@ -687,7 +687,7 @@ class KubernetesDockerRunner implements DockerRunner {
           .map(podName -> {
             // Remove from change set before processing in order to not lose updates
             final WorkflowInstance instance = podUpdates.remove(podName);
-            return runAsync(guard(() -> processPodUpdate(podName, instance)), eventExecutor);
+            return runAsync(guard(() -> processPodUpdate(podName, instance)), executor);
           })
           .collect(toList())
           .forEach(CompletableFuture::join);
