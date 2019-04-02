@@ -202,7 +202,6 @@ public class StyxSchedulerTest {
 
     StyxScheduler.setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats, time);
 
-    verify(stats).registerQueuedEventsMetric(longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("all"), longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("configured"), longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("enabled"), longGaugeCaptor.capture());
@@ -219,8 +218,6 @@ public class StyxSchedulerTest {
 
     longGaugeCaptor.getAllValues().forEach(Gauge::getValue);
     doubleGaugeCaptor.getAllValues().forEach(Gauge::getValue);
-
-    verify(stateManager).queuedEvents();
 
     // Verify that expensive methods were cached
     verify(stateManager, times(1)).getActiveStates();

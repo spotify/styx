@@ -55,7 +55,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -80,8 +79,6 @@ public class PersistentStateManager implements StateManager {
   private final Logger log;
 
   private static final long NO_EVENTS_PROCESSED = -1L;
-
-  private final LongAdder queuedEvents = new LongAdder();
 
   private final Time time;
   private final ExecutorService executor;
@@ -180,7 +177,6 @@ public class PersistentStateManager implements StateManager {
 
     // TODO: optional retry on transaction conflict
 
-    queuedEvents.increment();
     var newState = transition(event, expectedCounter);
     postTransition(newState._1, newState._2);
   }
@@ -224,7 +220,6 @@ public class PersistentStateManager implements StateManager {
   }
 
   private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
-    queuedEvents.decrement();
     try {
       return storage.runInTransaction(tx -> {
 
@@ -429,9 +424,5 @@ public class PersistentStateManager implements StateManager {
     if (!running) {
       throw new IsClosedException();
     }
-  }
-
-  public Long queuedEvents() {
-    return queuedEvents.sum();
   }
 }

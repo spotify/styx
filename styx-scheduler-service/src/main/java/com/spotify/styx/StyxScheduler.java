@@ -562,8 +562,6 @@ public class StyxScheduler implements AppInit {
     final CachedSupplier<Map<WorkflowInstance, RunState>> activeStatesCache =
         new CachedSupplier<>(stateManager::getActiveStates, time);
 
-    stats.registerQueuedEventsMetric(stateManager::queuedEvents);
-
     stats.registerWorkflowCountMetric("all", () -> (long) workflowCache.get().size());
 
     stats.registerWorkflowCountMetric("configured", () -> workflowCache.get().values()

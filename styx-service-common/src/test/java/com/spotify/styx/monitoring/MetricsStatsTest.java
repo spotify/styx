@@ -35,7 +35,6 @@ import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
-import static com.spotify.styx.monitoring.MetricsStats.QUEUED_EVENTS;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_DEMANDED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
@@ -149,12 +148,6 @@ public class MetricsStatsTest {
     when(time.nanoTime()).thenReturn(SECONDS.toNanos(4711L));
     stats.recordRunning("foo");
     verify(histogram).update(4711L - 17L);
-  }
-
-  @Test
-  public void shouldRegisterQueuedEventsMetric() {
-    stats.registerQueuedEventsMetric(gauge);
-    verify(registry).register(QUEUED_EVENTS, gauge);
   }
 
   @Test
