@@ -20,8 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.state.TimeoutConfig.createWithDefaultTtl;
-import static java.time.Duration.ofSeconds;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -61,12 +59,10 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -75,11 +71,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -131,15 +127,6 @@ public class SchedulerTest {
         .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
     when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
     doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
-  }
-
-  @After
-  public void tearDown() {
-    executor.shutdownNow();
-  }
-
-  private void setUp(long timeoutSeconds) throws IOException {
-    TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
 
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
@@ -148,15 +135,20 @@ public class SchedulerTest {
     when(resourceDecorator.decorateResources(
         any(RunState.class), any(WorkflowConfiguration.class), anySet()))
         .thenAnswer(a -> a.getArgument(2));
-    
+
     when(storage.workflow(any())).then(a -> Optional.ofNullable(workflows.get(a.<WorkflowId>getArgument(0))));
 
     when(stateManager.listActiveInstances()).thenReturn(activeStates.keySet());
     when(stateManager.getActiveState(any())).then(a ->
         Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
-    scheduler = new Scheduler(time, timeoutConfig, stateManager, storage, resourceDecorator,
+    scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
         stats, rateLimiter, gate, shardedCounter, executor);
+  }
+
+  @After
+  public void tearDown() {
+    executor.shutdownNow();
   }
 
   private void setResourceLimit(String resourceId, long limit) {
@@ -188,7 +180,6 @@ public class SchedulerTest {
   public void shouldBeRateLimiting() throws Exception {
     when(rateLimiter.acquire()).thenReturn(1.0);
 
-    setUp(20);
     setResourceLimit("r1", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
@@ -202,42 +193,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldTimeoutActiveState() throws Exception {
-    setUp(5);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
-
-    now = now.plus(5, ChronoUnit.SECONDS);
-    scheduler.tick();
-
-    verify(stateManager).receiveIgnoreClosed(eq(Event.timeout(INSTANCE_1)), anyLong());
-  }
-
-  @Test
-  public void shouldNotTimeoutTerminalState() throws Exception {
-    setUp(0);
-
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.DONE, time.get()));
-
-    scheduler.tick();
-    verify(stateManager, never()).receiveIgnoreClosed(any());
-  }
-
-  @Test
-  public void shouldNotTransitionIfNotTimedOut() throws Exception {
-    setUp(20);
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
-    populateActiveStates(RunState.create(INSTANCE_1, State.NEW, time.get()));
-
-    scheduler.tick();
-
-    verify(stateManager, never()).receiveIgnoreClosed(any());
-  }
-
-  @Test
   public void shouldExecuteRetryIfDelayHasPassed() throws Exception {
-    setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
@@ -252,7 +208,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldReadRunStateCounterForEachTick() throws Exception {
-    setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     populateActiveStates(RunState.create(
@@ -272,7 +227,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldExecuteRetryIfDelayIsReset() throws Exception {
-    setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
@@ -293,7 +247,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldExecuteNewTriggers() throws Exception {
-    setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().tries(0).build();
@@ -322,7 +275,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
-    setUp(20);
 
     workflows.clear();
 
@@ -351,7 +303,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldFailWhenUnknownResourceReference() throws Exception {
-    setUp(20);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "unknown"));
     populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
@@ -363,7 +314,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldFailWhenUnknownAndDepletedResources() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2", "r3"));
 
@@ -379,7 +329,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldIssueInfoOnceIfRepeated() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
@@ -413,22 +362,21 @@ public class SchedulerTest {
 
   @Test
   public void shouldRecordAggregateResourceUsageAndDemand() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 2);
     setResourceLimit("r2", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     initWorkflow(workflowUsingResources(WORKFLOW_ID2, "r2"));
 
     // do not consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i0"), State.NEW, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i1"), State.QUEUED, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i5"), State.QUEUED, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID2, "i6"), State.QUEUED, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, time.get()));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i0"), State.NEW, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i1"), State.QUEUED, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i5"), State.QUEUED, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID2, "i6"), State.QUEUED, "r2"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i4"), State.TERMINATED, "r1"));
 
     // consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i2"), State.SUBMITTING, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i3"), State.PREPARE, "r1"));
 
     scheduler.tick();
 
@@ -437,9 +385,13 @@ public class SchedulerTest {
     verify(stats).recordResourceUsed("r1", 2L);
   }
 
+  private RunState runStateWithResources(WorkflowInstance wfi, State state, String... resources) {
+    var stateData = StateData.newBuilder().resourceIds(Set.of(resources)).build();
+    return RunState.create(wfi, state, stateData, time.get());
+  }
+
   @Test
   public void shouldNotExceedResourceLimitsIfAlreadyAtLimit() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
@@ -453,9 +405,9 @@ public class SchedulerTest {
     populateActiveStates(rs1);
 
     // consume resources
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i2"), State.PREPARE, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i3"), State.PREPARE, time.get()));
-    populateActiveStates(RunState.create(instance(WORKFLOW_ID1, "i4"), State.PREPARE, time.get()));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i2"), State.PREPARE, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i3"), State.PREPARE, "r1"));
+    populateActiveStates(runStateWithResources(instance(WORKFLOW_ID1, "i4"), State.PREPARE, "r1"));
 
     scheduler.tick();
 
@@ -477,7 +429,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldCacheResourceUsageExceededLookup() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     when(shardedCounter.counterHasSpareCapacity("r1")).thenReturn(false);
@@ -497,7 +448,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldHandleResourceUsageExceededLookupFailure() throws Exception {
-    setUp(20);
     setResourceLimit("r1", 2);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
     when(shardedCounter.counterHasSpareCapacity("r1")).thenThrow(new RuntimeException("error!"));
@@ -514,7 +464,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldDecorateWorkflowInstanceResources() throws Exception {
-    setUp(20);
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
@@ -539,7 +488,6 @@ public class SchedulerTest {
 
   @Test
   public void shouldCountDecoratedResourcesOnNonQueuedStates() throws Exception {
-    setUp(20);
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
@@ -567,7 +515,8 @@ public class SchedulerTest {
     scheduler.tick();
 
     // TODO: verify that decorateResources was called for the expected instances
-    verify(resourceDecorator, times(5)).decorateResources(any(RunState.class), eq(workflow.configuration()),
+    // Resources are decorated on dequeue
+    verify(resourceDecorator, times(2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
         eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager, times(2)).receiveIgnoreClosed(argThat(
@@ -586,7 +535,6 @@ public class SchedulerTest {
 
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
 
-    setUp(TimeUnit.DAYS.toSeconds(2));
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();
@@ -621,7 +569,6 @@ public class SchedulerTest {
 
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
 
-    setUp(20);
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();
@@ -645,7 +592,6 @@ public class SchedulerTest {
 
     final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
 
-    setUp(20);
     initWorkflow(workflow);
 
     final StateData stateData = StateData.newBuilder().tries(0).build();

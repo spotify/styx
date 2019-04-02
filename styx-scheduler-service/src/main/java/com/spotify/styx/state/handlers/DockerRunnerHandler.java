@@ -95,6 +95,13 @@ public class DockerRunnerHandler implements OutputHandler {
         }
         break;
 
+      case SUBMITTED:
+      case RUNNING:
+        // This handler will be invoked regularly as long as the workflow instance is active, so while it is in the
+        // SUBMITTED and RUNNING states, we poll the runner to check the status and health of the container.
+        dockerRunner.poll(state);
+        break;
+
       case TERMINATED:
       case FAILED:
       case ERROR:
