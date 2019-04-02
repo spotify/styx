@@ -32,6 +32,7 @@ import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.Image;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import java.io.IOException;
 import java.util.Map;
@@ -73,13 +74,6 @@ class LocalDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void restore() {
-    // TODO: a meaningful implementation of this method needs LocalDockerRunner to list the
-    //       local docker containers using the docker api and emit events for them similar to
-    //       KubernetesDockerRunner.
-  }
-
-  @Override
   public void start(WorkflowInstance workflowInstance, RunSpec runSpec) {
     final String imageTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
@@ -108,6 +102,11 @@ class LocalDockerRunner implements DockerRunner {
 
     inFlight.put(creation.id(), workflowInstance);
     LOG.info("Started container with id " + creation.id() + " and name " + runSpec.executionId());
+  }
+
+  @Override
+  public void poll(RunState runState) {
+    // TODO
   }
 
   @Override

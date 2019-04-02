@@ -22,22 +22,37 @@ package com.spotify.styx.util;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class CachedSupplierTest {
 
-  Instant instant = Instant.parse("2016-10-17T15:00:00Z");
-  int x = 42;
-  int callCount = 0;
+  private volatile Instant instant = Instant.parse("2016-10-17T15:00:00Z");
+  private volatile int x = 42;
 
-  Supplier<Integer> sut = new CachedSupplier<>(this::real, () -> instant, 10_000);
+  @Mock private CachedSupplier.ThrowingSupplier<Integer, Exception> delegate;
 
-  int real() {
-    callCount++;
-    return x;
+  private Supplier<Integer> sut;
+
+  @Before
+  public void setUp() throws Exception {
+    when(delegate.get()).then(a -> x);
+    sut = new CachedSupplier<>(delegate, () -> instant, 10_000);
   }
 
   @Test
@@ -46,7 +61,8 @@ public class CachedSupplierTest {
     x = 100;
     int b = sut.get();
 
-    assertThat(callCount, is(1));
+    verify(delegate, times(1)).get();
+
     assertThat(a, is(42));
     assertThat(b, is(42));
   }
@@ -58,7 +74,7 @@ public class CachedSupplierTest {
     instant = Instant.parse("2016-10-17T15:00:11Z");
     int b = sut.get();
 
-    assertThat(callCount, is(2));
+    verify(delegate, times(2)).get();
     assertThat(a, is(42));
     assertThat(b, is(100));
   }
@@ -70,8 +86,33 @@ public class CachedSupplierTest {
     instant = Instant.parse("2016-10-17T15:00:09Z");
     int b = sut.get();
 
-    assertThat(callCount, is(1));
+    verify(delegate, times(1)).get();
     assertThat(a, is(42));
     assertThat(b, is(42));
+  }
+
+  @Test
+  public void shouldOnlyComputeOnceForConcurrentCalls() throws Exception {
+    var executor = Executors.newCachedThreadPool();
+    var queue = new LinkedBlockingQueue<Integer>();
+    when(delegate.get()).then(a -> queue.take());
+
+    var f1 = CompletableFuture.supplyAsync(sut, executor);
+    var f2 = CompletableFuture.supplyAsync(sut, executor);
+
+    // Wait for first thread to call delegate
+    verify(delegate, timeout(5000).times(1)).get();
+
+    // Wait for second thread to reach lock
+    Thread.sleep(500);
+    verifyNoMoreInteractions(delegate);
+
+    queue.put(17);
+    queue.put(4711);
+
+    assertThat(f1.join(), is(17));
+    assertThat(f2.join(), is(17));
+
+    verifyNoMoreInteractions(delegate);
   }
 }

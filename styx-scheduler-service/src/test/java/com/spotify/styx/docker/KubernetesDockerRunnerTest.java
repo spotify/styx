@@ -151,7 +151,7 @@ public class KubernetesDockerRunnerTest {
       .serviceAccount(SERVICE_ACCOUNT)
       .build();
 
-  private static final int POLL_INTERVAL_SECONDS = 60;
+  private static final int POD_CLEANUP_INTERVAL_SECONDS = 60;
   private static final int POD_DELETION_DELAY_SECONDS = 120;
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
 
@@ -213,7 +213,7 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
+        debug, STYX_ENVIRONMENT, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
 
     podWatcher = watchCaptor.getValue();
@@ -415,7 +415,7 @@ public class KubernetesDockerRunnerTest {
 
     when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
-    kdr.tryPollPods();
+    kdr.tryCleanupPods();
 
     verifyPodNeverDeleted(namedPod);
   }
@@ -434,7 +434,7 @@ public class KubernetesDockerRunnerTest {
 
     when(stateManager.getActiveStates()).thenReturn(Collections.emptyMap());
 
-    kdr.tryPollPods();
+    kdr.tryCleanupPods();
 
     verifyPodNeverDeleted(namedPod);
   }
@@ -810,42 +810,21 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldPollPodStatusAndEmitEventsOnRestore() throws Exception {
+  public void shouldPollPodStatusAndEmitEvents() throws Exception {
     when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-
-    // Stop the runner and change the pod status to terminated while styx is "down"
-    kdr.close();
-    setTerminated(createdPod, "Succeeded", 20, null);
-
-    // Start a new runner
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POLL_INTERVAL_SECONDS, 0, time, executor);
-    kdr.init();
-
-    // Make the runner poll states for all pods
-    kdr.restore();
-
-    // Verify that the runner polled and found out that the pods is terminated
-    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
-    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)), 0);
-  }
-
-  @Test
-  public void shouldRegularlyPollPodStatusAndEmitEvents() throws Exception {
-    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
-
-    setRunning(createdPod, /* ready= */ true);
 
     // Change the pod status to terminated without notifying the runner through the pod watcher
     final Pod terminatedPod = new PodBuilder(createdPod)
         .withStatus(terminated("Succeeded", 20, null))
         .build();
-    when(podList.getItems()).thenReturn(List.of(terminatedPod));
+    when(namedPod.get()).thenReturn(terminatedPod);
 
-    // Make time pass so the runner polls
-    executor.tick((long) (POLL_INTERVAL_SECONDS * 2), TimeUnit.SECONDS);
+    // Poll for execution status
+    var stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    var runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
+    kdr.poll(runState);
 
-    // Verify that the runner eventually polled and found out that the pod is terminated
+    // Verify that the runner found out that the pod is terminated and emits events
     verify(stateManager, atLeastOnce()).receive(
         Event.started(WORKFLOW_INSTANCE),
         -1);
@@ -867,7 +846,7 @@ public class KubernetesDockerRunnerTest {
     when(namedPod.get()).thenReturn(pod);
     when(podList.getItems()).thenReturn(List.of(pod));
 
-    assertThat(Try.run(() -> kdr.tryPollPods()).isSuccess(), is(true));
+    assertThat(Try.run(() -> kdr.tryCleanupPods()).isSuccess(), is(true));
   }
 
   @Test
