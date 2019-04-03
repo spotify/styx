@@ -667,6 +667,8 @@ public class DatastoreStorage implements Closeable {
 
   private void workflowQuery(Query<Entity> query, IOConsumer<Entity> consumer) throws IOException {
     datastore.query(query, entity -> {
+      // Exclude all workflow entities that are new-style as we currently only read from old keys.
+      // TODO: change when changing to read from new keys.
       if (isNewWorkflow(entity)) {
         return;
       }
