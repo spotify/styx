@@ -85,7 +85,6 @@ import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.state.handlers.TimeoutHandler;
 import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
-import com.spotify.styx.storage.InMemStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
@@ -145,8 +144,6 @@ public class StyxScheduler implements AppInit {
   public static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-  public static final String STYX_MODE = "styx.mode";
-  public static final String STYX_MODE_DEVELOPMENT = "development";
   public static final String STYX_EVENT_PROCESSING_THREADS = "styx.event-processing-threads";
   public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
@@ -204,7 +201,6 @@ public class StyxScheduler implements AppInit {
         String id,
         Environment environment,
         StateManager stateManager,
-        ScheduledExecutorService scheduler,
         Stats stats,
         Debug debug);
   }
@@ -220,7 +216,7 @@ public class StyxScheduler implements AppInit {
 
     private String serviceName = "styx-scheduler";
     private Time time = Instant::now;
-    private StorageFactory storageFactory = storage(StyxScheduler::storage);
+    private StorageFactory storageFactory = StyxScheduler::storage;
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
@@ -390,7 +386,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, tickExecutor, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
@@ -611,17 +607,6 @@ public class StyxScheduler implements AppInit {
     return new MetricsStats(environment.resolve(SemanticMetricRegistry.class), Instant::now);
   }
 
-  private static StorageFactory storage(StorageFactory storage) {
-    return (environment, stats) -> {
-      if (isDevMode(environment.config())) {
-        LOG.info("Running Styx in development mode, will use InMemStorage");
-        return new InMemStorage();
-      } else {
-        return storage.apply(environment, stats);
-      }
-    };
-  }
-
   private static AggregateStorage storage(Environment environment, Stats stats  ) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
@@ -635,23 +620,17 @@ public class StyxScheduler implements AppInit {
       String id,
       Environment environment,
       StateManager stateManager,
-      ScheduledExecutorService scheduler,
       Stats stats,
       Debug debug) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
-    if (isDevMode(config)) {
-      LOG.info("Creating LocalDockerRunner");
-      return closer.register(DockerRunner.local(scheduler, stateManager));
-    } else {
-      final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
-      final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
-          config, id, createGkeClient(), DefaultKubernetesClient::new));
-      final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
-      return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-          serviceAccountKeyManager, debug, styxEnvironment));
-    }
+    final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
+    final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
+        config, id, createGkeClient(), DefaultKubernetesClient::new));
+    final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
+    return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
+        serviceAccountKeyManager, debug, styxEnvironment));
   }
 
   private static Container createGkeClient() {
@@ -717,11 +696,6 @@ public class StyxScheduler implements AppInit {
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
-  }
-
-  @VisibleForTesting
-  static boolean isDevMode(Config config) {
-    return STYX_MODE_DEVELOPMENT.equals(config.getString(STYX_MODE));
   }
 
   interface KubernetesClientFactory
