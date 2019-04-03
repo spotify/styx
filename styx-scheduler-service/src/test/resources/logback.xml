@@ -3,7 +3,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
       <name>STDOUT</name>
       <encoder>
-        <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{request-id}] %-5level %logger{36} - %msg%n</pattern>
+        <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{request-id}] [wfi:%X{wfi-id} #%X{wfi-state-counter} %X{wfi-state-name}] %-5level %logger{36} - %msg%n</pattern>
       </encoder>
     </appender>
   </root>
