@@ -31,8 +31,6 @@ public interface Stats {
 
   Stats NOOP = new NoopStats();
 
-  void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount);
-
   void registerActiveStatesMetric(RunState.State state, String triggerName, Gauge<Long> activeStatesCount);
 
   void registerWorkflowCountMetric(String status, Gauge<Long> workflowCount);

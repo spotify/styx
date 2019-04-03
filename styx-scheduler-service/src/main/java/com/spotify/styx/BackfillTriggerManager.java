@@ -51,7 +51,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -210,11 +209,7 @@ class BackfillTriggerManager {
       //     transaction, so it will move on to trigger the same partition again, but we still
       //     don't violate concurrency limit in this case
       final TriggerParameters parameters = backfill.triggerParameters().orElse(TriggerParameters.zero());
-      final CompletableFuture<Void> processed = triggerListener
-          .event(workflow, Trigger.backfill(backfill.id()), nextTrigger, parameters)
-          .toCompletableFuture();
-      // Wait for the trigger execution to complete before proceeding to the next partition
-      processed.get();
+      triggerListener.event(workflow, Trigger.backfill(backfill.id()), nextTrigger, parameters);
     } catch (Exception e) {
       if (findCause(e, AlreadyInitializedException.class) != null) {
         // just encountered an ad-hoc trigger or it has been triggered by another scheduler instance
