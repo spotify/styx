@@ -73,6 +73,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.IntPredicate;
 import java.util.logging.Level;
 import javaslang.Tuple;
 import javaslang.Tuple2;
@@ -396,7 +397,15 @@ public class StyxSchedulerServiceFixture {
   }
 
   void awaitNumberOfDockerRuns(int n) {
-    await().atMost(30, SECONDS).until(() -> dockerRuns.size() == n);
+    awaitNumberOfDockerRuns(i -> i == n);
+  }
+
+  void awaitNumberOfDockerRunsAtLeast(int n) {
+    awaitNumberOfDockerRuns(i -> i >= n);
+  }
+
+  void awaitNumberOfDockerRuns(IntPredicate predicate) {
+    await().atMost(30, SECONDS).until(() -> predicate.test(dockerRuns.size()));
   }
 
   void awaitWorkflowInstanceState(WorkflowInstance instance, RunState.State state) {

@@ -379,9 +379,9 @@ public class StyxScheduler implements AppInit {
         eventConsumerFactory.apply(environment, stats),
         new PublisherHandler(publisher, stats),
         new TransitionLogger());
+    var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
     var queuedStateManager = closer.register(new PersistentStateManager(time, stateProcessingExecutor,
-        storage, eventConsumer, eventConsumerExecutor, fanOutput(outputHandlers),
-        shardedCounter));
+        storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
