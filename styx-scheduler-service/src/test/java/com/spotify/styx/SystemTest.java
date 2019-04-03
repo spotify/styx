@@ -593,7 +593,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(59, SECONDS);
     timePasses(StyxScheduler.DEFAULT_SCHEDULER_TICK_INTERVAL.getSeconds() * 2, SECONDS);
 
-    await().atMost(30, SECONDS).until(() -> dockerRuns.size() >= 2);
+    awaitNumberOfDockerRunsAtLeast(2);
 
     WorkflowInstance workflowInstance2 = getDockerRuns().get(1)._1;
     RunSpec runSpec2 = getDockerRuns().get(1)._2;
