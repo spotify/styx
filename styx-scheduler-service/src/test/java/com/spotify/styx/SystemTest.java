@@ -26,6 +26,7 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
@@ -592,7 +593,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(59, SECONDS);
     timePasses(StyxScheduler.DEFAULT_SCHEDULER_TICK_INTERVAL.getSeconds() * 2, SECONDS);
 
-    awaitNumberOfDockerRuns(2);
+    awaitNumberOfDockerRunsAtLeast(2);
 
     WorkflowInstance workflowInstance2 = getDockerRuns().get(1)._1;
     RunSpec runSpec2 = getDockerRuns().get(1)._2;
