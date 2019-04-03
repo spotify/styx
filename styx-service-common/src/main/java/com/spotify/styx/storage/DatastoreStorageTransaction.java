@@ -27,22 +27,22 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_NATURAL_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_TRIGGER_PARAMETERS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_ENABLED;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceIndexShardEntryKey;
 import static com.spotify.styx.storage.DatastoreStorage.activeWorkflowInstanceKey;
 import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
+import static com.spotify.styx.storage.DatastoreStorage.getWorkflowOpt;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
+import static com.spotify.styx.storage.DatastoreStorage.parseWorkflowJson;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
@@ -51,8 +51,8 @@ import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_INDEX;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_SHARD_VALUE;
 
 import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.Entity.Builder;
 import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.KeyFactory;
 import com.google.cloud.datastore.StringValue;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -68,6 +68,7 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public class DatastoreStorageTransaction implements StorageTransaction {
 
@@ -139,6 +140,12 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     tx.put(resourceToEntity(tx.getDatastore(), resource));
   }
 
+  @Override
+  public void deleteWorkflow(WorkflowId workflowId) throws IOException {
+    tx.delete(workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
+    tx.delete(workflowKeyNew(tx.getDatastore()::newKeyFactory, workflowId));
+  }
+
   private Entity resourceToEntity(CheckedDatastore datastore, Resource resource) {
     final Key key = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(resource.id());
     return Entity.newBuilder(key)
@@ -148,50 +155,37 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId store(Workflow workflow) throws IOException {
-    final Key componentKey = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), workflow.componentId());
-    if (tx.get(componentKey) == null) {
-      tx.put(Entity.newBuilder(componentKey).build());
-    }
-
-    final String json = OBJECT_MAPPER.writeValueAsString(workflow);
-    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
-    final Entity workflowEntity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
-        .set(PROPERTY_WORKFLOW_JSON,
-            StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
-        .build();
-
-    tx.put(workflowEntity);
-
-    return workflow.id();
+    var existing = getWorkflowOpt(tx, workflow.id());
+    return storeWorkflow(workflow, WorkflowState.empty(), existing);
   }
 
   @Override
   public WorkflowId storeWorkflowWithNextNaturalTrigger(Workflow workflow, TriggerInstantSpec triggerSpec)
       throws IOException {
+    var existing = getWorkflowOpt(tx, workflow.id());
+    return storeWorkflow(workflow, WorkflowState.ofTriggerSpec(triggerSpec), existing);
+  }
 
-    final Key componentKey = DatastoreStorage.componentKey(tx.getDatastore().newKeyFactory(), workflow.componentId());
-    if (tx.get(componentKey) == null) {
-      tx.put(Entity.newBuilder(componentKey).build());
-    }
+  private WorkflowId storeWorkflow(Workflow workflow, WorkflowState state, Optional<Entity> existing)
+      throws IOException {
+    final Supplier<KeyFactory> keyFactory = tx.getDatastore()::newKeyFactory;
 
-    final String json = OBJECT_MAPPER.writeValueAsString(workflow);
-    final Key workflowKey = DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflow.id());
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
-    final Builder entity = DatastoreStorage.asBuilderOrNew(workflowOpt, workflowKey)
-        .set(PROPERTY_WORKFLOW_JSON, StringValue.newBuilder(json).setExcludeFromIndexes(true).build())
-        .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
-        .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
-    tx.put(entity.build());
+    var key = workflowKeyNew(keyFactory, workflow.id());
+    var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
+    tx.put(entity);
+
+    // TODO: stop writing legacy workflow after migration
+    var legacyKey = workflowKey(keyFactory, workflow.id());
+    var legacyEntity = DatastoreStorage.workflowToEntity(workflow, state, existing, legacyKey);
+    tx.put(legacyEntity);
 
     return workflow.id();
-
   }
 
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     final Optional<Entity> entityOptional =
-        DatastoreStorage.getOpt(tx, DatastoreStorage.workflowKey(tx.getDatastore().newKeyFactory(), workflowId));
+        DatastoreStorage.getOpt(tx, workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
@@ -201,42 +195,22 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public WorkflowId updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
-    final Key workflowKey = DatastoreStorage
-        .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
-    if (!workflowOpt.isPresent()) {
-      throw new ResourceNotFoundException(
-          String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
+    var existing = getWorkflowOpt(tx, workflowId);
+    if (existing.isEmpty()) {
+      throw new ResourceNotFoundException("Workflow " + workflowId + " not found");
     }
-
-    final Entity.Builder builder = Entity
-        .newBuilder(workflowOpt.get())
-        .set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(triggerSpec.instant()))
-        .set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(triggerSpec.offsetInstant()));
-    tx.put(builder.build());
-
-    return workflowId;
+    var workflow = parseWorkflowJson(existing.orElseThrow(), workflowId);
+    return storeWorkflow(workflow, WorkflowState.ofTriggerSpec(triggerSpec), existing);
   }
 
   @Override
   public WorkflowId patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
-    final Key workflowKey = DatastoreStorage
-        .workflowKey(tx.getDatastore().newKeyFactory(), workflowId);
-    final Optional<Entity> workflowOpt = DatastoreStorage.getOpt(tx, workflowKey);
-    if (!workflowOpt.isPresent()) {
-      throw new ResourceNotFoundException(
-          String.format("%s:%s doesn't exist.", workflowId.componentId(), workflowId.id()));
+    var existing = getWorkflowOpt(tx, workflowId);
+    if (existing.isEmpty()) {
+      throw new ResourceNotFoundException("Workflow " + workflowId + " not found");
     }
-
-    final Entity.Builder builder = Entity.newBuilder(workflowOpt.get());
-    state.enabled().ifPresent(x -> builder.set(PROPERTY_WORKFLOW_ENABLED, x));
-    state.nextNaturalTrigger()
-        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_TRIGGER, instantToTimestamp(x)));
-    state.nextNaturalOffsetTrigger()
-        .ifPresent(x -> builder.set(PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER, instantToTimestamp(x)));
-    tx.put(builder.build());
-
-    return workflowId;
+    var workflow = parseWorkflowJson(existing.orElseThrow(), workflowId);
+    return storeWorkflow(workflow, state, existing);
   }
 
   @Override

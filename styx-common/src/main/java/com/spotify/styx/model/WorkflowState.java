@@ -23,6 +23,7 @@ package com.spotify.styx.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.util.TriggerInstantSpec;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -75,5 +76,12 @@ public abstract class WorkflowState {
 
   public static WorkflowState patchEnabled(boolean enabled) {
     return builder().enabled(enabled).build();
+  }
+
+  public static WorkflowState ofTriggerSpec(TriggerInstantSpec triggerSpec) {
+    return builder()
+        .nextNaturalTrigger(triggerSpec.instant())
+        .nextNaturalOffsetTrigger(triggerSpec.offsetInstant())
+        .build();
   }
 }
