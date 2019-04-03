@@ -20,91 +20,76 @@
 
 package com.spotify.styx.util;
 
-import com.google.common.base.Suppliers;
-import com.google.common.base.Throwables;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
+import com.google.common.base.Ticker;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javaslang.control.Try;
 
 /**
  * A decorator for a supplier function that will cache the returned value during some
  * configurable time.
- * <p>
- * Note: This could be replaced with {@link Suppliers#memoizeWithExpiration} if it wasn't for the need
- *  to be able to inject a synthetic time for test purposes.
  */
 public class CachedSupplier<T> implements Supplier<T> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CachedSupplier.class);
-  private static final long DEFAULT_TIMEOUT_MILLIS = 30_000;
+  static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-  private final ThrowingSupplier<T, Exception> delegate;
-  private final Time time;
-  private final long timeoutMillis;
+  private final LoadingCache<Boolean, T> cache;
 
-  private final AtomicReference<T> cachedValue = new AtomicReference<>();
-  private final Object lock = new Object() {};
-  private volatile long cacheTime;
-
-  public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time) {
-    this(delegate, time, DEFAULT_TIMEOUT_MILLIS);
+  public CachedSupplier(Try.CheckedSupplier<T> delegate, Time time) {
+    this(delegate, time, DEFAULT_TIMEOUT);
   }
 
-  public CachedSupplier(ThrowingSupplier<T, Exception> delegate, Time time, long timeoutMillis) {
-    this.delegate = Objects.requireNonNull(delegate);
-    this.time = Objects.requireNonNull(time);
-    this.timeoutMillis = timeoutMillis;
-
-    // TODO: use System.nanoTime instead.
-    cacheTime = time.get().toEpochMilli();
+  CachedSupplier(Try.CheckedSupplier<T> delegate, Time time, Duration timeout) {
+    this.cache = CacheBuilder.newBuilder()
+        .maximumSize(1)
+        .refreshAfterWrite(timeout)
+        .ticker(new Ticker() {
+          @Override
+          public long read() {
+            return time.nanoTime();
+          }
+        })
+        .build(new AsyncLoader<>(delegate));
   }
 
   @Override
   public T get() {
-    var value = cachedValue.get();
-
-    if (value != null && !timedOut()) {
-      return value;
-    }
-
-    return getSynchronized();
+    return Try.of(() -> cache.get(Boolean.TRUE)).get();
   }
 
   /**
-   * Synchronize on updating the cached value to avoid potentially many redundant and concurrent fetches/computations.
-   * The use of {@link CachedSupplier} is a strong indicator that fetching/computing the value is expensive and hence
-   * it makes sense to try hard to avoid doing it too much.
+   * A {@link CacheLoader} that asynchronously reloads the cached value.
    */
-  private T getSynchronized() {
-    synchronized (lock) {
-      var value = cachedValue.get();
-      if (value != null && !timedOut()) {
-        return value;
-      }
+  private static class AsyncLoader<T> extends CacheLoader<Boolean, T> {
+
+    private static final ListeningExecutorService EXECUTOR =
+        MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+
+    private final Try.CheckedSupplier<T> delegate;
+
+    private AsyncLoader(Try.CheckedSupplier<T> delegate) {this.delegate = delegate;}
+
+    @Override
+    public T load(Boolean key) throws Exception {
       try {
-        var newValue = delegate.get();
-        cachedValue.set(newValue);
-        cacheTime = time.get().toEpochMilli();
-        return newValue;
-      } catch (Throwable e) {
-        if (value == null) {
-          throw Throwables.propagate(e);
-        } else {
-          LOG.warn("Failed to update from delegate supplier, using old value", e);
-          return value;
-        }
+        return delegate.get();
+      } catch (Exception | Error e) {
+        throw e;
+      } catch (Throwable t) {
+        throw new RuntimeException(t);
       }
     }
-  }
 
-  private boolean timedOut() {
-    return time.get().toEpochMilli() - cacheTime > timeoutMillis;
-  }
-
-  @FunctionalInterface
-  public interface ThrowingSupplier<T, E extends Exception> {
-    T get() throws E;
+    @Override
+    public ListenableFuture<T> reload(Boolean key, T oldValue) {
+      return EXECUTOR.submit(() -> load(key));
+    }
   }
 }
