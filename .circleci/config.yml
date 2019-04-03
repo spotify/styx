@@ -8,7 +8,12 @@ jobs:
       - checkout
       - restore_cache:
           key: v3-deps-{{ checksum "pom.xml" }}
-      - run: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
+      - run:
+          name: Cache Dependencies
+          environment:
+            # Maven heap size
+            MAVEN_OPTS: -Xmx256m -Xms256m
+          command: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
       - save_cache:
           key: v3-deps-{{ checksum "pom.xml" }}
           paths:
@@ -39,6 +44,9 @@ jobs:
       # Run static analysis after tests
       - run:
           name: Static Analysis
+          environment:
+            # Maven heap size
+            MAVEN_OPTS: -Xmx256m -Xms256m
           when: always
           command: mvn -B clean compile test-compile
 workflows:
