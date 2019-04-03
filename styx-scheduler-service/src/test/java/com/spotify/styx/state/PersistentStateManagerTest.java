@@ -419,23 +419,6 @@ public class PersistentStateManagerTest {
   }
 
   @Test
-  public void shouldHaveZeroQueuedEvent() throws Exception {
-    Optional<RunState> runState = Optional.of(
-        RunState.create(INSTANCE, State.TERMINATED, StateData.zero(), NOW, 17L));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(
-        runState);
-
-    assertThat(stateManager.queuedEvents(), is(0L));
-
-    Event event = Event.success(INSTANCE);
-    stateManager.receive(event);
-
-    assertThat(stateManager.queuedEvents(), is(0L));
-    verify(transaction).deleteActiveState(INSTANCE);
-    verify(storage).writeEvent(SequenceEvent.create(event, 18, NOW.toEpochMilli()));
-  }
-
-  @Test
   public void shouldWriteActiveStateOnEvent() throws Exception {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW, 17));
