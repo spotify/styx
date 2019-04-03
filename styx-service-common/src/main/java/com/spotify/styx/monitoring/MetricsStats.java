@@ -65,10 +65,6 @@ public final class MetricsStats implements Stats {
   private static final String UNIT_MILLISECOND = "ms";
   private static final MetricId BASE = MetricId.build("styx");
 
-  static final MetricId QUEUED_EVENTS = BASE
-      .tagged("what", "queued-events-count")
-      .tagged("unit", "events");
-
   static final MetricId ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER = BASE
       .tagged("what", "active-states-per-runstate-per-trigger-count")
       .tagged("unit", "state");
@@ -237,11 +233,6 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
-  }
-
-  @Override
-  public void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount) {
-    registry.register(QUEUED_EVENTS, queuedEventsCount);
   }
 
   @Override
