@@ -25,12 +25,11 @@ import static com.spotify.styx.util.TimeUtil.previousInstant;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -42,7 +41,6 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
-import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -163,19 +161,17 @@ public class BackfillTriggerManagerTest {
     backfills = new LinkedHashMap<>(); // we need to keep entry order
     activeStates = new HashMap<>();
 
-    when(triggerListener.event(any(), any(), any(), any()))
-        .then(a -> {
-          Workflow workflow = a.getArgument(0);
-          Instant instant = a.getArgument(2);
+    doAnswer(a -> {
+      Workflow workflow = a.getArgument(0);
+      Instant instant = a.getArgument(2);
 
-          final String parameter = toParameter(workflow.configuration().schedule(), instant);
-          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
-                                                                            parameter);
-          RunState runState = RunState.fresh(workflowInstance);
-          activeStates.put(workflowInstance, runState);
-
-          return CompletableFuture.completedFuture(null);
-        });
+      final String parameter = toParameter(workflow.configuration().schedule(), instant);
+      final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
+          parameter);
+      RunState runState = RunState.fresh(workflowInstance);
+      activeStates.put(workflowInstance, runState);
+      return null;
+    }).when(triggerListener).event(any(), any(), any(), any());
 
     when(stateManager.getActiveStatesByTriggerId(anyString())).thenReturn(activeStates);
 
@@ -502,7 +498,7 @@ public class BackfillTriggerManagerTest {
       activeStates.put(workflowInstance, runState);
 
       triggerProcessingFutures.add(processed);
-      return processed;
+      return processed.join();
     }).when(triggerListener)
         .event(any(), any(), any(), any());
 
@@ -541,7 +537,7 @@ public class BackfillTriggerManagerTest {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
     backfills.put(BACKFILL_3.id(), BACKFILL_3);
 
-    doReturn(CompletableFutures.exceptionallyCompletedFuture(new RuntimeException()))
+    doThrow(new RuntimeException())
         .when(triggerListener)
         .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
@@ -595,8 +591,7 @@ public class BackfillTriggerManagerTest {
 
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
 
-    doReturn(CompletableFutures
-                 .exceptionallyCompletedFuture(new AlreadyInitializedException("")))
+    doThrow(new AlreadyInitializedException(""))
         .when(triggerListener)
         .event(any(), any(), eq(Instant.parse("2016-12-02T22:00:00Z")), eq(TRIGGER_PARAMETERS));
 
