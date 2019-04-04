@@ -204,12 +204,20 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void shouldStoreWorkflow() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
+  public void shouldStoreAndDeleteWorkflow() throws IOException {
+    var tx = new DatastoreStorageTransaction(datastore.newTransaction());
     Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
     tx.store(workflow);
     tx.commit();
     assertThat(storage.workflow(workflow.id()), is(Optional.of(workflow)));
+
+    tx  = new DatastoreStorageTransaction(datastore.newTransaction());
+    tx.deleteWorkflow(workflow.id());
+    tx.commit();
+
+    tx = new DatastoreStorageTransaction(datastore.newTransaction());
+    var deleted = tx.workflow(workflow.id());
+    assertThat(deleted, is(Optional.empty()));
   }
 
   @Test
