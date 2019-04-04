@@ -200,6 +200,8 @@ public class Scheduler {
                     currentResourceUsage, currentResourceDemand);
               } catch (StateTransitionConflictException e) {
                 LOG.debug("State transition conflict when scheduling instance: {}", instance, e);
+              } catch (Throwable e) {
+                LOG.warn("Caught exception when scheduling instance: {}", instance, e);
               }
             }), executor))
         .collect(toList());
