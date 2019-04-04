@@ -381,7 +381,7 @@ public class PersistentStateManagerTest {
     try {
       stateManager.receive(event, 16);
       fail();
-    } catch (StaleEventException ignore) {
+    } catch (StateTransitionConflictException ignore) {
     }
 
     verify(storage, never()).writeEvent(any());

@@ -46,6 +46,7 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.StateUtil;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
@@ -162,8 +163,8 @@ public class Scheduler {
 
     processInstances(config, resources, workflows, activeInstances, currentResourceUsage, currentResourceDemand);
 
+    // TODO: stats might be inaccurate if some instances fail processing
     updateResourceStats(resources, currentResourceUsage);
-
     currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
@@ -193,9 +194,14 @@ public class Scheduler {
     // Process instances in parallel
     var futures = shuffledInstances.stream()
         .map(instance -> CompletableFuture.runAsync(() ->
-            tracer.spanBuilder("processInstance").startSpanAndRun(() ->
+            tracer.spanBuilder("processInstance").startSpanAndRun(() -> {
+              try {
                 processInstance(config, resources, workflows, instance, resourceExhaustedCache,
-                    currentResourceUsage, currentResourceDemand)), executor))
+                    currentResourceUsage, currentResourceDemand);
+              } catch (StateTransitionConflictException e) {
+                LOG.debug("State transition conflict when scheduling instance: {}", instance, e);
+              }
+            }), executor))
         .collect(toList());
 
     // Wait for processing to complete

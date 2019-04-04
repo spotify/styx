@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Scheduler Service
  * --
- * Copyright (C) 2016 - 2018 Spotify AB
+ * Copyright (C) 2016 - 2019 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,16 @@
 package com.spotify.styx.state;
 
 /**
- * An exception thrown from State Manager when a stale event is encountered. This can happen when
- * a single-threaded looping tick enqueues the same event more than once due to slow state transitions.
+ * An exception signifying a {@link RunState} transition failed due to conflict with another concurrent transition.
+ * It is generally safe to swallow this exception in situations where it is known that the operation will be retried.
  */
-public class StaleEventException extends RuntimeException {
+public class StateTransitionConflictException extends RuntimeException {
 
-  public StaleEventException(String message) {
+  public StateTransitionConflictException(Throwable cause) {
+    super(cause);
+  }
+
+  public StateTransitionConflictException(String message) {
     super(message);
   }
 }
