@@ -34,9 +34,13 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
+import static com.spotify.styx.storage.DatastoreStorage.workflowToEntity;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -45,6 +49,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -121,6 +127,7 @@ public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
+  private static final WorkflowId WORKFLOW_ID2_NEW = WorkflowId.create("component", "endpoint2_new");
   private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
   static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
@@ -257,14 +264,28 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldDeleteWorkflows() throws Exception {
-    final Workflow workflow = Workflow.create("foo", WORKFLOW_CONFIGURATION);
-    storage.store(workflow);
-    storage.store(Workflow.create("bar", WORKFLOW_CONFIGURATION));
+    var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
+    var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
+    storage.store(foo);
+    storage.store(bar);
 
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(2));
+    var fooLegacyKey = workflowKey(datastore::newKeyFactory, foo.id());
+    var barLegacyKey = workflowKey(datastore::newKeyFactory, bar.id());
+    var fooKey = workflowKeyNew(datastore::newKeyFactory, foo.id());
+    var barKey = workflowKeyNew(datastore::newKeyFactory, bar.id());
 
-    storage.delete(workflow.id());
-    assertThat(entitiesOfKind(DatastoreStorage.KIND_WORKFLOW), hasSize(1));
+    assertThat(datastore.get(fooKey), is(notNullValue()));
+    assertThat(datastore.get(fooLegacyKey), is(notNullValue()));
+    assertThat(datastore.get(barKey), is(notNullValue()));
+    assertThat(datastore.get(barLegacyKey), is(notNullValue()));
+
+    storage.delete(foo.id());
+
+    assertThat(storage.workflow(foo.id()), is(Optional.empty()));
+    assertThat(datastore.get(fooKey), is(nullValue()));
+    assertThat(datastore.get(fooLegacyKey), is(nullValue()));
+    assertThat(datastore.get(barKey), is(notNullValue()));
+    assertThat(datastore.get(barLegacyKey), is(notNullValue()));
   }
 
   @Test
@@ -548,20 +569,51 @@ public class DatastoreStorageTest {
 
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow2new = workflow(WORKFLOW_ID2_NEW);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
     storage.store(workflow1);
     storage.store(workflow2);
     storage.store(workflow3);
 
-    storage.setEnabled(WORKFLOW_ID1, true);
-    storage.setEnabled(WORKFLOW_ID2, false);
-    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+    // Should not be returned as we only read _old_ keys
+    // TODO: change when we start reading from _new_ keys
+    storeWorkflowInNewWay(workflow2new);
 
-    assertThat(storage.workflows().size(), is(3));
-    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID1, workflow1));
-    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID2, workflow2));
-    assertThat(storage.workflows(), hasEntry(WORKFLOW_ID3, workflow3));
+    var workflows = storage.workflows();
+    assertThat(workflows.size(), is(3));
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  @Test
+  public void shouldReturnAllWorkflowsWithNextNaturalTrigger() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    var workflow1 = workflow(WORKFLOW_ID1);
+    var workflow2 = workflow(WORKFLOW_ID2);
+    var workflow2new = workflow(WORKFLOW_ID2_NEW);
+    var workflow3 = workflow(WORKFLOW_ID3);
+
+    var now = Instant.parse("2019-04-03T00:00:00Z");
+    var triggerSpec1 = TriggerInstantSpec.create(now.plusSeconds(1), now.plusSeconds(11));
+    var triggerSpec2 = TriggerInstantSpec.create(now.plusSeconds(2), now.plusSeconds(22));
+    var triggerSpec3 = TriggerInstantSpec.create(now.plusSeconds(3), now.plusSeconds(33));
+    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow1, triggerSpec1));
+    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow2, triggerSpec2));
+    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow3, triggerSpec3));
+
+    // Should not be returned as we only read _old_ keys
+    // TODO: change when we start reading from _new_ keys
+    var triggerSpec2new = TriggerInstantSpec.create(now.plusSeconds(222), now.plusSeconds(2222));
+    storeWorkflowInNewWay(workflow2new, WorkflowState.ofTriggerSpec(triggerSpec2new));
+
+    var workflows = storage.workflowsWithNextNaturalTrigger();
+    assertThat(workflows.size(), is(3));
+    assertThat(workflows, hasEntry(workflow1, triggerSpec1));
+    assertThat(workflows, hasEntry(workflow2, triggerSpec2));
+    assertThat(workflows, hasEntry(workflow3, triggerSpec3));
   }
 
   @Test
@@ -570,7 +622,7 @@ public class DatastoreStorageTest {
 
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     storage.store(workflow1);
-    final Key workflowKey = DatastoreStorage.workflowKey(datastore.newKeyFactory(), workflow1.id());
+    final Key workflowKey = workflowKey(datastore::newKeyFactory, workflow1.id());
 
     final Entity entity = datastore.get(workflowKey);
     final Entity corrupted = Entity.newBuilder(entity)
@@ -589,20 +641,22 @@ public class DatastoreStorageTest {
     final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow2new = workflow(WORKFLOW_ID2_NEW);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
     storage.store(workflow1);
     storage.store(workflow2);
     storage.store(workflow3);
 
-    storage.setEnabled(WORKFLOW_ID1, true);
-    storage.setEnabled(WORKFLOW_ID2, false);
-    storage.updateNextNaturalTrigger(WORKFLOW_ID3, TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+    // Should not be returned as we only read _old_ keys
+    // TODO: change when we start reading from _new_ keys
+    storeWorkflowInNewWay(workflow2new);
 
-    assertThat(storage.workflows(workflowIds).size(), is(3));
-    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID1, workflow1));
-    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID2, workflow2));
-    assertThat(storage.workflows(workflowIds), hasEntry(WORKFLOW_ID3, workflow3));
+    var workflows = storage.workflows(workflowIds);
+    assertThat(workflows.size(), is(3));
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, workflow3));
   }
 
   @Test
@@ -611,15 +665,21 @@ public class DatastoreStorageTest {
 
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow2new = workflow(WORKFLOW_ID2_NEW);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
     assertThat(workflow1.componentId(), is(componentId));
     assertThat(workflow2.componentId(), is(componentId));
+    assertThat(workflow2new.componentId(), is(componentId));
     assertThat(workflow3.componentId(), not(componentId));
 
     storage.store(workflow1);
     storage.store(workflow2);
     storage.store(workflow3);
+
+    // Should not be returned as we only read _old_ keys
+    // TODO: change when we start reading from _new_ keys
+    storeWorkflowInNewWay(workflow2new);
 
     List<Workflow> l = storage.workflows(componentId);
     assertThat(l, hasSize(2));
@@ -937,6 +997,80 @@ public class DatastoreStorageTest {
     exception.expectMessage("No limit found in Datastore for bar-resource");
 
     storage.getLimitForCounter("bar-resource");
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldStoreWorkflowsInBothLegacyAndNewWay() throws IOException {
+    var workflow = workflow(WORKFLOW_ID1);
+    storage.store(workflow);
+    var legacyKey = workflowKey(datastore::newKeyFactory, workflow.id());
+    var newKey = workflowKeyNew(datastore::newKeyFactory, workflow.id());
+    var legacyEntity = datastore.get(legacyKey);
+    var newEntity = datastore.get(newKey);
+    var newProperties = newEntity.getNames()
+        .stream()
+        .collect(toMap(key -> key, newEntity::getValue));
+    var legacyProperties = legacyEntity.getNames()
+        .stream()
+        .collect(toMap(key -> key, newEntity::getValue));
+    assertThat(newProperties, is(legacyProperties));
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldMigrateWorkflows() throws Exception {
+    assertThat(storage.workflows().isEmpty(), is(true));
+
+    var workflow1 = workflow(WORKFLOW_ID1);
+    var workflow2 = workflow(WORKFLOW_ID2);
+    var workflow3 = workflow(WORKFLOW_ID3);
+
+    var legacyKey1 = workflowKey(datastore::newKeyFactory, workflow1.id());
+    var legacyKey2 = workflowKey(datastore::newKeyFactory, workflow2.id());
+    var legacyKey3 = workflowKey(datastore::newKeyFactory, workflow3.id());
+
+    storeWorkflowInLegacyWay(workflow1);
+    storeWorkflowInLegacyWay(workflow2);
+    storeWorkflowInLegacyWay(workflow3);
+
+    assertThat(datastore.get(List.of(legacyKey1, legacyKey2, legacyKey3)), hasSize(3));
+
+    storage.store(storage.workflow(WORKFLOW_ID1).orElseThrow());
+    storage.setEnabled(WORKFLOW_ID2, false);
+    storage.updateNextNaturalTrigger(WORKFLOW_ID3,
+        TriggerInstantSpec.create(TIMESTAMP, TIMESTAMP.plus(Duration.ofHours(1))));
+
+    var workflows = storage.workflows();
+    assertThat(workflows.size(), is(3));
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, workflow1));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, workflow2));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, workflow3));
+
+    var newKey1 = workflowKeyNew(datastore::newKeyFactory, workflow1.id());
+    var newKey2 = workflowKeyNew(datastore::newKeyFactory, workflow2.id());
+    var newKey3 = workflowKeyNew(datastore::newKeyFactory, workflow3.id());
+
+    assertThat(datastore.get(List.of(legacyKey1, legacyKey2, legacyKey3)), hasSize(3));
+    assertThat(datastore.get(List.of(newKey1, newKey2, newKey3)), hasSize(3));
+  }
+
+  // TODO: remove after migration
+  private void storeWorkflowInLegacyWay(Workflow workflow) throws Exception {
+    var key = workflowKey(datastore::newKeyFactory, workflow.id());
+    var entity = workflowToEntity(workflow, WorkflowState.empty(), Optional.empty(), key);
+    datastore.put(entity);
+  }
+
+  // TODO: remove after migration
+  private void storeWorkflowInNewWay(Workflow workflow) throws Exception {
+    storeWorkflowInNewWay(workflow, WorkflowState.empty());
+  }
+
+  private void storeWorkflowInNewWay(Workflow workflow, WorkflowState state) throws Exception {
+    final Key key = workflowKeyNew(datastore::newKeyFactory, workflow.id());
+    var entity = workflowToEntity(workflow, state, Optional.empty(), key);
+    datastore.put(entity);
   }
 
   private static class FooException extends Exception {
