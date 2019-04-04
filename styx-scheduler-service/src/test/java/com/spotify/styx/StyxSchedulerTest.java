@@ -48,7 +48,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
-import com.spotify.styx.state.QueuedStateManager;
+import com.spotify.styx.state.PersistentStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -92,7 +92,7 @@ public class StyxSchedulerTest {
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
   @Mock private StorageTransaction transaction;
-  @Mock private QueuedStateManager stateManager;
+  @Mock private PersistentStateManager stateManager;
   @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
   @Mock private RateLimiter submissionRateLimiter;
   @Mock private Stats stats;
@@ -202,7 +202,6 @@ public class StyxSchedulerTest {
 
     StyxScheduler.setupMetrics(stateManager, workflowCache, storage, submissionRateLimiter, stats, time);
 
-    verify(stats).registerQueuedEventsMetric(longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("all"), longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("configured"), longGaugeCaptor.capture());
     verify(stats).registerWorkflowCountMetric(eq("enabled"), longGaugeCaptor.capture());
@@ -219,8 +218,6 @@ public class StyxSchedulerTest {
 
     longGaugeCaptor.getAllValues().forEach(Gauge::getValue);
     doubleGaugeCaptor.getAllValues().forEach(Gauge::getValue);
-
-    verify(stateManager).queuedEvents();
 
     // Verify that expensive methods were cached
     verify(stateManager, times(1)).getActiveStates();

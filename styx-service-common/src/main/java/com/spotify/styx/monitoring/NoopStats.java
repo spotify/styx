@@ -27,11 +27,6 @@ import com.spotify.styx.state.RunState;
 final class NoopStats implements Stats {
 
   @Override
-  public void registerQueuedEventsMetric(Gauge<Long> queuedEventsCount) {
-    // nop
-  }
-
-  @Override
   public void registerActiveStatesMetric(RunState.State state, String triggerName,
                                          Gauge<Long> activeStatesCount) {
     // nop

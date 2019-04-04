@@ -29,9 +29,8 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +52,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -87,7 +85,6 @@ public class ExecutionDescriptionHandlerTest {
   public void setUp() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
-    when(stateManager.receive(any(), anyLong())).thenReturn(CompletableFuture.completedFuture(null));
     toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
   }
 

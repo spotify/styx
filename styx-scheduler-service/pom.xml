@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>2.1.22-SNAPSHOT</version>
+    <version>2.1.23-SNAPSHOT</version>
   </parent>
 
   <name>Spotify Styx Scheduler Service</name>
@@ -44,10 +44,6 @@
     <dependency>
       <groupId>io.javaslang</groupId>
       <artifactId>javaslang</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.kabutz</groupId>
-      <artifactId>javaspecialists</artifactId>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
