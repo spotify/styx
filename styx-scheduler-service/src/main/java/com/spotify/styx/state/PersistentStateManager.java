@@ -136,16 +136,16 @@ public class PersistentStateManager implements StateManager {
       var stateOpt = storage.readActiveState(instance);
       stateOpt.ifPresent(state -> tickInstance(instance, state));
     } catch (Exception e) {
-      LOG.error("Error ticking instance: {}", instance, e);
+      log.error("Error ticking instance: {}", instance, e);
     }
   }
 
   private void tickInstance(WorkflowInstance instance, RunState state) {
-    LOG.info("Ticking instance: {}: #{} {}", instance, state.counter(), state.state());
+    log.info("Ticking instance: {}: #{} {}", instance, state.counter(), state.state());
     try {
       outputHandler.transitionInto(state);
     } catch (StateTransitionConflictException e) {
-      LOG.debug("State transition conflict when ticking instance: {}", instance, e);
+      log.debug("State transition conflict when ticking instance: {}", instance, e);
     }
   }
 
@@ -388,7 +388,7 @@ public class PersistentStateManager implements StateManager {
     try {
       outputHandler.transitionInto(runState);
     } catch (StateTransitionConflictException e) {
-      log.debug("State transition conflict when invoking output handler: {}", runState, e);
+      log.debug("State transition conflict when invoking output handler: {}", runState.workflowInstance(), e);
     }
   }
 
