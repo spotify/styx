@@ -58,6 +58,13 @@ public interface StorageTransaction {
       throws IOException;
 
   /**
+   * Deletes a workflow.
+   *
+   * @param workflowId The workflow to delete
+   */
+  void deleteWorkflow(WorkflowId workflowId) throws IOException;
+
+  /**
    * Get a {@link Workflow} definition.
    *
    * @param workflowId  The workflow to get
