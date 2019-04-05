@@ -21,11 +21,43 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Batch;
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreBatchWriter;
 import com.google.cloud.datastore.DatastoreWriter;
+import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.FullEntity;
 import com.spotify.styx.monitoring.Stats;
+import java.util.List;
 import java.util.Objects;
 
 interface InstrumentedBatch extends Batch, InstrumentedDatastoreBatchWriter {
+
+  Batch batch();
+
+  @Override
+  default Entity add(FullEntity<?> entity) {
+    return batch().add(entity);
+  }
+
+  @Override
+  default List<Entity> add(FullEntity<?>... entities) {
+    return batch().add(entities);
+  }
+
+  @Override
+  default Response submit() {
+    return batch().submit();
+  }
+
+  @Override
+  default Datastore getDatastore() {
+    return batch().getDatastore();
+  }
+
+  @Override
+  default DatastoreBatchWriter batchWriter() {
+    return batch();
+  }
 
   static InstrumentedBatch of(Stats stats, Batch batch) {
     Objects.requireNonNull(stats, "stats");

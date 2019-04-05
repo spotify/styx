@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import static com.google.datastore.v1.QueryResultBatch.MoreResultsType.MORE_RESULTS_AFTER_CURSOR;
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
@@ -424,12 +425,15 @@ public class InstrumentedDatastoreTest {
     when(delegate.hasNext()).thenReturn(true);
     when(delegate.next()).thenReturn((T) entity);
     when(delegate.getSkippedResults()).thenReturn(17);
+    when(delegate.getMoreResults()).thenReturn(MORE_RESULTS_AFTER_CURSOR);
     assertThat(instrumented.hasNext(), is(true));
     verify(delegate).hasNext();
     assertThat(instrumented.next(), is(entity));
     verify(delegate).next();
     assertThat(instrumented.getSkippedResults(), is(17));
+    assertThat(instrumented.getMoreResults(), is(MORE_RESULTS_AFTER_CURSOR));
     verify(delegate).getSkippedResults();
+    verify(delegate).getMoreResults();
     verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
   }
 

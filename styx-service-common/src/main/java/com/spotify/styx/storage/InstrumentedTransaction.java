@@ -119,7 +119,7 @@ interface InstrumentedTransaction extends
 
   @Override
   default Datastore getDatastore() {
-    return InstrumentedDatastoreBatchWriter.super.getDatastore();
+    return transaction().getDatastore();
   }
 
   @Override
@@ -128,7 +128,7 @@ interface InstrumentedTransaction extends
   }
 
   @Override
-  default Batch batch() {
+  default Batch batchWriter() {
     // Work around DatastoreBatchWriter not being a public interface
     return new Batch() {
       @Override
