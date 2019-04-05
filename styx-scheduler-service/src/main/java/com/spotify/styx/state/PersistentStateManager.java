@@ -134,18 +134,18 @@ public class PersistentStateManager implements StateManager {
   private void tickInstance(WorkflowInstance instance) {
     try {
       var stateOpt = storage.readActiveState(instance);
-      stateOpt.ifPresent(state -> tickInstance(instance, state));
+      stateOpt.ifPresent(this::tickInstance);
     } catch (Exception e) {
       log.error("Error ticking instance: {}", instance, e);
     }
   }
 
-  private void tickInstance(WorkflowInstance instance, RunState state) {
-    log.info("Ticking instance: {}: #{} {}", instance, state.counter(), state.state());
+  private void tickInstance(RunState state) {
+    log.info("Ticking instance: {}: #{} {}", state.workflowInstance(), state.counter(), state.state());
     try {
       outputHandler.transitionInto(state);
     } catch (StateTransitionConflictException e) {
-      log.debug("State transition conflict when ticking instance: {}", instance, e);
+      log.debug("State transition conflict when ticking instance: {}", state.workflowInstance(), e);
     }
   }
 
