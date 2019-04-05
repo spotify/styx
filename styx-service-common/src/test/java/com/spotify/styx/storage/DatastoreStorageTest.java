@@ -115,6 +115,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.contrib.java.lang.system.EnvironmentVariables;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -122,6 +123,8 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreStorageTest {
+
+  @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
@@ -266,6 +269,9 @@ public class DatastoreStorageTest {
   public void shouldDeleteWorkflows() throws Exception {
     var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
     var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
+
+    storeWorkflowInNewWay(foo);
+    storeWorkflowInNewWay(bar);
     storage.store(foo);
     storage.store(bar);
 
@@ -1023,7 +1029,22 @@ public class DatastoreStorageTest {
 
   // TODO: remove after migration
   @Test
-  public void shouldStoreWorkflowsInBothLegacyAndNewWay() throws IOException {
+  public void shouldStoreWorkflowsInLegacyWayOnlyByDefault() throws IOException {
+    var workflow = workflow(WORKFLOW_ID1);
+    storage.store(workflow);
+    var legacyKey = workflowKey(datastore::newKeyFactory, workflow.id());
+    var newKey = workflowKeyNew(datastore::newKeyFactory, workflow.id());
+    var legacyEntity = datastore.get(legacyKey);
+    var newEntity = datastore.get(newKey);
+    assertThat(legacyEntity, is(notNullValue()));
+    assertThat(newEntity, is(nullValue()));
+  }
+
+  // TODO: remove after migration
+  @Test
+  public void shouldStoreWorkflowsInBothLegacyAndNewWayIfEnabled() throws IOException {
+    environmentVariables.set("STYX_WORKFLOW_STORE_NEW", "true");
+
     var workflow = workflow(WORKFLOW_ID1);
     storage.store(workflow);
     var legacyKey = workflowKey(datastore::newKeyFactory, workflow.id());
@@ -1041,7 +1062,9 @@ public class DatastoreStorageTest {
 
   // TODO: remove after migration
   @Test
-  public void shouldMigrateWorkflows() throws Exception {
+  public void shouldMigrateWorkflowsIfEnabled() throws Exception {
+    environmentVariables.set("STYX_WORKFLOW_STORE_NEW", "true");
+
     assertThat(storage.workflows().isEmpty(), is(true));
 
     var workflow1 = workflow(WORKFLOW_ID1);

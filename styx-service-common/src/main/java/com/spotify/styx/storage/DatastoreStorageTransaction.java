@@ -39,10 +39,10 @@ import static com.spotify.styx.storage.DatastoreStorage.entityToBackfill;
 import static com.spotify.styx.storage.DatastoreStorage.entityToRunState;
 import static com.spotify.styx.storage.DatastoreStorage.getWorkflowOpt;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
-import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
 import static com.spotify.styx.storage.DatastoreStorage.parseWorkflowJson;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
 import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
@@ -71,6 +71,9 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 public class DatastoreStorageTransaction implements StorageTransaction {
+
+  // TODO: remove after migration
+  private final boolean workflowStoreNew = Boolean.parseBoolean(System.getenv("STYX_WORKFLOW_STORE_NEW"));
 
   private final CheckedDatastoreTransaction tx;
 
@@ -170,9 +173,11 @@ public class DatastoreStorageTransaction implements StorageTransaction {
       throws IOException {
     final Supplier<KeyFactory> keyFactory = tx.getDatastore()::newKeyFactory;
 
-    var key = workflowKeyNew(keyFactory, workflow.id());
-    var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
-    tx.put(entity);
+    if (workflowStoreNew) {
+      var key = workflowKeyNew(keyFactory, workflow.id());
+      var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
+      tx.put(entity);
+    }
 
     // TODO: stop writing legacy workflow after migration
     var legacyKey = workflowKey(keyFactory, workflow.id());
