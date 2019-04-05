@@ -20,11 +20,18 @@
 
 package com.spotify.styx.state;
 
+import static com.github.rholder.retry.StopStrategies.stopAfterAttempt;
+import static com.github.rholder.retry.WaitStrategies.exponentialWait;
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static com.spotify.styx.util.MDCUtil.withMDC;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
+import com.github.rholder.retry.Attempt;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.RetryListener;
+import com.github.rholder.retry.RetryerBuilder;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.spotify.futures.CompletableFutures;
@@ -53,6 +60,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
@@ -184,8 +192,6 @@ public class PersistentStateManager implements StateManager {
     ensureRunning();
     log.info("Received event {}", event);
 
-    // TODO: optional retry on transaction conflict
-
     var newState = transition(event, expectedCounter);
     postTransition(newState._1, newState._2);
   }
@@ -229,62 +235,101 @@ public class PersistentStateManager implements StateManager {
   }
 
   private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
+    var retryer = RetryerBuilder.<Tuple2<SequenceEvent, RunState>>newBuilder()
+        .retryIfException(this::isRetryableTransitionException)
+        .withRetryListener(transitionRetryListener(event, expectedCounter))
+        .withWaitStrategy(exponentialWait(3, SECONDS))
+        .withStopStrategy(stopAfterAttempt(6))
+        .build();
     try {
-      return storage.runInTransaction(tx -> {
-
-        // Read active state from datastore
-        final Optional<RunState> currentRunState =
-            tx.readActiveState(event.workflowInstance());
-        if (!currentRunState.isPresent()) {
-          String message = "Received event for unknown workflow instance: " + event;
-          log.warn(message);
-          throw new IllegalArgumentException(message);
-        }
-
-        // Verify counters for in-order event processing
-        verifyCounter(event, expectedCounter, currentRunState.get());
-        log.info("Received event (verified) {}", event);
-
-        final RunState nextRunState;
-        try {
-          nextRunState = currentRunState.get().transition(event, time);
-        } catch (IllegalStateException e) {
-          // TODO: illegal state transitions might become common as multiple scheduler
-          //       instances concurrently consume events from k8s.
-          log.warn("Illegal state transition", e);
-          throw e;
-        }
-
-        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
-
-        // Write new state to datastore (or remove it if terminal)
-        if (nextRunState.state().isTerminal()) {
-          tx.deleteActiveState(event.workflowInstance());
-        } else {
-          tx.updateActiveState(event.workflowInstance(), nextRunState);
-        }
-
-        final SequenceEvent sequenceEvent =
-            SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
-
-        return Tuple.of(sequenceEvent, nextRunState);
-      });
-    } catch (TransactionException e) {
-      if (e.isConflict()) {
-        log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
-            event, expectedCounter);
-        throw new StateTransitionConflictException(e);
+      return retryer.call(() -> storage.runInTransaction(tx -> transition0(tx, event, expectedCounter)));
+    } catch (ExecutionException e) {
+      var cause = e.getCause();
+      if (cause instanceof StaleEventException) {
+        throw new StateTransitionConflictException(cause);
       } else {
-        log.debug("Transaction failure during workflow instance transition: {}, counter={}",
-            event, expectedCounter, e);
         throw new RuntimeException(e);
       }
-    } catch (Exception e) {
-      log.debug("Failure during workflow instance transition: {}, counter={}",
-          event, expectedCounter, e);
-      Throwables.throwIfUnchecked(e);
+    } catch (RetryException e) {
+      log.debug("Failed workflow instance transition: {}, counter={}", event, expectedCounter, e);
       throw new RuntimeException(e);
+    }
+  }
+
+  private boolean isRetryableTransitionException(Throwable ex) {
+    if (ex instanceof TransactionException) {
+      var tex = (TransactionException) ex;
+      return tex.isRetryable();
+    }
+    // TODO: Also retry shard exhausted errors? Then the counter snapshot should be refreshed to avoid spinning.
+    return false;
+  }
+
+  private RetryListener transitionRetryListener(Event event, long expectedCounter) {
+    return new RetryListener() {
+      @Override
+      public <V> void onRetry(Attempt<V> attempt) {
+        if (attempt.hasException()) {
+          var cause = attempt.getExceptionCause();
+          if (cause instanceof TransactionException) {
+            var e = (TransactionException) cause;
+            if (e.isConflict()) {
+              log.debug("Transaction conflict during workflow instance transition. {}, counter={}",
+                  event, expectedCounter);
+            } else {
+              log.debug("Transaction failure during workflow instance transition: {}, counter={}",
+                  event, expectedCounter, e);
+            }
+          } else {
+            log.warn("Exception during workflow instance transition: {}, counter={}",
+                event, expectedCounter, cause);
+          }
+        }
+      }
+    };
+  }
+
+  private Tuple2<SequenceEvent, RunState> transition0(StorageTransaction tx, Event event, long expectedCounter)
+      throws IOException {
+
+    // Read active state from datastore
+    var currentRunStateOpt = tx.readActiveState(event.workflowInstance());
+
+    if (currentRunStateOpt.isEmpty()) {
+      var message = "Received event for unknown workflow instance: " + event;
+      log.warn(message);
+      throw new IllegalArgumentException(message);
+    }
+    var currentRunState = currentRunStateOpt.orElseThrow();
+
+    // Verify counters for in-order event processing
+    verifyCounter(event, expectedCounter, currentRunState);
+    log.info("Received event (verified) {}", event);
+
+    // Compute next state
+    var nextRunState = nextRunState(event, currentRunState);
+
+    // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
+    updateResourceCounters(tx, event, currentRunState, nextRunState);
+
+    // Write new state to datastore (or remove it if terminal)
+    if (nextRunState.state().isTerminal()) {
+      tx.deleteActiveState(event.workflowInstance());
+    } else {
+      tx.updateActiveState(event.workflowInstance(), nextRunState);
+    }
+
+    var sequenceEvent = SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
+
+    return Tuple.of(sequenceEvent, nextRunState);
+  }
+
+  private RunState nextRunState(Event event, RunState runState) {
+    try {
+      return runState.transition(event, time);
+    } catch (IllegalStateException e) {
+      log.warn("Illegal state transition", e);
+      throw e;
     }
   }
 
@@ -312,7 +357,11 @@ public class PersistentStateManager implements StateManager {
 
   private void tryUpdatingCounter(RunState runState,
                                   StorageTransaction tx,
-                                  Set<String> resourceIds) {
+                                  Set<String> resourceIds) throws IOException {
+    for (final String resourceId : resourceIds) {
+      tx.updateCounter(shardedCounter, resourceId, 1);
+    }
+
     final Set<Tuple2<String, Try<Void>>> failedTries = resourceIds.stream()
         .map(resource -> Tuple.of(resource, Try.run(() ->
             tx.updateCounter(shardedCounter, resource, 1))))
@@ -359,7 +408,7 @@ public class PersistentStateManager implements StateManager {
                              + expectedCounter  + " but current counter is "
                              + currentCounter + ". Discarding event " + event;
       log.debug(message);
-      throw new StateTransitionConflictException(message);
+      throw new StaleEventException(message);
     } else if (currentCounter < expectedCounter) {
       // This should never happen
       final String message = "Unexpected current counter is less than last observed one for "

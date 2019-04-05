@@ -28,41 +28,57 @@ public class TransactionException extends StorageException {
     super(cause.getMessage(), cause);
   }
 
-  // TODO: represent the failure cause using an enum instead
+  private DatastoreException datastoreExceptionCause() {
+    var cause = getCause();
+    return cause instanceof DatastoreException ? (DatastoreException) cause : null;
+  }
 
-  public boolean isConflict() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      return datastoreException.getCode() == 10;
-    } else {
+  public boolean isRetryable() {
+    var cause = datastoreExceptionCause();
+    if (cause == null) {
       return false;
     }
+    return cause.isRetryable() ||
+           isConflict(cause) ||
+           isTransactionClosed(cause);
+  }
+
+  public boolean isConflict() {
+    var cause = datastoreExceptionCause();
+    return cause != null && isConflict(cause);
   }
 
   public boolean isAlreadyExists() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      // TODO remove check on message when Google fixes the Datastore emulator
-      return "ALREADY_EXISTS".equals(datastoreException.getReason())
-             || messageStartsWith("entity already exists");
-    } else {
-      return false;
-    }
+    var cause = datastoreExceptionCause();
+    return cause != null && isAlreadyExists(cause);
   }
 
   public boolean isNotFound() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      // TODO remove check on message when Google fixes the Datastore emulator
-      return "NOT_FOUND".equals(datastoreException.getReason())
-             || messageStartsWith("no entity to update");
-    } else {
-      return false;
-    }
+    var cause = datastoreExceptionCause();
+    return cause != null && isNotFound(cause);
   }
 
-  private boolean messageStartsWith(String prefix) {
-    final String message = getMessage();
+  private static boolean isConflict(DatastoreException cause) {
+    return cause.getCode() == 10 || "ABORTED".equals(cause.getReason());
+  }
+
+  private static boolean isAlreadyExists(DatastoreException cause) {
+    return "ALREADY_EXISTS".equals(cause.getReason())
+           || messageStartsWith(cause, "entity already exists");
+  }
+
+  private static boolean isNotFound(DatastoreException cause) {
+    return "NOT_FOUND".equals(cause.getReason())
+           || messageStartsWith(cause, "no entity to update");
+  }
+
+  private static boolean isTransactionClosed(DatastoreException cause) {
+    // TODO: check if there is a reason code for this
+    return messageStartsWith(cause, "transaction closed");
+  }
+
+  private static boolean messageStartsWith(Throwable cause, String prefix) {
+    var message = cause.getMessage();
     return message != null && message.startsWith(prefix);
   }
 }
