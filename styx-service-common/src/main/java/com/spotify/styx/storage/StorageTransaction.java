@@ -37,7 +37,7 @@ import java.util.Optional;
  * The interface to the persistence layer where the same transaction is used across storage
  * operations.
  *
- * <p>Use the {@link Storage#runInTransaction(TransactionFunction)} method for automatic
+ * <p>Use the {@link Storage#runInTransactionWithRetries(TransactionFunction)} method for automatic
  * commit/rollback handling.
  */
 public interface StorageTransaction {
@@ -61,8 +61,9 @@ public interface StorageTransaction {
    * Deletes a workflow.
    *
    * @param workflowId The workflow to delete
+   * @return The id of the deleted workflow.
    */
-  void deleteWorkflow(WorkflowId workflowId) throws IOException;
+  WorkflowId deleteWorkflow(WorkflowId workflowId) throws IOException;
 
   /**
    * Get a {@link Workflow} definition.
@@ -126,25 +127,6 @@ public interface StorageTransaction {
    * @param backfill the backfill to store
    */
   Backfill store(Backfill backfill) throws IOException;
-
-  /**
-   * Commit all the storage operations previously called.
-   *
-   * @throws TransactionException if the commit fails.
-   */
-  void commit() throws TransactionException;
-
-  /**
-   * Roll back the transaction.
-   *
-   * @throws TransactionException if rollback fails.
-   */
-  void rollback() throws TransactionException;
-
-  /**
-   * Check if this transaction is still active (not yet committed or rolled back).
-   */
-  boolean isActive();
 
   /**
    * Update counter by delta for the specified resource.

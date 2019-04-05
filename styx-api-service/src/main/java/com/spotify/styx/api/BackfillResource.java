@@ -410,7 +410,7 @@ public final class BackfillResource implements Closeable {
 
     final Backfill backfill;
     try {
-      backfill = storage.runInTransaction(tx -> {
+      backfill = storage.runInTransactionWithRetries(tx -> {
         final Backfill oldBackfill = tx.backfill(id)
             .orElseThrow(() -> new ResourceNotFoundException(String.format("Backfill %s not found.", id)));
         workflowActionAuthorizer.authorizeWorkflowAction(ac, oldBackfill.workflowId());

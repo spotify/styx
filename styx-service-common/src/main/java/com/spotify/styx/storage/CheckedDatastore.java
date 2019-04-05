@@ -22,6 +22,7 @@ package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
+import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.IncompleteKey;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
@@ -69,5 +70,12 @@ class CheckedDatastore extends CheckedDatastoreReaderWriter {
    */
   Key allocateId(IncompleteKey newKey) throws IOException {
     return call(() -> datastore.allocateId(newKey));
+  }
+
+  /**
+   * @see Datastore#getOptions()
+   */
+  DatastoreOptions getOptions() {
+    return datastore.getOptions();
   }
 }

@@ -264,7 +264,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
-    return datastoreStorage.runInTransaction(f);
+  public <T, E extends Exception> T runInTransactionWithRetries(TransactionFunction<T, E> f) throws IOException, E {
+    try {
+      return datastoreStorage.runInTransactionWithRetries(f);
+    } catch (DatastoreIOException e) {
+      throw new TransactionException(e.getCause());
+    }
   }
 }

@@ -41,7 +41,7 @@ public class StorageTest {
     // Note that this is a compile-time test. The transaction body is not actually executed, we're
     // just verifying that the type system allows this code to compile.
     try {
-      sut.runInTransaction(tx -> {
+      sut.runInTransactionWithRetries(tx -> {
         switch (ThreadLocalRandom.current().nextInt()) {
           case 0:
             throw new FooException();

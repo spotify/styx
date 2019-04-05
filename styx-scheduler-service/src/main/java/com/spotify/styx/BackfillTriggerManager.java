@@ -168,7 +168,7 @@ class BackfillTriggerManager {
     final Instant initialNextTrigger = backfill.nextTrigger();
     while (true) {
       try {
-        if (!storage.runInTransaction(tx ->
+        if (!storage.runInTransactionWithRetries(tx ->
             triggerNextPartitionAndProgress(tx, backfill.id(), workflow,
                 initialNextTrigger, remainingCapacity, backfill.reverse()))) {
           break;

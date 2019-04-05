@@ -21,24 +21,22 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.model.Schedule.DAYS;
+import static com.spotify.styx.state.RunState.State.NEW;
 import static com.spotify.styx.storage.DatastoreStorageTest.RUN_STATE;
 import static com.spotify.styx.storage.DatastoreStorageTest.RUN_STATE1;
 import static com.spotify.styx.storage.DatastoreStorageTest.TIMESTAMP;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW;
 import static com.spotify.styx.storage.DatastoreStorageTest.WORKFLOW_INSTANCE1;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import com.google.cloud.datastore.Entity;
-import com.google.cloud.datastore.Key;
-import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
@@ -46,14 +44,17 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -94,7 +95,10 @@ public class DatastoreStorageTransactionTest {
 
   @Before
   public void setUp() throws Exception {
-    datastore = new CheckedDatastore(helper.getOptions().getService());
+    datastore = new CheckedDatastore(helper.getOptions().toBuilder()
+        .setRetrySettings(ServiceOptions.getDefaultRetrySettings())
+        .build()
+        .getService());
     storage = new DatastoreStorage(datastore, Duration.ZERO);
   }
 
@@ -104,175 +108,90 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void shouldCommitEmptyTransaction() throws IOException {
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
-    storageTransaction.commit();
-    assertFalse(transaction.isActive());
+  public void shouldRetryOnConflict() throws Exception {
+    var executor = Executors.newCachedThreadPool();
+
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var barrier = new CompletableFuture<Void>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      barrier.join();
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute a winning read-store transaction
+    storage.runInTransactionWithRetries(tx -> {
+      var wf = tx.workflow(workflow.id());
+      tx.store(wf.orElseThrow());
+      return null;
+    });
+    barrier.complete(null);
+
+    // Wait for first transaction to also complete and verify that it ran twice
+    future.get(3000, SECONDS);
+    assertThat(runs.get(), is(2));
+
   }
 
   @Test
-  public void shouldThrowIfUnexpectedDatastoreError() throws IOException {
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
-
-    transaction.rollback();
-    try {
-      storageTransaction.commit();
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertFalse(e.isConflict());
-    }
-  }
-
-  @Test
-  public void shouldThrowIfRollbackFails() throws IOException {
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction = new DatastoreStorageTransaction(transaction);
-
-    storageTransaction.commit();
-    try {
-      storageTransaction.rollback();
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertFalse(e.isConflict());
-    }
-  }
-
-  @Test
-  public void shouldThrowIfTransactionFailed() throws IOException, InterruptedException {
-    final CheckedDatastoreTransaction transaction1 = datastore.newTransaction();
-    final CheckedDatastoreTransaction transaction2 = datastore.newTransaction();
-    final CheckedDatastoreTransaction transaction3 = datastore.newTransaction();
-    DatastoreStorageTransaction storageTransaction1 = new DatastoreStorageTransaction(transaction1);
-    DatastoreStorageTransaction storageTransaction2 = new DatastoreStorageTransaction(transaction2);
-    DatastoreStorageTransaction storageTransaction3 = new DatastoreStorageTransaction(transaction3);
-
-    // Store first entity
-    KeyFactory keyFactory1 = datastore.newKeyFactory().setKind("MyKind");
-    Key key1 = datastore.allocateId(keyFactory1.newKey());
-    Entity entity1 = Entity.newBuilder(key1).set("key", "firstWrite").build();
-    transaction1.put(entity1);
-    storageTransaction1.commit();
-
-    // Read first entity then commit a change to the first entity
-    Entity entity1read = transaction3.get(key1);
-    Entity entity1modified = Entity.newBuilder(key1).set("key", "secondWrite").build();
-    transaction2.put(entity1modified);
-    storageTransaction2.commit();
-
-    // Used the read first entity to generate a second entity (copy of the first entity)
-    KeyFactory keyFactory2 = datastore.newKeyFactory().setKind("MyKindCopy");
-    Key key2 = datastore.allocateId(keyFactory2.newKey());
-    Entity copyOfEntity1 = Entity.newBuilder(key2).set("key", entity1read.getString("key")).build();
-    transaction3.put(copyOfEntity1);
-
-    try {
-      storageTransaction3.commit();
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertTrue(e.isConflict());
-      transaction3.rollback();
-    }
-  }
-
-  @Test
-  public void insertActiveStateShouldFailIfAlreadyExists() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    try {
-      tx.commit();
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertThat(e.isAlreadyExists(), is(true));
-    }
-  }
-
-  @Test
-  public void updateActiveStateShouldFailIfNotFound() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.updateActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    try {
-      tx.commit();
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertThat(e.isNotFound(), is(true));
-    }
-  }
-
-  @Test
-  public void shouldStoreAndDeleteWorkflow() throws IOException {
-    var tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
-    tx.store(workflow);
-    tx.commit();
+  public void shouldStoreAndDeleteWorkflow() throws Exception {
+    var workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+    storage.runInTransactionWithRetries(tx -> tx.store(workflow));
     assertThat(storage.workflow(workflow.id()), is(Optional.of(workflow)));
 
-    tx  = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.deleteWorkflow(workflow.id());
-    tx.commit();
+    storage.runInTransactionWithRetries(tx -> tx.deleteWorkflow(workflow.id()));
 
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    var deleted = tx.workflow(workflow.id());
+    var deleted = storage.runInTransactionWithRetries(tx -> tx.workflow(workflow.id()));
     assertThat(deleted, is(Optional.empty()));
   }
 
   @Test
-  public void shouldStoreWorkflowWithNextNaturalTrigger() throws IOException {
-    final Instant instant = Instant.parse("2016-03-14T14:00:00Z");
-    final Instant offset = instant.plus(1, ChronoUnit.DAYS);
-    final TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
+  public void shouldStoreWorkflowWithNextNaturalTrigger() throws Exception {
+    var instant = Instant.parse("2016-03-14T14:00:00Z");
+    var offset = instant.plus(1, ChronoUnit.DAYS);
+    var spec = TriggerInstantSpec.create(instant, offset);
 
-    final DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    final Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
-    tx.storeWorkflowWithNextNaturalTrigger(workflow, spec);
-    tx.commit();
+    var workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+    storage.runInTransactionWithRetries(tx -> {
+      tx.storeWorkflowWithNextNaturalTrigger(workflow, spec);
+      return null;
+    });
 
-    final Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
-    assertThat(result.values().size(), is(1));
-    assertThat(result, hasEntry(workflow, spec));
+    var workflows = storage.workflowsWithNextNaturalTrigger();
+    assertThat(workflows.values().size(), is(1));
+    assertThat(workflows, hasEntry(workflow, spec));
   }
 
 
   @Test
   public void shouldStoreShards() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    Shard shard1 = Shard.create("res1",0, 1);
-    Shard shard2 = Shard.create("res1",1, 1);
-    tx.store(shard1);
-    tx.store(shard2);
-    tx.commit();
+    storage.runInTransactionWithRetries(tx -> {
+      Shard shard1 = Shard.create("res1", 0, 1);
+      Shard shard2 = Shard.create("res1", 1, 1);
+      tx.store(shard1);
+      tx.store(shard2);
+      return null;
+    });
     assertEquals(storage.shardsForCounter("res1").size(), 2);
   }
 
   @Test
-  public void shouldGetWorkflow() throws IOException {
-    Workflow workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
+  public void shouldGetWorkflow() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
     storage.store(workflow);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    Optional<Workflow> workflowOptional = tx.workflow(workflow.id());
-    tx.commit();
-    assertThat(workflowOptional, is(Optional.of(workflow)));
-  }
-
-  @Test
-  public void shouldPersistNextScheduledRun() throws Exception {
-    Instant instant = Instant.parse("2016-03-14T14:00:00Z");
-    Instant offset = instant.plus(1, ChronoUnit.DAYS);
-    TriggerInstantSpec spec = TriggerInstantSpec.create(instant, offset);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.store(WORKFLOW);
-    tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.updateNextNaturalTrigger(WORKFLOW.id(), spec);
-    tx.commit();
-
-    Map<Workflow, TriggerInstantSpec> result = storage.workflowsWithNextNaturalTrigger();
-    assertThat(result.values().size(), is(1));
-    assertThat(result, hasEntry(WORKFLOW, spec));
+    var read = storage.runInTransactionWithRetries(tx -> tx.workflow(WORKFLOW_ID));
+    assertThat(read, is(Optional.of(workflow)));
   }
 
   @Test
@@ -285,9 +204,7 @@ public class DatastoreStorageTransactionTest {
         .nextNaturalTrigger(instant)
         .nextNaturalOffsetTrigger(offset)
         .build();
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.patchState(WORKFLOW.id(), state);
-    tx.commit();
+    storage.runInTransactionWithRetries(tx -> tx.patchState(WORKFLOW.id(), state));
     WorkflowState retrieved = storage.workflowState(WORKFLOW.id());
 
     assertThat(retrieved, is(state));
@@ -296,55 +213,35 @@ public class DatastoreStorageTransactionTest {
   @Test
   public void shouldReturnAllActiveStateForWFI() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    Optional<RunState> activeStates =
-        tx.readActiveState(WORKFLOW_INSTANCE1);
-    tx.commit();
-
+    var activeStates = storage.runInTransactionWithRetries(tx -> tx.readActiveState(WORKFLOW_INSTANCE1));
     assertThat(activeStates, is(Optional.of(RUN_STATE)));
   }
 
   @Test
   public void shouldInsertActiveState() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE);
-    tx.commit();
-
+    storage.runInTransactionWithRetries(tx -> tx.writeActiveState(WORKFLOW_INSTANCE1, RUN_STATE));
     assertThat(storage.readActiveState(WORKFLOW_INSTANCE1), is(Optional.of(RUN_STATE)));
   }
 
   @Test
   public void shouldUpdateActiveState() throws Exception {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
-        StateData.zero(), TIMESTAMP, 42L);
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.writeActiveState(WORKFLOW_INSTANCE1, runState);
-    tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    RunState newRunState = RunState.create(WORKFLOW_INSTANCE1, RunState.State.NEW,
-        StateData.zero(), TIMESTAMP, 43L);
-    tx.updateActiveState(WORKFLOW_INSTANCE1, newRunState);
-    tx.commit();
-
+    var runState = RunState.create(WORKFLOW_INSTANCE1, NEW, StateData.zero(), TIMESTAMP, 42L);
+    storage.runInTransactionWithRetries(tx -> tx.writeActiveState(WORKFLOW_INSTANCE1, runState));
+    var newRunState = RunState.create(WORKFLOW_INSTANCE1, NEW, StateData.zero(), TIMESTAMP, 43L);
+    storage.runInTransactionWithRetries(tx -> tx.updateActiveState(WORKFLOW_INSTANCE1, newRunState));
     assertThat(storage.readActiveState(WORKFLOW_INSTANCE1), is(Optional.of(newRunState)));
   }
 
   @Test
   public void shouldDeleteActiveState() throws Exception {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.writeActiveState(WORKFLOW_INSTANCE, RUN_STATE1);
-    tx.commit();
-    tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    tx.deleteActiveState(WORKFLOW_INSTANCE);
-    tx.commit();
-
+    storage.runInTransactionWithRetries(tx -> tx.writeActiveState(WORKFLOW_INSTANCE, RUN_STATE1));
+    storage.runInTransactionWithRetries(tx -> tx.deleteActiveState(WORKFLOW_INSTANCE));
     assertThat(storage.readActiveState(WORKFLOW_INSTANCE), is(Optional.empty()));
   }
 
   @Test
-  public void shouldStoreAndGetBackfill() throws IOException {
-    DatastoreStorageTransaction tx = new DatastoreStorageTransaction(datastore.newTransaction());
-    final Backfill backfill = Backfill.newBuilder()
+  public void shouldStoreAndGetBackfill() throws Exception {
+    var backfill = Backfill.newBuilder()
         .id("backfill-1")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
         .end(Instant.parse("2017-01-02T00:00:00Z"))
@@ -354,11 +251,8 @@ public class DatastoreStorageTransactionTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
         .build();
-    tx.store(backfill);
-    tx.commit();
-
-    DatastoreStorageTransaction newTx = new DatastoreStorageTransaction(datastore.newTransaction());
-    assertThat(newTx.backfill(backfill.id()), is(Optional.of(backfill)));
-    newTx.commit();
+    storage.runInTransactionWithRetries(tx -> tx.store(backfill));
+    var read = storage.runInTransactionWithRetries(tx -> tx.backfill(backfill.id()));
+    assertThat(read, is(Optional.of(backfill)));
   }
 }

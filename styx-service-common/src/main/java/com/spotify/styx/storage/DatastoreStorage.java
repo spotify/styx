@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import static com.google.api.client.util.BackOff.STOP;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
 import static com.spotify.styx.util.CloserUtil.register;
@@ -39,6 +40,7 @@ import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.api.client.util.ExponentialBackOff;
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
@@ -75,9 +77,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.util.FnWithException;
 import com.spotify.styx.util.MDCUtil;
-import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
 import com.spotify.styx.util.TriggerUtil;
@@ -94,6 +94,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -176,7 +177,6 @@ public class DatastoreStorage implements Closeable {
 
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
-  public static final int MAX_RETRIES = 100;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ = 1000;
   public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE = 500;
 
@@ -188,19 +188,21 @@ public class DatastoreStorage implements Closeable {
   private final Duration retryBaseDelay;
   private final Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
   private final Executor executor;
+  private final Logger log;
 
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY));
+    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY), LOG);
   }
 
   @VisibleForTesting
   DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay,
                    Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory,
-                   ExecutorService executor) {
+                   ExecutorService executor, Logger log) {
     this.datastore = Objects.requireNonNull(datastore);
     this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.executor = MDCUtil.withMDC(Context.currentContextExecutor(register(closer, executor, "datastore-storage")));
+    this.log = Objects.requireNonNull(log, "log");
   }
 
   @Override
@@ -263,7 +265,7 @@ public class DatastoreStorage implements Closeable {
   }
 
   void store(Workflow workflow) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.store(workflow)));
+    runInTransactionWithRetries(tx -> tx.store(workflow));
   }
 
   Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
@@ -276,14 +278,14 @@ public class DatastoreStorage implements Closeable {
   }
 
   void delete(WorkflowId workflowId) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> {
+    runInTransactionWithRetries(tx -> {
       tx.deleteWorkflow(workflowId);
       return null;
-    }));
+    });
   }
 
   public void updateNextNaturalTrigger(WorkflowId workflowId, TriggerInstantSpec triggerSpec) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec)));
+    runInTransactionWithRetries(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec));
   }
 
   public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
@@ -295,7 +297,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
+        log.warn("Failed to read workflow {}.", entity.getKey(), e);
         return;
       }
 
@@ -329,7 +331,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
+        log.warn("Failed to read workflow {}.", entity.getKey(), e);
         return;
       }
       workflows.put(workflow.id(), workflow);
@@ -360,7 +362,7 @@ public class DatastoreStorage implements Closeable {
       try {
         workflows.add(OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class));
       } catch (IOException e) {
-        LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
+        log.warn("Failed to read workflow {}.", entity.getKey(), e);
       }
     });
     return workflows;
@@ -378,7 +380,7 @@ public class DatastoreStorage implements Closeable {
         try {
           workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
         } catch (IOException e) {
-          LOG.warn("Failed to read workflow {}.", entity.getKey(), e);
+          log.warn("Failed to read workflow {}.", entity.getKey(), e);
           return;
         }
         workflows.add(workflow);
@@ -507,7 +509,7 @@ public class DatastoreStorage implements Closeable {
 
   WorkflowInstance writeActiveState(WorkflowInstance workflowInstance, RunState state)
       throws IOException {
-    return storeWithRetries(() -> runInTransaction(tx -> tx.writeActiveState(workflowInstance, state)));
+    return runInTransactionWithRetries(tx -> tx.writeActiveState(workflowInstance, state));
   }
 
   static List<Key> activeWorkflowInstanceIndexShardKeys(KeyFactory keyFactory) {
@@ -598,11 +600,11 @@ public class DatastoreStorage implements Closeable {
   }
 
   void deleteActiveState(WorkflowInstance workflowInstance) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.deleteActiveState(workflowInstance)));
+    runInTransactionWithRetries(tx -> tx.deleteActiveState(workflowInstance));
   }
 
   void patchState(WorkflowId workflowId, WorkflowState state) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.patchState(workflowId, state)));
+    runInTransactionWithRetries(tx -> tx.patchState(workflowId, state));
   }
 
   public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
@@ -619,36 +621,6 @@ public class DatastoreStorage implements Closeable {
         .ifPresent(builder::nextNaturalOffsetTrigger);
 
     return builder.build();
-  }
-
-  private <T> T storeWithRetries(FnWithException<T, IOException> storingOperation) throws IOException {
-    int storeRetries = 0;
-
-    while (storeRetries < MAX_RETRIES) {
-      try {
-        return storingOperation.apply();
-      } catch (ResourceNotFoundException e) {
-        throw e;
-      } catch (DatastoreException | IOException e) {
-        if (e.getCause() instanceof ResourceNotFoundException) {
-          throw (ResourceNotFoundException) e.getCause();
-        }
-
-        storeRetries++;
-        if (storeRetries == MAX_RETRIES) {
-          throw e;
-        }
-
-        LOG.warn(String.format("Failed to read/write from/to Datastore (attempt #%d)", storeRetries), e);
-        try {
-          Thread.sleep(retryBaseDelay.toMillis());
-        } catch (InterruptedException e1) {
-          throw new RuntimeException(e1);
-        }
-      }
-    }
-
-    throw new IOException("This should never happen");
   }
 
   private Key activeWorkflowInstanceKey(WorkflowInstance workflowInstance) {
@@ -756,10 +728,10 @@ public class DatastoreStorage implements Closeable {
   }
 
   void storeResource(Resource resource) throws IOException {
-    storeWithRetries(() -> runInTransaction(transaction -> {
+    runInTransactionWithRetries(transaction -> {
       transaction.store(resource);
       return null;
-    }));
+    });
   }
 
   List<Resource> getResources() throws IOException {
@@ -777,10 +749,7 @@ public class DatastoreStorage implements Closeable {
    * we cannot do everything in one transaction.
    */
   void deleteResource(String id) throws IOException {
-    storeWithRetries(() -> {
-      datastore.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
-      return null;
-    });
+    datastore.delete(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(id));
     deleteShardsForCounter(id);
   }
 
@@ -794,10 +763,7 @@ public class DatastoreStorage implements Closeable {
     // this is a safe guard to not to exceed max number of entities in one batch write
     // because in practice number of shards is much smaller
     for (List<Key> batch : Lists.partition(shards, MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE)) {
-      storeWithRetries(() -> {
         datastore.delete(batch.toArray(new Key[0]));
-        return null;
-      });
     }
   }
 
@@ -897,7 +863,7 @@ public class DatastoreStorage implements Closeable {
   }
 
   void storeBackfill(Backfill backfill) throws IOException {
-    storeWithRetries(() -> runInTransaction(tx -> tx.store(backfill)));
+    runInTransactionWithRetries(tx -> tx.store(backfill));
   }
 
   private <T> Stream<T> readStream(Entity entity, String property) {
@@ -935,32 +901,68 @@ public class DatastoreStorage implements Closeable {
         .build();
   }
 
-  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+  public <T, E extends Exception> T runInTransactionWithRetries(TransactionFunction<T, E> f)
       throws IOException, E {
-    final StorageTransaction tx = newTransaction();
-    try {
-      final T value = f.apply(tx);
-      tx.commit();
-      return value;
-    } catch (DatastoreIOException e) {
-      throw new TransactionException(e.getCause());
-    } catch (DatastoreException e) {
-      throw new TransactionException(e);
-    } finally {
-      if (tx.isActive()) {
-        tx.rollback();
+
+    var retrySettings = datastore.getOptions().getRetrySettings();
+    var backoff = new ExponentialBackOff.Builder()
+        .setInitialIntervalMillis((int) retrySettings.getInitialRetryDelay().toMillis())
+        .setMaxIntervalMillis((int) retrySettings.getMaxRetryDelay().toMillis())
+        .setMultiplier(retrySettings.getRetryDelayMultiplier())
+        .setMaxElapsedTimeMillis((int) retrySettings.getMaxRetryDelay().toMillis())
+        .build();
+
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return runInTransaction(f);
+      } catch (DatastoreIOException e) {
+        if (!isRetryableTransactionException(e.getCause())) {
+          throw e;
+        }
+        if (retrySettings.getMaxAttempts() > 0 && attempt >= retrySettings.getMaxAttempts()) {
+          throw e;
+        }
+        // Back-off sleep before retrying
+        var sleepMillis = backoff.nextBackOffMillis();
+        if (sleepMillis == STOP) {
+          throw e;
+        }
+        log.debug("datastore transaction exception, attempt #{}, retrying in {}ms", attempt, sleepMillis, e);
+        try {
+          Thread.sleep(sleepMillis);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        }
       }
     }
   }
 
-  private StorageTransaction newTransaction() throws TransactionException {
-    final CheckedDatastoreTransaction transaction;
+  private <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
+    var transaction = datastore.newTransaction();
     try {
-      transaction = datastore.newTransaction();
-    } catch (DatastoreIOException e) {
-      throw new TransactionException(e.getCause());
+      var result = f.apply(storageTransactionFactory.apply(transaction));
+      transaction.commit();
+      return result;
+    } finally {
+      if (transaction.isActive()) {
+        try {
+          transaction.rollback();
+        } catch (DatastoreIOException ex) {
+          log.debug("Exception on rollback", ex);
+        }
+      }
     }
-    return storageTransactionFactory.apply(transaction);
+  }
+
+  private boolean isRetryableTransactionException(DatastoreException e) {
+    return
+        // code 10 ABORTED means that the transaction was aborted due to a conflict and can be retried.
+        e.getCode() == 10
+        || "ABORTED".equals(e.getReason())
+        // The datastore client has a retry bug where it incorrectly retries ABORTED lookup operations
+        // in transactions. This results in 3 INVALID_ARGUMENT "transaction closed" errors.
+        // TODO: Remove after this bug has been fixed in datastore
+        || String.valueOf(e.getMessage()).toLowerCase(Locale.ROOT).startsWith("transaction closed");
   }
 
   Map<Integer, Long> shardsForCounter(String counterId) throws IOException {
