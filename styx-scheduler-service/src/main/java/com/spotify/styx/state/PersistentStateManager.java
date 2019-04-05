@@ -134,12 +134,18 @@ public class PersistentStateManager implements StateManager {
   private void tickInstance(WorkflowInstance instance) {
     try {
       var stateOpt = storage.readActiveState(instance);
-      stateOpt.ifPresent(state -> {
-        LOG.info("Ticking instance: {}: #{} {}", instance, state.counter(), state.state());
-        outputHandler.transitionInto(state);
-      });
+      stateOpt.ifPresent(this::tickInstance);
     } catch (Exception e) {
-      LOG.error("Error ticking instance: {}", instance, e);
+      log.error("Error ticking instance: {}", instance, e);
+    }
+  }
+
+  private void tickInstance(RunState state) {
+    log.info("Ticking instance: {}: #{} {}", state.workflowInstance(), state.counter(), state.state());
+    try {
+      outputHandler.transitionInto(state);
+    } catch (StateTransitionConflictException e) {
+      log.debug("State transition conflict when ticking instance: {}", state.workflowInstance(), e);
     }
   }
 
@@ -268,7 +274,7 @@ public class PersistentStateManager implements StateManager {
       if (e.isConflict()) {
         log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
             event, expectedCounter);
-        throw new RuntimeException(e);
+        throw new StateTransitionConflictException(e);
       } else {
         log.debug("Transaction failure during workflow instance transition: {}, counter={}",
             event, expectedCounter, e);
@@ -353,7 +359,7 @@ public class PersistentStateManager implements StateManager {
                              + expectedCounter  + " but current counter is "
                              + currentCounter + ". Discarding event " + event;
       log.debug(message);
-      throw new StaleEventException(message);
+      throw new StateTransitionConflictException(message);
     } else if (currentCounter < expectedCounter) {
       // This should never happen
       final String message = "Unexpected current counter is less than last observed one for "
@@ -379,7 +385,11 @@ public class PersistentStateManager implements StateManager {
     }
 
     // Execute output handler(s)
-    outputHandler.transitionInto(runState);
+    try {
+      outputHandler.transitionInto(runState);
+    } catch (StateTransitionConflictException e) {
+      log.debug("State transition conflict when invoking output handler: {}", runState.workflowInstance(), e);
+    }
   }
 
   @Override

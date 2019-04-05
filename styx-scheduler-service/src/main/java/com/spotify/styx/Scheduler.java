@@ -46,6 +46,7 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.StateUtil;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
@@ -92,8 +93,6 @@ import org.slf4j.LoggerFactory;
  */
 public class Scheduler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
-
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
 
@@ -108,10 +107,19 @@ public class Scheduler {
   private final WorkflowExecutionGate gate;
   private final ShardedCounter shardedCounter;
   private final Executor executor;
+  private final Logger log;
 
-  public Scheduler(Time time, StateManager stateManager, Storage storage,
-                   WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-                   WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor) {
+  Scheduler(Time time, StateManager stateManager, Storage storage,
+            WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
+            WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor) {
+    this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, gate, shardedCounter, executor,
+        LoggerFactory.getLogger(Scheduler.class));
+  }
+
+
+  Scheduler(Time time, StateManager stateManager, Storage storage,
+            WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
+            WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor, Logger log) {
     this.time = Objects.requireNonNull(time);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.storage = Objects.requireNonNull(storage);
@@ -121,6 +129,7 @@ public class Scheduler {
     this.gate = Objects.requireNonNull(gate, "gate");
     this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
     this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
+    this.log = Objects.requireNonNull(log, "log");
   }
 
   void tick() {
@@ -143,7 +152,7 @@ public class Scheduler {
       config = storage.config();
       globalConcurrency = config.globalConcurrency();
     } catch (IOException e) {
-      LOG.warn("Failed to get resource limits", e);
+      log.warn("Failed to get resource limits", e);
       return;
     }
 
@@ -162,8 +171,8 @@ public class Scheduler {
 
     processInstances(config, resources, workflows, activeInstances, currentResourceUsage, currentResourceDemand);
 
+    // TODO: stats might be inaccurate if some instances fail processing
     updateResourceStats(resources, currentResourceUsage);
-
     currentResourceDemand.asMap().forEach(stats::recordResourceDemanded);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
@@ -193,9 +202,16 @@ public class Scheduler {
     // Process instances in parallel
     var futures = shuffledInstances.stream()
         .map(instance -> CompletableFuture.runAsync(() ->
-            tracer.spanBuilder("processInstance").startSpanAndRun(() ->
+            tracer.spanBuilder("processInstance").startSpanAndRun(() -> {
+              try {
                 processInstance(config, resources, workflows, instance, resourceExhaustedCache,
-                    currentResourceUsage, currentResourceDemand)), executor))
+                    currentResourceUsage, currentResourceDemand);
+              } catch (StateTransitionConflictException e) {
+                log.debug("State transition conflict when scheduling instance: {}", instance, e);
+              } catch (Throwable e) {
+                log.warn("Caught exception when scheduling instance: {}", instance, e);
+              }
+            }), executor))
         .collect(toList());
 
     // Wait for processing to complete
@@ -208,7 +224,7 @@ public class Scheduler {
                                AtomicLongMap<String> currentResourceUsage,
                                AtomicLongMap<String> currentResourceDemand) {
 
-    LOG.debug("Processing instance: {}", instance);
+    log.debug("Processing instance: {}", instance);
 
     // Get the run state or exit if it does not exist
     var runStateOpt = stateManager.getActiveState(instance);
@@ -228,7 +244,7 @@ public class Scheduler {
       return;
     }
 
-    LOG.debug("Evaluating instance for dequeue: {}", instance);
+    log.debug("Evaluating instance for dequeue: {}", instance);
 
     // Get the workflow configuration
     var workflowOpt = workflows.computeIfAbsent(instance.workflowId(), this::readWorkflow);
@@ -265,7 +281,7 @@ public class Scheduler {
         .sorted()
         .collect(toList());
     if (!depletedResources.isEmpty()) {
-      LOG.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
+      log.debug("Resource limit reached for instance, not dequeueing: {}: exhausted resources={}",
           instance, depletedResources);
       MessageUtil.emitResourceLimitReachedMessage(stateManager, runState, depletedResources);
       return;
@@ -276,7 +292,7 @@ public class Scheduler {
     if (blocker.isPresent()) {
       var retry = Event.retryAfter(instance, blocker.get().delay().toMillis());
       stateManager.receiveIgnoreClosed(retry, runState.counter());
-      LOG.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
+      log.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
       return;
     }
 
@@ -297,7 +313,7 @@ public class Scheduler {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException | TimeoutException e) {
-      LOG.warn("Failed to check execution blocker for {}, assuming there is no blocker", instance, e);
+      log.warn("Failed to check execution blocker for {}, assuming there is no blocker", instance, e);
       return Optional.empty();
     }
   }
@@ -315,7 +331,7 @@ public class Scheduler {
       try {
         return !shardedCounter.counterHasSpareCapacity(resourceId);
       } catch (RuntimeException | IOException e) {
-        LOG.warn("Failed to check resource counter limit", e);
+        log.warn("Failed to check resource counter limit", e);
         return false;
       }
     });
@@ -339,14 +355,14 @@ public class Scheduler {
     if (sleepingTimeSeconds > 0.0001) {
       final double sleepingTimeMillis = sleepingTimeSeconds * 1000;
       final String message = "Dequeue rate limited and slept for " + sleepingTimeMillis + " ms";
-      LOG.debug(message, sleepingTimeMillis);
+      log.debug(message, sleepingTimeMillis);
       tracer.getCurrentSpan().addAnnotation(message);
     }
 
     if (state.data().tries() == 0) {
-      LOG.info("Executing {}", workflowInstance);
+      log.info("Executing {}", workflowInstance);
     } else {
-      LOG.info("Executing {}, retry #{}", workflowInstance, state.data().tries());
+      log.info("Executing {}, retry #{}", workflowInstance, state.data().tries());
     }
     var dequeue = Event.dequeue(workflowInstance, resourceIds);
     stateManager.receiveIgnoreClosed(dequeue, state.counter());

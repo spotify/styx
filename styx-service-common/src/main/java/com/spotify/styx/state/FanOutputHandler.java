@@ -21,15 +21,11 @@
 package com.spotify.styx.state;
 
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A {@link OutputHandler} that fans out to a list of other outputHandlers.
  */
 class FanOutputHandler implements OutputHandler {
-
-  private static final Logger LOG = LoggerFactory.getLogger(FanOutputHandler.class);
 
   private final Iterable<OutputHandler> outputHandlers;
 
@@ -40,12 +36,7 @@ class FanOutputHandler implements OutputHandler {
   @Override
   public void transitionInto(RunState state) {
     for (OutputHandler handler : outputHandlers) {
-      try {
-        handler.transitionInto(state);
-      } catch (Throwable e) {
-        LOG.warn("Output handler {} threw", handler, e);
-        throw e;
-      }
+      handler.transitionInto(state);
     }
   }
 }

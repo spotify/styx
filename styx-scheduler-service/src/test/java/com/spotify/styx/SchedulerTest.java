@@ -30,6 +30,7 @@ import static org.mockito.Matchers.anySetOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -59,6 +60,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
@@ -86,6 +88,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SchedulerTest {
@@ -96,6 +99,8 @@ public class SchedulerTest {
       WorkflowId.create("styx2", "example2");
   private static final WorkflowInstance INSTANCE_1 =
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
+  private static final WorkflowInstance INSTANCE_2 =
+      WorkflowInstance.create(WORKFLOW_ID2, "2016-12-02T01");
 
   private Scheduler scheduler;
 
@@ -117,6 +122,7 @@ public class SchedulerTest {
   @Mock StateManager stateManager;
   @Mock Storage storage;
   @Mock ShardedCounter shardedCounter;
+  @Mock Logger log;
 
   @Captor ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
 
@@ -143,7 +149,7 @@ public class SchedulerTest {
         Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
     scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, gate, shardedCounter, executor);
+        stats, rateLimiter, gate, shardedCounter, executor, log);
   }
 
   @After
@@ -606,6 +612,66 @@ public class SchedulerTest {
     verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
         anyLong());
     verifyZeroInteractions(gate);
+  }
+
+  @Test
+  public void shouldHandleDequeueFailures() throws Exception {
+    var workflow1 = workflowUsingResources(WORKFLOW_ID1);
+    var workflow2 = workflowUsingResources(WORKFLOW_ID2);
+
+    initWorkflow(workflow1);
+    initWorkflow(workflow2);
+
+    var counter1 = 17;
+    var stateData1 = StateData.newBuilder().tries(0).build();
+    var runState1 = RunState.create(INSTANCE_1, State.QUEUED, stateData1, time.get(), counter1);
+
+    var counter2 = 4711;
+    var stateData2 = StateData.newBuilder().tries(0).build();
+    var runState2 = RunState.create(INSTANCE_2, State.QUEUED, stateData2, time.get(), counter2);
+
+    populateActiveStates(runState1, runState2);
+
+    doThrow(new RuntimeException("fail!"))
+        .when(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+
+    scheduler.tick();
+
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_2, ImmutableSet.of()), counter2);
+
+    verify(stats).recordTickDuration(any(), anyLong());
+  }
+
+
+  @Test
+  public void shouldHandleStateTransitionConflicts() throws Exception {
+    var workflow1 = workflowUsingResources(WORKFLOW_ID1);
+    var workflow2 = workflowUsingResources(WORKFLOW_ID2);
+
+    initWorkflow(workflow1);
+    initWorkflow(workflow2);
+
+    var counter1 = 17;
+    var stateData1 = StateData.newBuilder().tries(0).build();
+    var runState1 = RunState.create(INSTANCE_1, State.QUEUED, stateData1, time.get(), counter1);
+
+    var counter2 = 4711;
+    var stateData2 = StateData.newBuilder().tries(0).build();
+    var runState2 = RunState.create(INSTANCE_2, State.QUEUED, stateData2, time.get(), counter2);
+
+    populateActiveStates(runState1, runState2);
+    var cause = new StateTransitionConflictException("conflict!");
+    doThrow(cause).when(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+
+    scheduler.tick();
+
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_2, ImmutableSet.of()), counter2);
+
+    verify(stats).recordTickDuration(any(), anyLong());
+
+    verify(log).debug("State transition conflict when scheduling instance: {}", INSTANCE_1, cause);
   }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
