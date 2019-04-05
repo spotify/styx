@@ -911,6 +911,28 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void runInTransactionShouldThrowTransactionExceptionOnDatastoreIOException() throws Exception {
+    var storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
+    var transaction = datastore.newTransaction();
+    var storageTransaction = spy(new DatastoreStorageTransaction(transaction));
+    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+
+    var datastoreException = new DatastoreException(1, "", "");
+    var datastoreIOException = new DatastoreIOException(datastoreException);
+    when(transactionFunction.apply(any())).thenThrow(datastoreIOException);
+
+    try {
+      storage.runInTransaction(transactionFunction);
+      fail("Expected exception!");
+    } catch (TransactionException e) {
+      assertThat(e.getCause(), is(datastoreException));
+    }
+
+    verify(transactionFunction).apply(storageTransaction);
+    verify(storageTransaction).rollback();
+  }
+
+  @Test
   public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     CheckedDatastore datastore = mock(CheckedDatastore.class);
     final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);

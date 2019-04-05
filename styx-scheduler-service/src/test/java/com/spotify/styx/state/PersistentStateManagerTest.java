@@ -165,12 +165,37 @@ public class PersistentStateManagerTest {
     when(storage.readActiveState(instance1)).thenReturn(Optional.of(runState1));
     when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
-    doThrow(new RuntimeException("fail!")).when(outputHandler).transitionInto(runState1);
+    var cause = new RuntimeException("fail!");
+    doThrow(cause).when(outputHandler).transitionInto(runState1);
 
     stateManager.tick();
 
     verify(outputHandler).transitionInto(runState1);
     verify(outputHandler).transitionInto(runState2);
+
+    verify(logger).error("Error ticking instance: {}", instance1, cause );
+  }
+
+  @Test
+  public void tickShouldTolerateOutputHandlerStateTransitionConflict() throws IOException {
+    var instance1 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-01");
+    var instance2 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-02");
+    var runState1 = RunState.create(instance1, State.SUBMITTING, StateData.zero(), NOW.minusMillis(2), 17);
+    var runState2 = RunState.create(instance2, State.TERMINATED, StateData.zero(), NOW.minusMillis(1), 4711);
+
+    when(storage.listActiveInstances()).thenReturn(Set.of(instance1, instance2));
+    when(storage.readActiveState(instance1)).thenReturn(Optional.of(runState1));
+    when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
+
+    var cause = new StateTransitionConflictException("conflict!");
+    doThrow(cause).when(outputHandler).transitionInto(runState1);
+
+    stateManager.tick();
+
+    verify(outputHandler).transitionInto(runState1);
+    verify(outputHandler).transitionInto(runState2);
+
+    verify(logger).debug("State transition conflict when ticking instance: {}", instance1, cause);
   }
 
   @Test
@@ -381,7 +406,7 @@ public class PersistentStateManagerTest {
     try {
       stateManager.receive(event, 16);
       fail();
-    } catch (StaleEventException ignore) {
+    } catch (StateTransitionConflictException ignore) {
     }
 
     verify(storage, never()).writeEvent(any());
@@ -516,7 +541,7 @@ public class PersistentStateManagerTest {
   }
 
   @Test
-  public void receiveShouldHandleThrowingOutputHandler() throws Exception {
+  public void receiveShouldPropagateOutputHandlerException() throws Exception {
     Optional<RunState> runState = Optional.of(
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
@@ -529,6 +554,18 @@ public class PersistentStateManagerTest {
     } catch (Exception e) {
       assertThat(Throwables.getRootCause(e), is(rootCause));
     }
+  }
+
+  @Test
+  public void receiveShouldHandleOutputHandlerThrowingStateTransitionConflict() throws Exception {
+    Optional<RunState> runState = Optional.of(
+        RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
+    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
+
+    final StateTransitionConflictException rootCause = new StateTransitionConflictException("conflict!");
+    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
+    verify(logger).debug("State transition conflict when invoking output handler: {}", INSTANCE, rootCause);
   }
 
   @Test

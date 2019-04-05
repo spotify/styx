@@ -982,8 +982,9 @@ public class DatastoreStorage implements Closeable {
       final T value = f.apply(tx);
       tx.commit();
       return value;
+    } catch (DatastoreIOException e) {
+      throw new TransactionException(e.getCause());
     } catch (DatastoreException e) {
-      tx.rollback();
       throw new TransactionException(e);
     } finally {
       if (tx.isActive()) {

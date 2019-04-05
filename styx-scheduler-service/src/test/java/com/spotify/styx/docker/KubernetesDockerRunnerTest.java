@@ -37,6 +37,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -58,6 +59,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.Time;
@@ -852,6 +854,29 @@ public class KubernetesDockerRunnerTest {
     verify(stateManager, atLeastOnce()).receive(
         Event.terminate(WORKFLOW_INSTANCE, Optional.of(20)),
         0);
+  }
+
+  @Test
+  public void shouldTolerateTransitionConflictWhenEmittingEvents() throws Exception {
+    when(k8sClient.pods().withName(createdPod.getMetadata().getName())).thenReturn(namedPod);
+
+    // Change the pod status to terminated without notifying the runner through the pod watcher
+    final Pod terminatedPod = new PodBuilder(createdPod)
+        .withStatus(terminated("Succeeded", 20, null))
+        .build();
+    when(namedPod.get()).thenReturn(terminatedPod);
+
+    doThrow(new StateTransitionConflictException("foo!"))
+        .when(stateManager).receive(any(), anyLong());
+
+    verifyZeroInteractions(stateManager);
+
+    // Poll for execution status
+    var stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    var runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
+    kdr.poll(runState);
+
+    verify(stateManager).receive(any(), anyLong());
   }
 
   @Test

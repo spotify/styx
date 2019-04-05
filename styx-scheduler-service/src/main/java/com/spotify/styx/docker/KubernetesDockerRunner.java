@@ -46,6 +46,7 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.EventUtil;
@@ -628,9 +629,11 @@ class KubernetesDockerRunner implements DockerRunner {
         // TODO: spoofing counter values like this can give unexpected results, e.g. if we emit two events here the
         // first one might be discarded and the second one accepted.
         stateManager.receive(event, runState.counter() + i);
-      } catch (IsClosedException isClosedException) {
-        LOG.warn("Could not receive kubernetes event", isClosedException);
-        throw new RuntimeException(isClosedException);
+      } catch (StateTransitionConflictException e) {
+        LOG.debug("State transition conflict on kubernetes pod event: {}", event, e);
+        return;
+      } catch (IsClosedException ignore) {
+        return;
       }
     }
   }
