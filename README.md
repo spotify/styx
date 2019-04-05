@@ -42,7 +42,7 @@ Instance executions and provides information about them via the API.
 ## Development status
 
 Styx is actively being developed and deployed internally at Spotify where it is being used to run
-around 6000 production workflows. Because of how we build and integrate infrastructure components at
+more than 10000 production workflows. Because of how we build and integrate infrastructure components at
 Spotify, this repository does not contain a GUI at the time of writing, while we do have one
 internally. The goal is to break out more of these components into open source projects that
 complement each other.
