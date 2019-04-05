@@ -701,7 +701,6 @@ public class DatastoreStorageTest {
         .globalDockerRunnerId("default")
         .globalEnabled(true)
         .debugEnabled(false)
-        .executionGatingEnabled(false)
         .build();
 
     assertThat(storage.config(), is(expectedConfig));

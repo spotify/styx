@@ -36,7 +36,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
@@ -44,8 +43,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.RateLimiter;
-import com.spotify.futures.CompletableFutures;
-import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -65,7 +62,6 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -74,7 +70,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -118,7 +113,6 @@ public class SchedulerTest {
   @Mock RateLimiter rateLimiter;
   @Mock Stats stats;
   @Mock StyxConfig config;
-  @Mock WorkflowExecutionGate gate;
   @Mock StateManager stateManager;
   @Mock Storage storage;
   @Mock ShardedCounter shardedCounter;
@@ -129,8 +123,6 @@ public class SchedulerTest {
   @Before
   public void setUp() throws Exception {
     workflows = new HashMap<>();
-    when(gate.executionBlocker(any()))
-        .thenReturn(WorkflowExecutionGate.NO_BLOCKER);
     when(shardedCounter.counterHasSpareCapacity(anyString())).thenReturn(true);
     doNothing().when(stateManager).receiveIgnoreClosed(eventCaptor.capture(), anyLong());
 
@@ -149,7 +141,7 @@ public class SchedulerTest {
         Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
     scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, gate, shardedCounter, executor, log);
+        stats, rateLimiter, shardedCounter, executor, log);
   }
 
   @After
@@ -529,89 +521,6 @@ public class SchedulerTest {
         either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))
             .or(is(Event.dequeue(i4, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))),
         anyLong());
-  }
-
-  @Test
-  public void shouldRetryLaterOnExecutionBlockers() throws Exception {
-    when(config.executionGatingEnabled()).thenReturn(true);
-
-    final ExecutionBlocker blocker = ExecutionBlocker.of("missing dep", Duration.ofMinutes(17));
-    when(gate.executionBlocker(any())).thenReturn(
-        CompletableFuture.completedFuture(Optional.of(blocker)));
-
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
-
-    initWorkflow(workflow);
-
-    final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
-
-    populateActiveStates(runState);
-
-    scheduler.tick();
-
-    verify(gate).executionBlocker(INSTANCE_1);
-    verify(stateManager).receiveIgnoreClosed(
-        eq(Event.retryAfter(INSTANCE_1, blocker.delay().toMillis())),
-        anyLong());
-    verify(stateManager, never()).receiveIgnoreClosed(
-        eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-        anyLong());
-
-    now = now.plus(blocker.delay());
-    when(gate.executionBlocker(any())).thenReturn(WorkflowExecutionGate.NO_BLOCKER);
-
-    scheduler.tick();
-
-    verify(gate, times(2)).executionBlocker(INSTANCE_1);
-
-    verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-        anyLong());
-  }
-
-  @Test
-  public void shouldNotGateExecutionIfDisabled() throws Exception {
-    when(config.executionGatingEnabled()).thenReturn(false);
-
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
-
-    initWorkflow(workflow);
-
-    final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
-
-    populateActiveStates(runState);
-
-    scheduler.tick();
-
-    verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-        anyLong());
-    verifyZeroInteractions(gate);
-  }
-
-  @Test
-  public void shouldIgnoreGatingFailure() throws Exception {
-    when(config.executionGatingEnabled()).thenReturn(true);
-
-    when(gate.executionBlocker(any())).thenReturn(
-        CompletableFutures.exceptionallyCompletedFuture(new Exception()));
-
-    final Workflow workflow = workflowUsingResources(WORKFLOW_ID1);
-
-    initWorkflow(workflow);
-
-    final StateData stateData = StateData.newBuilder().tries(0).build();
-    final RunState runState = RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get());
-
-    populateActiveStates(runState);
-
-    scheduler.tick();
-
-    verify(gate).executionBlocker(INSTANCE_1);
-
-    verify(stateManager).receiveIgnoreClosed(eq(Event.dequeue(INSTANCE_1, ImmutableSet.of())),
-        anyLong());
-    verifyZeroInteractions(gate);
   }
 
   @Test

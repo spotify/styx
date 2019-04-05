@@ -33,7 +33,6 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.futures.CompletableFutures;
-import com.spotify.styx.WorkflowExecutionGate.ExecutionBlocker;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -70,10 +69,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,14 +100,13 @@ public class Scheduler {
   private final WorkflowResourceDecorator resourceDecorator;
   private final Stats stats;
   private final RateLimiter dequeueRateLimiter;
-  private final WorkflowExecutionGate gate;
   private final ShardedCounter shardedCounter;
   private final Executor executor;
   private final Logger log;
 
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-            WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor) {
+            ShardedCounter shardedCounter, Executor executor) {
     this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, gate, shardedCounter, executor,
         LoggerFactory.getLogger(Scheduler.class));
   }
@@ -119,14 +114,13 @@ public class Scheduler {
 
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-            WorkflowExecutionGate gate, ShardedCounter shardedCounter, Executor executor, Logger log) {
+            ShardedCounter shardedCounter, Executor executor, Logger log) {
     this.time = Objects.requireNonNull(time);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.storage = Objects.requireNonNull(storage);
     this.resourceDecorator = Objects.requireNonNull(resourceDecorator);
     this.stats = Objects.requireNonNull(stats);
     this.dequeueRateLimiter = Objects.requireNonNull(dequeueRateLimiter, "dequeueRateLimiter");
-    this.gate = Objects.requireNonNull(gate, "gate");
     this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
     this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
     this.log = Objects.requireNonNull(log, "log");
@@ -287,35 +281,9 @@ public class Scheduler {
       return;
     }
 
-    // Check for execution blocker
-    var blocker = executionBlocker(config, instance);
-    if (blocker.isPresent()) {
-      var retry = Event.retryAfter(instance, blocker.get().delay().toMillis());
-      stateManager.receiveIgnoreClosed(retry, runState.counter());
-      log.debug("Dequeue rescheduled: {}: {}", instance, blocker.get());
-      return;
-    }
-
     // Racy: some resources may have been removed (become unknown) by now; in that case the
     // counters code during dequeue will treat them as unlimited...
     sendDequeue(instance, runState, instanceResourceRefs);
-  }
-
-  private Optional<ExecutionBlocker> executionBlocker(StyxConfig config, WorkflowInstance instance) {
-    if (!config.executionGatingEnabled()) {
-      return Optional.empty();
-    }
-
-    try {
-      return gate.executionBlocker(instance)
-          .toCompletableFuture().get(10, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (ExecutionException | TimeoutException e) {
-      log.warn("Failed to check execution blocker for {}, assuming there is no blocker", instance, e);
-      return Optional.empty();
-    }
   }
 
   private Optional<Workflow> readWorkflow(WorkflowId workflowId) {
