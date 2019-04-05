@@ -34,8 +34,6 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -91,8 +89,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
           .dockerImage("busybox")
           .dockerArgs(asList("--hour", "{}"))
           .build();
-  private static final String TEST_EXECUTION_ID_1 = "execution_1";
-  private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final Workflow HOURLY_WORKFLOW = Workflow.create(
       "styx",
       WORKFLOW_CONFIGURATION_HOURLY);
@@ -102,16 +98,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
   private static final Workflow HOURLY_WORKFLOW_WITH_TWO_HOURS_OFFSET = Workflow.create(
       "styx",
       WORKFLOW_CONFIGURATION_HOURLY_WITH_TWO_HOURS_OFFSET);
-  private static final ExecutionDescription TEST_EXECUTION_DESCRIPTION =
-      ExecutionDescription.builder()
-      .dockerImage(TEST_DOCKER_IMAGE)
-      .dockerArgs("--date", "{}", "--bar")
-      .build();
   private static final Workflow DAILY_WORKFLOW = Workflow.create(
       "styx",
       WORKFLOW_CONFIGURATION_DAILY);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
-  private static final Trigger TRIGGER2 = Trigger.unknown("trig2");
   private static final Backfill ONE_DAY_HOURLY_BACKFILL = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2015-01-01T00:00:00Z"))
@@ -121,16 +111,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
       .build();
-  private static final String RESOURCE_ID1 = "resource_1";
-  private static final String RESOURCE_ID2 = "resource_2";
-  private static final String RESOURCE_ID3 = "resource_3";
-  private static final String RESOURCE_ID4 = "resource_4";
-  private static final String RESOURCE_ID5 = "resource_5";
-  private static final Resource RESOURCE_1 = Resource.create(RESOURCE_ID1, 10);
-  private static final Resource RESOURCE_2 = Resource.create(RESOURCE_ID2, 128);
-  private static final Resource RESOURCE_3 = Resource.create(RESOURCE_ID3, 10000);
-  private static final Resource RESOURCE_4 = Resource.create(RESOURCE_ID4, 3);
-  private static final Resource RESOURCE_5 = Resource.create(RESOURCE_ID5, 1);
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args,
       Map<String, String> env) {
