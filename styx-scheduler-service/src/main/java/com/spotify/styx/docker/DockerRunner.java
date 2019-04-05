@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -111,15 +110,6 @@ public interface DockerRunner extends Closeable {
           .args(args)
           .build();
     }
-  }
-
-  /**
-   * A local runner
-   *
-   * @return A locally operating docker runner
-   */
-  static DockerRunner local(ScheduledExecutorService executorService, StateManager stateManager) {
-    return new LocalDockerRunner(executorService, stateManager);
   }
 
   static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient,

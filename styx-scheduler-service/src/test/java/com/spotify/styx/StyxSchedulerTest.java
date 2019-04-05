@@ -226,20 +226,4 @@ public class StyxSchedulerTest {
     verifyNoMoreInteractions(storage);
     verifyNoMoreInteractions(stateManager);
   }
-
-  @Test
-  public void shouldReflectDevMode() {
-    final Config devConfig = ConfigFactory.parseMap(Map.of("styx.mode", "development"));
-    final Config prodConfig = ConfigFactory.parseMap(Map.of("styx.mode", "production"));
-    assertThat(StyxScheduler.isDevMode(devConfig), is(true));
-    assertThat(StyxScheduler.isDevMode(prodConfig), is(false));
-  }
-
-  private void shardsWithValue(ArgumentCaptor<Shard> shardArgumentCaptor, long value, long times) {
-    assertThat(shardArgumentCaptor.getAllValues()
-            .stream()
-            .filter(shard -> shard.value() == value)
-            .count(),
-        is(times));
-  }
 }
