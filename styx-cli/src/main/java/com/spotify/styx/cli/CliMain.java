@@ -402,7 +402,8 @@ public final class CliMain {
 
     boolean invalid = false;
     for (WorkflowConfiguration configuration : configurations) {
-      final Collection<String> errors = cliContext.workflowValidator().validateWorkflowConfiguration(configuration);
+      var workflow = Workflow.create(component, configuration);
+      var errors = cliContext.workflowValidator().validateWorkflow(workflow);
       if (!errors.isEmpty()) {
         cliOutput.printError("Invalid workflow configuration: " + configuration.id());
         errors.forEach(error -> cliOutput.printError("  error: " + error));
