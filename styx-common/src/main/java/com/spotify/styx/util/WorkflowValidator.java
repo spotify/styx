@@ -24,7 +24,6 @@ import static java.lang.String.format;
 
 import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
@@ -60,12 +59,25 @@ public class WorkflowValidator {
   }
 
   public List<String> validateWorkflow(Workflow workflow) {
-    final WorkflowConfiguration configuration = workflow.configuration();
-    return validateWorkflowConfiguration(configuration);
-  }
+    var workflowId = workflow.id();
+    var cfg = workflow.configuration();
 
-  public List<String> validateWorkflowConfiguration(WorkflowConfiguration cfg) {
     final List<String> e = new ArrayList<>();
+
+    var componentId = workflowId.componentId();
+    if (componentId.isEmpty()) {
+      e.add("component id cannot be empty");
+    } else if (componentId.contains("#")) {
+      e.add("component id cannot contain #");
+    }
+
+    if (workflowId.id().isEmpty()) {
+      e.add("workflow id cannot be empty");
+    }
+
+    if (!workflowId.id().equals(cfg.id())) {
+      e.add("workflow id mismatch");
+    }
 
     // TODO: validate more of the contents
 
