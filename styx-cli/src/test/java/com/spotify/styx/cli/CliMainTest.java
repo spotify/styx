@@ -98,7 +98,6 @@ public class CliMainTest {
     MockitoAnnotations.initMocks(this);
 
     when(cliContext.workflowValidator()).thenReturn(validator);
-    when(validator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     when(validator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(cliContext.createClient(any())).thenReturn(client);
     when(cliContext.output(any())).thenReturn(cliOutput);
@@ -164,7 +163,8 @@ public class CliMainTest {
     assertThat(expected, is(not(Matchers.empty())));
 
     for (WorkflowConfiguration configuration : expected) {
-      when(validator.validateWorkflowConfiguration(configuration)).thenReturn(
+      var workflow = Workflow.create(component, configuration);
+      when(validator.validateWorkflow(workflow)).thenReturn(
           List.of("bad-" + configuration.id(), "cfg-" + configuration.id()));
     }
 
