@@ -25,7 +25,11 @@ import com.google.cloud.datastore.DatastoreException;
 public class TransactionException extends StorageException {
 
   public TransactionException(DatastoreException cause) {
-    super(cause.getMessage(), cause);
+    super(cause.getMessage() +
+          ", code=" + cause.getCode() +
+          ", reason=" + cause.getReason() +
+          ", isRetryable=" + cause.isRetryable()
+        , cause);
   }
 
   // TODO: represent the failure cause using an enum instead

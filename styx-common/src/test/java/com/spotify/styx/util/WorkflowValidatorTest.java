@@ -20,6 +20,7 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.util.WorkflowValidator.MAX_COMMIT_SHA_LENGTH;
 import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_SIZE;
 import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_VARS;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
@@ -67,7 +69,7 @@ public class WorkflowValidatorTest {
 
   private static final Duration EXCESSIVE_TIMEOUT = Duration.ofDays(365);
   private static final WorkflowConfiguration CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT =
-      WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
           .runningTimeout(EXCESSIVE_TIMEOUT)
           .build();
 
@@ -85,7 +87,7 @@ public class WorkflowValidatorTest {
 
   @Test
   public void validateValidWorkflow() {
-    assertThat(sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION), is(empty()));
+    assertThat(sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION)), is(empty()));
   }
 
   @Test
@@ -100,17 +102,17 @@ public class WorkflowValidatorTest {
       "yearly", "years",
   })
   public void validateValidCron(String expression) {
-    assertThat(sut.validateWorkflowConfiguration(
-        WorkflowConfigurationBuilder.from(TestData.FULL_WORKFLOW_CONFIGURATION)
+    assertThat(sut.validateWorkflow(Workflow.create(
+        "test", WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
             .schedule(Schedule.parse(expression))
-            .build()),
+            .build())),
         is(empty()));
   }
 
   @Test
   public void validateInvalidOffset() {
-    final List<String> errors = sut.validateWorkflowConfiguration(
-        TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET);
+    final List<String> errors = sut.validateWorkflow(Workflow.create(
+        "test", TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET));
     assertThat(errors, hasSize(1));
     assertThat(errors.get(0), startsWith("invalid offset"));
   }
@@ -118,7 +120,7 @@ public class WorkflowValidatorTest {
   @Test
   public void validateInvalidDockerImage() {
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(List.of("foo", "bar"));
-    final List<String> errors = sut.validateWorkflowConfiguration(TestData.FULL_WORKFLOW_CONFIGURATION);
+    final List<String> errors = sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
     assertThat(errors, contains("invalid image: foo", "invalid image: bar"));
   }
 
@@ -153,7 +155,7 @@ public class WorkflowValidatorTest {
         .runningTimeout(runningTimeout)
         .build();
 
-    final List<String> errors = sut.validateWorkflowConfiguration(invalidConfiguration);
+    final List<String> errors = sut.validateWorkflow(Workflow.create("test", invalidConfiguration));
 
     final List<String> expectedErrors = ImmutableList.<String>builder()
         .add(limit("id too long", id.length(), MAX_ID_LENGTH))
@@ -176,7 +178,8 @@ public class WorkflowValidatorTest {
 
   @Test
   public void shouldSkipMaxRunningTimeoutValidationByDefault() {
-    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+    final List<String> errors = sut.validateWorkflow(Workflow.create("test",
+        CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT));
 
     assertThat(errors, empty());
   }
@@ -188,11 +191,61 @@ public class WorkflowValidatorTest {
         .withMaxRunningTimeoutLimit(maxRunningTimeout)
         .build();
 
-    final List<String> errors = sut.validateWorkflowConfiguration(CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT);
+    final List<String> errors = sut.validateWorkflow(
+        Workflow.create("test", CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT));
 
     assertThat(errors, contains(limit("running timeout is too big", EXCESSIVE_TIMEOUT, maxRunningTimeout)));
   }
 
+  @Test
+  public void shouldNotAllowWorkflowIdMismatch() {
+    var component = "test";
+    var workflowConfiguration = WorkflowConfiguration.builder()
+        .id("foo")
+        .schedule(Schedule.HOURS)
+        .build();
+    var workflow = new Workflow() {
+      @Override
+      public String componentId() {
+        return component;
+      }
+
+      @Override
+      public String workflowId() {
+        return "bar";
+      }
+
+      @Override
+      public WorkflowConfiguration configuration() {
+        return workflowConfiguration;
+      }
+    };
+    var errors = sut.validateWorkflow(workflow);
+    assertThat(errors, contains("workflow id mismatch"));
+  }
+
+  @Test
+  public void shouldNotAllowEmptyWorkflowId() {
+    var workflowConfiguration = WorkflowConfiguration.builder()
+        .id("")
+        .schedule(Schedule.HOURS)
+        .build();
+    var errors = sut.validateWorkflow(Workflow.create("test", workflowConfiguration));
+    assertThat(errors, contains("workflow id cannot be empty"));
+  }
+
+  @Test
+  public void shouldNotAllowEmptyComponent() {
+    var errors = sut.validateWorkflow(Workflow.create("", FULL_WORKFLOW_CONFIGURATION));
+    assertThat(errors, contains("component id cannot be empty"));
+  }
+
+  @Parameters({"foo#bar", "#", "##"})
+  @Test
+  public void shouldNotAllowComponentWithHash(String component) {
+    assertThat(sut.validateWorkflow(Workflow.create(component, FULL_WORKFLOW_CONFIGURATION)),
+        contains("component id cannot contain #"));
+  }
 
   private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;

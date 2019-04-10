@@ -212,7 +212,6 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Before
   public void setUp() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     storage.storeWorkflow(Workflow.create(
         BACKFILL_1.workflowId().componentId(),
         WorkflowConfiguration.builder()

@@ -54,7 +54,6 @@ import com.google.cloud.datastore.StructuredQuery.Filter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Value;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -176,7 +175,6 @@ public class DatastoreStorage implements Closeable {
   public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
   public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
-  private static final boolean DEFAULT_CONFIG_BOOTSTRAP_ACTIVE_WFI_ENABLED = false;
 
   public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
@@ -271,7 +269,7 @@ public class DatastoreStorage implements Closeable {
   static Optional<Entity> getWorkflowOpt(final CheckedDatastoreReaderWriter datastore,
                                          final Supplier<KeyFactory> keyFactory,
                                          final WorkflowId workflowId) throws IOException {
-    var key = DatastoreStorage.workflowKey(keyFactory, workflowId);
+    var key = DatastoreStorage.workflowKeyNew(keyFactory, workflowId);
     return DatastoreStorage.getOpt(datastore, key);
   }
 
@@ -366,7 +364,7 @@ public class DatastoreStorage implements Closeable {
 
   private List<Workflow> getBatchOfWorkflows(final List<WorkflowId> batch) throws IOException {
     final List<Key> keys = batch.stream()
-        .map(workflowId -> workflowKey(datastore::newKeyFactory, workflowId))
+        .map(workflowId -> workflowKeyNew(datastore::newKeyFactory, workflowId))
         .collect(toList());
     final List<Workflow> workflows = new ArrayList<>();
     datastore.get(keys, entity -> {
@@ -380,11 +378,10 @@ public class DatastoreStorage implements Closeable {
   }
 
   public List<Workflow> workflows(String componentId) throws IOException {
-    final Key componentKey = componentKey(datastore::newKeyFactory, componentId);
     final List<Workflow> workflows = Lists.newArrayList();
     final EntityQuery query = Query.newEntityQueryBuilder()
         .setKind(KIND_WORKFLOW)
-        .setFilter(PropertyFilter.hasAncestor(componentKey))
+        .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
         .build();
     workflowQuery(query, entity -> {
       final Workflow workflow;
@@ -657,7 +654,7 @@ public class DatastoreStorage implements Closeable {
         try {
           Thread.sleep(retryBaseDelay.toMillis());
         } catch (InterruptedException e1) {
-          throw Throwables.propagate(e1);
+          throw new RuntimeException(e1);
         }
       }
     }
@@ -667,9 +664,9 @@ public class DatastoreStorage implements Closeable {
 
   private void workflowQuery(Query<Entity> query, IOConsumer<Entity> consumer) throws IOException {
     datastore.query(query, entity -> {
-      // Exclude all workflow entities that are new-style as we currently only read from old keys.
-      // TODO: change when changing to read from new keys.
-      if (isNewWorkflow(entity)) {
+      // Exclude all workflow entities that are old-style as we currently only read from new keys.
+      // TODO: delete after migration
+      if (!isNewWorkflow(entity)) {
         return;
       }
       consumer.accept(entity);
@@ -700,10 +697,7 @@ public class DatastoreStorage implements Closeable {
   }
 
   private WorkflowId parseWorkflowId(Entity workflow) {
-    final String componentId = workflow.getKey().getAncestors().get(0).getName();
-    final String id = workflow.getKey().getName();
-
-    return WorkflowId.create(componentId, id);
+    return WorkflowId.parseKey(workflow.getKey().getName());
   }
 
   static Workflow parseWorkflowJson(Entity entity, WorkflowId workflowId) throws IOException {

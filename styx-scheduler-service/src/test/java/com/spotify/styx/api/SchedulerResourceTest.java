@@ -123,7 +123,6 @@ public class SchedulerResourceTest {
   public void setUp() throws Exception {
     when(storage.workflow(WFI.workflowId())).thenReturn(Optional.of(FULL_DAILY_WORKFLOW));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
   }
 

@@ -100,7 +100,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -727,26 +726,9 @@ class KubernetesDockerRunner implements DockerRunner {
       emitPodEvents(pod, runState.get());
     }
 
-    private void reconnect() {
-      LOG.warn("Re-establishing pod watcher");
-
-      try {
-        watch = client.pods()
-            .watch(this);
-      } catch (Throwable e) {
-        LOG.warn("Retry threw", e);
-        scheduleReconnect();
-      }
-    }
-
-    private void scheduleReconnect() {
-      scheduledExecutor.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
-    }
-
     @Override
     public void onClose(KubernetesClientException e) {
       LOG.warn("Watch closed", e);
-      scheduleReconnect();
     }
   }
 
