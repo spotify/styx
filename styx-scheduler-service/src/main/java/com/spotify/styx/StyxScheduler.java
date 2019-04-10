@@ -103,10 +103,8 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
-import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
-import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -520,15 +518,6 @@ public class StyxScheduler implements AppInit {
   }
 
   private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
-    try (Scope ss = tracer.spanBuilder("Styx.StyxScheduler.updateRuntimeConfig")
-        .setRecordEvents(true)
-        .setSampler(Samplers.alwaysSample())
-        .startScopedSpan()) {
-      updateRuntimeConfig0(config, rateLimiter);
-    }
-  }
-
-  private static void updateRuntimeConfig0(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
     try {
       double currentRate = rateLimiter.getRate();
       Double updatedRate = config.get().submissionRateLimit().orElse(
