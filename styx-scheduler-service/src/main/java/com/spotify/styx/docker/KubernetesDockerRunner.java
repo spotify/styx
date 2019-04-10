@@ -79,6 +79,7 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
@@ -550,13 +551,23 @@ class KubernetesDockerRunner implements DockerRunner {
    */
   @VisibleForTesting
   void tryCleanupPods() {
-    client.pods().list().getItems().stream()
+    var pods = client.pods().list().getItems();
+    pods.stream()
         .map(pod -> runAsync(guard(() -> tryCleanupPod(pod)), executor))
         .collect(toList())
         .forEach(CompletableFuture::join);
+    tracer.getCurrentSpan().addAnnotation("processed",
+        Map.of("pods", AttributeValue.longAttributeValue(pods.size())));
+
   }
 
   private void tryCleanupPod(Pod pod) {
+    // Do not include all pod span in parent span to avoid it growing too big
+    tracer.spanBuilderWithExplicitParent("Styx.KubernetesDockerRunner.tryCleanupPod", null)
+        .startSpanAndRun(() -> tryCleanupPod0(pod));
+  }
+
+  private void tryCleanupPod0(Pod pod) {
     var workflowInstance = readPodWorkflowInstance(pod);
     if (workflowInstance.isEmpty()) {
       return;

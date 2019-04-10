@@ -41,6 +41,7 @@ import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.AlreadyInitializedException;
 import com.spotify.styx.util.Time;
 import io.opencensus.common.Scope;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
@@ -49,6 +50,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -125,9 +127,18 @@ class BackfillTriggerManager {
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
+
+    tracer.getCurrentSpan().addAnnotation("processed",
+        Map.of("backfills", AttributeValue.longAttributeValue(backfills.size())));
   }
 
   private void triggerAndProgress(Backfill backfill) {
+    // Do not include all backfill spans in parent tick span to avoid it growing too big
+    tracer.spanBuilderWithExplicitParent("Styx.BackfillTriggerManager.triggerAndProgress", null)
+        .startSpanAndRun(() -> triggerAndProgress0(backfill));
+  }
+
+  private void triggerAndProgress0(Backfill backfill) {
     final Optional<Workflow> workflowOpt;
     try {
       workflowOpt = storage.workflow(backfill.workflowId());
