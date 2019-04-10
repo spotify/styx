@@ -108,7 +108,7 @@ public class Scheduler {
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
             ShardedCounter shardedCounter, Executor executor) {
-    this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, gate, shardedCounter, executor,
+    this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, shardedCounter, executor,
         LoggerFactory.getLogger(Scheduler.class));
   }
 
