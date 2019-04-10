@@ -72,9 +72,6 @@ import java.util.function.Supplier;
 
 public class DatastoreStorageTransaction implements StorageTransaction {
 
-  // TODO: remove after migration
-  private final boolean workflowStoreNew = Boolean.parseBoolean(System.getenv("STYX_WORKFLOW_STORE_NEW"));
-
   private final CheckedDatastoreTransaction tx;
 
   public DatastoreStorageTransaction(CheckedDatastoreTransaction transaction) {
@@ -173,11 +170,9 @@ public class DatastoreStorageTransaction implements StorageTransaction {
       throws IOException {
     final Supplier<KeyFactory> keyFactory = tx.getDatastore()::newKeyFactory;
 
-    if (workflowStoreNew) {
-      var key = workflowKeyNew(keyFactory, workflow.id());
-      var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
-      tx.put(entity);
-    }
+    var key = workflowKeyNew(keyFactory, workflow.id());
+    var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
+    tx.put(entity);
 
     // TODO: stop writing legacy workflow after migration
     var legacyKey = workflowKey(keyFactory, workflow.id());
@@ -190,7 +185,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     final Optional<Entity> entityOptional =
-        DatastoreStorage.getOpt(tx, workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
+        DatastoreStorage.getOpt(tx, workflowKeyNew(tx.getDatastore()::newKeyFactory, workflowId));
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
