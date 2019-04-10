@@ -35,9 +35,7 @@ import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.SecretBuilder;
 import io.fabric8.kubernetes.api.model.SecretList;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
-import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -74,7 +72,7 @@ class KubernetesGCPServiceAccountSecretManager {
   // todo: use config value instead of hardcoded 24 hour timeout
   private static final Duration SECRET_GC_GRACE_PERIOD = DEFAULT_SECRET_EPOCH_PERIOD.plusHours(24);
 
-  private final KubernetesClient client;
+  private final Fabric8KubernetesClient client;
   private final ServiceAccountKeyManager keyManager;
   private final EpochProvider epochProvider;
   private final Clock clock;
@@ -84,7 +82,7 @@ class KubernetesGCPServiceAccountSecretManager {
       .build();
 
   KubernetesGCPServiceAccountSecretManager(
-      NamespacedKubernetesClient client,
+      Fabric8KubernetesClient client,
       ServiceAccountKeyManager keyManager,
       EpochProvider epochProvider,
       Clock clock) {
@@ -95,7 +93,7 @@ class KubernetesGCPServiceAccountSecretManager {
   }
 
   KubernetesGCPServiceAccountSecretManager(
-      NamespacedKubernetesClient client,
+      Fabric8KubernetesClient client,
       ServiceAccountKeyManager keyManager) {
     this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
@@ -138,8 +136,9 @@ class KubernetesGCPServiceAccountSecretManager {
     }
 
     // Check for existing secret
-    final Secret existingSecret = client.secrets().withName(secretName).get();
-    if (existingSecret != null) {
+    var existingSecretOpt = client.getSecret(secretName);
+    if (existingSecretOpt.isPresent()) {
+      var existingSecret = existingSecretOpt.orElseThrow();
       final Map<String, String> annotations = existingSecret.getMetadata().getAnnotations();
       final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
       final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
@@ -202,7 +201,7 @@ class KubernetesGCPServiceAccountSecretManager {
         .build();
 
     try {
-      client.secrets().create(newSecret);
+      client.createSecret(newSecret);
     } catch (KubernetesClientException e) {
       // Best effort delete of the generated keys since another entity already created the secret
       keyManager.tryDeleteKey(jsonKey.getName());
@@ -224,7 +223,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
   public void cleanup() throws IOException {
     // Enumerate all secrets currently used by non-terminated pods
-    final PodList pods = client.pods().list();
+    final PodList pods = client.listPods();
     final Set<String> activeSecrets = pods.getItems().stream()
         .filter(pod -> !isTerminatedPod(pod))
         .flatMap(pod -> pod.getSpec().getVolumes().stream())
@@ -234,7 +233,7 @@ class KubernetesGCPServiceAccountSecretManager {
     // Enumerate service account secrets to delete
     final long nowMillis = clock.millis();
     final Instant creationDeadline = clock.instant().minus(SECRET_GC_GRACE_PERIOD);
-    final SecretList secrets = client.secrets().list();
+    final SecretList secrets = client.listSecrets();
     final List<Secret> inactiveServiceAccountSecrets = secrets.getItems().stream()
         // Only include service account secrets
         .filter(secret -> secret.getMetadata().getName().startsWith(STYX_WORKFLOW_SA_SECRET_NAME))
@@ -280,17 +279,13 @@ class KubernetesGCPServiceAccountSecretManager {
   }
 
   private void deleteSecret(Secret secret) {
-    LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAccount(secret),
-        secret.getMetadata().getName());
+    var name = secret.getMetadata().getName();
+    LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAccount(secret), name);
     try {
-      client.secrets().delete(secret);
+      client.deleteSecret(name);
     } catch (KubernetesClientException e) {
-      if (e.getCode() == 404) {
-        LOG.debug("Couldn't find secret to delete {}", secret.getMetadata().getName());
-      } else {
-        LOG.warn("[AUDIT] Failed to delete secret {}", secret.getMetadata().getName());
-        throw e;
-      }
+      LOG.warn("[AUDIT] Failed to delete secret {}", name);
+      throw e;
     }
   }
 

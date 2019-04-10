@@ -21,7 +21,6 @@
 package com.spotify.styx.docker;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,15 +38,11 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Debug;
 import io.fabric8.kubernetes.api.model.ContainerStatus;
-import io.fabric8.kubernetes.api.model.DoneablePod;
 import io.fabric8.kubernetes.api.model.ListMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.api.model.PodStatusBuilder;
-import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
-import io.fabric8.kubernetes.client.dsl.MixedOperation;
-import io.fabric8.kubernetes.client.dsl.PodResource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -78,11 +73,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   private static final String STYX_ENVIRONMENT = "testing";
 
-  @Mock NamespacedKubernetesClient k8sClient;
-  @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
-  PodList podList;
-  @Mock PodResource<Pod, DoneablePod> namedPod1;
-  @Mock PodResource<Pod, DoneablePod> namedPod2;
+  @Mock Fabric8KubernetesClient k8sClient;
   @Mock PodStatus podStatus1;
   @Mock PodStatus podStatus2;
   @Mock ContainerStatus containerStatus1;
@@ -93,25 +84,27 @@ public class KubernetesDockerRunnerPodPollerTest {
   @Mock KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   @Mock Debug debug;
 
+  private PodList podList;
+
   KubernetesDockerRunner kdr;
 
   @Before
   public void setUp() {
     when(debug.get()).thenReturn(false);
 
-    when(k8sClient.pods()).thenReturn(pods);
-
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, Set.of());
     podList = new PodList();
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");
+
+    when(k8sClient.getPod(any())).thenReturn(Optional.empty());
+    when(k8sClient.listPods()).thenReturn(podList);
+
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+        debug, STYX_ENVIRONMENT, Set.of());
   }
 
   @Test
   public void shouldSendRunErrorWhenPodForRunningWFIDoesntExist() {
-    when(namedPod1.get()).thenReturn(null);
-    when(k8sClient.pods().withName(any())).thenReturn(namedPod1);
     var states = setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
     var runState = states.get(WORKFLOW_INSTANCE);
 
@@ -130,10 +123,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     createdPod1.setStatus(podStatus1);
     createdPod2.setStatus(podStatus2);
 
-    when(namedPod1.get()).thenReturn(createdPod1);
-    when(namedPod2.get()).thenReturn(createdPod2);
-    when(k8sClient.pods().withName(POD_NAME)).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(POD_NAME_2)).thenReturn(namedPod2);
+    when(k8sClient.getPod(POD_NAME)).thenReturn(Optional.of(createdPod1));
+    when(k8sClient.getPod(POD_NAME_2)).thenReturn(Optional.of(createdPod2));
     var states = setupActiveInstances(RunState.State.RUNNING, POD_NAME, POD_NAME_2);
     var runState1 = states.get(WORKFLOW_INSTANCE);
     var runState2 = states.get(WORKFLOW_INSTANCE_2);
@@ -146,7 +137,6 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   @Test
   public void shouldNotSendErrorEventForInstancesNotInRunningState() {
-    when(k8sClient.pods().list()).thenReturn(podList);
     setupActiveInstances(RunState.State.SUBMITTED, POD_NAME, POD_NAME_2);
 
     kdr.tryCleanupPods();
@@ -160,11 +150,8 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod2 = createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
-    when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
-    when(namedPod1.get()).thenReturn(createdPod1);
-    when(namedPod2.get()).thenReturn(createdPod2);
+    when(k8sClient.getPod(RUN_SPEC.executionId())).thenReturn(Optional.of(createdPod1));
+    when(k8sClient.getPod(RUN_SPEC_2.executionId())).thenReturn(Optional.of(createdPod2));
 
     createdPod1.setStatus(podStatus1);
     when(podStatus1.getContainerStatuses()).thenReturn(List.of(containerStatus1));
@@ -176,8 +163,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(pods).delete(createdPod1);
-    verify(pods).delete(createdPod2);
+    verify(k8sClient).deletePod(createdPod1.getMetadata().getName());
+    verify(k8sClient).deletePod(createdPod2.getMetadata().getName());
   }
 
   @Test
@@ -188,18 +175,14 @@ public class KubernetesDockerRunnerPodPollerTest {
     final Pod createdPod2 = createPod(WORKFLOW_INSTANCE_2, RUN_SPEC_2, SECRET_SPEC);
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
-    when(k8sClient.pods().list()).thenReturn(podList);
-    when(k8sClient.pods().withName(RUN_SPEC.executionId())).thenReturn(namedPod1);
-    when(k8sClient.pods().withName(RUN_SPEC_2.executionId())).thenReturn(namedPod2);
-    when(namedPod1.get()).thenReturn(createdPod1);
-    when(namedPod2.get()).thenReturn(createdPod2);
+    when(k8sClient.getPod(RUN_SPEC.executionId())).thenReturn(Optional.of(createdPod1));
+    when(k8sClient.getPod(RUN_SPEC_2.executionId())).thenReturn(Optional.of(createdPod2));
     createdPod1.setStatus(new PodStatusBuilder().withContainerStatuses().build());
     createdPod2.setStatus(new PodStatusBuilder().withContainerStatuses().build());
 
     kdr.tryCleanupPods();
 
-    verifyPodNeverDeleted(namedPod1);
-    verifyPodNeverDeleted(namedPod2);
+    verify(k8sClient, never()).deletePod(any());
   }
 
   @Test
@@ -211,12 +194,10 @@ public class KubernetesDockerRunnerPodPollerTest {
     createdPod2.getMetadata().getAnnotations().remove("styx-workflow-instance");
 
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
-    when(k8sClient.pods().list()).thenReturn(podList);
 
     kdr.tryCleanupPods();
 
-    verifyPodNeverDeleted(namedPod1);
-    verifyPodNeverDeleted(namedPod2);
+    verify(k8sClient, never()).deletePod(any());
   }
 
   @Test
@@ -227,16 +208,12 @@ public class KubernetesDockerRunnerPodPollerTest {
     createdPod1.setStatus(podStatus1);
     createdPod2.setStatus(podStatus2);
     podList.setItems(Arrays.asList(createdPod1, createdPod2));
-    when(k8sClient.pods().list()).thenReturn(podList);
 
     setupActiveInstances(RunState.State.RUNNING, RUN_SPEC.executionId(), RUN_SPEC_2.executionId());
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient.pods(), never()).delete(any(Pod.class));
-    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
-    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
-    verify(k8sClient.pods(), never()).delete();
+    verify(k8sClient, never()).deletePod(any());
   }
 
   private Map<WorkflowInstance, RunState> setupActiveInstances(RunState.State state, String podName1, String podName2) {
@@ -250,14 +227,6 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(stateManager.getActiveState(any())).thenAnswer(a ->
         Optional.ofNullable(map.get(a.<WorkflowInstance>getArgument(0))));
     return map;
-  }
-
-  private void verifyPodNeverDeleted(PodResource<Pod, DoneablePod> pod) {
-    verify(k8sClient.pods(), never()).delete(any(Pod.class));
-    verify(k8sClient.pods(), never()).delete(any(Pod[].class));
-    verify(k8sClient.pods(), never()).delete(anyListOf(Pod.class));
-    verify(k8sClient.pods(), never()).delete();
-    verify(pod, never()).delete();
   }
 
   private static Pod createPod(WorkflowInstance workflowInstance,

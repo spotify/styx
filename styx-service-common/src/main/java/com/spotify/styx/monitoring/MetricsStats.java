@@ -107,6 +107,18 @@ public final class MetricsStats implements Stats {
       .tagged("what", "docker-operation-error-rate")
       .tagged("unit", OPERATION);
 
+  static final MetricId KUBERNETES_DURATION = BASE
+      .tagged("what", "kubernetes-operation-duration")
+      .tagged("unit", UNIT_MILLISECOND);
+
+  static final MetricId KUBERNETES_RATE = BASE
+      .tagged("what", "kubernetes-operation-rate")
+      .tagged("unit", OPERATION);
+
+  static final MetricId KUBERNETES_ERROR_RATE = BASE
+      .tagged("what", "kubernetes-operation-error-rate")
+      .tagged("unit", OPERATION);
+
   static final MetricId TRANSITIONING_DURATION = BASE
       .tagged("what", "time-transitioning-between-submitted-running")
       .tagged("unit", UNIT_SECOND);
@@ -184,8 +196,11 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
   private final ConcurrentMap<String, Meter> dockerOperationMeters;
+  private final ConcurrentMap<Tuple2<String, String>, Meter> dockerOperationErrorMeters;
+  private final ConcurrentMap<String, Histogram> kubernetesOperationHistograms;
+  private final ConcurrentMap<String, Meter> kubernetesOperationMeters;
+  private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> kubernetesOperationErrorMeters;
   private final ConcurrentMap<Integer, Meter> exitCodeMeters;
-  private final ConcurrentMap<Tuple3<String, String, Integer>, Meter> dockerOperationErrorMeters;
   private final ConcurrentMap<String, Histogram> resourceConfiguredHistograms;
   private final ConcurrentMap<String, Histogram> resourceUsedHistograms;
   private final ConcurrentMap<String, Histogram> resourceDemandedHistograms;
@@ -221,8 +236,11 @@ public final class MetricsStats implements Stats {
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
     this.dockerOperationMeters = new ConcurrentHashMap<>();
-    this.exitCodeMeters = new ConcurrentHashMap<>();
     this.dockerOperationErrorMeters = new ConcurrentHashMap<>();
+    this.kubernetesOperationHistograms = new ConcurrentHashMap<>();
+    this.kubernetesOperationMeters = new ConcurrentHashMap<>();
+    this.kubernetesOperationErrorMeters = new ConcurrentHashMap<>();
+    this.exitCodeMeters = new ConcurrentHashMap<>();
     this.resourceConfiguredHistograms = new ConcurrentHashMap<>();
     this.resourceUsedHistograms = new ConcurrentHashMap<>();
     this.resourceDemandedHistograms = new ConcurrentHashMap<>();
@@ -265,8 +283,8 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordDockerOperationError(String operation, String type, int code, long durationMillis) {
-    dockerOpErrorMeter(operation, type, code).mark();
+  public void recordDockerOperationError(String operation, String type) {
+    dockerOpErrorMeter(operation, type).mark();
   }
 
   @Override
@@ -394,6 +412,17 @@ public final class MetricsStats implements Stats {
     counterCacheMissMeter.mark();
   }
 
+  @Override
+  public void recordKubernetesOperation(String operation, long durationMillis, String status) {
+    kubernetesOpHistogram(operation, status).update(durationMillis);
+    kubernetesOpMeter(operation, status).mark();
+  }
+
+  @Override
+  public void recordKubernetesOperationError(String operation, String type, int code) {
+    kubernetesOpErrorMeter(operation, type, code).mark();
+  }
+
   private void recordDatastoreOperations(String operation, String kind, int n) {
     datastoreOperationMeter(operation, kind).mark(n);
   }
@@ -404,10 +433,18 @@ public final class MetricsStats implements Stats {
             "exit-code", Integer.toString(exitCode))));
   }
 
-  private Meter dockerOpErrorMeter(String operation, String type, int code) {
+  private Meter dockerOpErrorMeter(String operation, String type) {
     return dockerOperationErrorMeters
-        .computeIfAbsent(Tuple.of(operation, type, code), (tuple) ->
+        .computeIfAbsent(Tuple.of(operation, type), (tuple) ->
             registry.meter(DOCKER_ERROR_RATE.tagged(
+                "operation", tuple._1,
+                "type", tuple._2)));
+  }
+
+  private Meter kubernetesOpErrorMeter(String operation, String type, int code) {
+    return kubernetesOperationErrorMeters
+        .computeIfAbsent(Tuple.of(operation, type, code), (tuple) ->
+            registry.meter(KUBERNETES_ERROR_RATE.tagged(
                 "operation", tuple._1,
                 "type", tuple._2,
                 "code", String.valueOf(tuple._3))));
@@ -431,6 +468,16 @@ public final class MetricsStats implements Stats {
   private Meter dockerOpMeter(String operation, String status) {
     return dockerOperationMeters.computeIfAbsent(
         operation, (op) -> registry.meter(DOCKER_RATE.tagged(OPERATION, op, STATUS, status)));
+  }
+
+  private Histogram kubernetesOpHistogram(String operation, String status) {
+    return kubernetesOperationHistograms.computeIfAbsent(
+        operation, (op) -> registry.getOrAdd(KUBERNETES_DURATION.tagged(OPERATION, op, STATUS, status), HISTOGRAM));
+  }
+
+  private Meter kubernetesOpMeter(String operation, String status) {
+    return kubernetesOperationMeters.computeIfAbsent(
+        operation, (op) -> registry.meter(KUBERNETES_RATE.tagged(OPERATION, op, STATUS, status)));
   }
 
   private Histogram resourceConfiguredHistogram(String resource) {

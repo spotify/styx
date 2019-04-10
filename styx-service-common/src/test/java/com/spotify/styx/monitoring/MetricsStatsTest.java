@@ -31,6 +31,9 @@ import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.HISTOGRAM;
+import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_DURATION;
+import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_ERROR_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.NATURAL_TRIGGER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.PUBLISHING_RATE;
@@ -135,9 +138,31 @@ public class MetricsStatsTest {
   public void shouldRecordDockerOperationError() {
     String operation = "start";
     String type = "kubernetes-client";
-    int code = 429;
-    when(registry.meter(DOCKER_ERROR_RATE.tagged("operation", operation, "type", type, "code", String.valueOf(code)))).thenReturn(meter);
-    stats.recordDockerOperationError(operation, type, code, 1000L);
+    when(registry.meter(DOCKER_ERROR_RATE.tagged("operation", operation, "type", type))).thenReturn(meter);
+    stats.recordDockerOperationError(operation, type);
+    verify(meter).mark();
+  }
+
+
+  @Test
+  public void shouldRecordKubernetesOperation() {
+    var operation = "start";
+    var status = "success";
+    when(registry.getOrAdd(KUBERNETES_DURATION.tagged("operation", operation, "status", status), HISTOGRAM)).thenReturn(histogram);
+    when(registry.meter(KUBERNETES_RATE.tagged("operation", operation, "status", status))).thenReturn(meter);
+    stats.recordKubernetesOperation(operation, 1000L, status);
+    verify(histogram).update(1000L);
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordKubernetesOperationError() {
+    var operation = "start";
+    var type = "kubernetes-client";
+    var code = 409;
+    when(registry.meter(KUBERNETES_ERROR_RATE.tagged("operation", operation, "type", type, "code",
+        String.valueOf(code)))).thenReturn(meter);
+    stats.recordKubernetesOperationError(operation, type, code);
     verify(meter).mark();
   }
 
