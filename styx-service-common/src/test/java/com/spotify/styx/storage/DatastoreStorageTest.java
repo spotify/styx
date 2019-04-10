@@ -32,15 +32,15 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
-import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
-import static com.spotify.styx.storage.DatastoreStorage.workflowToEntity;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -86,6 +86,7 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Message.MessageLevel;
 import com.spotify.styx.state.RunState;
@@ -270,8 +271,8 @@ public class DatastoreStorageTest {
     storage.store(foo);
     storage.store(bar);
 
-    var fooKey = workflowKeyNew(datastore::newKeyFactory, foo.id());
-    var barKey = workflowKeyNew(datastore::newKeyFactory, bar.id());
+    var fooKey = workflowKey(datastore::newKeyFactory, foo.id());
+    var barKey = workflowKey(datastore::newKeyFactory, bar.id());
 
     assertThat(datastore.get(fooKey), is(notNullValue()));
     assertThat(datastore.get(barKey), is(notNullValue()));
@@ -606,7 +607,7 @@ public class DatastoreStorageTest {
 
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     storage.store(workflow1);
-    final Key workflowKey = workflowKeyNew(datastore::newKeyFactory, workflow1.id());
+    final Key workflowKey = workflowKey(datastore::newKeyFactory, workflow1.id());
 
     final Entity entity = datastore.get(workflowKey);
     final Entity corrupted = Entity.newBuilder(entity)
@@ -625,16 +626,11 @@ public class DatastoreStorageTest {
     final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     Workflow workflow2 = workflow(WORKFLOW_ID2);
-    Workflow workflow2old = workflow(WORKFLOW_ID2_OLD);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
     storage.store(workflow1);
     storage.store(workflow2);
     storage.store(workflow3);
-
-    // Should not be returned as we only read _old_ keys
-    // TODO: change when we start reading from _new_ keys
-    storeWorkflowInOldWay(workflow2old);
 
     var workflows = storage.workflows(workflowIds);
     assertThat(workflows.size(), is(3));
@@ -1001,31 +997,21 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldStoreWorkflowsInOnlyInNewWay() throws IOException {
+  public void shouldStoreWorkflows() throws IOException {
     var workflow = workflow(WORKFLOW_ID1);
+
     storage.store(workflow);
-    var legacyKey = workflowKey(datastore::newKeyFactory, workflow.id());
-    var newKey = workflowKeyNew(datastore::newKeyFactory, workflow.id());
-    var legacyEntity = datastore.get(legacyKey);
+
+    var newKey = workflowKey(datastore::newKeyFactory, workflow.id());
     var newEntity = datastore.get(newKey);
     var newProperties = newEntity.getNames()
         .stream()
-        .collect(toMap(key -> key, newEntity::getValue));
-
-    assertThat(newProperties, is(notNullValue()));
-    assertThat(legacyEntity, is(nullValue()));
-  }
-
-
-  // TODO: remove after migration
-  private void storeWorkflowInOldWay(Workflow workflow) throws Exception {
-    storeWorkflowInOldWay(workflow, WorkflowState.empty());
-  }
-
-  private void storeWorkflowInOldWay(Workflow workflow, WorkflowState state) throws Exception {
-    final Key key = workflowKey(datastore::newKeyFactory, workflow.id());
-    var entity = workflowToEntity(workflow, state, Optional.empty(), key);
-    datastore.put(entity);
+        .collect(toMap(key -> key, name -> newEntity.getValue(name).get()));
+    assertThat(
+        newProperties,
+        allOf(
+            hasEntry(PROPERTY_COMPONENT, workflow.id().componentId()),
+            hasEntry(PROPERTY_WORKFLOW_JSON, Json.OBJECT_MAPPER.writeValueAsString(workflow))));
   }
 
   private static class FooException extends Exception {

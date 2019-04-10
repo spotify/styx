@@ -41,7 +41,7 @@ import static com.spotify.styx.storage.DatastoreStorage.getWorkflowOpt;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.parseWorkflowJson;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
-import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
+import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
 import static com.spotify.styx.util.ShardedCounter.PROPERTY_COUNTER_ID;
@@ -141,7 +141,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public void deleteWorkflow(WorkflowId workflowId) throws IOException {
-    tx.delete(workflowKeyNew(tx.getDatastore()::newKeyFactory, workflowId));
+    tx.delete(workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
   }
 
   private Entity resourceToEntity(CheckedDatastore datastore, Resource resource) {
@@ -168,7 +168,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
       throws IOException {
     final Supplier<KeyFactory> keyFactory = tx.getDatastore()::newKeyFactory;
 
-    var key = workflowKeyNew(keyFactory, workflow.id());
+    var key = workflowKey(keyFactory, workflow.id());
     var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
     tx.put(entity);
 
@@ -178,7 +178,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   @Override
   public Optional<Workflow> workflow(WorkflowId workflowId) throws IOException {
     final Optional<Entity> entityOptional =
-        DatastoreStorage.getOpt(tx, workflowKeyNew(tx.getDatastore()::newKeyFactory, workflowId));
+        DatastoreStorage.getOpt(tx, workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
     if (entityOptional.isPresent()) {
       return Optional.of(DatastoreStorage.parseWorkflowJson(entityOptional.get(), workflowId));
     } else {
