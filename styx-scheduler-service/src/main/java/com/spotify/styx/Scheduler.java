@@ -53,6 +53,7 @@ import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import io.grpc.Context;
 import io.opencensus.common.Scope;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
@@ -171,6 +172,9 @@ public class Scheduler {
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
+
+    tracer.getCurrentSpan().addAnnotation("processed",
+        Map.of("instances", AttributeValue.longAttributeValue(activeInstances.size())));
   }
 
   private void updateResourceStats(Map<String, Resource> resources,
@@ -196,7 +200,8 @@ public class Scheduler {
     // Process instances in parallel
     var futures = shuffledInstances.stream()
         .map(instance -> CompletableFuture.runAsync(() ->
-            tracer.spanBuilder("processInstance").startSpanAndRun(() -> {
+            // Do not include all instance spans in parent tick span to avoid it growing too big
+            tracer.spanBuilderWithExplicitParent("Styx.Scheduler.processInstance", null).startSpanAndRun(() -> {
               try {
                 processInstance(config, resources, workflows, instance, resourceExhaustedCache,
                     currentResourceUsage, currentResourceDemand);
