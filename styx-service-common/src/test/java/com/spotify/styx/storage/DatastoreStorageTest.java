@@ -127,7 +127,7 @@ public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
-  private static final WorkflowId WORKFLOW_ID2_NEW = WorkflowId.create("component", "endpoint2_new");
+  private static final WorkflowId WORKFLOW_ID2_OLD = WorkflowId.create("component", "endpoint2_old");
   private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
   static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
@@ -267,28 +267,20 @@ public class DatastoreStorageTest {
     var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
     var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
 
-    storeWorkflowInNewWay(foo);
-    storeWorkflowInNewWay(bar);
     storage.store(foo);
     storage.store(bar);
 
-    var fooLegacyKey = workflowKey(datastore::newKeyFactory, foo.id());
-    var barLegacyKey = workflowKey(datastore::newKeyFactory, bar.id());
     var fooKey = workflowKeyNew(datastore::newKeyFactory, foo.id());
     var barKey = workflowKeyNew(datastore::newKeyFactory, bar.id());
 
     assertThat(datastore.get(fooKey), is(notNullValue()));
-    assertThat(datastore.get(fooLegacyKey), is(notNullValue()));
     assertThat(datastore.get(barKey), is(notNullValue()));
-    assertThat(datastore.get(barLegacyKey), is(notNullValue()));
 
     storage.delete(foo.id());
 
     assertThat(storage.workflow(foo.id()), is(Optional.empty()));
     assertThat(datastore.get(fooKey), is(nullValue()));
-    assertThat(datastore.get(fooLegacyKey), is(nullValue()));
     assertThat(datastore.get(barKey), is(notNullValue()));
-    assertThat(datastore.get(barLegacyKey), is(notNullValue()));
   }
 
   @Test
@@ -633,7 +625,7 @@ public class DatastoreStorageTest {
     final Set<WorkflowId> workflowIds = ImmutableSet.of(WORKFLOW_ID1, WORKFLOW_ID2, WORKFLOW_ID3);
     Workflow workflow1 = workflow(WORKFLOW_ID1);
     Workflow workflow2 = workflow(WORKFLOW_ID2);
-    Workflow workflow2new = workflow(WORKFLOW_ID2_NEW);
+    Workflow workflow2old = workflow(WORKFLOW_ID2_OLD);
     Workflow workflow3 = workflow(WORKFLOW_ID3);
 
     storage.store(workflow1);
@@ -642,7 +634,7 @@ public class DatastoreStorageTest {
 
     // Should not be returned as we only read _old_ keys
     // TODO: change when we start reading from _new_ keys
-    storeWorkflowInNewWay(workflow2new);
+    storeWorkflowInOldWay(workflow2old);
 
     var workflows = storage.workflows(workflowIds);
     assertThat(workflows.size(), is(3));
@@ -1009,7 +1001,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldStoreWorkflowsInBothLegacyAndNewWayByDefault() throws IOException {
+  public void shouldStoreWorkflowsInOnlyInNewWay() throws IOException {
     var workflow = workflow(WORKFLOW_ID1);
     storage.store(workflow);
     var legacyKey = workflowKey(datastore::newKeyFactory, workflow.id());
@@ -1019,20 +1011,19 @@ public class DatastoreStorageTest {
     var newProperties = newEntity.getNames()
         .stream()
         .collect(toMap(key -> key, newEntity::getValue));
-    var legacyProperties = legacyEntity.getNames()
-        .stream()
-        .collect(toMap(key -> key, newEntity::getValue));
-    assertThat(newProperties, is(legacyProperties));
+
+    assertThat(newProperties, is(notNullValue()));
+    assertThat(legacyEntity, is(nullValue()));
   }
 
 
   // TODO: remove after migration
-  private void storeWorkflowInNewWay(Workflow workflow) throws Exception {
-    storeWorkflowInNewWay(workflow, WorkflowState.empty());
+  private void storeWorkflowInOldWay(Workflow workflow) throws Exception {
+    storeWorkflowInOldWay(workflow, WorkflowState.empty());
   }
 
-  private void storeWorkflowInNewWay(Workflow workflow, WorkflowState state) throws Exception {
-    final Key key = workflowKeyNew(datastore::newKeyFactory, workflow.id());
+  private void storeWorkflowInOldWay(Workflow workflow, WorkflowState state) throws Exception {
+    final Key key = workflowKey(datastore::newKeyFactory, workflow.id());
     var entity = workflowToEntity(workflow, state, Optional.empty(), key);
     datastore.put(entity);
   }

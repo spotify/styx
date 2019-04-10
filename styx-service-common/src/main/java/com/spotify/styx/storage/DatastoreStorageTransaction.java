@@ -41,7 +41,6 @@ import static com.spotify.styx.storage.DatastoreStorage.getWorkflowOpt;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.parseWorkflowJson;
 import static com.spotify.styx.storage.DatastoreStorage.runStateToEntity;
-import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
 import static com.spotify.styx.storage.DatastoreStorage.workflowKeyNew;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_LIMIT;
 import static com.spotify.styx.util.ShardedCounter.KIND_COUNTER_SHARD;
@@ -142,7 +141,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public void deleteWorkflow(WorkflowId workflowId) throws IOException {
-    tx.delete(workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
     tx.delete(workflowKeyNew(tx.getDatastore()::newKeyFactory, workflowId));
   }
 
@@ -173,11 +171,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     var key = workflowKeyNew(keyFactory, workflow.id());
     var entity = DatastoreStorage.workflowToEntity(workflow, state, existing, key);
     tx.put(entity);
-
-    // TODO: stop writing legacy workflow after migration
-    var legacyKey = workflowKey(keyFactory, workflow.id());
-    var legacyEntity = DatastoreStorage.workflowToEntity(workflow, state, existing, legacyKey);
-    tx.put(legacyEntity);
 
     return workflow.id();
   }
