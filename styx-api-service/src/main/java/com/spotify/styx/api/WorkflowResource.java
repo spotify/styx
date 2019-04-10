@@ -173,8 +173,7 @@ public final class WorkflowResource {
 
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
-    final Collection<String> errors =
-        workflowValidator.validateWorkflowConfiguration(workflowConfig);
+    var errors = workflowValidator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       return Response.forStatus(
           Status.BAD_REQUEST.withReasonPhrase("Invalid workflow configuration: " + errors));

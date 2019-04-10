@@ -159,7 +159,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(Collections.emptyList());
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
@@ -628,7 +627,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowValidator).validateWorkflow(WORKFLOW);
     verify(workflowInitializer).store(eq(WORKFLOW), any());
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW));
 
@@ -647,7 +646,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowValidator).validateWorkflow(WORKFLOW);
     verify(workflowInitializer).store(eq(WORKFLOW), any());
     verify(workflowConsumer).accept(Optional.of(EXISTING_WORKFLOW), Optional.of(WORKFLOW));
 
@@ -688,7 +687,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
             serviceHelper
                 .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowValidator).validateWorkflow(WORKFLOW);
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
@@ -752,12 +751,12 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailInvalidWorkflowImage() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(workflowValidator.validateWorkflowConfiguration(any())).thenReturn(List.of("bad", "image"));
+    when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("bad", "image"));
 
     Response<ByteString> response = awaitResponse(serviceHelper
         .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
 
-    verify(workflowValidator).validateWorkflowConfiguration(WORKFLOW_CONFIGURATION);
+    verify(workflowValidator).validateWorkflow(Workflow.create("foo", WORKFLOW_CONFIGURATION));
 
     assertThat(serviceHelper.stubClient().sentRequests(), is(empty()));
 
