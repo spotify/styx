@@ -613,8 +613,9 @@ public class StyxScheduler implements AppInit {
     final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
         config, id, createGkeClient(), DefaultKubernetesClient::new));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
-    var fabric8Client = MeteredFabric8KubernetesClientProxy.instrument(
-        Fabric8KubernetesClient.of(kubernetes), stats, time);
+    var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
+        MeteredFabric8KubernetesClientProxy.instrument(
+            Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(fabric8Client, stateManager, stats,
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
