@@ -23,6 +23,8 @@ package com.spotify.styx;
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
+import static com.spotify.styx.state.OutputHandler.mdcDecorating;
+import static com.spotify.styx.state.OutputHandler.tracing;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
@@ -188,7 +190,8 @@ public class StyxScheduler implements AppInit {
 
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
-  public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
+  public interface EventConsumer extends BiConsumer<SequenceEvent, RunState> { }
+  public interface EventConsumerFactory extends BiFunction<Environment, Stats, EventConsumer> { }
   public interface WorkflowExecutionGateFactory extends BiFunction<Environment, Storage, WorkflowExecutionGate> { }
 
   @FunctionalInterface
@@ -369,11 +372,11 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    var eventConsumer = fanoutEventConsumer(
+    var eventConsumer = tracingFanoutEventConsumer(
         eventConsumerFactory.apply(environment, stats),
         new PublisherHandler(publisher, stats),
         new TransitionLogger());
-    var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
+    var outputHandler = mdcDecorating(fanOutput(outputHandlers));
     var queuedStateManager = closer.register(new PersistentStateManager(time, stateProcessingExecutor,
         storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
@@ -395,7 +398,7 @@ public class StyxScheduler implements AppInit {
         .build();
 
     // These output handlers will be invoked in order.
-    outputHandlers.addAll(List.of(
+    outputHandlers.addAll(tracing(List.of(
         new DockerRunnerHandler(dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
@@ -406,7 +409,7 @@ public class StyxScheduler implements AppInit {
         // an extended downtime, many k8s pods will be completed and would transition the instance into done.
         // However, many of those instances would _also_ technically have timed out according to wall clock and
         // the TimeoutHandler would fail them if allowed to run first.
-        new TimeoutHandler(timeoutConfig, time, stateManager, workflowCache)));
+        new TimeoutHandler(timeoutConfig, time, stateManager, workflowCache))));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -459,14 +462,13 @@ public class StyxScheduler implements AppInit {
     this.backfillTriggerManager = backfillTriggerManager;
   }
 
-  @SafeVarargs
-  private BiConsumer<SequenceEvent, RunState> fanoutEventConsumer(
-      BiConsumer<SequenceEvent, RunState>... eventConsumers) {
-    return (event, runState) -> {
-      for (final BiConsumer<SequenceEvent, RunState> eventConsumer : eventConsumers) {
-        runGuarded(() -> eventConsumer.accept(event, runState));
+  private EventConsumer tracingFanoutEventConsumer(EventConsumer... eventConsumers) {
+    return TracingProxy.instrument(EventConsumer.class, (event, runState) -> {
+      for (var eventConsumer : eventConsumers) {
+        var traced = TracingProxy.instrument(EventConsumer.class, eventConsumer);
+        runGuarded(() -> traced.accept(event, runState));
       }
-    };
+    });
   }
 
   @VisibleForTesting

@@ -32,6 +32,7 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.spotify.styx.StyxScheduler;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
@@ -40,7 +41,6 @@ import com.spotify.styx.publisher.Publisher;
 import com.spotify.styx.state.RunState;
 import java.util.Objects;
 import java.util.concurrent.Callable;
-import java.util.function.BiConsumer;
 import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 /**
  * An event consumer that integrates {@link RunState.State} values with a {@link Publisher}.
  */
-public class PublisherHandler implements BiConsumer<SequenceEvent, RunState> {
+public class PublisherHandler implements StyxScheduler.EventConsumer {
 
   private static final Logger LOG = LoggerFactory.getLogger(PublisherHandler.class);
 
