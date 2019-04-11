@@ -122,36 +122,25 @@ public final class WorkflowResource {
 
   private Response<ByteString> deleteWorkflow(String cid, String wfid, AuthContext ac) {
     final WorkflowId workflowId = WorkflowId.create(cid, wfid);
-    final Optional<Workflow> workflow;
     try {
-      workflow = storage.workflow(workflowId);
+      var deletedWorkflow = storage.runInTransactionWithRetries(tx -> {
+        var workflowOpt = tx.workflow(workflowId);
+        if (workflowOpt.isEmpty()) {
+          var response = Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
+          throw new ResponseException(response);
+        }
+        var workflow = workflowOpt.orElseThrow();
+        workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
+        tx.deleteWorkflow(workflowId);
+        return workflow;
+      });
+      workflowConsumer.accept(Optional.of(deletedWorkflow), Optional.empty());
+      LOG.info("Workflow removed: {}", workflowId);
+      return Response.forStatus(Status.NO_CONTENT);
     } catch (IOException e) {
-      final String message = String.format("Couldn't read workflow %s. ", workflowId);
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR
-          .withReasonPhrase("Error in internal storage"));
+      LOG.warn("Failed to delete workflow: {}", workflowId);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
     }
-    
-    if (!workflow.isPresent()) {
-      return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
-    }
-
-    // TODO: run in transaction
-
-    workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow.get());
-
-    try {
-      storage.delete(workflowId);
-    } catch (IOException e) {
-      final String message = String.format("Couldn't remove workflow %s. ", workflowId);
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR
-          .withReasonPhrase("Error in internal storage"));
-    }
-
-    workflowConsumer.accept(workflow, Optional.empty());
-    LOG.info("Workflow removed: {}", workflowId);
-    return Response.forStatus(Status.NO_CONTENT);
   }
 
   private Response<Workflow> createOrUpdateWorkflow(String componentId,
