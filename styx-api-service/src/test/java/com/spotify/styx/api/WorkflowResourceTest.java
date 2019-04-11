@@ -38,6 +38,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -726,13 +727,14 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     doThrow(new IOException()).when(storage).delete(WORKFLOW.id());
 
-    when(storage.runInTransactionWithRetries(any())).thenAnswer(a -> {
+    doAnswer(a -> {
       TransactionFunction<Object, Exception> tf = a.getArgument(0);
       return rawStorage.runInTransactionWithRetries(tx -> {
-        when(tx.deleteWorkflow(any())).thenThrow(new IOException());
-        return tf.apply(tx);
+        var spiedTx = spy(tx);
+        when(spiedTx.deleteWorkflow(any())).thenThrow(new IOException());
+        return tf.apply(spiedTx);
       });
-    });
+    }).when(storage).runInTransactionWithRetries(any());
 
     var response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
 
