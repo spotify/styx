@@ -76,7 +76,9 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -88,10 +90,6 @@ import org.slf4j.Logger;
 public class PersistentStateManagerTest {
 
   private static final Instant NOW = Instant.parse("2017-01-02T01:02:03Z");
-  private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
-      TestData.WORKFLOW_ID, "2016-05-01");
-  private static final RunState INSTANCE_NEW_STATE =
-      RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, 18L);
   private static final Workflow WORKFLOW =
       Workflow.create("foo", TestData.FULL_WORKFLOW_CONFIGURATION);
   private static final Trigger TRIGGER1 = Trigger.unknown("trig1");
@@ -99,15 +97,25 @@ public class PersistentStateManagerTest {
       .env("FOO", "foo",
           "BAR", "bar")
       .build();
-  private static final StateData STATE_DATA_1 =
-      StateData.newBuilder().resourceIds(ImmutableSet.of("resource1")).build();
+  private static final StateData STATE_DATA_1 = StateData.newBuilder()
+      .resourceIds(ImmutableSet.of("resource1"))
+      .build();
   private static final BiConsumer<SequenceEvent, RunState> eventConsumer = (e, s) -> {};
+  private static final WorkflowInstance INSTANCE = WorkflowInstance.create(
+      TestData.WORKFLOW_ID, "2016-05-01");
+  private static final RunState INSTANCE_NEW_STATE =
+      RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, 18L);
+  private static final RunState INSTANCE_QUEUED_STATE =
+      INSTANCE_NEW_STATE.transition(Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), () -> NOW);
+
 
   private final ExecutorService executor = Executors.newWorkStealingPool();
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
 
   private PersistentStateManager stateManager;
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
@@ -199,15 +207,14 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldInitializeAndTriggerWFInstance() throws Exception {
-    final RunState instanceStateFresh =
-        RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, -1);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(instanceStateFresh));
 
+    var initialState = RunState.create(INSTANCE, State.NEW, StateData.zero(), NOW, -1);
+    var expectedState = initialState.transition(Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), time);
     stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
 
-    verify(transaction).writeActiveState(INSTANCE, instanceStateFresh);
+    verify(transaction).writeActiveState(INSTANCE, expectedState);
     verify(storage).writeEvent(SequenceEvent.create(
         Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), 0, NOW.toEpochMilli()));
   }
@@ -216,13 +223,14 @@ public class PersistentStateManagerTest {
   public void shouldReInitializeWFInstanceFromNextCounter() throws Exception {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE.counter()));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.of(INSTANCE_NEW_STATE));
 
     stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
 
-    verify(transaction).writeActiveState(INSTANCE, INSTANCE_NEW_STATE);
+    verify(storage).getLatestStoredCounter(INSTANCE);
+    verify(transaction).writeActiveState(INSTANCE, INSTANCE_QUEUED_STATE);
     verify(storage).writeEvent(SequenceEvent.create(
-        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), INSTANCE_NEW_STATE.counter() + 1, NOW.toEpochMilli()));
+        Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS),
+        INSTANCE_QUEUED_STATE.counter(), NOW.toEpochMilli()));
   }
 
   @Test
@@ -275,27 +283,19 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldFailTriggerIfGetLatestCounterFails() throws Exception {
-    when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
-    }
+    var cause = new IOException();
+    when(storage.getLatestStoredCounter(any())).thenThrow(cause);
+    exception.expectCause(is(cause));
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
   }
 
   @Test
   public void shouldFailTriggerIfWorkflowNotFound() throws Exception {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IllegalArgumentException.class)));
-    }
+    exception.expect(instanceOf(IllegalArgumentException.class));
+    exception.expectMessage("Workflow not found: " + INSTANCE.workflowId().toKey());
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
   }
 
   @Test
@@ -304,59 +304,21 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     var cause = new IOException("fail!");
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(cause));
-    }
-  }
-
-  @Test
-  public void shouldFailTriggerIfIsClosedOnReceive() throws Exception {
-    reset(storage);
-    stateManager = spy(new PersistentStateManager(
-        time, executor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler, shardedCounter));
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    doThrow(new IsClosedException()).when(stateManager).receive(any());
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
-    }
-  }
-
-  @Test
-  public void shouldFailTriggerIfIsClosedOnReceiveAndFailDeleteActiveState() throws Exception {
-    reset(storage);
-    stateManager = spy(new PersistentStateManager(
-        time, executor, storage, eventConsumer,
-        eventConsumerExecutor, outputHandler, shardedCounter));
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    doThrow(new IOException()).when(storage).deleteActiveState(any());
-    doThrow(new IsClosedException()).when(stateManager).receive(any());
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IsClosedException.class)));
-    }
-  }
-
-  @Test(expected = IsClosedException.class)
-  public void shouldRejectTriggertIfClosed() throws Exception {
-    stateManager.close();
+    exception.expectCause(is(cause));
     stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
   }
 
-  @Test(expected = IsClosedException.class)
+  @Test
+  public void shouldRejectTriggerIfIsClosed() throws Exception {
+    stateManager.close();
+    exception.expect(IsClosedException.class);
+    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+  }
+
+  @Test
   public void shouldRejectEventIfClosed() throws Exception {
     stateManager.close();
+    exception.expect(IsClosedException.class);
     stateManager.receive(Event.timeTrigger(INSTANCE));
   }
 
@@ -502,10 +464,8 @@ public class PersistentStateManagerTest {
 
   @Test
   public void triggerShouldHandleThrowingOutputHandler() throws Exception {
-    Optional<RunState> runState = Optional.of(RunState.create(INSTANCE, State.NEW, NOW, -1));
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(-1L));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any());
     try {

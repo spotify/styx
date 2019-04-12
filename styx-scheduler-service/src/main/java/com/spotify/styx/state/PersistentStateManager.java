@@ -155,54 +155,17 @@ public class PersistentStateManager implements StateManager {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
 
+    // Skip the NEW state and Write the QUEUED state directly in order to avoid needing to deal with the
+    // possibility of getting stuck in the NEW state.
 
-    // TODO: merge initialization and state transition into one transaction
-
-    initialize(workflowInstance);
-
-    final Event event = Event.triggerExecution(workflowInstance, trigger, parameters);
-    try {
-      receive(event);
-    } catch (IsClosedException isClosedException) {
-      log.warn("Failed to send 'triggerExecution' event", isClosedException);
-      // Best effort attempt to rollback the creation of the NEW state
-      try {
-        storage.deleteActiveState(workflowInstance);
-      } catch (IOException e) {
-        log.warn("Failed to remove dangling NEW state for: {}", workflowInstance, e);
-      }
-      throw new RuntimeException(isClosedException);
-    }
-  }
-
-  @Override
-  public void receive(Event event) throws IsClosedException {
-    receive(event, Long.MAX_VALUE);
-  }
-
-  @Override
-  public void receive(Event event, long expectedCounter) throws IsClosedException {
-    ensureRunning();
-    log.info("Received event {}", event);
-
-    var newState = transition(event, expectedCounter);
-    postTransition(newState._1, newState._2);
-  }
-
-  private void initialize(WorkflowInstance workflowInstance) {
-    // Write active state to datastore
-
-    final long counter;
-    try {
-      counter = storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    final RunState runState = RunState.create(workflowInstance, State.NEW, time.get(), counter);
+    var counter = latestEventCounter(workflowInstance);
+    var initialRunState = RunState.create(workflowInstance, State.NEW, time.get(), counter);
+    var event = Event.triggerExecution(workflowInstance, trigger, parameters);
+    var runState = initialRunState.transition(event, time);
     try {
       storage.runInTransactionWithRetries(tx -> {
         final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
-        if (!workflow.isPresent()) {
+        if (workflow.isEmpty()) {
           throw new IllegalArgumentException(
               "Workflow not found: " + workflowInstance.workflowId().toKey());
         }
@@ -225,9 +188,33 @@ public class PersistentStateManager implements StateManager {
       Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
     }
+
+    postTransition(event, runState);
   }
 
-  private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
+  private long latestEventCounter(WorkflowInstance workflowInstance) {
+    try {
+      return storage.getLatestStoredCounter(workflowInstance).orElse(NO_EVENTS_PROCESSED);
+    } catch (IOException e1) {
+      throw new RuntimeException(e1);
+    }
+  }
+
+  @Override
+  public void receive(Event event) throws IsClosedException {
+    receive(event, Long.MAX_VALUE);
+  }
+
+  @Override
+  public void receive(Event event, long expectedCounter) throws IsClosedException {
+    ensureRunning();
+    log.info("Received event {}", event);
+
+    var nextRunState = transition(event, expectedCounter);
+    postTransition(event, nextRunState);
+  }
+
+  private RunState transition(Event event, long expectedCounter) {
     try {
       return storage.runInTransactionWithRetries(tx -> transition0(tx, event, expectedCounter));
     } catch (Throwable e) {
@@ -237,7 +224,7 @@ public class PersistentStateManager implements StateManager {
     }
   }
 
-  private Tuple2<SequenceEvent, RunState> transition0(StorageTransaction tx, Event event, long expectedCounter)
+  private RunState transition0(StorageTransaction tx, Event event, long expectedCounter)
       throws IOException {
 
     // Read active state from datastore
@@ -268,9 +255,7 @@ public class PersistentStateManager implements StateManager {
       tx.updateActiveState(event.workflowInstance(), nextRunState);
     }
 
-    var sequenceEvent = SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
-
-    return Tuple.of(sequenceEvent, nextRunState);
+    return nextRunState;
   }
 
   private RunState nextRunState(Event event, RunState runState) {
@@ -363,7 +348,9 @@ public class PersistentStateManager implements StateManager {
     }
   }
 
-  private void postTransition(SequenceEvent sequenceEvent, RunState runState) {
+  private void postTransition(Event event, RunState runState) {
+    var sequenceEvent = SequenceEvent.create(event, runState.counter(), runState.timestamp());
+
     // Write event to bigtable
     try {
       storage.writeEvent(sequenceEvent);
