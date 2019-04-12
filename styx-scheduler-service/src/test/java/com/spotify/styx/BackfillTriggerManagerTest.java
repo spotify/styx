@@ -21,6 +21,7 @@ package com.spotify.styx;
 
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 import static com.spotify.styx.util.TimeUtil.instantsInRange;
+import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static com.spotify.styx.util.TimeUtil.previousInstant;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertFalse;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -211,13 +213,15 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     final List<Instant> instants = instantsInRange(BACKFILL_1.start(), BACKFILL_1.end(),
-        workflow.configuration().schedule());
+        workflow.configuration().schedule())
+        .subList(0, concurrency);
 
-    instants.stream().limit(concurrency).forEach(instant ->
-            verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant, TRIGGER_PARAMETERS));
+    for (Instant instant : instants) {
+      verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_1.id()), instant, TRIGGER_PARAMETERS);
+      verify(transaction).store(BACKFILL_1.builder().nextTrigger(nextInstant(instant, BACKFILL_1.schedule())).build());
+    }
 
-    verify(transaction)
-        .store(BACKFILL_1.builder().nextTrigger(instants.get(concurrency)).build());
+    verify(transaction, times(concurrency)).store(any(Backfill.class));
   }
 
   @Test
@@ -231,14 +235,16 @@ public class BackfillTriggerManagerTest {
 
     backfillTriggerManager.tick();
 
-    final List<Instant> instants = Lists.reverse(instantsInRange(BACKFILL_2.start(), BACKFILL_2.end(),
-            workflow.configuration().schedule()));
+    var schedule = workflow.configuration().schedule();
+    var instants = Lists.reverse(instantsInRange(BACKFILL_2.start(), BACKFILL_2.end(), schedule))
+        .subList(0, concurrency);
 
-    instants.stream().limit(concurrency).forEach(instant ->
-        verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant, TRIGGER_PARAMETERS));
+    for (final Instant instant : instants) {
+      verify(triggerListener).event(workflow, Trigger.backfill(BACKFILL_2.id()), instant, TRIGGER_PARAMETERS);
+      verify(transaction).store(BACKFILL_2.builder().nextTrigger(previousInstant(instant, BACKFILL_2.schedule())).build());
+    }
 
-    verify(transaction)
-        .store(BACKFILL_2.builder().nextTrigger(instants.get(concurrency)).build());
+    verify(transaction, times(concurrency)).store(any(Backfill.class));
   }
 
   @Test
@@ -286,13 +292,19 @@ public class BackfillTriggerManagerTest {
 
     backfillTriggerManager.tick();
 
-    List<Instant> instants =
-        instantsInRange(BACKFILL_3.start(), BACKFILL_3.end(), BACKFILL_3.schedule());
-    instants.forEach(instant -> inOrder(triggerListener).verify(triggerListener)
-        .event(workflow, Trigger.backfill(BACKFILL_3.id()), instant, TRIGGER_PARAMETERS));
+    var instants = instantsInRange(BACKFILL_3.start(), BACKFILL_3.end(), BACKFILL_3.schedule());
 
-    final Backfill completedBackfill =
-        BACKFILL_3.builder().nextTrigger(BACKFILL_3.end()).allTriggered(true).build();
+    // Verify all expected instances were triggered in the expected order
+    for (Instant instant : instants) {
+      inOrder(triggerListener).verify(triggerListener)
+          .event(workflow, Trigger.backfill(BACKFILL_3.id()), instant, TRIGGER_PARAMETERS);
+    }
+
+    // Check that the backfill was marked as completed
+    var completedBackfill = BACKFILL_3.builder()
+        .nextTrigger(BACKFILL_3.end())
+        .allTriggered(true)
+        .build();
     verify(transaction).store(completedBackfill);
   }
 
@@ -305,13 +317,19 @@ public class BackfillTriggerManagerTest {
 
     backfillTriggerManager.tick();
 
-    List<Instant> instants =
-        Lists.reverse(instantsInRange(BACKFILL_4.start(), BACKFILL_4.end(), BACKFILL_4.schedule()));
-    instants.forEach(instant -> inOrder(triggerListener).verify(triggerListener)
-        .event(workflow, Trigger.backfill(BACKFILL_4.id()), instant, TRIGGER_PARAMETERS));
+    var instants = Lists.reverse(instantsInRange(BACKFILL_4.start(), BACKFILL_4.end(), BACKFILL_4.schedule()));
 
-    final Backfill completedBackfill =
-        BACKFILL_4.builder().nextTrigger(previousInstant(BACKFILL_4.start(), BACKFILL_4.schedule())).allTriggered(true).build();
+    // Verify all expected instances were triggered in the expected (reversed) order
+    for (Instant instant : instants) {
+      inOrder(triggerListener).verify(triggerListener)
+          .event(workflow, Trigger.backfill(BACKFILL_4.id()), instant, TRIGGER_PARAMETERS);
+    }
+
+    // Check that the backfill was marked as completed
+    var completedBackfill = BACKFILL_4.builder()
+        .nextTrigger(previousInstant(BACKFILL_4.start(), BACKFILL_4.schedule()))
+        .allTriggered(true)
+        .build();
     verify(transaction).store(completedBackfill);
   }
 
@@ -330,6 +348,7 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
@@ -347,6 +366,7 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
@@ -362,6 +382,7 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
@@ -379,10 +400,11 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
-  public void shouldMarkedAsAllTriggeredIfEndOfBackfillEncountered() throws IOException {
+  public void shouldMarkAsAllTriggeredIfEndOfBackfillEncountered() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
@@ -425,40 +447,42 @@ public class BackfillTriggerManagerTest {
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
   public void shouldNotTriggerBackfillsWithMissingWorkflows() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
-    when(storage.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
+    when(transaction.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
 
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
-    verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+    verify(transaction).store(BACKFILL_1.builder().halted(true).build());
+    verify(transaction, times(1)).store(any(Backfill.class));
   }
 
   @Test
   public void shouldNotTriggerBackfillsAndStoreBackfillWithMissingWorkflows() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
-    when(storage.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
-    doThrow(new IOException()).when(storage).storeBackfill(any());
+    when(transaction.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
 
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
-    verify(storage).storeBackfill(BACKFILL_1.builder().halted(true).build());
+    verify(transaction).store(BACKFILL_1.builder().halted(true).build());
+    verify(transaction, times(1)).store(any(Backfill.class));
   }
 
   @Test
   public void shouldNotTriggerBackfillsWhenFailedToReadWorkflow() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
-    when(storage.workflow(BACKFILL_1.workflowId())).thenThrow(new IOException());
+    when(transaction.workflow(BACKFILL_1.workflowId())).thenThrow(new IOException());
 
     backfillTriggerManager.tick();
 
     verifyZeroInteractions(triggerListener);
-    verify(storage, never()).storeBackfill(BACKFILL_1.builder().halted(true).build());
+    verify(transaction, never()).store(any(Backfill.class));
   }
 
   @Test
@@ -614,14 +638,13 @@ public class BackfillTriggerManagerTest {
 
     backfills.put(BACKFILL_1.id(), BACKFILL_1.builder().halted(true).build());
 
-    final boolean moveOn = backfillTriggerManager.triggerNextPartitionAndProgress(transaction,
-        BACKFILL_1.id(), workflow, BACKFILL_1.nextTrigger(), 10, false);
+    var moveOn = backfillTriggerManager.triggerNextInstanceAndProgress(transaction, BACKFILL_1.id(), workflow, 0);
     assertFalse(moveOn);
     verifyNoMoreInteractions(triggerListener);
   }
 
   private void initWorkflow(Workflow workflow) throws IOException {
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    when(transaction.workflow(workflow.id())).thenReturn(Optional.of(workflow));
   }
 
   private static Workflow createWorkflow(WorkflowId id) {
