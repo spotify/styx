@@ -60,6 +60,7 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.ResourceNotFoundException;
@@ -75,7 +76,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
@@ -290,8 +290,8 @@ public final class BackfillResource implements Closeable {
   }
 
   private Optional<String> validate(RequestContext rc,
-                                             BackfillInput input,
-                                             Workflow workflow) {
+                                    BackfillInput input,
+                                    Workflow workflow) {
     if (!workflow.configuration().dockerImage().isPresent()) {
       return Optional.of("Workflow is missing docker image");
     }
@@ -328,34 +328,37 @@ public final class BackfillResource implements Closeable {
 
   private Response<Backfill> postBackfill(AuthContext ac, RequestContext rc,
       BackfillInput input) {
-    final BackfillBuilder builder = Backfill.newBuilder();
 
-    final String id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
-
-    final WorkflowId workflowId = WorkflowId.create(input.component(), input.workflow());
-    final Workflow workflow;
     try {
-      workflow = storage.workflow(workflowId)
-          .orElseThrow(() -> new ResponseException(
-              Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"))));
+      return storage.runInTransactionWithRetries(tx -> postBackfill0(tx, ac, rc, input));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private Response<Backfill> postBackfill0(StorageTransaction tx, AuthContext ac, RequestContext rc,
+                                           BackfillInput input) throws IOException {
+    var builder = Backfill.newBuilder();
+
+    var id = RandomGenerator.DEFAULT.generateUniqueId("backfill");
+
+    var workflowId = WorkflowId.create(input.component(), input.workflow());
+    var workflow = tx.workflow(workflowId)
+        .orElseThrow(() -> new ResponseException(
+            Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"))));
 
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
-    final Set<WorkflowInstance> activeWorkflowInstances;
-    try {
-      activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    var activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
+
+    // Validate backfill & workflow
+    var validationError = validate(rc, input, workflow);
+    if (validationError.isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(validationError.get()));
     }
 
-    final Optional<String> error = validate(rc, input, workflow);
-    if (error.isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(error.get()));
-    }
-
+    // Forbid backfill creation if there are already active instances in the backfill range
+    // TODO: Does this make sense?
     final Schedule schedule = workflow.configuration().schedule();
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
@@ -392,11 +395,7 @@ public final class BackfillResource implements Closeable {
 
     final Backfill backfill = builder.build();
 
-    try {
-      storage.storeBackfill(backfill);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    tx.store(backfill);
 
     return Response.forPayload(backfill);
   }
