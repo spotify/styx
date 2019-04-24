@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -101,7 +102,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.pods()).thenReturn(pods);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT);
+        debug, STYX_ENVIRONMENT, Set.of());
     podList = new PodList();
     podList.setMetadata(new ListMeta());
     podList.getMetadata().setResourceVersion("4711");

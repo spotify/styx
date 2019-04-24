@@ -29,6 +29,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 public class WorkflowValidator {
 
@@ -46,12 +48,15 @@ public class WorkflowValidator {
 
   private final DockerImageValidator dockerImageValidator;
   private final Duration maybeMaxRunningTimeout;
+  private final Set<String> secretWhitelist;
 
-  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout) {
+  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout,
+                            Set<String> secretWhitelist) {
     Preconditions.checkArgument(maybeMaxRunningTimeout == null || !maybeMaxRunningTimeout.isNegative(),
         "Max Running timeout should be positive");
-    this.dockerImageValidator = dockerImageValidator;
+    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator);
     this.maybeMaxRunningTimeout = maybeMaxRunningTimeout;
+    this.secretWhitelist = secretWhitelist;
   }
 
   public static Builder newBuilder(DockerImageValidator dockerImageValidator) {
@@ -133,6 +138,12 @@ public class WorkflowValidator {
       }
     });
 
+    cfg.secret().ifPresent(secret -> {
+      if (secretWhitelist != null && !secretWhitelist.contains(secret.name())) {
+        e.add("secret " + secret.name() + " is not whitelisted");
+      }
+    });
+
     return e;
   }
 
@@ -151,8 +162,9 @@ public class WorkflowValidator {
   }
 
   public static class Builder {
-    private final DockerImageValidator dockerImageValidator;
+    private DockerImageValidator dockerImageValidator;
     private Duration maxRunningTimeout;
+    private Set<String> secretWhitelist;
 
     public Builder(DockerImageValidator dockerImageValidator) {
       this.dockerImageValidator = dockerImageValidator;
@@ -163,8 +175,13 @@ public class WorkflowValidator {
       return this;
     }
 
+    public Builder withSecretWhitelist(Set<String> secretWhitelist) {
+      this.secretWhitelist = secretWhitelist;
+      return this;
+    }
+
     public WorkflowValidator build() {
-      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout);
+      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout, secretWhitelist);
     }
   }
 }

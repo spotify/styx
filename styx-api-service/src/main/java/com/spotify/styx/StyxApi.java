@@ -64,6 +64,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -78,13 +79,14 @@ public class StyxApi implements AppInit {
 
   public static final String SERVICE_NAME = "styx-api";
 
-  static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
-  static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
+  private static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
+  private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  private static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
 
-  static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
-  static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
+  private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+  private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
+  private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -176,6 +178,8 @@ public class StyxApi implements AppInit {
     final Duration runningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_TTL_CONFIG)
         .map(Duration::parse)
         .orElse(DEFAULT_STYX_RUNNING_STATE_TTL);
+    var secretWhitelist =
+        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -194,8 +198,9 @@ public class StyxApi implements AppInit {
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
     final WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
-      .withMaxRunningTimeoutLimit(runningStateTtl)
-      .build();
+        .withMaxRunningTimeoutLimit(runningStateTtl)
+        .withSecretWhitelist(secretWhitelist)
+        .build();
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
