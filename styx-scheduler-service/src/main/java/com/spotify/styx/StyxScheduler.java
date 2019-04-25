@@ -146,6 +146,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
+  private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
   public static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
@@ -198,7 +199,8 @@ public class StyxScheduler implements AppInit {
         Environment environment,
         StateManager stateManager,
         Stats stats,
-        Debug debug);
+        Debug debug,
+        Set<String> secretWhitelist);
   }
 
   @FunctionalInterface
@@ -381,8 +383,10 @@ public class StyxScheduler implements AppInit {
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
+    var secretWhitelist =
+        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
@@ -392,6 +396,7 @@ public class StyxScheduler implements AppInit {
     Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
     WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
         .withMaxRunningTimeoutLimit(runningStateTtl)
+        .withSecretWhitelist(secretWhitelist)
         .build();
 
     // These output handlers will be invoked in order.
@@ -606,7 +611,8 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       StateManager stateManager,
       Stats stats,
-      Debug debug) {
+      Debug debug,
+      Set<String> secretWhitelist) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -615,7 +621,7 @@ public class StyxScheduler implements AppInit {
         config, id, createGkeClient(), DefaultKubernetesClient::new));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
     return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-        serviceAccountKeyManager, debug, styxEnvironment));
+        serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 
   private static Container createGkeClient() {

@@ -55,6 +55,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -245,6 +246,30 @@ public class WorkflowValidatorTest {
   public void shouldNotAllowComponentWithHash(String component) {
     assertThat(sut.validateWorkflow(Workflow.create(component, FULL_WORKFLOW_CONFIGURATION)),
         contains("component id cannot contain #"));
+  }
+
+  @Test
+  public void shouldFailUsageOfNonWhitelistedSecret() {
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withSecretWhitelist(Set.of("bar-secret"))
+        .build();
+
+    final List<String> errors = sut.validateWorkflow(
+        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, contains("secret " + FULL_WORKFLOW_CONFIGURATION.secret().get().name() + " is not whitelisted"));
+  }
+
+  @Test
+  public void shouldPassUsageOfWhitelistedSecret() {
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withSecretWhitelist(Set.of(FULL_WORKFLOW_CONFIGURATION.secret().get().name()))
+        .build();
+
+    final List<String> errors = sut.validateWorkflow(
+        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, empty());
   }
 
   private String limit(String msg, Object value, Object limit) {
