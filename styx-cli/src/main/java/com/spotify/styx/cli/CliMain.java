@@ -57,6 +57,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
+import com.spotify.styx.util.BasicWorkflowValidator;
 import com.spotify.styx.util.DockerImageValidator;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.WorkflowValidator;
@@ -1167,7 +1168,7 @@ public final class CliMain {
 
       @Override
       public WorkflowValidator workflowValidator() {
-        return WorkflowValidator.newBuilder(new DockerImageValidator()).build();
+        return new BasicWorkflowValidator(new DockerImageValidator());
       }
     };
   }

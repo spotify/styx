@@ -86,10 +86,12 @@ import com.spotify.styx.state.handlers.TimeoutHandler;
 import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.BasicWorkflowValidator;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ExtendedWorkflowValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.ShardedCounter;
@@ -97,7 +99,6 @@ import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
-import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
@@ -393,11 +394,8 @@ public class StyxScheduler implements AppInit {
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
-    Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
-    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl)
-        .withSecretWhitelist(secretWhitelist)
-        .build();
+    var workflowValidator = new ExtendedWorkflowValidator(
+        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
 
     // These output handlers will be invoked in order.
     outputHandlers.addAll(List.of(

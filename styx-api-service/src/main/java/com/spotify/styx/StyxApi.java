@@ -54,11 +54,12 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.BasicWorkflowValidator;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ExtendedWorkflowValidator;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
-import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
@@ -197,10 +198,8 @@ public class StyxApi implements AppInit {
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
-    final WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl)
-        .withSecretWhitelist(secretWhitelist)
-        .build();
+    var workflowValidator = new ExtendedWorkflowValidator(
+        new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl, secretWhitelist);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
