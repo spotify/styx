@@ -144,17 +144,16 @@ public class WorkflowValidator {
         upperLimit(e, timeout, maybeMaxRunningTimeout, "running timeout is too big");
       }
     });
-
+    
     cfg.secret().ifPresent(secret -> {
       if (secretWhitelist != null && !secretWhitelist.contains(secret.name())) {
         e.add("secret " + secret.name() + " is not whitelisted");
       }
     });
 
-    // Check if the service account contains space
     cfg.serviceAccount().ifPresent(serviceAccount -> {
       if (!validateServiceAccount(serviceAccount)) {
-        e.add("service account format is not valid");
+        e.add("service account is not a valid email address: " + serviceAccount);
       }
     });
 
