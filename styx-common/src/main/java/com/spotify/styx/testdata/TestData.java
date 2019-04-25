@@ -136,7 +136,7 @@ public final class TestData {
           .dockerImage("busybox")
           .dockerArgs(List.of("x", "y"))
           .secret(Secret.create("name", "/path"))
-          .serviceAccount("foo@bar.baz.quux")
+          .serviceAccount("foo@bar.baz.quu")
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =

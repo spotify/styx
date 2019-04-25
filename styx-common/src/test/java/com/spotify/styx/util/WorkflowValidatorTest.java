@@ -134,7 +134,7 @@ public class WorkflowValidatorTest {
     final String commitSha = Strings.repeat("sha", 1024);
     final List<String> args = IntStream.range(0, 100).mapToObj(i -> "arg-" + i).collect(toList());
     final Secret secret = Secret.create(Strings.repeat("foo", 1024), Strings.repeat("bar", 4711));
-    final String serviceAccount = Strings.repeat("account", 1024);
+    final String serviceAccount = Strings.repeat("account@abc.com", 1024);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
     final Map<String, String> env = IntStream.range(0, 2000).boxed()
@@ -172,6 +172,7 @@ public class WorkflowValidatorTest {
         .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
         .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
+            .add("service account format is not valid")
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
@@ -268,8 +269,66 @@ public class WorkflowValidatorTest {
 
     final List<String> errors = sut.validateWorkflow(
         Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
+  @Parameters({"sa@.abc.com", "sa#@abc.com"})
+  @Test
+  public void shouldRejectInvalidServiceAccount(String serviceAccount) {
+    WorkflowConfiguration configuration = WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+            .serviceAccount(serviceAccount)
+            .build();
+
+    assertThat(sut.validateWorkflow(Workflow.create("test", configuration)),
+            contains("service account format is not valid"));
+  }
+
+  @Test
+  public void shouldFailUsageOfNonWhitelistedSecret() {
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withSecretWhitelist(Set.of("bar-secret"))
+        .build();
+
+    final List<String> errors = sut.validateWorkflow(
+        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, contains("secret " + FULL_WORKFLOW_CONFIGURATION.secret().get().name() + " is not whitelisted"));
+  }
+
+  @Test
+  public void shouldPassUsageOfWhitelistedSecret() {
+    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
+        .withSecretWhitelist(Set.of(FULL_WORKFLOW_CONFIGURATION.secret().get().name()))
+        .build();
+
+    final List<String> errors = sut.validateWorkflow(
+        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
 
     assertThat(errors, empty());
+  }
+
+  @Test
+  public void shouldRejectSpaceServiceAccountWithTailingSpace() {
+    String[] invalidServiceAccounts = {"sa@abc.com ", "sa@abc.com\n"};
+
+    for (String serviceAccount : invalidServiceAccounts) {
+      WorkflowConfiguration configuration =
+          WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+              .serviceAccount(serviceAccount)
+              .build();
+
+      assertThat(
+          sut.validateWorkflow(Workflow.create("test", configuration)),
+          contains("service account format is not valid"));
+      }
+  }
+
+  @Parameters({"abc@abc.com", "sa@ab-cd.abc.com", "sa_abc@abc.com"})
+  @Test
+  public void shouldAcceptValidServiceAccount(String serviceAccount) {
+    WorkflowConfiguration configuration = WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+            .serviceAccount(serviceAccount)
+            .build();
+
+    assertThat(sut.validateWorkflow(Workflow.create("test", configuration)),
+            empty());
   }
 
   private String limit(String msg, Object value, Object limit) {

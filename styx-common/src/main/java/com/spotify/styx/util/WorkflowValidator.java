@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class WorkflowValidator {
 
@@ -50,8 +52,13 @@ public class WorkflowValidator {
   private final Duration maybeMaxRunningTimeout;
   private final Set<String> secretWhitelist;
 
+  private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
+      Pattern.compile(
+              "^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$", Pattern.CASE_INSENSITIVE);
+
   private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout,
                             Set<String> secretWhitelist) {
+
     Preconditions.checkArgument(maybeMaxRunningTimeout == null || !maybeMaxRunningTimeout.isNegative(),
         "Max Running timeout should be positive");
     this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator);
@@ -144,6 +151,13 @@ public class WorkflowValidator {
       }
     });
 
+    // Check if the service account contains space
+    cfg.serviceAccount().ifPresent(serviceAccount -> {
+      if (!validateServiceAccount(serviceAccount)) {
+        e.add("service account format is not valid");
+      }
+    });
+
     return e;
   }
 
@@ -159,6 +173,11 @@ public class WorkflowValidator {
     if (isError) {
       errors.add(message + ": " + value + ", limit = " + limit);
     }
+  }
+
+  private static boolean validateServiceAccount(String serviceAccount) {
+    Matcher matcher = VALID_EMAIL_ADDRESS_REGEX .matcher(serviceAccount);
+    return matcher.matches();
   }
 
   public static class Builder {
