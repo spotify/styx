@@ -144,7 +144,7 @@ public class WorkflowValidator {
         upperLimit(e, timeout, maybeMaxRunningTimeout, "running timeout is too big");
       }
     });
-    
+
     cfg.secret().ifPresent(secret -> {
       if (secretWhitelist != null && !secretWhitelist.contains(secret.name())) {
         e.add("secret " + secret.name() + " is not whitelisted");
@@ -175,7 +175,7 @@ public class WorkflowValidator {
   }
 
   private static boolean validateServiceAccount(String serviceAccount) {
-    Matcher matcher = VALID_EMAIL_ADDRESS_REGEX .matcher(serviceAccount);
+    var matcher = VALID_EMAIL_ADDRESS_REGEX .matcher(serviceAccount);
     return matcher.matches();
   }
 
