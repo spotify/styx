@@ -249,26 +249,6 @@ public class WorkflowValidatorTest {
         contains("component id cannot contain #"));
   }
 
-  @Test
-  public void shouldFailUsageOfNonWhitelistedSecret() {
-    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
-        .withSecretWhitelist(Set.of("bar-secret"))
-        .build();
-
-    final List<String> errors = sut.validateWorkflow(
-        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
-
-    assertThat(errors, contains("secret " + FULL_WORKFLOW_CONFIGURATION.secret().get().name() + " is not whitelisted"));
-  }
-
-  @Test
-  public void shouldPassUsageOfWhitelistedSecret() {
-    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
-        .withSecretWhitelist(Set.of(FULL_WORKFLOW_CONFIGURATION.secret().get().name()))
-        .build();
-
-    final List<String> errors = sut.validateWorkflow(
-        Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
   @Parameters({"sa@.abc.com", "sa#@abc.com"})
   @Test
   public void shouldRejectInvalidServiceAccount(String serviceAccount) {
