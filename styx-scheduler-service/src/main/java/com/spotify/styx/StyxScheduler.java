@@ -179,7 +179,6 @@ public class StyxScheduler implements AppInit {
   private final RetryUtil retryUtil;
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
-  private final WorkflowExecutionGateFactory executionGateFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
 
@@ -191,7 +190,6 @@ public class StyxScheduler implements AppInit {
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
-  public interface WorkflowExecutionGateFactory extends BiFunction<Environment, Storage, WorkflowExecutionGate> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -223,7 +221,6 @@ public class StyxScheduler implements AppInit {
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
-    private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
@@ -278,11 +275,6 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
-    public Builder setExecutionGateFactory(WorkflowExecutionGateFactory executionGateFactory) {
-      this.executionGateFactory = executionGateFactory;
-      return this;
-    }
-
     public Builder setAuthenticatorFactory(
         AuthenticatorFactory authenticatorFactory) {
       this.authenticatorFactory = authenticatorFactory;
@@ -321,7 +313,6 @@ public class StyxScheduler implements AppInit {
     this.retryUtil = requireNonNull(builder.retryUtil);
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
-    this.executionGateFactory = requireNonNull(builder.executionGateFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
   }
@@ -420,7 +411,7 @@ public class StyxScheduler implements AppInit {
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
     final Scheduler scheduler = new Scheduler(time, stateManager, storage, resourceDecorator, stats,
-        dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor);
+        dequeueRateLimiter, shardedCounter, schedulerExecutor);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 

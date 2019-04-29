@@ -129,7 +129,6 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
   public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
-  public static final String PROPERTY_CONFIG_EXECUTION_GATING_ENABLED = "executionGatingEnabled";
   public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
 
   public static final String PROPERTY_WORKFLOW_JSON = "json";
@@ -227,8 +226,6 @@ public class DatastoreStorage implements Closeable {
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
         .clientBlacklist(this.<String>readStream(entity, PROPERTY_CONFIG_CLIENT_BLACKLIST)
             .collect(toList()))
-        .executionGatingEnabled(
-            read(entity, PROPERTY_CONFIG_EXECUTION_GATING_ENABLED, DEFAULT_CONFIG_EXECUTION_GATING_ENABLED))
         .build();
   }
 
