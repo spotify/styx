@@ -101,6 +101,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
@@ -128,7 +129,12 @@ public class KubernetesDockerRunnerTest {
   private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.builder()
       .executionId("eid1")
       .imageName("busybox")
-      .secret(WorkflowConfiguration.Secret.create("secret1", "/etc/secret"))
+      .secret(WorkflowConfiguration.Secret.create("foo-secret", "/etc/secret"))
+      .build();
+  private static final RunSpec RUN_SPEC_WITH_NON_WHITELISTED_SECRET = RunSpec.builder()
+      .executionId("eid1")
+      .imageName("busybox")
+      .secret(WorkflowConfiguration.Secret.create("secret-1", "/etc/secret"))
       .build();
   private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.builder()
       .executionId("eid3")
@@ -159,6 +165,8 @@ public class KubernetesDockerRunnerTest {
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
 
   private static final String STYX_ENVIRONMENT = "testing";
+
+  private static final Set<String> SECRET_WHITELIST = Set.of("foo-secret", "bar-secret", "styx-wf-sa-keys-foo");
 
   @Mock private NamespacedKubernetesClient k8sClient;
   @Mock private KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
@@ -218,7 +226,8 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time, executor);
+        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
+        executor);
     kdr.init();
 
     verify(k8sClient).pods();
@@ -624,6 +633,12 @@ public class KubernetesDockerRunnerTest {
     kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
 
     verify(pods).create(podCaptor.capture());
+  }
+
+  @Test
+  public void shouldNotRunIfUsingNonWhitelistedSecret() throws IOException {
+    exception.expectMessage("Referenced secret 'secret-1' is not whitelisted");
+    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET);
   }
 
   @Test

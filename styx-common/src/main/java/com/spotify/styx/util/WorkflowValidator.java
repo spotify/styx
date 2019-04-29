@@ -29,6 +29,9 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 public class WorkflowValidator {
 
@@ -46,12 +49,20 @@ public class WorkflowValidator {
 
   private final DockerImageValidator dockerImageValidator;
   private final Duration maybeMaxRunningTimeout;
+  private final Set<String> secretWhitelist;
 
-  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout) {
+  private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
+      Pattern.compile(
+              "^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$", Pattern.CASE_INSENSITIVE);
+
+  private WorkflowValidator(DockerImageValidator dockerImageValidator, Duration maybeMaxRunningTimeout,
+                            Set<String> secretWhitelist) {
+
     Preconditions.checkArgument(maybeMaxRunningTimeout == null || !maybeMaxRunningTimeout.isNegative(),
         "Max Running timeout should be positive");
-    this.dockerImageValidator = dockerImageValidator;
+    this.dockerImageValidator = Objects.requireNonNull(dockerImageValidator);
     this.maybeMaxRunningTimeout = maybeMaxRunningTimeout;
+    this.secretWhitelist = secretWhitelist;
   }
 
   public static Builder newBuilder(DockerImageValidator dockerImageValidator) {
@@ -133,6 +144,18 @@ public class WorkflowValidator {
       }
     });
 
+    cfg.secret().ifPresent(secret -> {
+      if (secretWhitelist != null && !secretWhitelist.contains(secret.name())) {
+        e.add("secret " + secret.name() + " is not whitelisted");
+      }
+    });
+
+    cfg.serviceAccount().ifPresent(serviceAccount -> {
+      if (!validateServiceAccount(serviceAccount)) {
+        e.add("service account is not a valid email address: " + serviceAccount);
+      }
+    });
+
     return e;
   }
 
@@ -150,9 +173,15 @@ public class WorkflowValidator {
     }
   }
 
+  private static boolean validateServiceAccount(String serviceAccount) {
+    var matcher = VALID_EMAIL_ADDRESS_REGEX .matcher(serviceAccount);
+    return matcher.matches();
+  }
+
   public static class Builder {
-    private final DockerImageValidator dockerImageValidator;
+    private DockerImageValidator dockerImageValidator;
     private Duration maxRunningTimeout;
+    private Set<String> secretWhitelist;
 
     public Builder(DockerImageValidator dockerImageValidator) {
       this.dockerImageValidator = dockerImageValidator;
@@ -163,8 +192,13 @@ public class WorkflowValidator {
       return this;
     }
 
+    public Builder withSecretWhitelist(Set<String> secretWhitelist) {
+      this.secretWhitelist = secretWhitelist;
+      return this;
+    }
+
     public WorkflowValidator build() {
-      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout);
+      return new WorkflowValidator(dockerImageValidator, maxRunningTimeout, secretWhitelist);
     }
   }
 }
