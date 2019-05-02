@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -114,14 +115,16 @@ public interface DockerRunner extends Closeable {
 
   static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient,
                                  StateManager stateManager,
-                                 Stats stats, ServiceAccountKeyManager serviceAccountKeyManager,
+                                 Stats stats,
+                                 ServiceAccountKeyManager serviceAccountKeyManager,
                                  Debug debug,
-                                 String styxEnvironment) {
+                                 String styxEnvironment,
+                                 Set<String> secretWhitelist) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
         new KubernetesDockerRunner(kubernetesClient, stateManager, stats,
-            serviceAccountSecretManager, debug, styxEnvironment);
+            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist);
 
     dockerRunner.init();
 

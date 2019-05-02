@@ -79,6 +79,7 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
@@ -151,6 +152,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
   private final String styxEnvironment;
+  private final Set<String> secretWhitelist;
   private final Duration cleanupPodsInterval;
   private final Duration podDeletionDelay;
   private final Time time;
@@ -161,14 +163,17 @@ class KubernetesDockerRunner implements DockerRunner {
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
-                         int cleanupPodsIntervalSeconds, int podDeletionDelaySeconds,
+                         Set<String> secretWhitelist,
+                         int cleanupPodsIntervalSeconds,
+                         int podDeletionDelaySeconds,
                          Time time, ScheduledExecutorService scheduledExecutor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
-    this.debug = debug;
-    this.styxEnvironment = styxEnvironment;
+    this.debug = Objects.requireNonNull(debug);
+    this.styxEnvironment = Objects.requireNonNull(styxEnvironment);
+    this.secretWhitelist = Objects.requireNonNull(secretWhitelist);
     this.cleanupPodsInterval = Duration.ofSeconds(cleanupPodsIntervalSeconds);
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
@@ -180,8 +185,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(NamespacedKubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment) {
-    this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
+                         Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
+    this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
         DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
@@ -250,6 +255,13 @@ class KubernetesDockerRunner implements DockerRunner {
   private Optional<WorkflowConfiguration.Secret> ensureCustomSecret(
       WorkflowInstance workflowInstance, RunSpec runSpec) {
     return runSpec.secret().map(specSecret -> {
+      if (!secretWhitelist.contains(specSecret.name())) {
+        LOG.warn("[AUDIT] Workflow {} refers to non-whitelisted secret {}, "
+                 + "denying execution", workflowInstance.workflowId(), specSecret.name());
+        throw new InvalidExecutionException(
+            "Referenced secret '" + specSecret.name() + "' is not whitelisted");
+      }
+
       if (specSecret.name().startsWith(STYX_WORKFLOW_SA_SECRET_NAME)) {
         LOG.warn("[AUDIT] Workflow {} refers to secret {} with managed service account key secret name prefix, "
             + "denying execution", workflowInstance.workflowId(), specSecret.name());
@@ -550,13 +562,23 @@ class KubernetesDockerRunner implements DockerRunner {
    */
   @VisibleForTesting
   void tryCleanupPods() {
-    client.pods().list().getItems().stream()
+    var pods = client.pods().list().getItems();
+    pods.stream()
         .map(pod -> runAsync(guard(() -> tryCleanupPod(pod)), executor))
         .collect(toList())
         .forEach(CompletableFuture::join);
+    tracer.getCurrentSpan().addAnnotation("processed",
+        Map.of("pods", AttributeValue.longAttributeValue(pods.size())));
+
   }
 
   private void tryCleanupPod(Pod pod) {
+    // Do not include all pod span in parent span to avoid it growing too big
+    tracer.spanBuilderWithExplicitParent("Styx.KubernetesDockerRunner.tryCleanupPod", null)
+        .startSpanAndRun(() -> tryCleanupPod0(pod));
+  }
+
+  private void tryCleanupPod0(Pod pod) {
     var workflowInstance = readPodWorkflowInstance(pod);
     if (workflowInstance.isEmpty()) {
       return;

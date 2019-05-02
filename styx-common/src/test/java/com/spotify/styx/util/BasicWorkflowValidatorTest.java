@@ -21,16 +21,6 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
-import static com.spotify.styx.util.WorkflowValidator.MAX_COMMIT_SHA_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_SIZE;
-import static com.spotify.styx.util.WorkflowValidator.MAX_ENV_VARS;
-import static com.spotify.styx.util.WorkflowValidator.MAX_ID_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCES;
-import static com.spotify.styx.util.WorkflowValidator.MAX_RESOURCE_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_MOUNT_PATH_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_SECRET_NAME_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MAX_SERVICE_ACCOUNT_LENGTH;
-import static com.spotify.styx.util.WorkflowValidator.MIN_RUNNING_TIMEOUT;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.contains;
@@ -65,13 +55,18 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
-public class WorkflowValidatorTest {
+public class BasicWorkflowValidatorTest {
 
-  private static final Duration EXCESSIVE_TIMEOUT = Duration.ofDays(365);
-  private static final WorkflowConfiguration CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT =
-      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
-          .runningTimeout(EXCESSIVE_TIMEOUT)
-          .build();
+  private static final int MAX_ID_LENGTH = 256;
+  private static final int MAX_RESOURCES = 5;
+  private static final int MAX_RESOURCE_LENGTH = 256;
+  private static final int MAX_COMMIT_SHA_LENGTH = 256;
+  private static final int MAX_SECRET_NAME_LENGTH = 253;
+  private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
+  private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  private static final int MAX_ENV_VARS = 128;
+  private static final int MAX_ENV_SIZE = 16 * 1024;
+  private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
 
   @Mock
   private DockerImageValidator dockerImageValidator;
@@ -82,7 +77,7 @@ public class WorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
-    sut = WorkflowValidator.newBuilder(dockerImageValidator).build();
+    sut = new BasicWorkflowValidator(dockerImageValidator);
   }
 
   @Test
@@ -116,8 +111,8 @@ public class WorkflowValidatorTest {
     assertThat(errors, hasSize(1));
     assertThat(errors.get(0), startsWith("invalid offset"));
   }
-
   @Test
+
   public void validateInvalidDockerImage() {
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(List.of("foo", "bar"));
     final List<String> errors = sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
@@ -133,7 +128,7 @@ public class WorkflowValidatorTest {
     final String commitSha = Strings.repeat("sha", 1024);
     final List<String> args = IntStream.range(0, 100).mapToObj(i -> "arg-" + i).collect(toList());
     final Secret secret = Secret.create(Strings.repeat("foo", 1024), Strings.repeat("bar", 4711));
-    final String serviceAccount = Strings.repeat("account", 1024);
+    final String serviceAccount = Strings.repeat("account@abc.com", 1024);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
     final Map<String, String> env = IntStream.range(0, 2000).boxed()
@@ -171,30 +166,10 @@ public class WorkflowValidatorTest {
         .add(limit("too many env vars", env.size(), MAX_ENV_VARS))
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
         .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
+        .add("service account is not a valid email address: " + serviceAccount)
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));
-  }
-
-  @Test
-  public void shouldSkipMaxRunningTimeoutValidationByDefault() {
-    final List<String> errors = sut.validateWorkflow(Workflow.create("test",
-        CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT));
-
-    assertThat(errors, empty());
-  }
-
-  @Test
-  public void shouldEnforceMaxRunningTimeoutLimitWhenSpecified() {
-    final Duration maxRunningTimeout = Duration.ofHours(24);
-    WorkflowValidator sut = WorkflowValidator.newBuilder(dockerImageValidator)
-        .withMaxRunningTimeoutLimit(maxRunningTimeout)
-        .build();
-
-    final List<String> errors = sut.validateWorkflow(
-        Workflow.create("test", CONFIGURATION_WITH_EXCESSIVE_RUNTIME_TIMEOUT));
-
-    assertThat(errors, contains(limit("running timeout is too big", EXCESSIVE_TIMEOUT, maxRunningTimeout)));
   }
 
   @Test
@@ -245,6 +220,45 @@ public class WorkflowValidatorTest {
   public void shouldNotAllowComponentWithHash(String component) {
     assertThat(sut.validateWorkflow(Workflow.create(component, FULL_WORKFLOW_CONFIGURATION)),
         contains("component id cannot contain #"));
+  }
+
+  @Parameters({"sa@.abc.com", "sa#@abc.com"})
+  @Test
+  public void shouldRejectInvalidServiceAccount(String serviceAccount) {
+    WorkflowConfiguration configuration = WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+            .serviceAccount(serviceAccount)
+            .build();
+
+    assertThat(sut.validateWorkflow(Workflow.create("test", configuration)),
+            contains("service account is not a valid email address: " + serviceAccount));
+  }
+
+  @Test
+  public void shouldRejectSpaceServiceAccountWithTailingSpace() {
+    String[] invalidServiceAccounts = {"sa@abc.com ", "sa@abc.com\n"};
+    // We are looping through the invalid service account list because JUnitParameter removes
+    // the trailing spaces and new line but that are the cases we need to test
+    for (String serviceAccount : invalidServiceAccounts) {
+      WorkflowConfiguration configuration =
+          WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+              .serviceAccount(serviceAccount)
+              .build();
+
+      assertThat(
+          sut.validateWorkflow(Workflow.create("test", configuration)),
+          contains("service account is not a valid email address: " + serviceAccount));
+      }
+  }
+
+  @Parameters({"abc@abc.com", "sa@ab-cd.abc.com", "sa_abc@abc.com"})
+  @Test
+  public void shouldAcceptValidServiceAccount(String serviceAccount) {
+    WorkflowConfiguration configuration = WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+            .serviceAccount(serviceAccount)
+            .build();
+
+    assertThat(sut.validateWorkflow(Workflow.create("test", configuration)),
+            empty());
   }
 
   private String limit(String msg, Object value, Object limit) {

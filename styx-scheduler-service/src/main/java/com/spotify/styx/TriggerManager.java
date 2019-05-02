@@ -45,6 +45,7 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import io.grpc.Context;
 import io.opencensus.common.Scope;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
@@ -128,52 +129,62 @@ class TriggerManager implements Closeable {
     final Instant now = time.get();
     canBeTriggeredWorkflows.entrySet().stream()
         .filter(entry -> now.isAfter(entry.getValue().offsetInstant()))
-        .map(entry -> CompletableFuture.runAsync(
-            tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows), executor))
+        .map(entry -> CompletableFuture.runAsync(guard(() ->
+            tryTriggering(entry.getKey(), entry.getValue(), enabledWorkflows)), executor))
         .collect(toList()) // collect here to trigger in parallel
         .forEach(CompletableFuture::join);
 
     final long durationMillis = t0.until(time.get(), ChronoUnit.MILLIS);
     stats.recordTickDuration(TICK_TYPE, durationMillis);
+
+    tracer.getCurrentSpan().addAnnotation("processed",
+        Map.of("workflows", AttributeValue.longAttributeValue(canBeTriggeredWorkflows.size())));
+
   }
 
-  private Runnable tryTriggering(Workflow workflow,
+  private void tryTriggering(Workflow workflow,
                              TriggerInstantSpec instantSpec,
                              Set<WorkflowId> enabledWorkflows) {
-    return guard(() -> {
-      if (enabledWorkflows.contains(workflow.id())) {
-        try {
-          triggerListener.event(workflow, Trigger.natural(), instantSpec.instant(), TriggerParameters.zero());
-        } catch (Exception e) {
-          final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
-              toParameter(workflow.configuration().schedule(), instantSpec.instant()));
+    // Do not include all trigger spans in parent tick span to avoid it growing too big
+    tracer.spanBuilderWithExplicitParent("Styx.TriggerManager.tryTriggering", null)
+        .startSpanAndRun(() -> tryTriggering0(workflow, instantSpec, enabledWorkflows));
+  }
 
-          if (findCause(e, AlreadyInitializedException.class) != null) {
-            LOG.debug("{} already triggered", workflowInstance, e);
-            // move on to update next natural trigger
-          } else {
-            LOG.debug("Failed to trigger {}", workflowInstance, e);
-            return;
-          }
-        }
-
-        stats.recordNaturalTrigger();
-      }
-
-      final Schedule schedule = workflow.configuration().schedule();
-      final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);
-      final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
-      final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
-
+  private void tryTriggering0(Workflow workflow,
+                                 TriggerInstantSpec instantSpec,
+                                 Set<WorkflowId> enabledWorkflows) {
+    if (enabledWorkflows.contains(workflow.id())) {
       try {
-        storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
-      } catch (IOException e) {
-        LOG.error(
-            "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",
-            workflow.id(), nextTrigger);
-        throw Throwables.propagate(e);
+        triggerListener.event(workflow, Trigger.natural(), instantSpec.instant(), TriggerParameters.zero());
+      } catch (Exception e) {
+        final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(),
+            toParameter(workflow.configuration().schedule(), instantSpec.instant()));
+
+        if (findCause(e, AlreadyInitializedException.class) != null) {
+          LOG.debug("{} already triggered", workflowInstance, e);
+          // move on to update next natural trigger
+        } else {
+          LOG.debug("Failed to trigger {}", workflowInstance, e);
+          return;
+        }
       }
-    });
+
+      stats.recordNaturalTrigger();
+    }
+
+    final Schedule schedule = workflow.configuration().schedule();
+    final Instant nextTrigger = nextInstant(instantSpec.instant(), schedule);
+    final Instant nextWithOffset = workflow.configuration().addOffset(nextTrigger);
+    final TriggerInstantSpec nextSpec = TriggerInstantSpec.create(nextTrigger, nextWithOffset);
+
+    try {
+      storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
+    } catch (IOException e) {
+      LOG.error(
+          "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",
+          workflow.id(), nextTrigger);
+      throw Throwables.propagate(e);
+    }
   }
 
   @Override

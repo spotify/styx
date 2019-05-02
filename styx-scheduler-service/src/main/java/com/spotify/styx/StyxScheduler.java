@@ -86,10 +86,12 @@ import com.spotify.styx.state.handlers.TimeoutHandler;
 import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.BasicWorkflowValidator;
 import com.spotify.styx.util.CachedSupplier;
 import com.spotify.styx.util.CounterSnapshotFactory;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.DockerImageValidator;
+import com.spotify.styx.util.ExtendedWorkflowValidator;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.ShardedCounter;
@@ -97,16 +99,13 @@ import com.spotify.styx.util.ShardedCounterSnapshotFactory;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
-import com.spotify.styx.util.WorkflowValidator;
 import com.typesafe.config.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
-import io.opencensus.common.Scope;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
-import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -148,6 +147,7 @@ public class StyxScheduler implements AppInit {
   public static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
+  private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
   public static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
@@ -179,7 +179,6 @@ public class StyxScheduler implements AppInit {
   private final RetryUtil retryUtil;
   private final WorkflowResourceDecorator resourceDecorator;
   private final EventConsumerFactory eventConsumerFactory;
-  private final WorkflowExecutionGateFactory executionGateFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
 
@@ -191,7 +190,6 @@ public class StyxScheduler implements AppInit {
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
-  public interface WorkflowExecutionGateFactory extends BiFunction<Environment, Storage, WorkflowExecutionGate> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -200,7 +198,8 @@ public class StyxScheduler implements AppInit {
         Environment environment,
         StateManager stateManager,
         Stats stats,
-        Debug debug);
+        Debug debug,
+        Set<String> secretWhitelist);
   }
 
   @FunctionalInterface
@@ -222,7 +221,6 @@ public class StyxScheduler implements AppInit {
     private RetryUtil retryUtil = DEFAULT_RETRY_UTIL;
     private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
     private EventConsumerFactory eventConsumerFactory = (env, stats) -> (event, state) -> { };
-    private WorkflowExecutionGateFactory executionGateFactory = (env, storage) -> WorkflowExecutionGate.NOOP;
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
@@ -277,11 +275,6 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
-    public Builder setExecutionGateFactory(WorkflowExecutionGateFactory executionGateFactory) {
-      this.executionGateFactory = executionGateFactory;
-      return this;
-    }
-
     public Builder setAuthenticatorFactory(
         AuthenticatorFactory authenticatorFactory) {
       this.authenticatorFactory = authenticatorFactory;
@@ -320,7 +313,6 @@ public class StyxScheduler implements AppInit {
     this.retryUtil = requireNonNull(builder.retryUtil);
     this.resourceDecorator = requireNonNull(builder.resourceDecorator);
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
-    this.executionGateFactory = requireNonNull(builder.executionGateFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
   }
@@ -383,18 +375,18 @@ public class StyxScheduler implements AppInit {
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
     final Debug debug = () -> styxConfig.get().debugEnabled();
+    var secretWhitelist =
+        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
 
-    Duration runningStateTtl = timeoutConfig.ttlOf(State.RUNNING);
-    WorkflowValidator workflowValidator = WorkflowValidator.newBuilder(new DockerImageValidator())
-        .withMaxRunningTimeoutLimit(runningStateTtl)
-        .build();
+    var workflowValidator = new ExtendedWorkflowValidator(
+        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
 
     // These output handlers will be invoked in order.
     outputHandlers.addAll(List.of(
@@ -419,7 +411,7 @@ public class StyxScheduler implements AppInit {
         new BackfillTriggerManager(stateManager, storage, trigger, stats, time);
 
     final Scheduler scheduler = new Scheduler(time, stateManager, storage, resourceDecorator, stats,
-        dequeueRateLimiter, executionGateFactory.apply(environment, storage), shardedCounter, schedulerExecutor);
+        dequeueRateLimiter, shardedCounter, schedulerExecutor);
 
     final Cleaner cleaner = new Cleaner(dockerRunner);
 
@@ -520,15 +512,6 @@ public class StyxScheduler implements AppInit {
   }
 
   private static void updateRuntimeConfig(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
-    try (Scope ss = tracer.spanBuilder("Styx.StyxScheduler.updateRuntimeConfig")
-        .setRecordEvents(true)
-        .setSampler(Samplers.alwaysSample())
-        .startScopedSpan()) {
-      updateRuntimeConfig0(config, rateLimiter);
-    }
-  }
-
-  private static void updateRuntimeConfig0(Supplier<StyxConfig> config, RateLimiter rateLimiter) {
     try {
       double currentRate = rateLimiter.getRate();
       Double updatedRate = config.get().submissionRateLimit().orElse(
@@ -617,7 +600,8 @@ public class StyxScheduler implements AppInit {
       Environment environment,
       StateManager stateManager,
       Stats stats,
-      Debug debug) {
+      Debug debug,
+      Set<String> secretWhitelist) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -626,7 +610,7 @@ public class StyxScheduler implements AppInit {
         config, id, createGkeClient(), DefaultKubernetesClient::new));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
     return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
-        serviceAccountKeyManager, debug, styxEnvironment));
+        serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 
   private static Container createGkeClient() {
