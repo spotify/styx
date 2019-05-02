@@ -37,6 +37,7 @@ import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.state.EventConsumer;
 import com.spotify.styx.state.RunState;
 import java.util.Objects;
 import java.util.concurrent.Callable;

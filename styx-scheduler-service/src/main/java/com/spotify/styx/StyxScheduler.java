@@ -79,7 +79,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
-import com.spotify.styx.state.consumers.EventConsumer;
+import com.spotify.styx.state.EventConsumer;
 import com.spotify.styx.state.consumers.PublisherHandler;
 import com.spotify.styx.state.consumers.TransitionLogger;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;

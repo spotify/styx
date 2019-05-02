@@ -24,6 +24,7 @@ import static java.lang.String.format;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.SequenceEvent;
+import com.spotify.styx.state.EventConsumer;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import java.util.Locale;
