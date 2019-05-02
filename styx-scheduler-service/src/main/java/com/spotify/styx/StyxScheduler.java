@@ -24,7 +24,6 @@ import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.state.EventConsumer.fanEvent;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.OutputHandler.mdcDecorating;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
@@ -363,7 +362,7 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    var outputHandler = mdcDecorating(fanOutput(outputHandlers));
+    var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
 
     var eventConsumer = fanEvent(EventConsumer.tracing(List.of(
         eventConsumerFactory.apply(environment, stats),
