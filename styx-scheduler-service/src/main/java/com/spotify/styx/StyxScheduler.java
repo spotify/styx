@@ -61,7 +61,6 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -80,12 +79,13 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
+import com.spotify.styx.state.consumers.EventConsumer;
+import com.spotify.styx.state.consumers.PublisherHandler;
+import com.spotify.styx.state.consumers.TransitionLogger;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
-import com.spotify.styx.state.handlers.PublisherHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.state.handlers.TimeoutHandler;
-import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.BasicWorkflowValidator;
@@ -122,7 +122,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -191,7 +190,6 @@ public class StyxScheduler implements AppInit {
 
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
-  public interface EventConsumer extends BiConsumer<SequenceEvent, RunState> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, EventConsumer> { }
 
   @FunctionalInterface

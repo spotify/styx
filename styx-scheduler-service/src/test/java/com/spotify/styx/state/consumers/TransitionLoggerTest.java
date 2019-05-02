@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.state.handlers;
+package com.spotify.styx.state.consumers;
 
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
@@ -41,6 +41,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.util.EventUtil;
 import java.time.Instant;
 import org.junit.Test;

@@ -18,12 +18,11 @@
  * -/-/-
  */
 
-package com.spotify.styx.state.handlers;
+package com.spotify.styx.state.consumers;
 
 import static java.lang.String.format;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.spotify.styx.StyxScheduler;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
@@ -32,7 +31,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TransitionLogger implements StyxScheduler.EventConsumer {
+public class TransitionLogger implements EventConsumer {
 
   private final Logger log;
 

@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.state.handlers;
+package com.spotify.styx.state.consumers;
 
 import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
 import static com.github.rholder.retry.WaitStrategies.exponentialWait;
@@ -32,7 +32,6 @@ import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.spotify.styx.StyxScheduler;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowInstance;
@@ -48,7 +47,7 @@ import org.slf4j.LoggerFactory;
 /**
  * An event consumer that integrates {@link RunState.State} values with a {@link Publisher}.
  */
-public class PublisherHandler implements StyxScheduler.EventConsumer {
+public class PublisherHandler implements EventConsumer {
 
   private static final Logger LOG = LoggerFactory.getLogger(PublisherHandler.class);
 
