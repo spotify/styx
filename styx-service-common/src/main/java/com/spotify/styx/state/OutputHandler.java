@@ -36,16 +36,10 @@ import java.util.stream.Collectors;
 @FunctionalInterface
 public interface OutputHandler {
 
-  OutputHandler NOOP = (runState) -> { };
-
   void transitionInto(RunState state);
 
-  static OutputHandler fanOutput(OutputHandler... outputHandlers) {
-    return fanOutput(List.of(outputHandlers));
-  }
-
-  static OutputHandler fanOutput(Iterable<OutputHandler> outputHandlers) {
-    return new FanOutputHandler(outputHandlers);
+  static OutputHandler fanOutput(Collection<OutputHandler> outputHandlers) {
+    return state -> outputHandlers.forEach(outputHandler -> outputHandler.transitionInto(state));
   }
 
   static OutputHandler tracing(OutputHandler outputHandler) {

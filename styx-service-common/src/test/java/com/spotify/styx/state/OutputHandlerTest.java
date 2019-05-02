@@ -43,8 +43,7 @@ public class OutputHandlerTest {
 
   @Test
   public void fanOutput() {
-    var outputHandler = OutputHandler.fanOutput(outputHandler1, outputHandler2);
-    assertThat(outputHandler, is(instanceOf(FanOutputHandler.class)));
+    var outputHandler = OutputHandler.fanOutput(List.of(outputHandler1, outputHandler2));
     outputHandler.transitionInto(runState);
     verify(outputHandler1).transitionInto(runState);
     verify(outputHandler2).transitionInto(runState);
