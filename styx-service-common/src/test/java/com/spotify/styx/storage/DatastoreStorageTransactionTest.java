@@ -163,8 +163,6 @@ public class DatastoreStorageTransactionTest {
 
   @Test
   public void shouldHandleRollbackFailure() throws Exception {
-    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
-
     var transaction = spy(datastore.newTransaction());
     doReturn(transaction).when(datastore).newTransaction();
     var rollbackFailure = new DatastoreIOException(new DatastoreException(1, "fail", "error"));
