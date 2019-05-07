@@ -925,11 +925,7 @@ public class DatastoreStorage implements Closeable {
           throw e;
         }
         log.debug("datastore transaction exception, attempt #{}, retrying in {}ms", attempt, sleepMillis, e);
-        try {
-          Thread.sleep(sleepMillis);
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-        }
+        sleepMillis(sleepMillis);
       }
     }
   }
@@ -992,5 +988,13 @@ public class DatastoreStorage implements Closeable {
 
   private <T> CompletableFuture<T> asyncIO(IOOperation<T> f) {
     return f.executeAsync(executor);
+  }
+
+  static void sleepMillis(long sleepMillis) {
+    try {
+      Thread.sleep(sleepMillis);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

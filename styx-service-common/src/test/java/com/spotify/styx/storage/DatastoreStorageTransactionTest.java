@@ -187,7 +187,16 @@ public class DatastoreStorageTransactionTest {
     barrier.complete(null);
 
     // Wait for first transaction to fail
-    future.get(30, SECONDS);
+    try {
+      future.get(30, SECONDS);
+      fail("Expected transaction to fail");
+    } catch (ExecutionException e) {
+      var cause = e.getCause();
+      assertThat(cause, instanceOf(DatastoreIOException.class));
+      var dex = ((DatastoreIOException) cause).getCause();
+      assertThat(dex.getCode(), is(10));
+    }
+
     assertThat(runs.get(), is(1));
   }
 
@@ -238,6 +247,21 @@ public class DatastoreStorageTransactionTest {
 
     // Verify that it retried as many times as expected before giving up
     assertThat(runs.get(), is(RETRY_SETTINGS.getMaxAttempts()));
+  }
+
+
+  @Test
+  public void sleepShouldBeInterruptible() throws Exception {
+    var running = new CompletableFuture<String>();
+    var future = executor.submit(() -> {
+      running.complete(null);
+      DatastoreStorage.sleepMillis(Long.MAX_VALUE);
+      return "foobar";
+    });
+    running.join();
+    executor.shutdownNow();
+    var result = future.get(30, SECONDS);
+    assertThat(result, is("foobar"));
   }
 
   @Test
