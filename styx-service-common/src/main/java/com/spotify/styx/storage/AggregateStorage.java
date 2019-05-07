@@ -52,7 +52,7 @@ public class AggregateStorage implements Storage {
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this(new BigtableStorage(connection, retryBaseDelay),
-         new DatastoreStorage(new CheckedDatastore(datastore), retryBaseDelay));
+         new DatastoreStorage(new CheckedDatastore(datastore)));
   }
 
   AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {

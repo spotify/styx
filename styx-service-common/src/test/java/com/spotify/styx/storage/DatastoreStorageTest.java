@@ -97,7 +97,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -254,7 +253,7 @@ public class DatastoreStorageTest {
         .getService();
     innerDatastore = new CheckedDatastore(datastoreClient);
     datastore = spy(innerDatastore);
-    storage = new DatastoreStorage(datastore, Duration.ZERO, DatastoreStorageTransaction::new, executor, logger);
+    storage = new DatastoreStorage(datastore, DatastoreStorageTransaction::new, executor, logger);
   }
 
   @After
@@ -779,7 +778,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionWithRetriesShouldCallFunction() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory,
+    final DatastoreStorage storage = new DatastoreStorage(datastore, storageTransactionFactory,
         executor, logger);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
@@ -795,6 +794,23 @@ public class DatastoreStorageTest {
 
   @Test
   public void runInTransactionWithRetriesShouldPropagateUserException() throws Exception {
+    final Exception expectedException = new FooException();
+    when(transactionFunction.apply(any())).thenThrow(expectedException);
+
+    try {
+      storage.runInTransactionWithRetries(transactionFunction);
+      fail("Expected exception!");
+    } catch (FooException e) {
+      // Verify that we can throw a user defined checked exception type inside the transaction
+      // body and catch it
+      assertThat(e, is(expectedException));
+    }
+
+    verify(transactionFunction).apply(any());
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldRetry() throws Exception {
     final Exception expectedException = new FooException();
     when(transactionFunction.apply(any())).thenThrow(expectedException);
 

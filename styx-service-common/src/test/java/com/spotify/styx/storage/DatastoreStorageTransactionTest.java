@@ -32,10 +32,13 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
@@ -48,12 +51,14 @@ import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import org.junit.After;
@@ -63,13 +68,21 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.threeten.bp.Duration;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTransactionTest {
 
+  private static final RetrySettings RETRY_SETTINGS = ServiceOptions.getDefaultRetrySettings().toBuilder()
+      .setInitialRetryDelay(Duration.ofMillis(1L))
+      .setMaxAttempts(3)
+      .build();
+
   private static LocalDatastoreHelper helper;
   private static CheckedDatastore datastore;
   private DatastoreStorage storage;
+
+  private ExecutorService executor = Executors.newCachedThreadPool();
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -96,21 +109,20 @@ public class DatastoreStorageTransactionTest {
   @Before
   public void setUp() throws Exception {
     datastore = new CheckedDatastore(helper.getOptions().toBuilder()
-        .setRetrySettings(ServiceOptions.getDefaultRetrySettings())
+        .setRetrySettings(RETRY_SETTINGS)
         .build()
         .getService());
-    storage = new DatastoreStorage(datastore, Duration.ZERO);
+    storage = new DatastoreStorage(datastore);
   }
 
   @After
   public void tearDown() throws Exception {
     helper.reset();
+    executor.shutdownNow();
   }
 
   @Test
   public void shouldRetryOnConflict() throws Exception {
-    var executor = Executors.newCachedThreadPool();
-
     var workflow = TestData.WORKFLOW_WITH_RESOURCES;
 
     // Store workflow
@@ -139,9 +151,57 @@ public class DatastoreStorageTransactionTest {
     barrier.complete(null);
 
     // Wait for first transaction to also complete and verify that it ran twice
-    future.get(3000, SECONDS);
+    future.get(30, SECONDS);
     assertThat(runs.get(), is(2));
+  }
 
+  @Test
+  public void shouldRetryUntilMaxAttempts() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var waiting = new LinkedBlockingQueue<Boolean>();
+    var proceed = new LinkedBlockingQueue<Boolean>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      waiting.put(true);
+      proceed.take();
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute winning read-store transactions to make each retry of the above transaction fail
+    for (int i = 0; i < RETRY_SETTINGS.getMaxAttempts(); i++) {
+      waiting.take();
+      storage.runInTransactionWithRetries(tx -> {
+        var wf = tx.workflow(workflow.id());
+        tx.store(wf.orElseThrow());
+        return null;
+      });
+      proceed.put(true);
+    }
+
+    // Wait for first transaction to give up
+    try {
+      future.get(300, SECONDS);
+      fail("Expected transaction to fail");
+    } catch (ExecutionException e) {
+      var cause = e.getCause();
+      assertThat(cause, instanceOf(DatastoreIOException.class));
+      var dex = ((DatastoreIOException) cause).getCause();
+      assertThat(dex.getCode(), is(10));
+    }
+
+    // Verify that it retried as many times as expected before giving up
+    assertThat(runs.get(), is(RETRY_SETTINGS.getMaxAttempts()));
   }
 
   @Test

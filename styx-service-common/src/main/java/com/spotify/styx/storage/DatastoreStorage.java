@@ -85,7 +85,6 @@ import io.grpc.Context;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -185,21 +184,19 @@ public class DatastoreStorage implements Closeable {
   private final Closer closer = Closer.create();
 
   private final CheckedDatastore datastore;
-  private final Duration retryBaseDelay;
   private final Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
   private final Executor executor;
   private final Logger log;
 
-  DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay) {
-    this(datastore, retryBaseDelay, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY), LOG);
+  DatastoreStorage(CheckedDatastore datastore) {
+    this(datastore, DatastoreStorageTransaction::new, new ForkJoinPool(REQUEST_CONCURRENCY), LOG);
   }
 
   @VisibleForTesting
-  DatastoreStorage(CheckedDatastore datastore, Duration retryBaseDelay,
+  DatastoreStorage(CheckedDatastore datastore,
                    Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory,
                    ExecutorService executor, Logger log) {
     this.datastore = Objects.requireNonNull(datastore);
-    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
     this.executor = MDCUtil.withMDC(Context.currentContextExecutor(register(closer, executor, "datastore-storage")));
     this.log = Objects.requireNonNull(log, "log");
