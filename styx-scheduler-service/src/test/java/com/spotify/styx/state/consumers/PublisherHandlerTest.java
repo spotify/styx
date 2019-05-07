@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.state.handlers;
+package com.spotify.styx.state.consumers;
 
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.mockito.ArgumentMatchers.any;

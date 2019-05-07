@@ -27,6 +27,8 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Proxy;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -41,8 +43,7 @@ public class OutputHandlerTest {
 
   @Test
   public void fanOutput() {
-    var outputHandler = OutputHandler.fanOutput(outputHandler1, outputHandler2);
-    assertThat(outputHandler, is(instanceOf(FanOutputHandler.class)));
+    var outputHandler = OutputHandler.fanOutput(List.of(outputHandler1, outputHandler2));
     outputHandler.transitionInto(runState);
     verify(outputHandler1).transitionInto(runState);
     verify(outputHandler2).transitionInto(runState);
@@ -57,5 +58,17 @@ public class OutputHandlerTest {
     when(runState.counter()).thenReturn(17L);
     outputHandler.transitionInto(runState);
     verify(outputHandler1).transitionInto(runState);
+  }
+
+  @Test
+  public void tracing() {
+    var outputHandlers = OutputHandler.tracing(List.of(outputHandler1, outputHandler2));
+    assertThat(outputHandlers.size(), is(2));
+    assertThat(Proxy.isProxyClass(outputHandlers.get(0).getClass()), is(true));
+    assertThat(Proxy.isProxyClass(outputHandlers.get(1).getClass()), is(true));
+    outputHandlers.get(0).transitionInto(runState);
+    verify(outputHandler1).transitionInto(runState);
+    outputHandlers.get(1).transitionInto(runState);
+    verify(outputHandler2).transitionInto(runState);
   }
 }
