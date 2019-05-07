@@ -37,9 +37,14 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.ServiceOptions;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
@@ -109,10 +114,10 @@ public class DatastoreStorageTransactionTest {
 
   @Before
   public void setUp() throws Exception {
-    datastore = new CheckedDatastore(helper.getOptions().toBuilder()
+    datastore = spy(new CheckedDatastore(helper.getOptions().toBuilder()
         .setRetrySettings(RETRY_SETTINGS)
         .build()
-        .getService());
+        .getService()));
     storage = new DatastoreStorage(datastore);
   }
 
@@ -154,6 +159,29 @@ public class DatastoreStorageTransactionTest {
     // Wait for first transaction to also complete and verify that it ran twice
     future.get(30, SECONDS);
     assertThat(runs.get(), is(2));
+  }
+
+  @Test
+  public void shouldHandleRollbackFailure() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    var transaction = spy(datastore.newTransaction());
+    doReturn(transaction).when(datastore).newTransaction();
+    var rollbackFailure = new DatastoreIOException(new DatastoreException(1, "fail", "error"));
+    doThrow(rollbackFailure).when(transaction).rollback();
+
+    var cause = new RuntimeException("foobar");
+
+    // Run a failing transaction and verify that the rollback failure does not suppress our exception
+    try {
+      storage.runInTransactionWithRetries(tx -> {
+        throw cause;
+      });
+    } catch (RuntimeException e) {
+      assertThat(e, is(cause));
+    }
+
+    verify(transaction).rollback();
   }
 
   @Test
