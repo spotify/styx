@@ -906,7 +906,7 @@ public class DatastoreStorage implements Closeable {
         .setInitialIntervalMillis((int) retrySettings.getInitialRetryDelay().toMillis())
         .setMaxIntervalMillis((int) retrySettings.getMaxRetryDelay().toMillis())
         .setMultiplier(retrySettings.getRetryDelayMultiplier())
-        .setMaxElapsedTimeMillis((int) retrySettings.getMaxRetryDelay().toMillis())
+        .setMaxElapsedTimeMillis((int) retrySettings.getTotalTimeout().toMillis())
         .build();
 
     for (int attempt = 1; ; attempt++) {

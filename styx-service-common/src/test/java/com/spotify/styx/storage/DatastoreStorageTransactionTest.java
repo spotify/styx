@@ -75,6 +75,7 @@ public class DatastoreStorageTransactionTest {
 
   private static final RetrySettings RETRY_SETTINGS = ServiceOptions.getDefaultRetrySettings().toBuilder()
       .setInitialRetryDelay(Duration.ofMillis(1L))
+      .setTotalTimeout(Duration.ofSeconds(5))
       .setMaxAttempts(3)
       .build();
 
@@ -153,6 +154,41 @@ public class DatastoreStorageTransactionTest {
     // Wait for first transaction to also complete and verify that it ran twice
     future.get(30, SECONDS);
     assertThat(runs.get(), is(2));
+  }
+
+  @Test
+  public void shouldGiveUpOnTimeout() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var barrier = new CompletableFuture<Void>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      barrier.join();
+      Thread.sleep(RETRY_SETTINGS.getTotalTimeout().toMillis());
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute a winning read-store transaction
+    storage.runInTransactionWithRetries(tx -> {
+      var wf = tx.workflow(workflow.id());
+      tx.store(wf.orElseThrow());
+      return null;
+    });
+    barrier.complete(null);
+
+    // Wait for first transaction to fail
+    future.get(30, SECONDS);
+    assertThat(runs.get(), is(1));
   }
 
   @Test
