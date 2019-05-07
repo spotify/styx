@@ -42,7 +42,6 @@ import static org.mockito.Mockito.when;
 
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -53,6 +52,8 @@ import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
@@ -127,7 +128,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private Directory.Members.HasMember isMember;
   @Mock private Directory.Members.HasMember isNotMember;
 
-  private GoogleCredential credential;
+  private GoogleCredentials credential;
 
   private final com.google.api.services.cloudresourcemanager.model.Binding projectBinding =
       new com.google.api.services.cloudresourcemanager.model.Binding();
@@ -168,9 +169,9 @@ public class ServiceAccountUsageAuthorizerTest {
         .thenReturn(new ServiceAccount()
             .setEmail(MANAGED_SERVICE_ACCOUNT)
             .setProjectId(SERVICE_ACCOUNT_PROJECT));
-    credential = new GoogleCredential.Builder()
-        .setServiceAccountPrivateKey(privateKey)
-        .setServiceAccountId("styx@bar.iam.gserviceaccount.com")
+    credential = ServiceAccountCredentials.newBuilder()
+        .setPrivateKey(privateKey)
+        .setClientEmail("styx@bar.iam.gserviceaccount.com")
         .build();
     sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
         WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
@@ -492,13 +493,13 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void createShouldFailIfCredentialIsNotAServiceAccount() {
-    credential = new GoogleCredential.Builder().build();
+    credential = GoogleCredentials.newBuilder().build();
     try {
       ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential,
           GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
       fail();
     } catch (IllegalArgumentException e) {
-      assertThat(e.getMessage(), is("Credential must be a service account"));
+      assertThat(e.getMessage(), is("Credential is not a service account"));
     }
   }
 
