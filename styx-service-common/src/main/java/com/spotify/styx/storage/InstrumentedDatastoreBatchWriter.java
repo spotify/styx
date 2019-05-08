@@ -21,13 +21,11 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreBatchWriter;
-import com.google.cloud.datastore.DatastoreWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.FullEntity;
 import com.google.cloud.datastore.Key;
 import com.spotify.styx.monitoring.Stats;
 import java.util.List;
-import java.util.Objects;
 
 interface InstrumentedDatastoreBatchWriter extends DatastoreBatchWriter, InstrumentedDatastoreWriter {
 
@@ -84,26 +82,5 @@ interface InstrumentedDatastoreBatchWriter extends DatastoreBatchWriter, Instrum
   @Override
   default List<Entity> put(FullEntity<?>... entities) {
     return InstrumentedDatastoreWriter.super.put(entities);
-  }
-
-  static InstrumentedDatastoreBatchWriter of(Stats stats, DatastoreBatchWriter batchWriter) {
-    Objects.requireNonNull(stats, "stats");
-    Objects.requireNonNull(batchWriter, "batchWriter");
-    return new InstrumentedDatastoreBatchWriter() {
-      @Override
-      public Stats stats() {
-        return stats;
-      }
-
-      @Override
-      public DatastoreBatchWriter batchWriter() {
-        return batchWriter;
-      }
-
-      @Override
-      public DatastoreWriter writer() {
-        return batchWriter;
-      }
-    };
   }
 }
