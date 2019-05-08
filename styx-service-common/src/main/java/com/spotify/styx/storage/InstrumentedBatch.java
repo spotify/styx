@@ -36,12 +36,12 @@ interface InstrumentedBatch extends Batch, InstrumentedDatastoreBatchWriter {
 
   @Override
   default Entity add(FullEntity<?> entity) {
-    return batch().add(entity);
+    return InstrumentedDatastoreBatchWriter.super.add(entity);
   }
 
   @Override
   default List<Entity> add(FullEntity<?>... entities) {
-    return batch().add(entities);
+    return InstrumentedDatastoreBatchWriter.super.add(entities);
   }
 
   @Override
