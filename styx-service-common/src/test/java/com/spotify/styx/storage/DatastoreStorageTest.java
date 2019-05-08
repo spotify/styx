@@ -41,6 +41,7 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -614,15 +615,33 @@ public class DatastoreStorageTest {
   public void shouldFailToReadCorruptWorkflow() throws Exception {
     assertThat(storage.workflows().isEmpty(), is(true));
 
-    Workflow workflow1 = workflow(WORKFLOW_ID1);
-    storage.store(workflow1);
-    final Key workflowKey = workflowKey(datastore::newKeyFactory, workflow1.id());
+    var instant = Instant.parse("2019-05-08T01:00:00Z");
+    var workflowState = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(instant)
+        .build();
 
-    final Entity entity = datastore.get(workflowKey);
-    final Entity corrupted = Entity.newBuilder(entity)
+    var workflow1 = workflow(WORKFLOW_ID1);
+    storage.store(workflow1);
+    storage.patchState(WORKFLOW_ID1, workflowState);
+    var workflowKey1 = workflowKey(datastore::newKeyFactory, workflow1.id());
+
+    var workflowEntity1 = datastore.get(workflowKey1);
+    var corruptedWorkflowEntity1 = Entity.newBuilder(workflowEntity1)
         .set("json", "bork")
         .build();
-    datastore.put(corrupted);
+    datastore.put(corruptedWorkflowEntity1);
+
+    var workflow2 = workflow(WORKFLOW_ID2);
+    storage.store(workflow2);
+    storage.patchState(WORKFLOW_ID2, workflowState);
+
+    assertThat(storage.workflows(), is(Map.of(WORKFLOW_ID2, workflow2)));
+    assertThat(storage.workflowsWithNextNaturalTrigger(),
+        is(Map.of(workflow2, TriggerInstantSpec.create(instant, instant))));
+    assertThat(storage.workflows(Set.of(WORKFLOW_ID1, WORKFLOW_ID2)), is(Map.of(WORKFLOW_ID2, workflow2)));
+    assertThat(storage.workflows(WORKFLOW_ID1.componentId()), contains(workflow2));
 
     exception.expect(IOException.class);
     storage.workflow(workflow1.id());
