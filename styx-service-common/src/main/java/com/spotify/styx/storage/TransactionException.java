@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreException;
+import java.util.Objects;
 
 public class TransactionException extends StorageException {
 
@@ -29,27 +30,24 @@ public class TransactionException extends StorageException {
           ", code=" + cause.getCode() +
           ", reason=" + cause.getReason() +
           ", isRetryable=" + cause.isRetryable()
-        , cause);
+        , Objects.requireNonNull(cause));
   }
 
-  private DatastoreException datastoreExceptionCause() {
-    var cause = getCause();
-    return cause instanceof DatastoreException ? (DatastoreException) cause : null;
+  @Override
+  public synchronized DatastoreException getCause() {
+    return (DatastoreException) super.getCause();
   }
 
   public boolean isConflict() {
-    var cause = datastoreExceptionCause();
-    return cause != null && isConflict(cause);
+    return isConflict(getCause());
   }
 
   public boolean isAlreadyExists() {
-    var cause = datastoreExceptionCause();
-    return cause != null && isAlreadyExists(cause);
+    return isAlreadyExists(getCause());
   }
 
   public boolean isNotFound() {
-    var cause = datastoreExceptionCause();
-    return cause != null && isNotFound(cause);
+    return isNotFound(getCause());
   }
 
   private static boolean isConflict(DatastoreException cause) {

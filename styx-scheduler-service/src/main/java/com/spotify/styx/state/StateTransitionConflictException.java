@@ -26,10 +26,6 @@ package com.spotify.styx.state;
  */
 public class StateTransitionConflictException extends RuntimeException {
 
-  public StateTransitionConflictException(Throwable cause) {
-    super(cause);
-  }
-
   public StateTransitionConflictException(String message) {
     super(message);
   }
