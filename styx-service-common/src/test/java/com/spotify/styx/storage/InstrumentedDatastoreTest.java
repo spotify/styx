@@ -23,11 +23,12 @@ package com.spotify.styx.storage;
 import static com.google.datastore.v1.QueryResultBatch.MoreResultsType.MORE_RESULTS_AFTER_CURSOR;
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -37,6 +38,7 @@ import com.google.cloud.datastore.BaseEntity;
 import com.google.cloud.datastore.Batch;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Datastore.TransactionCallable;
+import com.google.cloud.datastore.DatastoreBatchWriter;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.DatastoreReader;
 import com.google.cloud.datastore.DatastoreReaderWriter;
@@ -82,7 +84,7 @@ public class InstrumentedDatastoreTest {
       EntityQuery.newProjectionEntityQueryBuilder().setKind(TEST_KIND).addDistinctOn("foo", "bar").build();
   private static final KeyFactory KEY_FACTORY = new KeyFactory(TEST_PROJECT);
 
-  private Datastore instrumentedDatastore;
+  private InstrumentedDatastore instrumentedDatastore;
 
   @Mock Datastore datastore;
   @Mock Stats stats;
@@ -134,7 +136,7 @@ public class InstrumentedDatastoreTest {
 
     // Entity Query
     when(datastore.run(TEST_ENTITY_QUERY, readOption1, readOption2)).thenReturn(entityQueryResults);
-    final QueryResults<Entity> instrumentedEntityQueryResults =
+    var instrumentedEntityQueryResults =
         instrumentedDatastore.run(TEST_ENTITY_QUERY, readOption1, readOption2);
     verify(datastore).run(TEST_ENTITY_QUERY, readOption1, readOption2);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
@@ -153,7 +155,7 @@ public class InstrumentedDatastoreTest {
     // Projection Query - With Distinct
     when(datastore.run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2))
         .thenReturn(projectionQueryResults);
-    final QueryResults<ProjectionEntity> instrumentedProjectionQueryResults =
+    var instrumentedProjectionQueryResults =
         instrumentedDatastore.run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2);
     verify(datastore).run(TEST_PROJECTION_QUERY_WITH_DISTINCT, readOption1, readOption2);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
@@ -204,8 +206,8 @@ public class InstrumentedDatastoreTest {
   public void newTransaction() {
     // Transaction newTransaction(TransactionOptions options);
     when(datastore.newTransaction(any(TransactionOptions.class))).thenReturn(transaction);
-    final TransactionOptions transactionOptions = TransactionOptions.newBuilder().build();
-    final Transaction instrumented1 = instrumentedDatastore.newTransaction(transactionOptions);
+    var transactionOptions = TransactionOptions.newBuilder().build();
+    var instrumented1 = instrumentedDatastore.newTransaction(transactionOptions);
     verify(datastore).newTransaction(transactionOptions);
     verifyNoMoreInteractions(datastore);
     reset(datastore);
@@ -213,7 +215,7 @@ public class InstrumentedDatastoreTest {
 
     // Transaction newTransaction();
     when(datastore.newTransaction()).thenReturn(transaction);
-    final Transaction instrumented2 = instrumentedDatastore.newTransaction();
+    var instrumented2 = instrumentedDatastore.newTransaction();
     verify(datastore).newTransaction();
     verifyNoMoreInteractions(datastore);
     reset(datastore);
@@ -226,7 +228,7 @@ public class InstrumentedDatastoreTest {
         a.<TransactionCallable>getArgument(0)
             .run(transaction));
 
-    final String foobar = instrumentedDatastore.runInTransaction(tx -> {
+    var foobar = instrumentedDatastore.runInTransaction(tx -> {
       testReaderWriter(tx, transaction);
       return "foobar";
     });
@@ -243,9 +245,9 @@ public class InstrumentedDatastoreTest {
         a.<TransactionCallable>getArgument(0)
             .run(transaction));
 
-    final TransactionOptions transactionOptions = TransactionOptions.newBuilder().build();
+    var transactionOptions = TransactionOptions.newBuilder().build();
 
-    final String foobar = instrumentedDatastore.runInTransaction(tx -> {
+    var foobar = instrumentedDatastore.runInTransaction(tx -> {
       testReaderWriter(tx, transaction);
       return "foobar";
     }, transactionOptions);
@@ -259,7 +261,7 @@ public class InstrumentedDatastoreTest {
   @Test
   public void newBatch() {
     when(datastore.newBatch()).thenReturn(batch);
-    final Batch instrumentedBatch = instrumentedDatastore.newBatch();
+    var instrumentedBatch = instrumentedDatastore.newBatch();
     verify(datastore).newBatch();
     verifyNoMoreInteractions(datastore);
     reset(datastore);
@@ -271,7 +273,9 @@ public class InstrumentedDatastoreTest {
     reset(batch);
 
     when(batch.getDatastore()).thenReturn(datastore);
-    assertThat(instrumentedBatch.getDatastore(), is(datastore));
+    var instrumentedDatastore = instrumentedBatch.getDatastore();
+    assertThat(instrumentedDatastore, instanceOf(InstrumentedDatastore.class));
+    assertThat(((InstrumentedDatastore) instrumentedDatastore).delegate(), is(datastore));
     verify(batch).getDatastore();
     verifyNoMoreInteractions(batch);
   }
@@ -299,6 +303,13 @@ public class InstrumentedDatastoreTest {
     // Response commit();
     instrumented.commit();
     verify(transaction).commit();
+
+    // Datastore getDatastore();
+    when(transaction.getDatastore()).thenReturn(datastore);
+    var instrumentedDatastore = instrumented.getDatastore();
+    assertThat(instrumentedDatastore, instanceOf(InstrumentedDatastore.class));
+    assertThat(((InstrumentedDatastore) instrumentedDatastore).delegate(), is(datastore));
+    verify(transaction).getDatastore();
 
     verifyNoMoreInteractions(transaction);
     reset(transaction);
@@ -386,7 +397,7 @@ public class InstrumentedDatastoreTest {
 
     // Entity Query
     when(delegate.run(TEST_ENTITY_QUERY)).thenReturn(entityQueryResults);
-    final QueryResults<Entity> instrumentedEntityQueryResults = instrumented.run(TEST_ENTITY_QUERY);
+    var instrumentedEntityQueryResults = instrumented.run(TEST_ENTITY_QUERY);
     verify(delegate).run(TEST_ENTITY_QUERY);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
     testInstrumentedQueryResults(instrumentedEntityQueryResults, entityQueryResults);
@@ -403,7 +414,7 @@ public class InstrumentedDatastoreTest {
 
     // Projection Query - With Distinct
     when(delegate.run(TEST_PROJECTION_QUERY_WITH_DISTINCT)).thenReturn(projectionQueryResults);
-    final QueryResults<ProjectionEntity> instrumentedProjectionQueryResults =
+    var instrumentedProjectionQueryResults =
         instrumented.run(TEST_PROJECTION_QUERY_WITH_DISTINCT);
     verify(delegate).run(TEST_PROJECTION_QUERY_WITH_DISTINCT);
     verify(stats).recordDatastoreQueries(TEST_KIND, 1);
@@ -437,7 +448,7 @@ public class InstrumentedDatastoreTest {
     verify(stats).recordDatastoreEntityReads(TEST_KIND, 1);
   }
 
-  private void testBatchWriter(Batch instrumented, Batch delegate) {
+  private void testBatchWriter(DatastoreBatchWriter instrumented, DatastoreBatchWriter delegate) {
     testWriter(instrumented, delegate);
 
     // void addWithDeferredIdAllocation(FullEntity<?>... entities);

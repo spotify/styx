@@ -119,7 +119,7 @@ interface InstrumentedTransaction extends
 
   @Override
   default Datastore getDatastore() {
-    return transaction().getDatastore();
+    return InstrumentedDatastore.of(transaction().getDatastore(), stats());
   }
 
   @Override

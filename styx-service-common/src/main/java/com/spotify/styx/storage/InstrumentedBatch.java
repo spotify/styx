@@ -51,7 +51,7 @@ interface InstrumentedBatch extends Batch, InstrumentedDatastoreBatchWriter {
 
   @Override
   default Datastore getDatastore() {
-    return batch().getDatastore();
+    return InstrumentedDatastore.of(batch().getDatastore(), stats());
   }
 
   @Override

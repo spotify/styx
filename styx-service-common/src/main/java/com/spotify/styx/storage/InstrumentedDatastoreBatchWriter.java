@@ -88,7 +88,7 @@ interface InstrumentedDatastoreBatchWriter extends DatastoreBatchWriter, Instrum
 
   static InstrumentedDatastoreBatchWriter of(Stats stats, DatastoreBatchWriter batchWriter) {
     Objects.requireNonNull(stats, "stats");
-    Objects.requireNonNull(batchWriter, "batch");
+    Objects.requireNonNull(batchWriter, "batchWriter");
     return new InstrumentedDatastoreBatchWriter() {
       @Override
       public Stats stats() {
