@@ -27,6 +27,7 @@ import com.google.cloud.datastore.ProjectionEntityQuery;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery;
+import com.google.datastore.v1.QueryResultBatch;
 import com.spotify.styx.monitoring.Stats;
 import java.util.Objects;
 
@@ -71,6 +72,11 @@ class InstrumentedQueryResults<T> implements QueryResults<T> {
   @Override
   public int getSkippedResults() {
     return results.getSkippedResults();
+  }
+
+  @Override
+  public QueryResultBatch.MoreResultsType getMoreResults() {
+    return results.getMoreResults();
   }
 
   @Override
