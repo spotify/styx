@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -204,8 +203,9 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows().values());
     } catch (IOException e) {
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
-          "Failed to get workflows"));
+      var message = "Failed to get workflows";
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
   }
 
@@ -213,8 +213,9 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows(componentId));
     } catch (IOException e) {
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
-          "Failed to get workflows of component " + componentId));
+      var message = "Failed to get workflows of component " + componentId;
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
   }
 
@@ -246,30 +247,35 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to update the state."));
+      var message = "Failed to update the state of workflow " + workflowId.toKey();
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
 
     return state(componentId, id);
   }
 
   private Response<Workflow> workflow(String componentId, String id) {
+    var workflowId = WorkflowId.create(componentId, id);
     try {
-      return storage.workflow(WorkflowId.create(componentId, id))
+      return storage.workflow(workflowId)
           .map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      var message = "Failed get workflow " + workflowId.toKey();
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
   }
 
   private Response<WorkflowState> state(String componentId, String id) {
+    var workflowId = WorkflowId.create(componentId, id);
     try {
-      return Response.forPayload(storage.workflowState(WorkflowId.create(componentId, id)));
+      return Response.forPayload(storage.workflowState(workflowId));
     } catch (IOException e) {
-      return Response
-          .forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch state."));
+      var message = "Failed to get the state of workflow " + workflowId.toKey();
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
   }
 
@@ -307,8 +313,9 @@ public final class WorkflowResource {
         data = storage.executionData(workflowId, start, stop);
       }
     } catch (IOException e) {
-      return Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
+      var message = "Failed to get execution data of workflow " + workflowId.toKey();
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
     return Response.forPayload(data);
   }
@@ -328,8 +335,9 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
+      var message = "Failed to get execution data of workflow instance" + workflowInstance.toKey();
+      LOG.warn(message, e);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
     }
   }
 
