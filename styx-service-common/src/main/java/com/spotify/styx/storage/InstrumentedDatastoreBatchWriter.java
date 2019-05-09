@@ -20,42 +20,25 @@
 
 package com.spotify.styx.storage;
 
-import com.google.cloud.datastore.Batch;
-import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreWriter;
+import com.google.cloud.datastore.DatastoreBatchWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.FullEntity;
 import com.google.cloud.datastore.Key;
 import com.spotify.styx.monitoring.Stats;
 import java.util.List;
-import java.util.Objects;
 
-interface InstrumentedDatastoreBatchWriter
-    // XXX: DatastoreBatchWriter is not a public interface, Batch is an almost identical subtype
-    // https://github.com/GoogleCloudPlatform/google-cloud-java/pull/3387
-    extends Batch,
-    InstrumentedDatastoreWriter {
+interface InstrumentedDatastoreBatchWriter extends DatastoreBatchWriter, InstrumentedDatastoreWriter {
 
   Stats stats();
 
-  Batch batch();
-
-  @Override
-  default Response submit() {
-    return batch().submit();
-  }
-
-  @Override
-  default Datastore getDatastore() {
-    return batch().getDatastore();
-  }
+  DatastoreBatchWriter batchWriter();
 
   @Override
   default void addWithDeferredIdAllocation(FullEntity<?>... entities) {
     for (FullEntity<?> entity : entities) {
       stats().recordDatastoreEntityWrites(entity.getKey().getKind(), 1);
     }
-    batch().addWithDeferredIdAllocation(entities);
+    batchWriter().addWithDeferredIdAllocation(entities);
   }
 
   @Override
@@ -63,12 +46,12 @@ interface InstrumentedDatastoreBatchWriter
     for (FullEntity<?> entity : entities) {
       stats().recordDatastoreEntityWrites(entity.getKey().getKind(), 1);
     }
-    batch().putWithDeferredIdAllocation(entities);
+    batchWriter().putWithDeferredIdAllocation(entities);
   }
 
   @Override
   default boolean isActive() {
-    return batch().isActive();
+    return batchWriter().isActive();
   }
 
   @Override
@@ -99,26 +82,5 @@ interface InstrumentedDatastoreBatchWriter
   @Override
   default List<Entity> put(FullEntity<?>... entities) {
     return InstrumentedDatastoreWriter.super.put(entities);
-  }
-
-  static InstrumentedDatastoreBatchWriter of(Stats stats, Batch batch) {
-    Objects.requireNonNull(stats, "stats");
-    Objects.requireNonNull(batch, "batch");
-    return new InstrumentedDatastoreBatchWriter() {
-      @Override
-      public Stats stats() {
-        return stats;
-      }
-
-      @Override
-      public Batch batch() {
-        return batch;
-      }
-
-      @Override
-      public DatastoreWriter writer() {
-        return batch;
-      }
-    };
   }
 }

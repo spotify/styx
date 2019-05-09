@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.state.handlers;
+package com.spotify.styx.state.consumers;
 
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
@@ -29,7 +29,7 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
-import static com.spotify.styx.state.handlers.TransitionLogger.stateInfo;
+import static com.spotify.styx.state.consumers.TransitionLogger.stateInfo;
 import static java.lang.String.format;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;

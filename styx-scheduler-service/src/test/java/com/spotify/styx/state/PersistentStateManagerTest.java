@@ -128,7 +128,7 @@ public class PersistentStateManagerTest {
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new PersistentStateManager(
         time, executor, storage, eventConsumer,
-        eventConsumerExecutor, OutputHandler.fanOutput(outputHandler), shardedCounter, logger);
+        eventConsumerExecutor, OutputHandler.fanOutput(List.of(outputHandler)), shardedCounter, logger);
   }
 
   @After

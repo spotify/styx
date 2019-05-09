@@ -22,12 +22,12 @@ package com.spotify.styx;
 
 import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
+import static com.spotify.styx.state.EventConsumer.fanEvent;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
 import static com.spotify.styx.util.Connections.createDatastore;
-import static com.spotify.styx.util.GuardedRunnable.runGuarded;
 import static java.util.Objects.requireNonNull;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -60,7 +60,6 @@ import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -74,18 +73,19 @@ import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
 import com.spotify.styx.monitoring.TracingProxy;
 import com.spotify.styx.publisher.Publisher;
+import com.spotify.styx.state.EventConsumer;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.PersistentStateManager;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
+import com.spotify.styx.state.consumers.PublisherHandler;
+import com.spotify.styx.state.consumers.TransitionLogger;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
-import com.spotify.styx.state.handlers.PublisherHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.state.handlers.TimeoutHandler;
-import com.spotify.styx.state.handlers.TransitionLogger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.BasicWorkflowValidator;
@@ -122,7 +122,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -191,7 +190,7 @@ public class StyxScheduler implements AppInit {
 
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
-  public interface EventConsumerFactory extends BiFunction<Environment, Stats, BiConsumer<SequenceEvent, RunState>> { }
+  public interface EventConsumerFactory extends BiFunction<Environment, Stats, EventConsumer> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -366,11 +365,13 @@ public class StyxScheduler implements AppInit {
     // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
     //       take StateManager as argument instead?
     final List<OutputHandler> outputHandlers = new ArrayList<>();
-    var eventConsumer = fanoutEventConsumer(
+    var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
+
+    var eventConsumer = fanEvent(EventConsumer.tracing(List.of(
         eventConsumerFactory.apply(environment, stats),
         new PublisherHandler(publisher, stats),
-        new TransitionLogger());
-    var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
+        new TransitionLogger())));
+
     var queuedStateManager = closer.register(new PersistentStateManager(time, stateProcessingExecutor,
         storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
@@ -392,7 +393,7 @@ public class StyxScheduler implements AppInit {
         new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
 
     // These output handlers will be invoked in order.
-    outputHandlers.addAll(List.of(
+    outputHandlers.addAll(OutputHandler.tracing(List.of(
         new DockerRunnerHandler(dockerRunner, stateManager),
         new TerminationHandler(retryUtil, stateManager),
         new MonitoringHandler(stats),
@@ -403,7 +404,7 @@ public class StyxScheduler implements AppInit {
         // an extended downtime, many k8s pods will be completed and would transition the instance into done.
         // However, many of those instances would _also_ technically have timed out according to wall clock and
         // the TimeoutHandler would fail them if allowed to run first.
-        new TimeoutHandler(timeoutConfig, time, stateManager, workflowCache)));
+        new TimeoutHandler(timeoutConfig, time, stateManager, workflowCache))));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);
@@ -454,16 +455,6 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
-  }
-
-  @SafeVarargs
-  private BiConsumer<SequenceEvent, RunState> fanoutEventConsumer(
-      BiConsumer<SequenceEvent, RunState>... eventConsumers) {
-    return (event, runState) -> {
-      for (final BiConsumer<SequenceEvent, RunState> eventConsumer : eventConsumers) {
-        runGuarded(() -> eventConsumer.accept(event, runState));
-      }
-    };
   }
 
   @VisibleForTesting
