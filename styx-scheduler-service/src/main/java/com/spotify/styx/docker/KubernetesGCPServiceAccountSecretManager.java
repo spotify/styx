@@ -282,7 +282,10 @@ class KubernetesGCPServiceAccountSecretManager {
     var name = secret.getMetadata().getName();
     LOG.info("[AUDIT] Deleting service account {} secret {}", serviceAccount(secret), name);
     try {
-      client.deleteSecret(name);
+      final boolean found = client.deleteSecret(name);
+      if (!found) {
+        LOG.debug("Couldn't find secret to delete {}", secret.getMetadata().getName());
+      }
     } catch (KubernetesClientException e) {
       LOG.warn("[AUDIT] Failed to delete secret {}", name);
       throw e;
