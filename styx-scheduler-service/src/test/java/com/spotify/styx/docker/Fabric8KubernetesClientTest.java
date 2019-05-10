@@ -206,7 +206,7 @@ public class Fabric8KubernetesClientTest {
   }
 
   @Test
-  public void shouldWatchPods() throws IOException {
+  public void shouldWatchPods() {
     when(pods.watch(watcher)).thenReturn(watch);
     var actual = sut.watchPods(watcher);
     verify(client).pods();
