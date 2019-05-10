@@ -45,8 +45,6 @@ import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
-import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
@@ -101,13 +99,6 @@ public class Fabric8KubernetesClientTest {
         .withNewMetadata()
         .withName(POD_NAME)
         .withUid(POD_UID)
-        .endMetadata()
-        .build();
-    deletedPod = new PodBuilder()
-        .withNewMetadata()
-        .withName(POD_NAME)
-        .withUid(POD_UID)
-        .withDeletionTimestamp(Instant.now().toString())
         .endMetadata()
         .build();
     podList = new PodListBuilder()
