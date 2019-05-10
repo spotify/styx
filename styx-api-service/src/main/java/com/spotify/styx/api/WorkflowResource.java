@@ -125,10 +125,7 @@ public final class WorkflowResource {
     try {
       workflow = storage.workflow(workflowId);
     } catch (IOException e) {
-      final String message = String.format("Couldn't read workflow %s. ", workflowId);
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR
-          .withReasonPhrase("Error in internal storage"));
+      throw new RuntimeException("Couldn't read workflow " + workflowId, e);
     }
     
     if (!workflow.isPresent()) {
@@ -142,10 +139,7 @@ public final class WorkflowResource {
     try {
       storage.delete(workflowId);
     } catch (IOException e) {
-      final String message = String.format("Couldn't remove workflow %s. ", workflowId);
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR
-          .withReasonPhrase("Error in internal storage"));
+      throw new RuntimeException("Couldn't remove workflow " + workflowId, e);
     }
 
     workflowConsumer.accept(workflow, Optional.empty());
@@ -203,9 +197,7 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows().values());
     } catch (IOException e) {
-      var message = "Failed to get workflows";
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to get workflows", e);
     }
   }
 
@@ -213,9 +205,7 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows(componentId));
     } catch (IOException e) {
-      var message = "Failed to get workflows of component " + componentId;
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to get workflows of component " + componentId, e);
     }
   }
 
@@ -247,9 +237,7 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      var message = "Failed to update the state of workflow " + workflowId.toKey();
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to update the state of workflow " + workflowId.toKey(), e);
     }
 
     return state(componentId, id);
@@ -262,9 +250,7 @@ public final class WorkflowResource {
           .map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
-      var message = "Failed get workflow " + workflowId.toKey();
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed get workflow " + workflowId.toKey(), e);
     }
   }
 
@@ -273,9 +259,7 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflowState(workflowId));
     } catch (IOException e) {
-      var message = "Failed to get the state of workflow " + workflowId.toKey();
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to get the state of workflow " + workflowId.toKey(), e);
     }
   }
 
@@ -313,9 +297,7 @@ public final class WorkflowResource {
         data = storage.executionData(workflowId, start, stop);
       }
     } catch (IOException e) {
-      var message = "Failed to get execution data of workflow " + workflowId.toKey();
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(), e);
     }
     return Response.forPayload(data);
   }
@@ -335,9 +317,7 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      var message = "Failed to get execution data of workflow instance" + workflowInstance.toKey();
-      LOG.warn(message, e);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(message));
+      throw new RuntimeException("Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
     }
   }
 
