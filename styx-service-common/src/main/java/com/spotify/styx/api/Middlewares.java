@@ -151,8 +151,10 @@ public final class Middlewares {
         return completedFuture(e.<T>getResponse()
             .withHeader(X_REQUEST_ID, requestId));
       } catch (Throwable t) {
+        var internalServerErrorReason = internalServerErrorReason(requestId, t);
+        LOG.warn(internalServerErrorReason, t);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
-            .withReasonPhrase(internalServerErrorReason(requestId, t)))
+            .withReasonPhrase(internalServerErrorReason))
             .withHeader(X_REQUEST_ID, requestId));
       }
     };
