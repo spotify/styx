@@ -79,7 +79,6 @@ public class Fabric8KubernetesClientTest {
 
   private Pod pod;
   private Pod createdPod;
-  private Pod deletedPod;
   private PodList podList;
   private Secret secret;
   private Secret createdSecret;
