@@ -107,20 +107,6 @@ public class DatastoreStorageTransactionTest {
   }
 
   @Test
-  public void sleepShouldBeInterruptible() throws Exception {
-    var running = new CompletableFuture<String>();
-    var future = executor.submit(() -> {
-      running.complete(null);
-      DatastoreStorage.sleepMillis(Long.MAX_VALUE);
-      return "foobar";
-    });
-    running.join();
-    executor.shutdownNow();
-    var result = future.get(30, SECONDS);
-    assertThat(result, is("foobar"));
-  }
-
-  @Test
   public void shouldStoreAndDeleteWorkflow() throws Exception {
     var workflow = Workflow.create("test", FULL_WORKFLOW_CONFIGURATION);
     storage.runInTransactionWithRetries(tx -> tx.store(workflow));

@@ -1168,6 +1168,20 @@ public class DatastoreStorageTest {
             hasEntry(PROPERTY_WORKFLOW_JSON, Json.OBJECT_MAPPER.writeValueAsString(workflow))));
   }
 
+  @Test
+  public void sleepShouldBeInterruptible() throws Exception {
+    var running = new CompletableFuture<String>();
+    var future = executor.submit(() -> {
+      running.complete(null);
+      DatastoreStorage.sleepMillis(Long.MAX_VALUE);
+      return "foobar";
+    });
+    running.join();
+    executor.shutdownNow();
+    var result = future.get(30, SECONDS);
+    assertThat(result, is("foobar"));
+  }
+
   private static class FooException extends Exception {
   }
 }
