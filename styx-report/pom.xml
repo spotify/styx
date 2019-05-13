@@ -40,6 +40,11 @@
       <artifactId>styx-test</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-e2e-test</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

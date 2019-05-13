@@ -1,0 +1,29 @@
+<configuration>
+  <root level="INFO">
+    <if condition='isDefined("testName")'>
+      <then>
+        <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+          <file>target/test-logs/${testName}.log</file>
+          <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{request-id}] %-5level %logger{36} - %msg%n</pattern>
+          </encoder>
+        </appender>
+      </then>
+      <else>
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+          <name>STDOUT</name>
+          <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{request-id}] %-5level %logger{36} - %msg%n</pattern>
+          </encoder>
+        </appender>
+      </else>
+    </if>
+  </root>
+
+  <logger name="org.eclipse.jetty" level="WARN" />
+  <logger name="com.google" level="WARN" />
+  <logger name="com.spotify.apollo" level="WARN" />
+  <logger name="io.grpc" level="WARN" />
+  <logger name="io.netty" level="WARN" />
+  <logger name="io.fabric8" level="WARN" />
+</configuration>
