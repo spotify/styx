@@ -20,6 +20,7 @@
 
 package com.spotify.styx.model.data;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 
@@ -35,7 +36,11 @@ public abstract class EventInfo {
   @JsonProperty
   public abstract String info();
 
-  public static EventInfo create(long ts, String eventName, String eventInfo) {
+  @JsonCreator
+  public static EventInfo create(
+      @JsonProperty("timestamp") long ts,
+      @JsonProperty("name") String eventName,
+      @JsonProperty("info") String eventInfo) {
     return new AutoValue_EventInfo(ts, eventName, eventInfo);
   }
 }

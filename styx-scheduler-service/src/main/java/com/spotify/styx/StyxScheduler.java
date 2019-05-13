@@ -601,14 +601,17 @@ public class StyxScheduler implements AppInit {
     final Closer closer = environment.closer();
 
     final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
-    final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
-        config, id, createGkeClient(), DefaultKubernetesClient::new));
+    final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
     var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(fabric8Client, stateManager, stats,
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
+  }
+
+  public static NamespacedKubernetesClient getKubernetesClient(Config config, String id) {
+    return getKubernetesClient(config, id, createGkeClient(), DefaultKubernetesClient::new);
   }
 
   private static Container createGkeClient() {
@@ -644,7 +647,7 @@ public class StyxScheduler implements AppInit {
   }
 
   static NamespacedKubernetesClient getKubernetesClient(Config rootConfig, String id,
-      Container gke, KubernetesClientFactory clientFactory) {
+                                                        Container gke, KubernetesClientFactory clientFactory) {
     try {
       final Config config = rootConfig
           .getConfig(GKE_CLUSTER_PATH)

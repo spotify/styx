@@ -41,15 +41,24 @@ jobs:
       - store_artifacts:
           path: test-logs/
           destination: test-logs
-      - run: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
-      - run: |
-          mkdir test-reports
-          find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
+      - run:
+          name: Submit codecov report
+          when: always
+          command: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
+      - run:
+          name: Aggregate test reports
+          when: always
+          command: |
+            mkdir test-reports
+            find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
       - store_test_results:
           path: test-reports/
       - store_artifacts:
           path: styx-report/target/site/jacoco-aggregate/
           destination: jacoco-aggregate
+      - store_artifacts:
+          path: styx-e2e-test/target/test-logs/
+          destination: e2e-test-logs
       # Run static analysis after tests
       - run:
           name: Static Analysis
