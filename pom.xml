@@ -414,7 +414,7 @@
       <dependency>
         <groupId>com.github.stefanbirkner</groupId>
         <artifactId>system-rules</artifactId>
-        <version>1.18.0</version>
+        <version>1.19.0</version>
         <scope>test</scope>
         <exclusions>
           <exclusion>
@@ -559,11 +559,6 @@
         <groupId>com.squareup.okhttp3</groupId>
         <artifactId>mockwebserver</artifactId>
         <version>3.11.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.stefanbirkner</groupId>
-        <artifactId>system-rules</artifactId>
-        <version>1.19.0</version>
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
