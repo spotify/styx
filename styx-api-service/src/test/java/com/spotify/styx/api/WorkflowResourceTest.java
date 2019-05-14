@@ -71,6 +71,7 @@ import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.ParameterUtil;
+import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -311,6 +312,32 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailToPatchStateOfNonexistWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new ResourceNotFoundException(""))
+        .when(storage).patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
+            STATEPAYLOAD_ENABLED));
+
+    assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
+  }
+
+  @Test
+  public void shouldFailToPatchStateOfWorkflowDueToStorageError() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    doThrow(new IOException())
+        .when(storage).patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
+            STATEPAYLOAD_ENABLED));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
   public void shouldReturnCurrentWorkflowState() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -328,6 +355,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "enabled", equalTo(true));
+  }
+
+  @Test
+  public void shouldFailToReturnCurrentWorkflowState() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflowState(WorkflowId.create("foo", "bar"))).thenThrow(new IOException());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   @Test
@@ -382,6 +421,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "[0].triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
+  }
+
+  @Test
+  public void shouldFailToReturnWorkflowInstancesData() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.executionData(WORKFLOW.id(), "0", 1)).thenThrow(new IOException());
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances?offset=0&limit=1")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   @Test
@@ -771,6 +822,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailedToReturnWorkflows() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenThrow(new IOException());
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
   public void shouldReturnWorkflowsInComponent() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -782,6 +845,43 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
     assertJson(response, "[0].component_id", is("foo"));
+  }
+
+  @Test
+  public void shouldFailToReturnWorkflowsInComponent() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows("foo")).thenThrow(new IOException());
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
+  @Test
+  public void shouldReturnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeWorkflow(Workflow.create("other_component", WORKFLOW_CONFIGURATION));
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "component_id", is("foo"));
+  }
+
+  @Test
+  public void shouldFailToReturnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflow(WorkflowId.create("foo", "bar"))).thenThrow(new IOException());
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
 
   private long ms(String time) {

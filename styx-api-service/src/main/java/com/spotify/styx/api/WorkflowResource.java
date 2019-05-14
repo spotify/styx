@@ -25,7 +25,6 @@ import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -138,8 +137,7 @@ public final class WorkflowResource {
       LOG.info("Workflow removed: {}", workflowId);
       return Response.forStatus(Status.NO_CONTENT);
     } catch (IOException e) {
-      LOG.warn("Failed to delete workflow: {}", workflowId);
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
+      throw new RuntimeException("Failed to delete workflow: " + workflowId, e);
     }
   }
 
@@ -193,8 +191,7 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows().values());
     } catch (IOException e) {
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
-          "Failed to get workflows"));
+      throw new RuntimeException("Failed to get workflows", e);
     }
   }
 
@@ -202,8 +199,7 @@ public final class WorkflowResource {
     try {
       return Response.forPayload(storage.workflows(componentId));
     } catch (IOException e) {
-      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(
-          "Failed to get workflows of component " + componentId));
+      throw new RuntimeException("Failed to get workflows of component " + componentId, e);
     }
   }
 
@@ -235,30 +231,29 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response
-          .forStatus(
-              Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Failed to update the state."));
+      throw new RuntimeException("Failed to update the state of workflow " + workflowId.toKey(), e);
     }
 
     return state(componentId, id);
   }
 
   private Response<Workflow> workflow(String componentId, String id) {
+    var workflowId = WorkflowId.create(componentId, id);
     try {
-      return storage.workflow(WorkflowId.create(componentId, id))
+      return storage.workflow(workflowId)
           .map(Response::forPayload)
           .orElse(Response.forStatus(Status.NOT_FOUND));
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException("Failed get workflow " + workflowId.toKey(), e);
     }
   }
 
   private Response<WorkflowState> state(String componentId, String id) {
+    var workflowId = WorkflowId.create(componentId, id);
     try {
-      return Response.forPayload(storage.workflowState(WorkflowId.create(componentId, id)));
+      return Response.forPayload(storage.workflowState(workflowId));
     } catch (IOException e) {
-      return Response
-          .forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch state."));
+      throw new RuntimeException("Failed to get the state of workflow " + workflowId.toKey(), e);
     }
   }
 
@@ -296,8 +291,7 @@ public final class WorkflowResource {
         data = storage.executionData(workflowId, start, stop);
       }
     } catch (IOException e) {
-      return Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
+      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(), e);
     }
     return Response.forPayload(data);
   }
@@ -317,8 +311,7 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      return Response.forStatus(
-          Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Couldn't fetch execution info."));
+      throw new RuntimeException("Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
     }
   }
 

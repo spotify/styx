@@ -20,8 +20,8 @@
 
 package com.spotify.styx.storage;
 
-import com.google.cloud.datastore.Batch;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreBatchWriter;
 import com.google.cloud.datastore.DatastoreReaderWriter;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.FullEntity;
@@ -119,73 +119,12 @@ interface InstrumentedTransaction extends
 
   @Override
   default Datastore getDatastore() {
-    return InstrumentedDatastoreBatchWriter.super.getDatastore();
+    return InstrumentedDatastore.of(transaction().getDatastore(), stats());
   }
 
   @Override
   default ByteString getTransactionId() {
     return transaction().getTransactionId();
-  }
-
-  @Override
-  default Batch batch() {
-    // Work around DatastoreBatchWriter not being a public interface
-    return new Batch() {
-      @Override
-      public Entity add(FullEntity<?> entity) {
-        return transaction().add(entity);
-      }
-
-      @Override
-      public List<Entity> add(FullEntity<?>... entities) {
-        return transaction().add();
-      }
-
-      @Override
-      public Response submit() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Datastore getDatastore() {
-        return transaction().getDatastore();
-      }
-
-      @Override
-      public void addWithDeferredIdAllocation(FullEntity<?>... entities) {
-        transaction().addWithDeferredIdAllocation(entities);
-      }
-
-      @Override
-      public void update(Entity... entities) {
-        transaction().update(entities);
-      }
-
-      @Override
-      public void delete(Key... keys) {
-        transaction().delete(keys);
-      }
-
-      @Override
-      public void putWithDeferredIdAllocation(FullEntity<?>... entities) {
-        transaction().putWithDeferredIdAllocation(entities);
-      }
-
-      @Override
-      public Entity put(FullEntity<?> entity) {
-        return transaction().put(entity);
-      }
-
-      @Override
-      public List<Entity> put(FullEntity<?>... entities) {
-        return transaction().put();
-      }
-
-      @Override
-      public boolean isActive() {
-        return transaction().isActive();
-      }
-    };
   }
 
   @Override
@@ -205,6 +144,11 @@ interface InstrumentedTransaction extends
       @Override
       public Stats stats() {
         return stats;
+      }
+
+      @Override
+      public DatastoreBatchWriter batchWriter() {
+        return transaction;
       }
     };
   }
