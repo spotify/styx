@@ -80,7 +80,7 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
   private static void initShardRange(Storage storage, String counterId, int startIndex,
                                      int endIndex) {
     try {
-      storage.runInTransaction(tx -> {
+      storage.runInTransactionWithRetries(tx -> {
         for (int index = startIndex; index < endIndex; index++) {
           final Optional<Shard> shard = tx.shard(counterId, index);
           if (!shard.isPresent()) {

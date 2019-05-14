@@ -102,7 +102,7 @@ public class ShardedCounterSnapshotFactoryTest {
   @Test
   public void testSpeedOfCreate() throws IOException {
     counterSnapshotFactory.create(RESOURCE_ID);
-    verify(storage, times(NUM_SHARDS / TRANSACTION_GROUP_SIZE + 1)).runInTransaction(any());
+    verify(storage, times(NUM_SHARDS / TRANSACTION_GROUP_SIZE + 1)).runInTransactionWithRetries(any());
     assertEquals(128, storage.shardsForCounter(RESOURCE_ID).size());
   }
 }

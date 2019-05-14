@@ -155,7 +155,8 @@ public class PersistentStateManager implements StateManager {
     ensureRunning();
     log.debug("Trigger {}", workflowInstance);
 
-    // TODO: optional retry on transaction conflict
+
+    // TODO: merge initialization and state transition into one transaction
 
     initialize(workflowInstance);
 
@@ -184,8 +185,6 @@ public class PersistentStateManager implements StateManager {
     ensureRunning();
     log.info("Received event {}", event);
 
-    // TODO: optional retry on transaction conflict
-
     var newState = transition(event, expectedCounter);
     postTransition(newState._1, newState._2);
   }
@@ -201,7 +200,7 @@ public class PersistentStateManager implements StateManager {
     }
     final RunState runState = RunState.create(workflowInstance, State.NEW, time.get(), counter);
     try {
-      storage.runInTransaction(tx -> {
+      storage.runInTransactionWithRetries(tx -> {
         final Optional<Workflow> workflow = tx.workflow(workflowInstance.workflowId());
         if (!workflow.isPresent()) {
           throw new IllegalArgumentException(
@@ -230,61 +229,56 @@ public class PersistentStateManager implements StateManager {
 
   private Tuple2<SequenceEvent, RunState> transition(Event event, long expectedCounter) {
     try {
-      return storage.runInTransaction(tx -> {
-
-        // Read active state from datastore
-        final Optional<RunState> currentRunState =
-            tx.readActiveState(event.workflowInstance());
-        if (!currentRunState.isPresent()) {
-          String message = "Received event for unknown workflow instance: " + event;
-          log.warn(message);
-          throw new IllegalArgumentException(message);
-        }
-
-        // Verify counters for in-order event processing
-        verifyCounter(event, expectedCounter, currentRunState.get());
-        log.info("Received event (verified) {}", event);
-
-        final RunState nextRunState;
-        try {
-          nextRunState = currentRunState.get().transition(event, time);
-        } catch (IllegalStateException e) {
-          // TODO: illegal state transitions might become common as multiple scheduler
-          //       instances concurrently consume events from k8s.
-          log.warn("Illegal state transition", e);
-          throw e;
-        }
-
-        // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
-        updateResourceCounters(tx, event, currentRunState.get(), nextRunState);
-
-        // Write new state to datastore (or remove it if terminal)
-        if (nextRunState.state().isTerminal()) {
-          tx.deleteActiveState(event.workflowInstance());
-        } else {
-          tx.updateActiveState(event.workflowInstance(), nextRunState);
-        }
-
-        final SequenceEvent sequenceEvent =
-            SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
-
-        return Tuple.of(sequenceEvent, nextRunState);
-      });
-    } catch (TransactionException e) {
-      if (e.isConflict()) {
-        log.debug("Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
-            event, expectedCounter);
-        throw new StateTransitionConflictException(e);
-      } else {
-        log.debug("Transaction failure during workflow instance transition: {}, counter={}",
-            event, expectedCounter, e);
-        throw new RuntimeException(e);
-      }
-    } catch (Exception e) {
-      log.debug("Failure during workflow instance transition: {}, counter={}",
-          event, expectedCounter, e);
+      return storage.runInTransactionWithRetries(tx -> transition0(tx, event, expectedCounter));
+    } catch (Throwable e) {
+      log.debug("Failed workflow instance transition: {}, counter={}", event, expectedCounter, e);
       Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
+    }
+  }
+
+  private Tuple2<SequenceEvent, RunState> transition0(StorageTransaction tx, Event event, long expectedCounter)
+      throws IOException {
+
+    // Read active state from datastore
+    var currentRunStateOpt = tx.readActiveState(event.workflowInstance());
+
+    if (currentRunStateOpt.isEmpty()) {
+      var message = "Received event for unknown workflow instance: " + event;
+      log.warn(message);
+      throw new IllegalArgumentException(message);
+    }
+    var currentRunState = currentRunStateOpt.orElseThrow();
+
+    // Verify counters for in-order event processing
+    verifyCounter(event, expectedCounter, currentRunState);
+    log.info("Received event (verified) {}", event);
+
+    // Compute next state
+    var nextRunState = nextRunState(event, currentRunState);
+
+    // Resource limiting occurs by throwing here, or by failing the commit with a conflict.
+    // TODO: emit info message in this transaction instead
+    updateResourceCounters(tx, event, currentRunState, nextRunState);
+
+    // Write new state to datastore (or remove it if terminal)
+    if (nextRunState.state().isTerminal()) {
+      tx.deleteActiveState(event.workflowInstance());
+    } else {
+      tx.updateActiveState(event.workflowInstance(), nextRunState);
+    }
+
+    var sequenceEvent = SequenceEvent.create(event, nextRunState.counter(), nextRunState.timestamp());
+
+    return Tuple.of(sequenceEvent, nextRunState);
+  }
+
+  private RunState nextRunState(Event event, RunState runState) {
+    try {
+      return runState.transition(event, time);
+    } catch (IllegalStateException e) {
+      log.warn("Illegal state transition", e);
+      throw e;
     }
   }
 

@@ -20,7 +20,6 @@
 
 package com.spotify.styx.util;
 
-import com.google.cloud.ServiceOptions;
 import com.google.cloud.bigtable.hbase.BigtableConfiguration;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
@@ -57,16 +56,6 @@ public final class Connections {
     final Datastore datastore = DatastoreOptions.newBuilder()
         .setNamespace(namespace)
         .setProjectId(projectId)
-        // Disable retries as the datastore client (at the time of writing) has a retry bug
-        // where it incorrectly retries ABORTED lookup operations in transactions without
-        // restarting the transaction. This results in 3 INVALID_ARGUMENT "transaction closed" errors
-        // that pollute our warning/error logs.
-        // We have our own retry implementation in DatastoreStorage#storeWithRetries.
-        // This has the downside that retryable transient RPC errors inside transactions will now
-        // cause transactions to be rolled back and retried, which is a more expensive operation than
-        // immediately retrying the RPC.
-        // TODO: Use the datastore client retry mechanism instead when the above bug has been fixed
-        .setRetrySettings(ServiceOptions.getNoRetrySettings())
         .build()
         .getService();
 

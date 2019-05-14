@@ -70,7 +70,7 @@ public class WorkflowInitializerTest {
   @Before
   public void setUp() throws Exception {
     workflowInitializer = new WorkflowInitializer(storage, () -> NOW);
-    when(storage.runInTransaction(any())).then(a ->
+    when(storage.runInTransactionWithRetries(any())).then(a ->
         a.<TransactionFunction>getArgument(0).apply(transaction));
   }
 

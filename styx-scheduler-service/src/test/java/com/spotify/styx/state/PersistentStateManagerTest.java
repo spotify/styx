@@ -28,7 +28,6 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
@@ -123,7 +122,7 @@ public class PersistentStateManagerTest {
   @Before
   public void setUp() throws Exception {
     when(time.get()).thenReturn(NOW);
-    when(storage.runInTransaction(any())).thenAnswer(
+    when(storage.runInTransactionWithRetries(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
     doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
     stateManager = new PersistentStateManager(
@@ -264,37 +263,13 @@ public class PersistentStateManagerTest {
 
     when(transactionException.isAlreadyExists()).thenReturn(true);
     doThrow(transactionException).when(transaction).writeActiveState(any(), any());
-    when(storage.runInTransaction(any())).thenAnswer(a ->
+    when(storage.runInTransactionWithRetries(any())).thenAnswer(a ->
         a.<TransactionFunction>getArgument(0).apply(transaction));
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
     } catch (AlreadyInitializedException ignore) {
-    }
-  }
-
-  @Test
-  public void shouldFailTriggerWFIfOnConflict() throws Exception {
-    reset(storage);
-    when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
-    final DatastoreException datastoreException = new DatastoreException(1, "", "");
-    final TransactionException transactionException = spy(new TransactionException(datastoreException));
-    when(transactionException.isConflict()).thenReturn(true);
-    when(storage.runInTransaction(any())).thenAnswer(a -> {
-      a.<TransactionFunction>getArgument(0)
-          .apply(transaction);
-      throw transactionException;
-    });
-
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(e.getCause(), is(instanceOf(TransactionException.class)));
-      TransactionException cause = (TransactionException) e.getCause();
-      assertTrue(cause.isConflict());
     }
   }
 
@@ -324,16 +299,17 @@ public class PersistentStateManagerTest {
   }
 
   @Test
-  public void shouldFailTriggerIfIOExceptionFromTransaction() throws Exception {
+  public void shouldFailTriggerOnExceptionFromTransaction() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    when(storage.runInTransaction(any())).thenThrow(new IOException());
+    var cause = new IOException("fail!");
+    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
     } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(instanceOf(IOException.class)));
+      assertThat(Throwables.getRootCause(e), is(cause));
     }
   }
 
@@ -569,44 +545,10 @@ public class PersistentStateManagerTest {
   }
 
   @Test
-  public void receiveShouldLogTransactionConflict() throws Exception {
-    final TransactionException cause = new TransactionException(
-        new DatastoreException(10, "foo", "bar"));
-    reset(storage);
-    when(storage.runInTransaction(any())).thenThrow(cause);
-    final Event event = Event.started(INSTANCE);
-    try {
-      stateManager.receive(event, 4711L);
-      fail();
-    } catch (Exception ignore) {
-    }
-    verify(logger).debug(
-        "Transaction conflict during workflow instance transition. Aborted: {}, counter={}",
-        event, 4711L);
-  }
-
-  @Test
-  public void receiveShouldLogTransactionFailure() throws Exception {
-    final TransactionException cause = new TransactionException(
-        new DatastoreException(new IOException("netsplit!")));
-    reset(storage);
-    when(storage.runInTransaction(any())).thenThrow(cause);
-    final Event event = Event.started(INSTANCE);
-    try {
-      stateManager.receive(event, 4711L);
-      fail();
-    } catch (Exception ignore) {
-    }
-    verify(logger).debug(
-        "Transaction failure during workflow instance transition: {}, counter={}",
-        event, 4711L, cause);
-  }
-
-  @Test
   public void receiveShouldLogFailure() throws Exception {
     final Exception cause = new Exception("fubared");
     reset(storage);
-    when(storage.runInTransaction(any())).thenThrow(cause);
+    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
     try {
       stateManager.receive(event, 4711L);
@@ -614,7 +556,7 @@ public class PersistentStateManagerTest {
     } catch (Exception ignore) {
     }
     verify(logger).debug(
-        "Failure during workflow instance transition: {}, counter={}",
+        "Failed workflow instance transition: {}, counter={}",
         event, 4711L, cause);
   }
 
@@ -624,7 +566,7 @@ public class PersistentStateManagerTest {
         new DatastoreException(10, "foo", "bar"));
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
-    when(storage.runInTransaction(any())).thenThrow(cause);
+    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     try {
       stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
@@ -640,7 +582,7 @@ public class PersistentStateManagerTest {
         new DatastoreException(new IOException("netsplit!")));
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
-    when(storage.runInTransaction(any())).thenThrow(cause);
+    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     try {
       stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
@@ -655,7 +597,7 @@ public class PersistentStateManagerTest {
     final Exception cause = new Exception("fubared");
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
-    when(storage.runInTransaction(any())).thenThrow(cause);
+    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     try {
       stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
       fail();
@@ -668,7 +610,7 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
-    doThrow(exception).when(storage).runInTransaction(any());
+    doThrow(exception).when(storage).runInTransactionWithRetries(any());
     try {
       stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
       fail();

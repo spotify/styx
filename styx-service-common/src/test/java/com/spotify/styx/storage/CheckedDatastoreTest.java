@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
+import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.IncompleteKey;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
@@ -38,7 +39,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CheckedDatastoreTest {
@@ -49,7 +50,8 @@ public class CheckedDatastoreTest {
 
   @Mock private Datastore datastore;
   @Mock private Transaction transaction;
-  @Mock IncompleteKey incompleteKey;
+  @Mock private IncompleteKey incompleteKey;
+  @Mock private DatastoreOptions options;
 
   private final KeyFactory keyFactory = new KeyFactory("foo");
   private final Key key = Key.newBuilder("foo", "bar", 17).build();
@@ -96,5 +98,12 @@ public class CheckedDatastoreTest {
     exception.expect(DatastoreIOException.class);
     exception.expectCause(is(CAUSE));
     sut.allocateId(incompleteKey);
+  }
+
+  @Test
+  public void shouldGetOptions() {
+    when(datastore.getOptions()).thenReturn(options);
+    assertThat(sut.getOptions(), is(options));
+    verify(datastore).getOptions();
   }
 }

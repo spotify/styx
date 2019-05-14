@@ -22,9 +22,12 @@ package com.spotify.styx.storage;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.datastore.DatastoreException;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import java.io.IOException;
@@ -32,7 +35,9 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -41,6 +46,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class AggregateStorageTest {
 
   private static final String COMPONENT = "test-component";
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Mock BigtableStorage bigtable;
   @Mock DatastoreStorage datastore;
@@ -94,5 +101,15 @@ public class AggregateStorageTest {
   public void writeActiveState() throws Exception {
     sut.writeActiveState(workflowInstance, runState);
     verify(datastore).writeActiveState(workflowInstance, runState);
+  }
+
+  @Test
+  public void shouldPropagateTransactionFailure() throws IOException {
+    var rootCause = new DatastoreException(1, "fail", "error");
+    var cause = new DatastoreIOException(rootCause);
+    doThrow(cause).when(datastore).runInTransactionWithRetries(any());
+    exception.expect(TransactionException.class);
+    exception.expectCause(is(rootCause));
+    sut.runInTransactionWithRetries(tx -> "foobar");
   }
 }

@@ -39,14 +39,17 @@ import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -57,13 +60,15 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.gax.retrying.RetrySettings;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.Entity;
@@ -93,10 +98,10 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -104,8 +109,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
 import junitparams.JUnitParamsRunner;
@@ -120,9 +129,17 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
+import org.threeten.bp.Duration;
 
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreStorageTest {
+
+  private static final RetrySettings RETRY_SETTINGS = ServiceOptions.getDefaultRetrySettings().toBuilder()
+      .setInitialRetryDelay(Duration.ofMillis(1L))
+      .setTotalTimeout(Duration.ofSeconds(5))
+      .setMaxAttempts(3)
+      .build();
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
@@ -212,9 +229,12 @@ public class DatastoreStorageTest {
   private static LocalDatastoreHelper helper;
   private DatastoreStorage storage;
   private CheckedDatastore datastore;
+  private Datastore datastoreClient;
+  private CheckedDatastore innerDatastore;
 
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
+  @Mock Logger logger;
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -243,8 +263,13 @@ public class DatastoreStorageTest {
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    datastore = spy(new CheckedDatastore(helper.getOptions().getService()));
-    storage = new DatastoreStorage(datastore, Duration.ZERO, DatastoreStorageTransaction::new, executor);
+    datastoreClient = helper.getOptions().toBuilder()
+        .setRetrySettings(RETRY_SETTINGS)
+        .build()
+        .getService();
+    innerDatastore = new CheckedDatastore(datastoreClient);
+    datastore = spy(innerDatastore);
+    storage = new DatastoreStorage(datastore, DatastoreStorageTransaction::new, executor, logger);
   }
 
   @After
@@ -590,9 +615,9 @@ public class DatastoreStorageTest {
     var triggerSpec1 = TriggerInstantSpec.create(now.plusSeconds(1), now.plusSeconds(11));
     var triggerSpec2 = TriggerInstantSpec.create(now.plusSeconds(2), now.plusSeconds(22));
     var triggerSpec3 = TriggerInstantSpec.create(now.plusSeconds(3), now.plusSeconds(33));
-    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow1, triggerSpec1));
-    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow2, triggerSpec2));
-    storage.runInTransaction(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow3, triggerSpec3));
+    storage.runInTransactionWithRetries(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow1, triggerSpec1));
+    storage.runInTransactionWithRetries(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow2, triggerSpec2));
+    storage.runInTransactionWithRetries(tx -> tx.storeWorkflowWithNextNaturalTrigger(workflow3, triggerSpec3));
 
     var workflows = storage.workflowsWithNextNaturalTrigger();
     assertThat(workflows.size(), is(3));
@@ -605,15 +630,33 @@ public class DatastoreStorageTest {
   public void shouldFailToReadCorruptWorkflow() throws Exception {
     assertThat(storage.workflows().isEmpty(), is(true));
 
-    Workflow workflow1 = workflow(WORKFLOW_ID1);
-    storage.store(workflow1);
-    final Key workflowKey = workflowKey(datastore::newKeyFactory, workflow1.id());
+    var instant = Instant.parse("2019-05-08T01:00:00Z");
+    var workflowState = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(instant)
+        .build();
 
-    final Entity entity = datastore.get(workflowKey);
-    final Entity corrupted = Entity.newBuilder(entity)
+    var workflow1 = workflow(WORKFLOW_ID1);
+    storage.store(workflow1);
+    storage.patchState(WORKFLOW_ID1, workflowState);
+    var workflowKey1 = workflowKey(datastore::newKeyFactory, workflow1.id());
+
+    var workflowEntity1 = datastore.get(workflowKey1);
+    var corruptedWorkflowEntity1 = Entity.newBuilder(workflowEntity1)
         .set("json", "bork")
         .build();
-    datastore.put(corrupted);
+    datastore.put(corruptedWorkflowEntity1);
+
+    var workflow2 = workflow(WORKFLOW_ID2);
+    storage.store(workflow2);
+    storage.patchState(WORKFLOW_ID2, workflowState);
+
+    assertThat(storage.workflows(), is(Map.of(WORKFLOW_ID2, workflow2)));
+    assertThat(storage.workflowsWithNextNaturalTrigger(),
+        is(Map.of(workflow2, TriggerInstantSpec.create(instant, instant))));
+    assertThat(storage.workflows(Set.of(WORKFLOW_ID1, WORKFLOW_ID2)), is(Map.of(WORKFLOW_ID2, workflow2)));
+    assertThat(storage.workflows(WORKFLOW_ID1.componentId()), contains(workflow2));
 
     exception.expect(IOException.class);
     storage.workflow(workflow1.id());
@@ -768,34 +811,28 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void runInTransactionShouldCallFunctionAndCommit() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
+  public void runInTransactionWithRetriesShouldCallFunction() throws Exception {
+    final DatastoreStorage storage = new DatastoreStorage(datastore, storageTransactionFactory,
+        executor, logger);
     final CheckedDatastoreTransaction transaction = datastore.newTransaction();
     final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
     when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
 
     when(transactionFunction.apply(any())).thenReturn("foo");
 
-    String result = storage.runInTransaction(transactionFunction);
+    String result = storage.runInTransactionWithRetries(transactionFunction);
 
     assertThat(result, is("foo"));
     verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction).commit();
-    verify(storageTransaction, never()).rollback();
   }
 
   @Test
-  public void runInTransactionShouldCallFunctionAndRollbackOnFailure() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
-    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
-
+  public void runInTransactionWithRetriesShouldPropagateUserException() throws Exception {
     final Exception expectedException = new FooException();
     when(transactionFunction.apply(any())).thenThrow(expectedException);
 
     try {
-      storage.runInTransaction(transactionFunction);
+      storage.runInTransactionWithRetries(transactionFunction);
       fail("Expected exception!");
     } catch (FooException e) {
       // Verify that we can throw a user defined checked exception type inside the transaction
@@ -803,124 +840,242 @@ public class DatastoreStorageTest {
       assertThat(e, is(expectedException));
     }
 
-    verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction, never()).commit();
-    verify(storageTransaction).rollback();
+    verify(transactionFunction).apply(any());
   }
 
   @Test
-  public void runInTransactionShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
-    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+  public void runInTransactionWithRetriesShouldRetryOnConflict() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
 
-    final Exception expectedException = new DatastoreException(10, "", "");
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var barrier = new CompletableFuture<Void>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      barrier.join();
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute a winning read-store transaction
+    storage.runInTransactionWithRetries(tx -> {
+      var wf = tx.workflow(workflow.id());
+      tx.store(wf.orElseThrow());
+      return null;
+    });
+    barrier.complete(null);
+
+    // Wait for first transaction to also complete and verify that it ran twice
+    future.get(30, SECONDS);
+    assertThat(runs.get(), is(2));
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldHandleRollbackFailure() throws Exception {
+    var transaction = spy(datastore.newTransaction());
+    doReturn(transaction).when(datastore).newTransaction();
+    var rollbackFailure = new DatastoreIOException(new DatastoreException(1, "fail", "error"));
+    doThrow(rollbackFailure).when(transaction).rollback();
+
+    var cause = new RuntimeException("foobar");
+
+    // Run a failing transaction and verify that the rollback failure does not suppress our exception
+    try {
+      storage.runInTransactionWithRetries(tx -> {
+        throw cause;
+      });
+    } catch (RuntimeException e) {
+      assertThat(e, is(cause));
+    }
+
+    verify(transaction).rollback();
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldGiveUpOnTimeout() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var barrier = new CompletableFuture<Void>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      barrier.join();
+      Thread.sleep(RETRY_SETTINGS.getTotalTimeout().toMillis());
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute a winning read-store transaction
+    storage.runInTransactionWithRetries(tx -> {
+      var wf = tx.workflow(workflow.id());
+      tx.store(wf.orElseThrow());
+      return null;
+    });
+    barrier.complete(null);
+
+    // Wait for first transaction to fail
+    try {
+      future.get(30, SECONDS);
+      fail("Expected transaction to fail");
+    } catch (ExecutionException e) {
+      var cause = e.getCause();
+      assertThat(cause, instanceOf(DatastoreIOException.class));
+      var dex = ((DatastoreIOException) cause).getCause();
+      assertThat(dex.getCode(), is(10));
+    }
+
+    assertThat(runs.get(), is(1));
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldRetryUntilMaxAttempts() throws Exception {
+    var workflow = TestData.WORKFLOW_WITH_RESOURCES;
+
+    // Store workflow
+    storage.runInTransactionWithRetries(tx -> {
+      tx.store(workflow);
+      return null;
+    });
+
+    // Start a losing transaction that reads, waits for barrier and then stores the workflow
+    var runs = new AtomicInteger();
+    var waiting = new LinkedBlockingQueue<Boolean>();
+    var proceed = new LinkedBlockingQueue<Boolean>();
+    var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
+      runs.incrementAndGet();
+      var wf = tx.workflow(workflow.id());
+      waiting.put(true);
+      proceed.take();
+      tx.store(wf.orElseThrow());
+      return null;
+    }));
+
+    // Execute winning read-store transactions to make each retry of the above transaction fail
+    for (int i = 0; i < RETRY_SETTINGS.getMaxAttempts(); i++) {
+      waiting.take();
+      storage.runInTransactionWithRetries(tx -> {
+        var wf = tx.workflow(workflow.id());
+        tx.store(wf.orElseThrow());
+        return null;
+      });
+      proceed.put(true);
+    }
+
+    // Wait for first transaction to give up
+    try {
+      future.get(300, SECONDS);
+      fail("Expected transaction to fail");
+    } catch (ExecutionException e) {
+      var cause = e.getCause();
+      assertThat(cause, instanceOf(DatastoreIOException.class));
+      var dex = ((DatastoreIOException) cause).getCause();
+      assertThat(dex.getCode(), is(10));
+    }
+
+    // Verify that it retried as many times as expected before giving up
+    assertThat(runs.get(), is(RETRY_SETTINGS.getMaxAttempts()));
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldCallFunctionAndRollbackOnPreCommitConflict() throws Exception {
+    var expectedException = new DatastoreIOException(new DatastoreException(1, "", ""));
     when(transactionFunction.apply(any())).thenThrow(expectedException);
 
-    try {
-      storage.runInTransaction(transactionFunction);
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertTrue(e.isConflict());
-    }
-
-    verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction, never()).commit();
-    verify(storageTransaction).rollback();
-  }
-
-  @Test
-  public void runInTransactionShouldCallFunctionAndRollbackOnCommitConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
-    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
-
-    final DatastoreException datastoreException = new DatastoreException(1, "", "");
-    final TransactionException expectedException = new TransactionException(datastoreException);
-    when(transactionFunction.apply(any())).thenReturn("");
-    doThrow(expectedException).when(storageTransaction).commit();
+    var transaction = spy(datastore.newTransaction());
+    when(datastore.newTransaction()).thenReturn(transaction);
 
     try {
-      storage.runInTransaction(transactionFunction);
+      storage.runInTransactionWithRetries(transactionFunction);
       fail("Expected exception!");
-    } catch (TransactionException e) {
+    } catch (DatastoreIOException e) {
       assertThat(e, is(expectedException));
     }
 
-    verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction).rollback();
+    verify(transactionFunction).apply(any());
+    verify(transaction, never()).commit();
+    verify(transaction).rollback();
   }
 
   @Test
-  public void runInTransactionShouldThrowIfRollbackFailsAfterConflict() throws Exception {
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    final CheckedDatastoreTransaction transaction = datastore.newTransaction();
-    final DatastoreStorageTransaction storageTransaction = spy(new DatastoreStorageTransaction(transaction));
-    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+  public void runInTransactionWithRetriesShouldCallFunctionAndRollbackOnCommitFailure() throws Exception {
+    var commitException = new DatastoreIOException(new DatastoreException(1, "", ""));
+
+    var transaction = spy(datastore.newTransaction());
+    doReturn(transaction).when(datastore).newTransaction();
 
     when(transactionFunction.apply(any())).thenReturn("");
-    final DatastoreException datastoreException = new DatastoreException(1, "", "");
-    doThrow(new TransactionException(datastoreException)).when(storageTransaction).commit();
-    final TransactionException expectedException = new TransactionException(datastoreException);
-    doThrow(expectedException).when(storageTransaction).rollback();
+    doThrow(commitException).when(transaction).commit();
 
     try {
-      storage.runInTransaction(transactionFunction);
+      storage.runInTransactionWithRetries(transactionFunction);
       fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertFalse(e.isConflict());
-      assertThat(e, is(expectedException));
+    } catch (DatastoreIOException e) {
+      assertThat(e, is(commitException));
     }
 
-    verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction).rollback();
+    verify(transactionFunction).apply(any());
+    verify(transaction).rollback();
   }
 
   @Test
-  public void runInTransactionShouldThrowTransactionExceptionOnDatastoreIOException() throws Exception {
-    var storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    var transaction = datastore.newTransaction();
-    var storageTransaction = spy(new DatastoreStorageTransaction(transaction));
-    when(storageTransactionFactory.apply(any())).thenReturn(storageTransaction);
+  public void runInTransactionWithRetriesShouldPropagateCommitExceptionIfRollbackFails() throws Exception {
 
+    var transaction = spy(datastore.newTransaction());
+    doReturn(transaction).when(datastore).newTransaction();
+
+    when(transactionFunction.apply(any())).thenReturn("");
+
+    var commitException = new DatastoreIOException(new DatastoreException(1, "", ""));
+    doThrow(commitException).when(transaction).commit();
+
+    var rollbackException = new DatastoreIOException(new DatastoreException(2, "", ""));
+    doThrow(rollbackException).when(transaction).rollback();
+
+    try {
+      storage.runInTransactionWithRetries(transactionFunction);
+      fail("Expected exception!");
+    } catch (DatastoreIOException e) {
+      assertThat(e, is(commitException));
+    }
+
+    verify(transactionFunction).apply(any());
+    verify(transaction).rollback();
+    verify(logger).debug("Exception on rollback", rollbackException);
+  }
+
+  @Test
+  public void runInTransactionWithRetriesShouldPropagateDatastoreIOException() throws Exception {
     var datastoreException = new DatastoreException(1, "", "");
     var datastoreIOException = new DatastoreIOException(datastoreException);
     when(transactionFunction.apply(any())).thenThrow(datastoreIOException);
-
-    try {
-      storage.runInTransaction(transactionFunction);
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertThat(e.getCause(), is(datastoreException));
-    }
-
-    verify(transactionFunction).apply(storageTransaction);
-    verify(storageTransaction).rollback();
   }
 
   @Test
-  public void runInTransactionShouldThrowIfDatastoreNewTransactionFails() throws Exception {
-    CheckedDatastore datastore = mock(CheckedDatastore.class);
-    final DatastoreStorage storage = new DatastoreStorage(datastore, Duration.ZERO, storageTransactionFactory, executor);
-    when(datastore.newTransaction()).thenThrow(new DatastoreIOException(new DatastoreException(1, "", "")));
-
-    when(transactionFunction.apply(any())).thenReturn("");
-
-    try {
-      storage.runInTransaction(transactionFunction);
-      fail("Expected exception!");
-    } catch (TransactionException e) {
-      assertFalse(e.isConflict());
-    }
-
-    verify(transactionFunction, never()).apply(any());
+  public void runInTransactionWithRetriesShouldThrowIfDatastoreNewTransactionFails() throws Exception {
+    var cause = new DatastoreIOException(new DatastoreException(1, "", ""));
+    doThrow(cause).when(datastore).newTransaction();
+    exception.expect(is(cause));
+    storage.runInTransactionWithRetries(transactionFunction);
   }
 
   @Test
-  public void shouldReturnResource() throws IOException {
-    storage.runInTransaction(tx -> {
+  public void shouldReturnResource() throws Exception {
+    storage.runInTransactionWithRetries(tx -> {
       tx.store(RESOURCE1);
       tx.store(RESOURCE2);
       return null;
@@ -930,7 +1085,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnResources() throws IOException {
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       tx.store(RESOURCE1);
       tx.store(RESOURCE2);
       return null;
@@ -940,7 +1095,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldDeleteResource() throws IOException {
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       tx.store(RESOURCE1);
       return null;
     });
@@ -951,7 +1106,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnShardsForCounter() throws Exception {
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       tx.store(Shard.create(RESOURCE1.id(), 0, 0));
       tx.store(Shard.create(RESOURCE1.id(), 1, 3));
       return null;
@@ -964,7 +1119,7 @@ public class DatastoreStorageTest {
 
   @Test
   public void shouldReturnCounterLimit() throws IOException {
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       tx.store(RESOURCE1);
       return null;
     });
@@ -1011,6 +1166,20 @@ public class DatastoreStorageTest {
         allOf(
             hasEntry(PROPERTY_COMPONENT, workflow.id().componentId()),
             hasEntry(PROPERTY_WORKFLOW_JSON, Json.OBJECT_MAPPER.writeValueAsString(workflow))));
+  }
+
+  @Test
+  public void sleepShouldBeInterruptible() throws Exception {
+    var running = new CompletableFuture<String>();
+    var future = executor.submit(() -> {
+      running.complete(null);
+      DatastoreStorage.sleepMillis(Long.MAX_VALUE);
+      return "foobar";
+    });
+    running.join();
+    executor.shutdownNow();
+    var result = future.get(30, SECONDS);
+    assertThat(result, is("foobar"));
   }
 
   private static class FooException extends Exception {

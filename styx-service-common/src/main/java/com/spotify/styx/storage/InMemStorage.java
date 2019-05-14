@@ -287,7 +287,7 @@ public class InMemStorage implements Storage {
   }
 
   @Override
-  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f)
+  public <T, E extends Exception> T runInTransactionWithRetries(TransactionFunction<T, E> f)
       throws IOException, E {
     throw new UnsupportedOperationException("Unsupported Operation!");
   }
