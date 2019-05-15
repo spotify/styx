@@ -38,7 +38,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -69,6 +69,7 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerUtil;
@@ -104,6 +105,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   private Datastore datastore = localDatastore.getOptions().getService();
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
+  private AggregateStorage rawStorage;
 
   @Mock private WorkflowValidator workflowValidator;
   @Mock private WorkflowInitializer workflowInitializer;
@@ -158,7 +160,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, datastore, Duration.ZERO));
+    rawStorage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+    storage = spy(rawStorage);
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
@@ -746,41 +749,25 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldDeleteWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("DELETE", path("/foo/bar")));
-
+    var response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
     assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
     assertThat(response, hasNoPayload());
-    verify(storage).delete(WORKFLOW.id());
+    assertThat(storage.workflow(WORKFLOW.id()), is(Optional.empty()));
     verify(workflowConsumer).accept(Optional.of(WORKFLOW), Optional.empty());
   }
 
   @Test
   public void shouldReturnErrorWhenDeleteNonexistWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-
-    doReturn(Optional.empty()).when(storage).workflow(WORKFLOW.id());
-
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("DELETE", path("/foo/bar")));
-
+    var response = awaitResponse(serviceHelper.request("DELETE", path("/non/existent")));
     assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
-    verify(storage, never()).delete(WORKFLOW.id());
   }
 
   @Test
   public void shouldReturnErrorWhenFailedToGetWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
-
     doThrow(new IOException()).when(storage).workflow(WORKFLOW.id());
-
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("DELETE", path("/foo/bar")));
-
+    var response = awaitResponse(serviceHelper.request("GET", path("/foo/bar")));
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     verify(storage, never()).delete(WORKFLOW.id());
   }
@@ -791,9 +778,16 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     doThrow(new IOException()).when(storage).delete(WORKFLOW.id());
 
-    Response<ByteString> response =
-        awaitResponse(
-            serviceHelper.request("DELETE", path("/foo/bar")));
+    doAnswer(a -> {
+      TransactionFunction<Object, Exception> tf = a.getArgument(0);
+      return rawStorage.runInTransactionWithRetries(tx -> {
+        var spiedTx = spy(tx);
+        when(spiedTx.deleteWorkflow(any())).thenThrow(new IOException());
+        return tf.apply(spiedTx);
+      });
+    }).when(storage).runInTransactionWithRetries(any());
+
+    var response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
