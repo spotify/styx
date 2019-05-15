@@ -159,7 +159,7 @@ public class ShardedCounterTest {
     helper.reset();
     assertNull(getLimitFromStorage(COUNTER_ID1));
 
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 500);
       return null;
     });
@@ -363,7 +363,7 @@ public class ShardedCounterTest {
   public void shouldFailIncrementingFullShard() throws IOException {
     shardedCounter.getCounter(COUNTER_ID1);
     updateShard(COUNTER_ID1, 0, 10);
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       shardedCounter.updateCounterShard(tx, COUNTER_ID1, 1, 0, 10);
       return null;
     });
@@ -373,7 +373,7 @@ public class ShardedCounterTest {
   public void shouldFailDecrementingEmptyShard() throws IOException {
     shardedCounter.getCounter(COUNTER_ID1);
 
-    storage.runInTransaction(tx -> {
+    storage.runInTransactionWithRetries(tx -> {
       shardedCounter.updateCounterShard(tx, COUNTER_ID1, -1, 0, 10);
       return null;
     });
@@ -389,7 +389,7 @@ public class ShardedCounterTest {
   @Test
   public void shouldFailIncrementingFullCounter() throws IOException {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
     });
@@ -419,7 +419,7 @@ public class ShardedCounterTest {
   @Test
   public void testCounterHasSpareCapacity() throws IOException {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
       return null;
     });
@@ -441,7 +441,7 @@ public class ShardedCounterTest {
     assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
 
     // Raise limit and check that the counter again has capacity
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 3);
       return null;
     });
@@ -454,7 +454,7 @@ public class ShardedCounterTest {
     assertThat(shardedCounter.counterHasSpareCapacity(COUNTER_ID1), is(false));
 
     // Lower limit and verify that the counter is still out of capacity
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 2);
       return null;
     });
@@ -477,7 +477,7 @@ public class ShardedCounterTest {
     //init counter
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID1));
     // create limit
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       return null;
     });
@@ -497,7 +497,7 @@ public class ShardedCounterTest {
     assertEquals(0L, shardedCounter.getCounter(COUNTER_ID2));
 
     // create limit
-    storage.runInTransaction(transaction -> {
+    storage.runInTransactionWithRetries(transaction -> {
       shardedCounter.updateLimit(transaction, COUNTER_ID1, 10);
       shardedCounter.updateLimit(transaction, COUNTER_ID2, 10);
       return null;
@@ -552,7 +552,7 @@ public class ShardedCounterTest {
 
   private void updateCounterInTransaction(String counterId, long delta) {
     try {
-      storage.runInTransaction(tx -> {
+      storage.runInTransactionWithRetries(tx -> {
         shardedCounter.updateCounter(tx, counterId, delta);
         return null;
       });

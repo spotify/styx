@@ -78,29 +78,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   @Override
-  public void commit() throws TransactionException {
-    try {
-      tx.commit();
-    } catch (DatastoreIOException e) {
-      throw new TransactionException(e.getCause());
-    }
-  }
-
-  @Override
-  public void rollback() throws TransactionException {
-    try {
-      tx.rollback();
-    } catch (DatastoreIOException e) {
-      throw new TransactionException(e.getCause());
-    }
-  }
-
-  @Override
-  public boolean isActive() {
-    return tx.isActive();
-  }
-
-  @Override
   public void updateCounter(ShardedCounter shardedCounter, String resource, int delta) throws IOException {
     shardedCounter.updateCounter(this, resource, delta);
   }
@@ -140,8 +117,9 @@ public class DatastoreStorageTransaction implements StorageTransaction {
   }
 
   @Override
-  public void deleteWorkflow(WorkflowId workflowId) throws IOException {
+  public WorkflowId deleteWorkflow(WorkflowId workflowId) throws IOException {
     tx.delete(workflowKey(tx.getDatastore()::newKeyFactory, workflowId));
+    return workflowId;
   }
 
   private Entity resourceToEntity(CheckedDatastore datastore, Resource resource) {

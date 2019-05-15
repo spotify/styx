@@ -186,7 +186,7 @@ public class BackfillTriggerManagerTest {
 
     when(storage.backfills(anyBoolean())).then(a -> new ArrayList<>(backfills.values()));
 
-    when(storage.runInTransaction(any())).then(
+    when(storage.runInTransactionWithRetries(any())).then(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
     backfillTriggerManager = new BackfillTriggerManager(stateManager, storage,
@@ -466,7 +466,7 @@ public class BackfillTriggerManagerTest {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
 
-    doThrow(new IOException()).when(storage).runInTransaction(any());
+    doThrow(new IOException()).when(storage).runInTransactionWithRetries(any());
 
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
 

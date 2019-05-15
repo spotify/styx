@@ -52,7 +52,7 @@ public class AggregateStorage implements Storage {
 
   public AggregateStorage(Connection connection, Datastore datastore, Duration retryBaseDelay) {
     this(new BigtableStorage(connection, retryBaseDelay),
-         new DatastoreStorage(new CheckedDatastore(datastore), retryBaseDelay));
+         new DatastoreStorage(new CheckedDatastore(datastore)));
   }
 
   AggregateStorage(BigtableStorage bigtableStorage, DatastoreStorage datastoreStorage) {
@@ -264,7 +264,11 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {
-    return datastoreStorage.runInTransaction(f);
+  public <T, E extends Exception> T runInTransactionWithRetries(TransactionFunction<T, E> f) throws IOException, E {
+    try {
+      return datastoreStorage.runInTransactionWithRetries(f);
+    } catch (DatastoreIOException e) {
+      throw new TransactionException(e.getCause());
+    }
   }
 }

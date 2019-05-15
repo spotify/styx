@@ -21,6 +21,7 @@
 package com.spotify.styx.storage;
 
 import com.google.cloud.datastore.DatastoreException;
+import java.util.Objects;
 
 public class TransactionException extends StorageException {
 
@@ -29,44 +30,42 @@ public class TransactionException extends StorageException {
           ", code=" + cause.getCode() +
           ", reason=" + cause.getReason() +
           ", isRetryable=" + cause.isRetryable()
-        , cause);
+        , Objects.requireNonNull(cause));
   }
 
-  // TODO: represent the failure cause using an enum instead
+  @Override
+  public synchronized DatastoreException getCause() {
+    return (DatastoreException) super.getCause();
+  }
 
   public boolean isConflict() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      return datastoreException.getCode() == 10;
-    } else {
-      return false;
-    }
+    return isConflict(getCause());
   }
 
   public boolean isAlreadyExists() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      // TODO remove check on message when Google fixes the Datastore emulator
-      return "ALREADY_EXISTS".equals(datastoreException.getReason())
-             || messageStartsWith("entity already exists");
-    } else {
-      return false;
-    }
+    return isAlreadyExists(getCause());
   }
 
   public boolean isNotFound() {
-    if (getCause() != null && getCause() instanceof DatastoreException) {
-      DatastoreException datastoreException = (DatastoreException) getCause();
-      // TODO remove check on message when Google fixes the Datastore emulator
-      return "NOT_FOUND".equals(datastoreException.getReason())
-             || messageStartsWith("no entity to update");
-    } else {
-      return false;
-    }
+    return isNotFound(getCause());
   }
 
-  private boolean messageStartsWith(String prefix) {
-    final String message = getMessage();
+  private static boolean isConflict(DatastoreException cause) {
+    return cause.getCode() == 10 || "ABORTED".equals(cause.getReason());
+  }
+
+  private static boolean isAlreadyExists(DatastoreException cause) {
+    return "ALREADY_EXISTS".equals(cause.getReason())
+           || messageStartsWith(cause, "entity already exists");
+  }
+
+  private static boolean isNotFound(DatastoreException cause) {
+    return "NOT_FOUND".equals(cause.getReason())
+           || messageStartsWith(cause, "no entity to update");
+  }
+
+  private static boolean messageStartsWith(Throwable cause, String prefix) {
+    var message = cause.getMessage();
     return message != null && message.startsWith(prefix);
   }
 }

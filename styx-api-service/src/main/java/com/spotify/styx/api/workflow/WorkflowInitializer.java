@@ -50,7 +50,7 @@ public class WorkflowInitializer {
   public Optional<Workflow> store(Workflow workflow, Consumer<Optional<Workflow>> guard)
       throws WorkflowInitializationException {
     try {
-      return storage.runInTransaction(tx -> store(tx, workflow, guard));
+      return storage.runInTransactionWithRetries(tx -> store(tx, workflow, guard));
     } catch (IOException e) {
       LOG.warn("failed to write workflow {} to storage", workflow.id(), e);
       throw new RuntimeException(e);
