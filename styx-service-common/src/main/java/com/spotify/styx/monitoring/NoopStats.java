@@ -53,7 +53,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordDockerOperationError(String operation, String type, int code, long durationMillis) {
+  public void recordDockerOperationError(String operation, String type) {
     // nop
   }
 
@@ -174,6 +174,16 @@ final class NoopStats implements Stats {
 
   @Override
   public void recordCounterCacheMiss() {
+    // nop
+  }
+
+  @Override
+  public void recordKubernetesOperation(String operation, long durationMillis, String status) {
+    // nop
+  }
+
+  @Override
+  public void recordKubernetesOperationError(String operation, String type, int code) {
     // nop
   }
 }

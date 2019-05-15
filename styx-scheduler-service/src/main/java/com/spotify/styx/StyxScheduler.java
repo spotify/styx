@@ -58,12 +58,14 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.docker.Fabric8KubernetesClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.MeteredDockerRunnerProxy;
+import com.spotify.styx.monitoring.MeteredFabric8KubernetesClientProxy;
 import com.spotify.styx.monitoring.MeteredStorageProxy;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.MonitoringHandler;
@@ -198,7 +200,8 @@ public class StyxScheduler implements AppInit {
         StateManager stateManager,
         Stats stats,
         Debug debug,
-        Set<String> secretWhitelist);
+        Set<String> secretWhitelist,
+        Time time);
   }
 
   @FunctionalInterface
@@ -379,7 +382,7 @@ public class StyxScheduler implements AppInit {
     var secretWhitelist =
         get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
         dockerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
@@ -592,7 +595,8 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       Stats stats,
       Debug debug,
-      Set<String> secretWhitelist) {
+      Set<String> secretWhitelist,
+      Time time) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
 
@@ -600,7 +604,10 @@ public class StyxScheduler implements AppInit {
     final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(
         config, id, createGkeClient(), DefaultKubernetesClient::new));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
-    return closer.register(DockerRunner.kubernetes(kubernetes, stateManager, stats,
+    var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
+        MeteredFabric8KubernetesClientProxy.instrument(
+            Fabric8KubernetesClient.of(kubernetes), stats, time));
+    return closer.register(DockerRunner.kubernetes(fabric8Client, stateManager, stats,
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 

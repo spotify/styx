@@ -41,7 +41,7 @@ public interface Stats {
 
   void recordDockerOperation(String operation, long durationMillis, String status);
 
-  void recordDockerOperationError(String operation, String type, int code, long durationMillis);
+  void recordDockerOperationError(String operation, String type);
 
   void recordSubmission(String executionId);
 
@@ -90,4 +90,8 @@ public interface Stats {
   void recordCounterCacheHit();
 
   void recordCounterCacheMiss();
+
+  void recordKubernetesOperation(String operation, long durationMillis, String status);
+
+  void recordKubernetesOperationError(String operation, String type, int code);
 }

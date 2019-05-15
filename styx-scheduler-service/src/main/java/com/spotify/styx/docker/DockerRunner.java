@@ -28,7 +28,6 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.Debug;
-import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.norberg.automatter.AutoMatter;
 import java.io.Closeable;
 import java.io.IOException;
@@ -113,7 +112,7 @@ public interface DockerRunner extends Closeable {
     }
   }
 
-  static DockerRunner kubernetes(NamespacedKubernetesClient kubernetesClient,
+  static DockerRunner kubernetes(Fabric8KubernetesClient kubernetesClient,
                                  StateManager stateManager,
                                  Stats stats,
                                  ServiceAccountKeyManager serviceAccountKeyManager,
