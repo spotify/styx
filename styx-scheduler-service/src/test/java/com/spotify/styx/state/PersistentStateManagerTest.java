@@ -206,6 +206,28 @@ public class PersistentStateManagerTest {
   }
 
   @Test
+  public void tickShouldTolerateOutputHandlerCounterCapacityException() throws IOException {
+    var instance1 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-01");
+    var instance2 = WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-05-02");
+    var runState1 = RunState.create(instance1, State.SUBMITTING, StateData.zero(), NOW.minusMillis(2), 17);
+    var runState2 = RunState.create(instance2, State.TERMINATED, StateData.zero(), NOW.minusMillis(1), 4711);
+
+    when(storage.listActiveInstances()).thenReturn(Set.of(instance1, instance2));
+    when(storage.readActiveState(instance1)).thenReturn(Optional.of(runState1));
+    when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
+
+    var cause = new CounterCapacityException("no capacity");
+    doThrow(cause).when(outputHandler).transitionInto(runState1);
+
+    stateManager.tick();
+
+    verify(outputHandler).transitionInto(runState1);
+    verify(outputHandler).transitionInto(runState2);
+
+    verify(logger).debug("Counter capacity exhausted when ticking instance: {}", instance1, cause);
+  }
+
+  @Test
   public void shouldInitializeAndTriggerWFInstance() throws Exception {
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
