@@ -59,6 +59,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
@@ -581,6 +582,36 @@ public class SchedulerTest {
     verify(stats).recordTickDuration(any(), anyLong());
 
     verify(log).debug("State transition conflict when scheduling instance: {}", INSTANCE_1, cause);
+  }
+
+  @Test
+  public void shouldHandleCounterCapacityExceptions() throws Exception {
+    var workflow1 = workflowUsingResources(WORKFLOW_ID1);
+    var workflow2 = workflowUsingResources(WORKFLOW_ID2);
+
+    initWorkflow(workflow1);
+    initWorkflow(workflow2);
+
+    var counter1 = 17;
+    var stateData1 = StateData.newBuilder().tries(0).build();
+    var runState1 = RunState.create(INSTANCE_1, State.QUEUED, stateData1, time.get(), counter1);
+
+    var counter2 = 4711;
+    var stateData2 = StateData.newBuilder().tries(0).build();
+    var runState2 = RunState.create(INSTANCE_2, State.QUEUED, stateData2, time.get(), counter2);
+
+    populateActiveStates(runState1, runState2);
+    var cause = new CounterCapacityException("foo!");
+    doThrow(cause).when(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+
+    scheduler.tick();
+
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_1, ImmutableSet.of()), counter1);
+    verify(stateManager).receiveIgnoreClosed(Event.dequeue(INSTANCE_2, ImmutableSet.of()), counter2);
+
+    verify(stats).recordTickDuration(any(), anyLong());
+
+    verify(log).debug("Counter capacity exhausted when scheduling instance: {}", INSTANCE_1, cause);
   }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
