@@ -59,6 +59,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.Time;
 import io.fabric8.kubernetes.api.model.Container;
@@ -796,6 +797,27 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.getPod(POD_NAME)).thenReturn(Optional.of(terminatedPod));
 
     doThrow(new StateTransitionConflictException("foo!"))
+        .when(stateManager).receive(any(), anyLong());
+
+    verifyZeroInteractions(stateManager);
+
+    // Poll for execution status
+    var stateData = StateData.newBuilder().executionId(POD_NAME).build();
+    var runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, stateData);
+    kdr.poll(runState);
+
+    verify(stateManager).receive(any(), anyLong());
+  }
+
+  @Test
+  public void shouldTolerateCounterCapacityExceptionWhenEmittingEvents() throws Exception {
+    // Change the pod status to terminated without notifying the runner through the pod watcher
+    final Pod terminatedPod = new PodBuilder(createdPod)
+        .withStatus(terminated("Succeeded", 20, null))
+        .build();
+    when(k8sClient.getPod(POD_NAME)).thenReturn(Optional.of(terminatedPod));
+
+    doThrow(new CounterCapacityException("foo!"))
         .when(stateManager).receive(any(), anyLong());
 
     verifyZeroInteractions(stateManager);
