@@ -48,6 +48,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.Debug;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
@@ -648,6 +649,8 @@ class KubernetesDockerRunner implements DockerRunner {
       } catch (StateTransitionConflictException e) {
         LOG.debug("State transition conflict on kubernetes pod event: {}", event, e);
         return;
+      } catch (CounterCapacityException e) {
+        LOG.debug("Counter capacity exhausted when processing pod event: {}", event, e);
       } catch (IsClosedException ignore) {
         return;
       }
