@@ -667,7 +667,7 @@ public class PersistentStateManagerTest {
 
     doThrow(rootCause).when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    final Event dequeueEvent = Event.dequeue(INSTANCE, Set.of("resource1"));
+    var dequeueEvent = Event.dequeue(INSTANCE, Set.of("resource1"));
 
     exception.expect(RuntimeException.class);
     exception.expectCause(is(rootCause));

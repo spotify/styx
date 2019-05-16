@@ -812,7 +812,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldTolerateCounterCapacityExceptionWhenEmittingEvents() throws Exception {
     // Change the pod status to terminated without notifying the runner through the pod watcher
-    final Pod terminatedPod = new PodBuilder(createdPod)
+    var terminatedPod = new PodBuilder(createdPod)
         .withStatus(terminated("Succeeded", 20, null))
         .build();
     when(k8sClient.getPod(POD_NAME)).thenReturn(Optional.of(terminatedPod));
