@@ -292,7 +292,7 @@ public class PersistentStateManager implements StateManager {
                                   Set<String> resourceIds) throws IOException {
 
     var depletedResourceIds = new ArrayList<String>();
-    for (final String resourceId : resourceIds) {
+    for (var resourceId : resourceIds) {
       try {
         tx.updateCounter(shardedCounter, resourceId, 1);
       } catch (CounterCapacityException e) {
