@@ -651,6 +651,7 @@ class KubernetesDockerRunner implements DockerRunner {
         return;
       } catch (CounterCapacityException e) {
         LOG.debug("Counter capacity exhausted when processing pod event: {}", event, e);
+        return;
       } catch (IsClosedException ignore) {
         return;
       }
