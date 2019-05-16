@@ -22,18 +22,17 @@ package com.spotify.styx.state;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
-import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -55,6 +54,7 @@ import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.storage.DatastoreIOException;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import com.spotify.styx.storage.TransactionException;
@@ -662,28 +662,17 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToConflict() throws Exception {
     givenState(INSTANCE, State.QUEUED);
-    final RuntimeException rootCause = new RuntimeException("conflict!");
-    doThrow(rootCause)
-        .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
-    final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
-    final Event dequeueEvent = Event.dequeue(INSTANCE,
-        resources.stream().map(Resource::id).collect(toSet()));
-    final Event infoEvent = Event.info(INSTANCE,
-        Message.info(String.format("Resource limit reached for: %s", resourceIds)));
-    final PersistentStateManager spied = spy(stateManager);
+    var rootCause = new DatastoreIOException(new DatastoreException(10, "conflict!", "conflict!"));
 
-    try {
-      spied.receive(dequeueEvent);
-      fail();
-    } catch (RuntimeException e) {
-      assertThat(e.getMessage(), is("Failed to update resource counter for workflow instance: "
-          + INSTANCE + ": [resource1]"));
-      assertThat(e.getSuppressed(), is(arrayContaining(rootCause)));
-    }
+    doThrow(rootCause).when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    verify(spied, never()).receiveIgnoreClosed(eq(infoEvent), anyLong());
+    var dequeueEvent = Event.dequeue(INSTANCE, Set.of("resource1"));
+
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(rootCause));
+
+    stateManager.receive(dequeueEvent);
   }
 
   @Test

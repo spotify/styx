@@ -49,6 +49,7 @@ import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.StateUtil;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.Storage;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
 import io.grpc.Context;
@@ -207,6 +208,8 @@ public class Scheduler {
                     currentResourceUsage, currentResourceDemand);
               } catch (StateTransitionConflictException e) {
                 log.debug("State transition conflict when scheduling instance: {}", instance, e);
+              } catch (CounterCapacityException e) {
+                log.debug("Counter capacity exhausted when scheduling instance: {}", instance, e);
               } catch (Throwable e) {
                 log.warn("Caught exception when scheduling instance: {}", instance, e);
               }

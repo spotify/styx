@@ -34,8 +34,8 @@ public class MessageUtil {
     throw new UnsupportedOperationException();
   }
 
-  public static void emitResourceLimitReachedMessage(StateManager stateManager, RunState runState,
-      List<String> depletedResources) {
+  public static Message emitResourceLimitReachedMessage(StateManager stateManager, RunState runState,
+                                                        List<String> depletedResources) {
     if (depletedResources.isEmpty()) {
       throw new IllegalArgumentException();
     }
@@ -44,5 +44,6 @@ public class MessageUtil {
     if (!runState.data().message().map(message::equals).orElse(false)) {
       stateManager.receiveIgnoreClosed(Event.info(runState.workflowInstance(), message), runState.counter());
     }
+    return message;
   }
 }
