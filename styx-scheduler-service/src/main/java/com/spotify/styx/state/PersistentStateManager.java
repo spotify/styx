@@ -23,7 +23,6 @@ package com.spotify.styx.state;
 import static com.spotify.styx.state.StateUtil.isConsumingResources;
 import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -47,7 +46,6 @@ import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,8 +54,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
-import javaslang.Tuple;
-import javaslang.Tuple2;
 import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -293,35 +289,21 @@ public class PersistentStateManager implements StateManager {
 
   private void tryUpdatingCounter(RunState runState,
                                   StorageTransaction tx,
-                                  Set<String> resourceIds) {
-    final Set<Tuple2<String, Try<Void>>> failedTries = resourceIds.stream()
-        .map(resource -> Tuple.of(resource, Try.run(() ->
-            tx.updateCounter(shardedCounter, resource, 1))))
-        .filter(x -> x._2.isFailure())
-        .collect(toSet());
-    final List<String> depletedResourceIds = failedTries.stream()
-        .filter(x -> x._2.getCause() instanceof CounterCapacityException)
-        .map(x -> x._1)
-        // Sort resource ids to get deterministic message contents
-        .sorted()
-        .collect(toList());
+                                  Set<String> resourceIds) throws IOException {
 
-    if (!depletedResourceIds.isEmpty()) {
-      MessageUtil.emitResourceLimitReachedMessage(this, runState, depletedResourceIds);
+    var depletedResourceIds = new ArrayList<String>();
+    for (final String resourceId : resourceIds) {
+      try {
+        tx.updateCounter(shardedCounter, resourceId, 1);
+      } catch (CounterCapacityException e) {
+        depletedResourceIds.add(resourceId);
+      }
     }
 
-    if (!failedTries.isEmpty()) {
-      final List<String> failedResources = failedTries.stream()
-          .map(x -> x._1)
-          .sorted()
-          .collect(toList());
-      final RuntimeException exception = new RuntimeException(
-          "Failed to update resource counter for workflow instance: "
-              + runState.workflowInstance() + ": " + failedResources);
-      failedTries.stream()
-          .map(x -> x._2.getCause())
-          .forEach(exception::addSuppressed);
-      throw exception;
+    if (!depletedResourceIds.isEmpty()) {
+      var message = MessageUtil.emitResourceLimitReachedMessage(this, runState, depletedResourceIds);
+      throw new CounterCapacityException("Failed to update resource counter for workflow instance: " +
+                                         runState.workflowInstance() + ": " + message.line());
     }
   }
 
