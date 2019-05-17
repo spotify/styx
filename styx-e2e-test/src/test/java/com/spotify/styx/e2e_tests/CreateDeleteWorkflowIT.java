@@ -46,6 +46,7 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .schedule(Schedule.DAYS)
         .dockerImage("busybox")
         .dockerArgs(List.of("echo", "hello world"))
+        .serviceAccount(workflowServiceAccount.getEmail())
         .build();
     var workflow = Workflow.create(component1, workflowConfiguration);
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(workflowConfiguration);

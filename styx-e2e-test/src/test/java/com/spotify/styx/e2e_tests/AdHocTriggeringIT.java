@@ -40,12 +40,11 @@ public class AdHocTriggeringIT extends EndToEndTestBase {
   @Test
   public void testAdHocTriggering() throws Exception {
 
-    // TODO: configure a workflow service account
-
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,
         "schedule", "daily",
+        "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "hello world")));
     var workflowJsonFile = temporaryFolder.newFile().toPath();
