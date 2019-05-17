@@ -41,12 +41,11 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
   @Test
   public void testScheduledTriggering() throws Exception {
 
-    // TODO: configure a workflow service account
-
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,
         "schedule", "* * * * *",
+        "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "{}")));
     var workflowJsonFile = temporaryFolder.newFile().toPath();

@@ -77,4 +77,20 @@ class TestNamespaces {
     }
     return true;
   }
+
+  static String testNamespaceTimeTimestamp(String namespace) {
+    var matcher = TEST_NAMESPACE_PATTERN.matcher(namespace);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException();
+    }
+    return matcher.group("timestamp");
+  }
+
+  static String testNamespaceRandom(String namespace) {
+    var matcher = TEST_NAMESPACE_PATTERN.matcher(namespace);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException();
+    }
+    return matcher.group("random");
+  }
 }
