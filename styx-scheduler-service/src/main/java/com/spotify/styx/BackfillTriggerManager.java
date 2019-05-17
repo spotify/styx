@@ -155,6 +155,9 @@ class BackfillTriggerManager {
     }
     var workflow = workflowOpt.orElseThrow();
 
+    // Trigger a limited number of instances. Limit here to avoid starvation (if this is a big backfill)
+    // and to limit the risk of alreadyActiveInstances going stale (because of concurrent triggering) while
+    // triggering instances.
     for (int i = 0; i < MAX_INSTANCES_TICK_TRIGGER; i++) {
       // The total number of triggered instances, including the ones that were already active
       var activeInstances = alreadyActiveInstances + i;
