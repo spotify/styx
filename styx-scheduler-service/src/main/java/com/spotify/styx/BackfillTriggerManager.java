@@ -167,7 +167,7 @@ class BackfillTriggerManager {
           triggerNextInstanceAndProgress(tx, backfill.id(), workflow, activeInstances));
 
       if (!shouldContinue) {
-        return;
+        break;
       }
     }
   }
