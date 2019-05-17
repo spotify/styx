@@ -32,7 +32,7 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B verify -P disable-static-analysis
-      - run: bash <(curl -s https://codecov.io/bash) -f '!**/jacoco-aggregate/**'
+      - run: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
       - run: |
           mkdir test-reports
           find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
