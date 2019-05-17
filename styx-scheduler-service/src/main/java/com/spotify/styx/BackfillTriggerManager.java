@@ -50,7 +50,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Consumer;
 import javaslang.control.Try;
 import org.slf4j.Logger;
@@ -148,13 +147,6 @@ class BackfillTriggerManager {
     // Note: getActiveStatesByTriggerId is eventually consistent and may not return all triggered instances.
     var alreadyActiveInstances = stateManager.getActiveStatesByTriggerId(backfill.id()).size();
 
-    // Look up the workflow. Halts the backfill if the workflow does not exist.
-    var workflowOpt = readBackfillWorkflowOrHalt(backfill.id());
-    if (workflowOpt.isEmpty()) {
-      return;
-    }
-    var workflow = workflowOpt.orElseThrow();
-
     // Trigger a limited number of instances. Limit here to avoid starvation (if this is a big backfill)
     // and to limit the risk of alreadyActiveInstances going stale (because of concurrent triggering) while
     // triggering instances.
@@ -164,7 +156,7 @@ class BackfillTriggerManager {
 
       // Attempt to trigger an instance
       var shouldContinue = storage.runInTransactionWithRetries(tx ->
-          triggerNextInstanceAndProgress(tx, backfill.id(), workflow, activeInstances));
+          triggerNextInstanceAndProgress(tx, backfill.id(), activeInstances));
 
       if (!shouldContinue) {
         break;
@@ -172,29 +164,8 @@ class BackfillTriggerManager {
     }
   }
 
-  private Optional<Workflow> readBackfillWorkflowOrHalt(String backfillId) throws IOException {
-    return storage.runInTransactionWithRetries(tx -> {
-
-      // Read the backfill workflow ID in this transaction to ensure consistency
-      var backfillOpt = tx.backfill(backfillId);
-      if (backfillOpt.isEmpty()) {
-        LOG.debug("backfill not found: {}", backfillId);
-        return Optional.empty();
-      }
-      var backfill = backfillOpt.orElseThrow();
-
-      var workflowOpt = tx.workflow(backfill.workflowId());
-      if (workflowOpt.isEmpty()) {
-        LOG.debug("workflow not found for backfill, halting: {}", backfill);
-        tx.store(backfill.builder().halted(true).build());
-      }
-
-      return workflowOpt;
-    });
-  }
-
   @VisibleForTesting
-  boolean triggerNextInstanceAndProgress(StorageTransaction tx, String backfillId, Workflow workflow,
+  boolean triggerNextInstanceAndProgress(StorageTransaction tx, String backfillId,
                                          int triggeredInstances) throws IOException {
 
     // Re-read backfill for each trigger to provide stronger consistency in case of concurrent updates.
@@ -209,6 +180,15 @@ class BackfillTriggerManager {
       LOG.debug("Backfill halted: {}", backfill);
       return false;
     }
+
+    // Halt if the workflow is gone
+    var workflowOpt = tx.workflow(backfill.workflowId());
+    if (workflowOpt.isEmpty()) {
+      LOG.debug("workflow not found for backfill, halting: {}", backfill);
+      tx.store(backfill.builder().halted(true).build());
+      return false;
+    }
+    var workflow = workflowOpt.orElseThrow();
 
     // Do not trigger if the concurrency limit has been reached.
     if (triggeredInstances >= backfill.concurrency()) {

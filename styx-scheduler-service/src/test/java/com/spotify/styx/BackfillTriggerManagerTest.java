@@ -648,7 +648,7 @@ public class BackfillTriggerManagerTest {
 
     backfills.put(BACKFILL_1.id(), BACKFILL_1.builder().halted(true).build());
 
-    var moveOn = backfillTriggerManager.triggerNextInstanceAndProgress(transaction, BACKFILL_1.id(), workflow, 0);
+    var moveOn = backfillTriggerManager.triggerNextInstanceAndProgress(transaction, BACKFILL_1.id(), 0);
     assertFalse(moveOn);
     verifyNoMoreInteractions(triggerListener);
   }
