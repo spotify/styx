@@ -463,6 +463,16 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerBackfillsWithMissingBackfill() throws Exception {
+    backfills.put(BACKFILL_1.id(), BACKFILL_1);
+    when(transaction.backfill(BACKFILL_1.id())).thenReturn(Optional.empty());
+
+    backfillTriggerManager.tick();
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
   public void shouldNotTriggerBackfillsAndStoreBackfillWithMissingWorkflows() throws Exception {
     backfills.put(BACKFILL_1.id(), BACKFILL_1);
     when(transaction.workflow(BACKFILL_1.workflowId())).thenReturn(Optional.empty());
