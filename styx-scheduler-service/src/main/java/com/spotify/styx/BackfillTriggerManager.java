@@ -149,6 +149,8 @@ class BackfillTriggerManager {
     var alreadyActiveInstances = stateManager.getActiveStatesByTriggerId(backfill.id()).size();
 
     // Look up the workflow. Halts the backfill if the workflow does not exist.
+    // Note: This lookup cannot currently be done in the below backfill transaction itself because it would
+    //  conflict with the instance triggering transaction.
     var workflowOpt = readBackfillWorkflowOrHalt(backfill.id());
     if (workflowOpt.isEmpty()) {
       return;
