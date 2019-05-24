@@ -51,6 +51,8 @@ import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -494,7 +496,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredential credential) {
+  static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredentials credential) {
     return get(config, config::getString, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
         .map(role -> {
           final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
@@ -515,12 +517,12 @@ public interface ServiceAccountUsageAuthorizer {
   }
 
   static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
-    return create(config, serviceName, defaultCredential());
+    return create(config, serviceName, defaultCredentials());
   }
 
   static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
-                                              GoogleCredential credential,
+                                              GoogleCredentials credentials,
                                               String gsuiteUserEmail,
                                               String serviceName,
                                               String message,
@@ -537,27 +539,19 @@ public interface ServiceAccountUsageAuthorizer {
     final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
 
     final CloudResourceManager crm = new CloudResourceManager.Builder(
-        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
+        httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials.createScoped(IamScopes.all())))
         .setApplicationName(serviceName)
         .build();
 
     final Iam iam = new Iam.Builder(
-        httpTransport, jsonFactory, credential.createScoped(IamScopes.all()))
+        httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials.createScoped(IamScopes.all())))
         .setApplicationName(serviceName)
         .build();
 
-    if (credential.getServiceAccountId() == null) {
-      // TODO: Allow GCE default service accounts and look up the ID using the tokeninfo endpoint
-      throw new IllegalArgumentException("Credential must be a service account");
-    }
-
-    final GoogleCredential directoryCredential = new GoogleCredential.Builder()
-        .setTransport(httpTransport)
-        .setJsonFactory(jsonFactory)
-        .setServiceAccountId(credential.getServiceAccountId())
-        .setServiceAccountScopes(ImmutableSet.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))
+    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iam)
+        .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
         .setServiceAccountUser(gsuiteUserEmail)
-        .setServiceAccountPrivateKey(credential.getServiceAccountPrivateKey())
+        .setServiceAccountScopes(Set.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))
         .build();
 
     final Directory directory = new Directory.Builder(httpTransport, jsonFactory, directoryCredential)
@@ -568,8 +562,8 @@ public interface ServiceAccountUsageAuthorizer {
         Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 
-  static GoogleCredential defaultCredential() {
-    return Try.of(GoogleCredential::getApplicationDefault).get();
+  static GoogleCredentials defaultCredentials() {
+    return Try.of(GoogleCredentials::getApplicationDefault).get();
   }
 
   static ServiceAccountUsageAuthorizer nop() {
