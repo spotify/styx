@@ -110,6 +110,7 @@ public class EndToEndTestBase {
   private NamespacedKubernetesClient k8s;
 
   private Config schedulerConfig;
+  private Config apiConfig;
 
   private static final int BASE_PORT = 18080;
 
@@ -127,57 +128,26 @@ public class EndToEndTestBase {
 
   @Before
   public void setUp() throws Exception {
-    // Setup namespace
     log.info("Setting up styx e2e test: {}", testNamespace);
-    System.setProperty("styx.test.namespace", testNamespace);
 
-    System.setProperty("styx.api.port", String.valueOf(styxApiPort));
-    System.setProperty("styx.scheduler.port", String.valueOf(styxSchedulerPort));
+    setUpServiceAccounts();
+    setUpConfig();
+    setUpDatastore();
+    setUpKubernetes();
+    startStyx();
+  }
 
-    // Create workflow service account
-    iam = new Iam.Builder(
-        Utils.getDefaultTransport(), Utils.getDefaultJsonFactory(),
-        GoogleCredential.getApplicationDefault().createScoped(IamScopes.all()))
-        .setApplicationName(testNamespace)
-        .build();
-    workflowServiceAccount = iam.projects().serviceAccounts()
-        .create("projects/styx-oss-test",
-            new CreateServiceAccountRequest().setAccountId(workflowServiceAccountId)
-                .setServiceAccount(new ServiceAccount().setDisplayName(testNamespace)))
-        .execute();
-    log.info("Created workflow test service account: {}", workflowServiceAccount.getEmail());
+  @After
+  public void tearDown() {
+    log.info("Tearing down styx e2e test: {}", testNamespace);
 
-    // Set up workflow service account permissions
-    var workflowServiceAccountFqn = "projects/styx-oss-test/serviceAccounts/" + workflowServiceAccount.getEmail();
-    var workflowServiceAccountPolicy = iam.projects().serviceAccounts()
-        .getIamPolicy(workflowServiceAccountFqn)
-        .execute();
-    if (workflowServiceAccountPolicy.getBindings() == null) {
-      workflowServiceAccountPolicy.setBindings(new ArrayList<>());
-    }
-    workflowServiceAccountPolicy.getBindings()
-        .add(new Binding().setRole("projects/styx-oss-test/roles/StyxWorkflowServiceAccountUser")
-        .setMembers(List.of("serviceAccount:styx-circle-ci@styx-oss-test.iam.gserviceaccount.com")));
-    // TODO: set up a styx service account instead of using styx-circle-ci@
-    workflowServiceAccountPolicy.getBindings()
-        .add(new Binding().setRole("roles/iam.serviceAccountKeyAdmin")
-        .setMembers(List.of("serviceAccount:styx-circle-ci@styx-oss-test.iam.gserviceaccount.com")));
-    iam.projects().serviceAccounts().setIamPolicy(workflowServiceAccountFqn,
-        new SetIamPolicyRequest().setPolicy(workflowServiceAccountPolicy))
-        .execute();
+    Try.run(this::stopStyx).onFailure(e -> log.error("Styx teardown failed", e));
+    Try.run(this::tearDownDatastore).onFailure(e -> log.error("Datastore teardown failed", e));
+    Try.run(this::tearDownKubernetes).onFailure(e -> log.error("Kubernetes teardown failed", e));
+    Try.run(this::tearDownServiceAccounts).onFailure(e -> log.error("Service account teardown failed", e));
+  }
 
-    // Create datastore client
-    schedulerConfig = ConfigFactory.load(SCHEDULER_SERVICE_NAME);
-    datastore = Connections.createDatastore(schedulerConfig, Stats.NOOP);
-
-    // Set up k8s namespace
-    System.setProperty("kubernetes.auth.tryKubeConfig", "false");
-    log.info("Creating k8s namespace: {}", testNamespace);
-    k8s = StyxScheduler.getKubernetesClient(schedulerConfig, "default");
-    k8s.namespaces().createNew()
-        .withNewMetadata().withName(testNamespace).endMetadata()
-        .done();
-
+  private void startStyx() {
     // Start scheduler
     styxSchedulerThread = executor.submit(() -> {
       HttpService.boot(env -> StyxScheduler.newBuilder()
@@ -208,55 +178,98 @@ public class EndToEndTestBase {
         });
   }
 
-  @After
-  public void tearDown() throws Exception {
-    log.info("Tearing down styx e2e test: {}", testNamespace);
+  private void setUpKubernetes() {
+    System.setProperty("kubernetes.auth.tryKubeConfig", "false");
+    log.info("Creating k8s namespace: {}", testNamespace);
+    k8s = StyxScheduler.getKubernetesClient(schedulerConfig, "default");
+    k8s.namespaces().createNew()
+        .withNewMetadata().withName(testNamespace).endMetadata()
+        .done();
+  }
 
-    try {
-      styxApiInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
-      styxSchedulerInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
-      if (styxApiThread != null) {
-        Try.run(() -> styxApiThread.get(30, SECONDS));
-        styxApiThread.cancel(true);
-      }
-      if (styxSchedulerThread != null) {
-        Try.run(() -> styxSchedulerThread.get(30, SECONDS));
-        styxSchedulerThread.cancel(true);
-      }
-      executor.shutdownNow();
-      executor.awaitTermination(30, SECONDS);
-    } catch (Throwable t) {
-      log.error("styx teardown failed", t);
-    }
+  private void setUpDatastore() {
+    // Create datastore client
+    datastore = Connections.createDatastore(schedulerConfig, Stats.NOOP);
+  }
 
-    try {
-      if (datastore != null) {
-        Try.run(() -> deleteDatastoreNamespace(datastore, testNamespace));
-      }
-    } catch (Throwable t) {
-      log.error("datastore teardown failed", t);
-    }
+  private void setUpConfig() {
+    System.setProperty("styx.test.namespace", testNamespace);
+    System.setProperty("styx.api.port", String.valueOf(styxApiPort));
+    System.setProperty("styx.scheduler.port", String.valueOf(styxSchedulerPort));
+    schedulerConfig = ConfigFactory.load(SCHEDULER_SERVICE_NAME);
+    apiConfig = ConfigFactory.load(API_SERVICE_NAME);
+  }
 
-    try {
-      if (k8s != null) {
-        log.info("Deleting k8s namespace: {}", testNamespace);
-        k8s.inNamespace(testNamespace).pods().withGracePeriod(0).delete();
-        k8s.namespaces().withName(testNamespace).delete();
-      }
-    } catch (Throwable t) {
-      log.error("k8s teardown failed", t);
-    }
+  private void setUpServiceAccounts() throws IOException {
+    // Create workflow service account
+    iam = new Iam.Builder(
+        Utils.getDefaultTransport(), Utils.getDefaultJsonFactory(),
+        GoogleCredential.getApplicationDefault().createScoped(IamScopes.all()))
+        .setApplicationName(testNamespace)
+        .build();
+    workflowServiceAccount = iam.projects().serviceAccounts()
+        .create("projects/styx-oss-test",
+            new CreateServiceAccountRequest().setAccountId(workflowServiceAccountId)
+                .setServiceAccount(new ServiceAccount().setDisplayName(testNamespace)))
+        .execute();
+    log.info("Created workflow test service account: {}", workflowServiceAccount.getEmail());
 
-    try {
-      if (iam != null && workflowServiceAccount != null) {
-        log.info("Deleting workflow service account: {}", workflowServiceAccount.getEmail());
-        iam.projects().serviceAccounts()
-            .delete("projects/styx-oss-test/serviceAccounts/" + workflowServiceAccount.getEmail())
-            .execute();
-      }
-    } catch (Throwable t) {
-      log.error("service account teardown failed", t);
+    // Set up workflow service account permissions
+    var workflowServiceAccountFqn = "projects/styx-oss-test/serviceAccounts/" + workflowServiceAccount.getEmail();
+    var workflowServiceAccountPolicy = iam.projects().serviceAccounts()
+        .getIamPolicy(workflowServiceAccountFqn)
+        .execute();
+    if (workflowServiceAccountPolicy.getBindings() == null) {
+      workflowServiceAccountPolicy.setBindings(new ArrayList<>());
     }
+    workflowServiceAccountPolicy.getBindings()
+        .add(new Binding().setRole("projects/styx-oss-test/roles/StyxWorkflowServiceAccountUser")
+            .setMembers(List.of("serviceAccount:styx-circle-ci@styx-oss-test.iam.gserviceaccount.com")));
+    // TODO: set up a styx service account instead of using styx-circle-ci@
+    workflowServiceAccountPolicy.getBindings()
+        .add(new Binding().setRole("roles/iam.serviceAccountKeyAdmin")
+            .setMembers(List.of("serviceAccount:styx-circle-ci@styx-oss-test.iam.gserviceaccount.com")));
+    iam.projects().serviceAccounts().setIamPolicy(workflowServiceAccountFqn,
+        new SetIamPolicyRequest().setPolicy(workflowServiceAccountPolicy))
+        .execute();
+  }
+
+  private void tearDownServiceAccounts() throws IOException {
+    if (iam != null && workflowServiceAccount != null) {
+      log.info("Deleting workflow service account: {}", workflowServiceAccount.getEmail());
+      iam.projects().serviceAccounts()
+          .delete("projects/styx-oss-test/serviceAccounts/" + workflowServiceAccount.getEmail())
+          .execute();
+    }
+  }
+
+  private void tearDownKubernetes() {
+    if (k8s != null) {
+      log.info("Deleting k8s namespace: {}", testNamespace);
+      k8s.inNamespace(testNamespace).pods().withGracePeriod(0).delete();
+      k8s.namespaces().withName(testNamespace).delete();
+    }
+  }
+
+  private void tearDownDatastore() {
+    if (datastore != null) {
+      deleteDatastoreNamespace(datastore, testNamespace);
+    }
+  }
+
+  private void stopStyx() throws InterruptedException {
+    styxApiInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
+    styxSchedulerInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
+    if (styxApiThread != null) {
+      Try.run(() -> styxApiThread.get(30, SECONDS));
+      styxApiThread.cancel(true);
+    }
+    if (styxSchedulerThread != null) {
+      Try.run(() -> styxSchedulerThread.get(30, SECONDS));
+      styxSchedulerThread.cancel(true);
+    }
+    executor.shutdownNow();
+    executor.awaitTermination(30, SECONDS);
   }
 
   <T> T cliJson(Class<T> outputClass, String... args) throws IOException, InterruptedException, CliException {
