@@ -51,7 +51,7 @@ class TestNamespaces {
     return String.join("-",
         TEST_NAMESPACE_PREFIX,
         TIMESTAMP_FORMATTER.format(now),
-        Long.toHexString(ThreadLocalRandom.current().nextLong()));
+        Integer.toHexString(ThreadLocalRandom.current().nextInt()));
   }
 
   /**
