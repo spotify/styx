@@ -34,7 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This removes old test service accounts. It is not really a test.
+ * This removes expired service accounts that might be left behind by e2e tests
+ * due to interrupted execution or failing teardown etc. It is not really a test.
  */
 public class ServiceAccountCleanupTest {
 
@@ -43,7 +44,7 @@ public class ServiceAccountCleanupTest {
   private static final Instant NOW = Instant.now();
 
   @Test
-  public void deleteOldTestServiceAccounts() throws IOException {
+  public void deleteExpiredTestServiceAccounts() throws IOException {
     var iam = new Iam.Builder(
         Utils.getDefaultTransport(), Utils.getDefaultJsonFactory(),
         GoogleCredential.getApplicationDefault().createScoped(IamScopes.all()))
