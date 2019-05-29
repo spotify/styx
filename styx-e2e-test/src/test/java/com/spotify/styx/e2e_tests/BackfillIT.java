@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.auto.service.AutoService;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.data.EventInfo;
@@ -38,6 +39,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.Test;
 
+@AutoService(EndToEndTestBase.class)
 public class BackfillIT extends EndToEndTestBase {
 
   @Test

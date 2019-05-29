@@ -97,5 +97,24 @@
       <version>3.0.12</version>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>com.google.auto.service</groupId>
+      <artifactId>auto-service</artifactId>
+      <version>1.0-rc5</version>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <reuseForks>false</reuseForks>
+          <forkCount>1C</forkCount>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
