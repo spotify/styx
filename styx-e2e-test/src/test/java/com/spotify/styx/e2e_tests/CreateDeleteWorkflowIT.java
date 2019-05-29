@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
+import com.google.auto.service.AutoService;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
+@AutoService(EndToEndTestBase.class)
 public class CreateDeleteWorkflowIT extends EndToEndTestBase {
 
   @Test

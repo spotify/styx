@@ -23,6 +23,7 @@ package com.spotify.styx.e2e_tests;
 import static com.spotify.styx.e2e_tests.DatastoreUtil.deleteDatastoreNamespace;
 import static java.lang.ProcessBuilder.Redirect.INHERIT;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
 import static org.awaitility.Awaitility.await;
 
 import ch.qos.logback.classic.LoggerContext;
@@ -55,6 +56,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -95,12 +97,22 @@ public class EndToEndTestBase {
   private Future<Object> styxSchedulerThread;
   private Future<Object> styxApiThread;
 
-  int styxApiPort = -1;
-
   private Datastore datastore;
   private NamespacedKubernetesClient k8s;
 
   private Config schedulerConfig;
+
+  private static final int BASE_PORT = 18080;
+
+  private final List<? extends Class<? extends EndToEndTestBase>> testClasses =
+      ServiceLoader.load(EndToEndTestBase.class)
+          .stream()
+          .map(ServiceLoader.Provider::type)
+          .collect(toList());
+
+  private final int testIndex = testClasses.indexOf(getClass());
+  private final int styxApiPort = BASE_PORT + testIndex * 2;
+  private final int styxSchedulerPort = BASE_PORT + testIndex * 2 + 1;
 
   /**
    * Sets up per-test log files.
@@ -137,6 +149,9 @@ public class EndToEndTestBase {
     // Setup namespace
     log.info("Setting up styx e2e test: {}", namespace);
     System.setProperty("styx.test.namespace", namespace);
+
+    System.setProperty("styx.api.port", String.valueOf(styxApiPort));
+    System.setProperty("styx.scheduler.port", String.valueOf(styxSchedulerPort));
 
     schedulerConfig = ConfigFactory.load(SCHEDULER_SERVICE_NAME);
     datastore = Connections.createDatastore(schedulerConfig, Stats.NOOP);
@@ -176,8 +191,6 @@ public class EndToEndTestBase {
           }
           return styxSchedulerInstance.isDone() && styxApiInstance.isDone();
         });
-
-    styxApiPort = styxApiInstance.join().getConfig().getInt("http.server.port");
   }
 
   @After

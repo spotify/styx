@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.auto.service.AutoService;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.serialization.Json;
 import java.nio.file.Files;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 
+@AutoService(EndToEndTestBase.class)
 public class ScheduledTriggeringIT extends EndToEndTestBase {
 
   @Test
