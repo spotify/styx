@@ -706,6 +706,7 @@
           <excludes>
             <exclude><!-- disable exclusion of inner classes--></exclude>
           </excludes>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
         </configuration>
       </plugin>
 
