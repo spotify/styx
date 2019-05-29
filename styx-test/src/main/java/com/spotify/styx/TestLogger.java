@@ -28,7 +28,15 @@ import org.slf4j.LoggerFactory;
 
 public class TestLogger extends RunListener {
 
-  private static final Logger log = LoggerFactory.getLogger(TestLogger.class);
+  private final Logger log;
+
+  public TestLogger() {
+    this(LoggerFactory.getLogger(TestLogger.class));
+  }
+
+  TestLogger(Logger log) {
+    this.log = log;
+  }
 
   @Override
   public void testStarted(Description description) {
@@ -52,6 +60,6 @@ public class TestLogger extends RunListener {
 
   @Override
   public void testIgnored(Description description) {
-    log.info("Test ignore: {}", description);
+    log.info("Test ignored: {}", description);
   }
 }
