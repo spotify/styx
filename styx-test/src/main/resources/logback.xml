@@ -7,4 +7,11 @@
       </encoder>
     </appender>
   </root>
+
+  <logger name="org.eclipse.jetty" level="WARN" />
+  <logger name="com.google" level="WARN" />
+  <logger name="com.spotify.apollo" level="WARN" />
+  <logger name="io.grpc" level="WARN" />
+  <logger name="io.netty" level="WARN" />
+  <logger name="io.fabric8" level="WARN" />
 </configuration>
