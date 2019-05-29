@@ -707,6 +707,12 @@
             <exclude><!-- disable exclusion of inner classes--></exclude>
           </excludes>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <properties>
+            <property>
+              <name>listener</name>
+              <value>com.spotify.styx.TestLogger</value>
+            </property>
+          </properties>
         </configuration>
       </plugin>
 
