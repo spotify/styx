@@ -58,16 +58,16 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
         "workflow", "create", "-f", workflowJsonFile.toString(), component1);
     assertThat(workflowCreateResult, is("Workflow " + workflowId1 + " in component " + component1 + " created."));
 
+    // Enable workflow scheduled execution
+    log.info("Enabling workflow: {} {}", component1, workflowId1);
+    var enableResult = cliJson(String.class, "workflow", "enable", component1, workflowId1);
+    assertThat(enableResult, is("Workflow " + workflowId1 + " in component " + component1 + " enabled."));
+
     // Get expected scheduled instance
     var workflowWithState = cliJson(WorkflowWithState.class, "workflow", "show", component1, workflowId1);
     var nextNaturalTrigger = workflowWithState.state().nextNaturalTrigger().get();
     var instance = nextNaturalTrigger.truncatedTo(ChronoUnit.SECONDS).toString();
     log.info("Expected instance: {}", instance);
-
-    // Enable workflow scheduled execution
-    log.info("Enabling workflow: {} {}", component1, workflowId1);
-    var enableResult = cliJson(String.class, "workflow", "enable", component1, workflowId1);
-    assertThat(enableResult, is("Workflow " + workflowId1 + " in component " + component1 + " enabled."));
 
     // Wait for expected instance to successfully complete
     await().atMost(5, MINUTES).until(() -> {
