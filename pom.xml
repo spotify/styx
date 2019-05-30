@@ -766,6 +766,13 @@
           <argLine>-Xmx256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true ${argLine}</argLine>
           <reuseForks>false</reuseForks>
           <forkCount>1</forkCount>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <properties>
+            <property>
+              <name>listener</name>
+              <value>com.spotify.styx.TestLogger</value>
+            </property>
+          </properties>
         </configuration>
       </plugin>
 
