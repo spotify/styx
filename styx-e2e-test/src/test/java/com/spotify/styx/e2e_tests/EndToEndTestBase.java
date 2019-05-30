@@ -190,6 +190,7 @@ public class EndToEndTestBase {
     try {
       if (k8s != null) {
         log.info("Deleting k8s namespace: {}", namespace);
+        k8s.inNamespace(namespace).pods().withGracePeriod(0).delete();
         k8s.namespaces().withName(namespace).delete();
       }
     } catch (Throwable t) {
