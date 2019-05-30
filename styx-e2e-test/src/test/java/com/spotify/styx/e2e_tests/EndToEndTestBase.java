@@ -225,7 +225,9 @@ public class EndToEndTestBase {
     var stdout = new ByteArrayOutputStream();
 
     var spawner = Subprocesses.process().main(CliMain.class)
-        .jvmArgs("-Xmx128m", "-Xms128m")
+        .jvmArgs(
+            "-Xmx128m", "-Xms128m",
+            "-Xverify:none", "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1")
         .args(args)
         .redirectStderr(INHERIT)
         .pipeStdout(stdout);
