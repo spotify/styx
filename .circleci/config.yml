@@ -38,7 +38,7 @@ jobs:
           when: always
           command: |
             mkdir test-logs
-            find . -type f -regex ".*/target/surefire-reports/.*txt" -exec cp {} test-logs/ \;
+            find . -type f -regextype egrep -regex ".*/target/(surefire|failsafe)-reports/.*txt" -exec cp {} test-logs/ \;
       - store_artifacts:
           path: test-logs/
           destination: test-logs
@@ -57,9 +57,6 @@ jobs:
       - store_artifacts:
           path: styx-report/target/site/jacoco-aggregate/
           destination: jacoco-aggregate
-      - store_artifacts:
-          path: styx-e2e-test/target/test-logs/
-          destination: e2e-test-logs
       # Run static analysis after tests
       - run:
           name: Static Analysis
