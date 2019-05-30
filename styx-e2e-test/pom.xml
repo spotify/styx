@@ -91,12 +91,6 @@
       <artifactId>awaitility</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.codehaus.janino</groupId>
-      <artifactId>janino</artifactId>
-      <version>3.0.12</version>
-      <scope>test</scope>
-    </dependency>
 
     <dependency>
       <groupId>com.google.auto.service</groupId>
