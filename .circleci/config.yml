@@ -1,6 +1,7 @@
 version: 2
 jobs:
   test_jdk11_with_coverage:
+    resource_class: xlarge
     working_directory: ~/styx
     docker:
       - image: maven:3.6.0-jdk-11
