@@ -56,6 +56,13 @@ public class KubernetesCleanupTest {
     for (final Namespace namespace : expiredNamespaces) {
       var name = namespace.getMetadata().getName();
       log.info("Deleting expired k8s test namespace: {}", name);
+      // Forcibly delete any lingering pods to allow kubernetes to remove the namespace
+      k8s.inNamespace(name).pods().withGracePeriod(0).delete();
+      // Skip namespace delete request if it is already terminating
+      if (namespace.getStatus().getPhase().equalsIgnoreCase("Terminating")) {
+        log.debug("Namespace already terminating");
+        continue;
+      }
       try {
         k8s.namespaces().delete(namespace);
       } catch (Exception e) {
