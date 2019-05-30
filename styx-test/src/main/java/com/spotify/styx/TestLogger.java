@@ -26,6 +26,7 @@ import org.junit.runner.notification.RunListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@RunListener.ThreadSafe
 public class TestLogger extends RunListener {
 
   private final Logger log;
