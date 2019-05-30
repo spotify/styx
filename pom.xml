@@ -139,6 +139,11 @@
         <version>1.5.3</version>
       </dependency>
       <dependency>
+        <groupId>com.google.auto.service</groupId>
+        <artifactId>auto-service</artifactId>
+        <version>1.0-rc5</version>
+      </dependency>
+      <dependency>
         <groupId>io.norberg</groupId>
         <artifactId>auto-matter</artifactId>
         <version>0.15.3</version>
