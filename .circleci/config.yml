@@ -32,6 +32,15 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B verify -P disable-static-analysis
+      - run:
+          name: Aggregate test logs
+          when: always
+          command: |
+            mkdir test-logs
+            find . -type f -regex ".*/target/surefire-reports/.*txt" -exec cp {} test-logs/ \;
+      - store_artifacts:
+          path: test-logs/
+          destination: test-logs
       - run: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
       - run: |
           mkdir test-reports
