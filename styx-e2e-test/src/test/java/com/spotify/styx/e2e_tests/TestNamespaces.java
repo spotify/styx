@@ -33,7 +33,7 @@ class TestNamespaces {
 
   private static final Logger log = LoggerFactory.getLogger(TestNamespaces.class);
 
-  static final Duration TEST_NAMESPACE_TTL = Duration.ofDays(1);
+  static final Duration TEST_NAMESPACE_TTL = Duration.ofHours(2);
 
   static final String TEST_NAMESPACE_PREFIX = "styx-e2e-test";
 
