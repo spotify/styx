@@ -31,6 +31,7 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -141,7 +142,10 @@ public class StyxSchedulerServiceFixture {
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
     }
-    datastore = localDatastore.getOptions().getService();
+    datastore = localDatastore.getOptions()
+        // Enable retries
+        .toBuilder().setRetrySettings(DatastoreOptions.getDefaultRetrySettings()).build()
+        .getService();
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
     StorageFactory storageFactory = (env, stats) -> storage;
