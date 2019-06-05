@@ -64,13 +64,15 @@ public abstract class VersionedApiTest {
   protected VersionedApiTest(String basePath, Api.Version version, String serviceName) {
     this.basePath = basePath;
     this.version = version;
-    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName));
+    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName))
+        .startTimeoutSeconds(30);
   }
 
   protected VersionedApiTest(String basePath, Api.Version version, String serviceName, StubClient stubClient) {
     this.basePath = basePath;
     this.version = version;
-    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName, stubClient));
+    this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName, stubClient))
+        .startTimeoutSeconds(30);
   }
 
   @Parameterized.Parameters(name = "{0}")

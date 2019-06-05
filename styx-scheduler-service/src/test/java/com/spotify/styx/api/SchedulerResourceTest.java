@@ -138,7 +138,7 @@ public class SchedulerResourceTest {
       environment.routingEngine()
           .registerRoutes(schedulerResource.routes(requestAuthenticator).map(r ->
               r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
-    }, "styx");
+    }, "styx").startTimeoutSeconds(30);
   }
 
   private Response<ByteString> requestAndWaitTriggerWorkflowInstance(TriggerRequest request)
