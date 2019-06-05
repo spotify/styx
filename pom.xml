@@ -737,7 +737,7 @@
           <!-- TODO: remove -D after openjdk fixes the bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 -->
           <argLine>-Xmx256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true ${argLine}</argLine>
           <reuseForks>false</reuseForks>
-          <forkCount>0.75C</forkCount>
+          <forkCount>0.5C</forkCount>
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
