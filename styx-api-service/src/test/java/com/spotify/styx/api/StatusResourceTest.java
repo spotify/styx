@@ -34,11 +34,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
 import com.spotify.styx.model.Event;
@@ -58,12 +58,10 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 public class StatusResourceTest extends VersionedApiTest {
@@ -84,7 +82,6 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
-  private static LocalDatastoreHelper localDatastore;
   private Connection bigtable = setupBigTableMockTable();
 
   private Storage storage;
@@ -93,42 +90,25 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final String AUTH_PRINCIPAL = "bar@example.com";
   private static final ByteString AUTH_PAYLOAD = ByteString.encodeUtf8(
       String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
+
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
+
   private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
 
   public StatusResourceTest(Api.Version version) {
     super(StatusResource.BASE, version);
   }
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   @After
   public void tearDown() throws Exception {
-    localDatastore.reset();
+    datastoreEmulator.reset();
   }
 
   @Override
   protected void init(Environment environment) {
     accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
-    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.datastoreClient(),
         Duration.ZERO));
     final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 

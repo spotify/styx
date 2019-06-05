@@ -45,7 +45,6 @@ import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
@@ -54,6 +53,7 @@ import com.spotify.apollo.StatusType;
 import com.spotify.apollo.test.StubClient;
 import com.spotify.apollo.test.response.ResponseWithDelay;
 import com.spotify.apollo.test.response.Responses;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
@@ -81,13 +81,11 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -101,7 +99,9 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:12345";
 
-  private static LocalDatastoreHelper localDatastore;
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
+
   private Connection bigtable = setupBigTableMockTable();
 
   private Storage storage;
@@ -176,7 +176,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.datastoreClient(),
         Duration.ZERO));
 
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
@@ -186,27 +186,6 @@ public class BackfillResourceTest extends VersionedApiTest {
     environment.routingEngine()
         .registerRoutes(backfillResource.routes(requestAuthenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
-  }
-
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
   }
 
   @Before
@@ -240,7 +219,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @After
   public void tearDown() throws Exception {
-    localDatastore.reset();
+    datastoreEmulator.reset();
   }
 
   @Test

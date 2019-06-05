@@ -36,7 +36,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.spy;
 
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -52,11 +52,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -64,43 +62,23 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class DatastoreStorageTransactionTest {
 
-  private static LocalDatastoreHelper helper;
-  private static CheckedDatastore datastore;
+  private CheckedDatastore datastore;
   private DatastoreStorage storage;
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
-    helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    helper.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
 
   @Before
   public void setUp() throws Exception {
-    datastore = spy(new CheckedDatastore(helper.getOptions().getService()));
+    datastore = spy(new CheckedDatastore(datastoreEmulator.datastoreClient()));
     storage = new DatastoreStorage(datastore);
   }
 
   @After
   public void tearDown() throws Exception {
-    helper.reset();
+    datastoreEmulator.reset();
     executor.shutdownNow();
   }
 

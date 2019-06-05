@@ -24,6 +24,7 @@ jobs:
           command: |
             echo "$GCLOUD_SERVICE_KEY" > credentials.json
             echo "export GOOGLE_APPLICATION_CREDENTIALS=\"$(realpath credentials.json)\"" >> $BASH_ENV
+      - setup_remote_docker
       # Run tests without static analysis
       - run:
           name: Tests

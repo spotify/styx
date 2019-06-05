@@ -49,11 +49,11 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Event;
@@ -82,13 +82,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -100,9 +98,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
           "BAR", "bar")
       .build();
 
-  private static LocalDatastoreHelper localDatastore;
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
 
-  private Datastore datastore = localDatastore.getOptions().getService();
+  private Datastore datastore = datastoreEmulator.datastoreClient();
   private Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
   private AggregateStorage rawStorage;
@@ -173,27 +172,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
   }
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   @Before
   public void setUp() throws Exception {
     storage.storeWorkflow(WORKFLOW);
@@ -201,7 +179,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @After
   public void tearDown() throws Exception {
-    localDatastore.reset();
+    datastoreEmulator.reset();
     serviceHelper.stubClient().clear();
   }
 

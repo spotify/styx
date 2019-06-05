@@ -29,20 +29,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.logging.Level;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -50,47 +49,27 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ShardedCounterSnapshotFactoryTest {
 
   private static final String RESOURCE_ID = "resourceid-1";
-  private static LocalDatastoreHelper helper;
-  private static Datastore datastore;
-  private static Connection connection;
 
-  private static Storage storage;
+  @Mock private Connection connection;
+
+  private Storage storage;
+  private Datastore datastore;
   private ShardedCounterSnapshotFactory counterSnapshotFactory;
 
-  @BeforeClass
-  public static void setUpClass() throws IOException, InterruptedException {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    helper = LocalDatastoreHelper.create(1.0);
-    helper.start();
-    datastore = helper.getOptions().getService();
-    connection = Mockito.mock(Connection.class);
-    storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    connection.close();
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
 
   @Before
   public void setUp() throws IOException {
+    datastore = datastoreEmulator.datastoreClient();
+    storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
     storage.storeResource(Resource.create(RESOURCE_ID, 10L));
   }
 
   @After
   public void tearDown() throws IOException {
-    helper.reset();
+    datastoreEmulator.reset();
   }
 
   @Test

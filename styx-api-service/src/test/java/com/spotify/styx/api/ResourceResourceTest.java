@@ -38,28 +38,27 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.StatusType;
+import com.spotify.styx.DatastoreEmulatorContainer;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.mockito.MockitoAnnotations;
 
 public class ResourceResourceTest extends VersionedApiTest {
 
-  private static LocalDatastoreHelper localDatastore;
+  // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
+  @ClassRule public static final DatastoreEmulatorContainer datastoreEmulator = new DatastoreEmulatorContainer();
 
   private AggregateStorage storage;
 
@@ -73,36 +72,12 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(
-        mock(Connection.class),
-        localDatastore.getOptions().getService(),
-        Duration.ZERO));
+    storage = spy(new AggregateStorage(mock(Connection.class), datastoreEmulator.datastoreClient(), Duration.ZERO));
 
     ResourceResource resourceResource = new ResourceResource(storage);
 
     environment.routingEngine()
         .registerRoutes(resourceResource.routes());
-  }
-
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
   }
 
   @Before
@@ -112,7 +87,7 @@ public class ResourceResourceTest extends VersionedApiTest {
 
   @After
   public void tearDown() throws Exception {
-    localDatastore.reset();
+    datastoreEmulator.reset();
   }
 
   @Test
