@@ -1,6 +1,7 @@
 version: 2
 jobs:
   test_jdk11_with_coverage:
+    resource_class: xlarge
     working_directory: ~/styx
     docker:
       - image: maven:3.6.0-jdk-11
@@ -37,14 +38,20 @@ jobs:
           when: always
           command: |
             mkdir test-logs
-            find . -type f -regex ".*/target/surefire-reports/.*txt" -exec cp {} test-logs/ \;
+            find . -type f -regextype egrep -regex ".*/target/(surefire|failsafe)-reports/.*txt" -exec cp {} test-logs/ \;
       - store_artifacts:
           path: test-logs/
           destination: test-logs
-      - run: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
-      - run: |
-          mkdir test-reports
-          find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
+      - run:
+          name: Submit codecov report
+          when: always
+          command: bash <(curl -s https://codecov.io/bash) -f styx-report/target/site/jacoco-aggregate/jacoco.xml
+      - run:
+          name: Aggregate test reports
+          when: always
+          command: |
+            mkdir test-reports
+            find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} test-reports/ \;
       - store_test_results:
           path: test-reports/
       - store_artifacts:
