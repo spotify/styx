@@ -610,6 +610,7 @@ public class StyxScheduler implements AppInit {
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 
+  @VisibleForTesting
   public static NamespacedKubernetesClient getKubernetesClient(Config config, String id) {
     return getKubernetesClient(config, id, createGkeClient(), DefaultKubernetesClient::new);
   }
