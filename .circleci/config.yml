@@ -33,6 +33,7 @@ jobs:
             JAVA: java -Xmx256m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
+            TESTCONTAINERS_RYUK_DISABLED: true
           command: mvn -B verify -P disable-static-analysis
       - run:
           name: Aggregate test logs
