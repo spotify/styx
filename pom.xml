@@ -306,11 +306,6 @@
 
       <!-- external clients libs -->
       <dependency>
-        <groupId>com.spotify</groupId>
-        <artifactId>docker-client</artifactId>
-        <version>3.5.0</version>
-      </dependency>
-      <dependency>
         <groupId>io.fabric8</groupId>
         <artifactId>kubernetes-client</artifactId>
         <version>4.1.0</version>
