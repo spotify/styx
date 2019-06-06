@@ -20,9 +20,18 @@
 
 package com.spotify.styx.api;
 
+import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
+import static com.github.rholder.retry.WaitStrategies.exponentialWait;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategy;
+import com.github.rholder.retry.WaitStrategy;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.Ancestor;
 import com.google.api.services.cloudresourcemanager.model.GetAncestryRequest;
@@ -31,7 +40,6 @@ import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.cloudresourcemanager.model.Project;
 import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -42,8 +50,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hbase.shaded.com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,10 +90,27 @@ public class Authenticator {
 
   private final Collection<String> allowedAudiences;
 
+  private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = stopAfterDelay(30, SECONDS);
+  private static final WaitStrategy DEFAULT_RETRY_WAIT_STRATEGY = exponentialWait();
+
+  private final WaitStrategy retryWaitStrategy;
+  private final StopStrategy retryStopStrategy;
+
   Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
-      CloudResourceManager cloudResourceManager,
-      Iam iam,
-      AuthenticatorConfiguration configuration) {
+                CloudResourceManager cloudResourceManager,
+                Iam iam,
+                AuthenticatorConfiguration configuration) {
+    this(googleIdTokenVerifier, cloudResourceManager, iam, configuration,
+        DEFAULT_RETRY_WAIT_STRATEGY,
+        DEFAULT_RETRY_STOP_STRATEGY);
+  }
+
+  Authenticator(GoogleIdTokenVerifier googleIdTokenVerifier,
+                CloudResourceManager cloudResourceManager,
+                Iam iam,
+                AuthenticatorConfiguration configuration,
+                WaitStrategy retryWaitStrategy,
+                StopStrategy retryStopStrategy) {
     this.googleIdTokenVerifier =
         Objects.requireNonNull(googleIdTokenVerifier, "googleIdTokenVerifier");
     this.cloudResourceManager =
@@ -92,6 +119,32 @@ public class Authenticator {
     this.domainWhitelist = configuration.domainWhitelist();
     this.resourceWhitelist = configuration.resourceWhitelist();
     this.allowedAudiences = configuration.allowedAudiences();
+    this.retryWaitStrategy = Objects.requireNonNull(retryWaitStrategy, "retryWaitStrategy");
+    this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
+  }
+
+  <T> T executeWithRetries(AbstractGoogleJsonClientRequest<T> request) throws IOException {
+    var retryer = RetryerBuilder.<T>newBuilder()
+        .retryIfException(Authenticator::isRetryableRequestFailure)
+        .withWaitStrategy(retryWaitStrategy)
+        .withStopStrategy(retryStopStrategy)
+        .build();
+    try {
+      return retryer.call(request::execute);
+    } catch (RetryException e) {
+      throw new IOException(e);
+    } catch (ExecutionException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
+      throw new IOException(e);
+    }
+  }
+
+  private static boolean isRetryableRequestFailure(Throwable t) {
+    if (t instanceof GoogleJsonResponseException) {
+      var statusCode = ((GoogleJsonResponseException) t).getStatusCode();
+      return statusCode == 429 || statusCode / 100 == 5;
+    }
+    return true;
   }
 
   void cacheResources() throws IOException {
@@ -99,7 +152,7 @@ public class Authenticator {
 
     ListProjectsResponse response;
     do {
-      response = request.execute();
+      response = executeWithRetries(request);
       if (response.getProjects() == null) {
         continue;
       }
@@ -115,7 +168,9 @@ public class Authenticator {
 
   /**
    * Authenticate and authorize a Google ID token string from an incoming Styx API request.
+   *
    * @param token The Google ID token string.
+   *
    * @return A {@link GoogleIdToken} instance if the token was valid and the user is authorized.
    */
   GoogleIdToken authenticate(String token) {
@@ -245,9 +300,9 @@ public class Authenticator {
   }
 
   private String getProjectIdOfServiceAccount(String email) throws IOException {
+    var request = iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + email);
     try {
-      final ServiceAccount serviceAccount =
-          iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + email).execute();
+      var serviceAccount = executeWithRetries(request);
       return serviceAccount.getProjectId();
     } catch (GoogleJsonResponseException e) {
       if (e.getStatusCode() == 404) {
@@ -262,16 +317,19 @@ public class Authenticator {
 
   private boolean resolveProjectAccess(String projectId) throws IOException {
     final GetAncestryResponse ancestry;
+    var request = cloudResourceManager.projects().getAncestry(projectId, new GetAncestryRequest());
     try {
-      ancestry = cloudResourceManager.projects().getAncestry(projectId, new GetAncestryRequest()).execute();
+      ancestry = executeWithRetries(request);
     } catch (GoogleJsonResponseException e) {
       if (e.getStatusCode() == 404) {
         logger.debug("Project {} doesn't exist", projectId, e);
         return false;
       }
 
-      // TODO: handle 403 quota exhausted?
       logger.info("Cannot get project with id {}", projectId, e);
+      return false;
+    }
+    if (ancestry.getAncestor() == null) {
       return false;
     }
     return resolveAccess(ancestry.getAncestor());
