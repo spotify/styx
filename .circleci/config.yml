@@ -8,17 +8,28 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: v3-deps-{{ checksum "pom.xml" }}
+          key: v4-deps-{{ checksum "pom.xml" }}-{{ checksum "gcloud-sdk-url.txt" }}
       - run:
-          name: Cache Dependencies
+          name: Download Maven Dependencies
           environment:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: mvn -B dependency:go-offline compile test-compile -P disable-static-analysis
+      - run:
+          name: Install Google Cloud SDK
+          command: |
+            if [[ ! -d google-cloud-sdk ]]; then
+              wget -i gcloud-sdk-url.txt
+              tar xzf google-cloud-sdk-*.tar.gz
+              google-cloud-sdk/install.sh -q
+              google-cloud-sdk/bin/gcloud components install beta cloud-datastore-emulator -q
+              google-cloud-sdk/bin/gcloud config set project testing
+            fi
       - save_cache:
-          key: v3-deps-{{ checksum "pom.xml" }}
+          key: v4-deps-{{ checksum "pom.xml" }}-{{ checksum "gcloud-sdk-url.txt" }}
           paths:
             - ~/.m2
+            - ~/google-cloud-sdk
       - run:
           name: "Set up GCP credentials"
           command: |
@@ -32,7 +43,9 @@ jobs:
             JAVA: java -Xmx256m
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
-          command: mvn -B verify -P disable-static-analysis
+          command: |
+            source google-cloud-sdk/path.bash.inc
+            mvn -B verify -P disable-static-analysis
       - run:
           name: Aggregate test logs
           when: always
