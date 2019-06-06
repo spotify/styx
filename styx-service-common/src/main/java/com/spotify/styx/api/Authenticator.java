@@ -144,7 +144,7 @@ public class Authenticator {
       var statusCode = ((GoogleJsonResponseException) t).getStatusCode();
       return statusCode == 429 || statusCode / 100 == 5;
     }
-    return true;
+    return t instanceof IOException;
   }
 
   void cacheResources() throws IOException {
