@@ -28,6 +28,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CREATED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_LAST_MODIFIED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
@@ -234,7 +235,8 @@ public class DatastoreStorageTransaction implements StorageTransaction {
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
         .set(PROPERTY_REVERSE, backfill.reverse())
-        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()));
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()))
+        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified()));
 
     backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
         .newBuilder(x).setExcludeFromIndexes(true).build()));

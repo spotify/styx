@@ -29,6 +29,7 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CREATED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_LAST_MODIFIED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_START;
@@ -716,7 +717,8 @@ public class DatastoreStorageTest {
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
-        .created(currentTime);
+        .created(currentTime)
+        .lastModified(currentTime);
 
     if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
@@ -746,6 +748,7 @@ public class DatastoreStorageTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final Key key = DatastoreStorage.backfillKey(datastore.newKeyFactory(), backfill.id());
@@ -759,7 +762,8 @@ public class DatastoreStorageTest {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
-        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()));
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()))
+        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified()));
 
     datastore.put(builder.build());
 
@@ -778,6 +782,7 @@ public class DatastoreStorageTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     storage.storeBackfill(backfill);

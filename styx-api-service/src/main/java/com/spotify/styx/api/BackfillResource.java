@@ -405,7 +405,8 @@ public final class BackfillResource implements Closeable {
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
         .halted(false)
-        .created(currentTimer.getCurrentTime());
+        .created(currentTimer.getCurrentTime())
+        .lastModified(currentTimer.getCurrentTime());
 
     final Backfill backfill = builder.build();
 
@@ -430,6 +431,7 @@ public final class BackfillResource implements Closeable {
         final BackfillBuilder backfillBuilder = oldBackfill.builder();
         backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
         backfillInput.description().ifPresent(backfillBuilder::description);
+        backfillBuilder.lastModified(currentTimer.getCurrentTime());
         return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {

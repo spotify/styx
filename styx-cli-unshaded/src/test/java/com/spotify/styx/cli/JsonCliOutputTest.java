@@ -65,6 +65,7 @@ public class JsonCliOutputTest {
       .schedule(Schedule.DAYS)
       .reverse(true)
       .created(Instant.parse("2019-01-01T00:00:00Z"))
+      .lastModified(Instant.parse("2019-06-01T00:00:00Z"))
       .build();
 
   private static final String EXPECTED_OUTPUT =
@@ -82,7 +83,8 @@ public class JsonCliOutputTest {
           + "\"halted\":false,"
           + "\"reverse\":true,"
           + "\"trigger_parameters\":null,"
-          + "\"created\":\"2019-01-01T00:00:00Z\"}";
+          + "\"created\":\"2019-01-01T00:00:00Z\","
+          + "\"last_modified\":\"2019-06-01T00:00:00Z\"}";
 
   private static final String EXPECTED_OUTPUT_WITH_STATUS = "{\"backfill\":"
                                                             + EXPECTED_OUTPUT

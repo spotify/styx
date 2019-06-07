@@ -848,7 +848,8 @@ public class DatastoreStorage implements Closeable {
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
         .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE))
-        .created(timestampToInstant(entity.getTimestamp(PROPERTY_CREATED)));
+        .created(timestampToInstant(entity.getTimestamp(PROPERTY_CREATED)))
+        .lastModified(timestampToInstant(entity.getTimestamp(PROPERTY_LAST_MODIFIED)));
 
     if (entity.contains(PROPERTY_DESCRIPTION)) {
       builder.description(entity.getString(PROPERTY_DESCRIPTION));

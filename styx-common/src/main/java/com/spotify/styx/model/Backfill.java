@@ -53,6 +53,8 @@ public interface Backfill {
 
   Instant created();
 
+  Instant lastModified();
+
   BackfillBuilder builder();
 
   static BackfillBuilder newBuilder() {
