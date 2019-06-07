@@ -24,7 +24,6 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.cloud.testing.BaseEmulatorHelper;
-import java.io.IOException;
 import java.util.logging.Level;
 import javaslang.control.Try;
 import org.junit.rules.ExternalResource;
@@ -70,25 +69,19 @@ public class DatastoreEmulator extends ExternalResource {
   }
 
   public void reset() {
-    try {
-      helper.reset();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Try.run(helper::reset).get();
   }
 
   private void assertGcloudDatastoreEmulator() {
-    try {
+    var runnerClass = Try.of(() -> {
       var activeRunnerField = BaseEmulatorHelper.class.getDeclaredField("activeRunner");
       activeRunnerField.setAccessible(true);
       var activeRunner = activeRunnerField.get(helper);
-      var runnerClass = activeRunner.getClass();
-      if (!runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$GcloudEmulatorRunner")) {
-        throw new AssertionError("Not using gcloud sdk datastore emulator, please run: "
-                                 + "gcloud components install beta cloud-datastore-emulator");
-      }
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      throw new AssertionError(e);
+      return activeRunner.getClass();
+    }).get();
+    if (!runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$GcloudEmulatorRunner")) {
+      throw new AssertionError("Not using gcloud sdk datastore emulator, please run: "
+                               + "gcloud components install beta cloud-datastore-emulator");
     }
   }
 }
