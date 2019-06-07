@@ -24,6 +24,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CREATED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
@@ -232,7 +233,8 @@ public class DatastoreStorageTransaction implements StorageTransaction {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
-        .set(PROPERTY_REVERSE, backfill.reverse());
+        .set(PROPERTY_REVERSE, backfill.reverse())
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()));
 
     backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
         .newBuilder(x).setExcludeFromIndexes(true).build()));

@@ -64,22 +64,25 @@ public class JsonCliOutputTest {
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.DAYS)
       .reverse(true)
+      .created(Instant.parse("2019-01-01T00:00:00Z"))
       .build();
 
-  private static final String EXPECTED_OUTPUT = "{\"id\":\"backfill-2\","
-                                               + "\"start\":\"2017-01-01T00:00:00Z\","
-                                               + "\"end\":\"2017-01-02T00:00:00Z\","
-                                               + "\"workflow_id\":"
-                                               + "{\"component_id\":\"component\","
-                                               + "\"id\":\"workflow2\"},"
-                                               + "\"concurrency\":2,"
-                                               + "\"description\":\"Description\","
-                                               + "\"next_trigger\":\"2017-01-01T00:00:00Z\","
-                                               + "\"schedule\":\"days\","
-                                               + "\"all_triggered\":false,"
-                                               + "\"halted\":false,"
-                                               + "\"reverse\":true,"
-                                               + "\"trigger_parameters\":null}";
+  private static final String EXPECTED_OUTPUT =
+      "{\"id\":\"backfill-2\","
+          + "\"start\":\"2017-01-01T00:00:00Z\","
+          + "\"end\":\"2017-01-02T00:00:00Z\","
+          + "\"workflow_id\":"
+          + "{\"component_id\":\"component\","
+          + "\"id\":\"workflow2\"},"
+          + "\"concurrency\":2,"
+          + "\"description\":\"Description\","
+          + "\"next_trigger\":\"2017-01-01T00:00:00Z\","
+          + "\"schedule\":\"days\","
+          + "\"all_triggered\":false,"
+          + "\"halted\":false,"
+          + "\"reverse\":true,"
+          + "\"trigger_parameters\":null,"
+          + "\"created\":\"2019-01-01T00:00:00Z\"}";
 
   private static final String EXPECTED_OUTPUT_WITH_STATUS = "{\"backfill\":"
                                                             + EXPECTED_OUTPUT

@@ -58,6 +58,7 @@ public class PlainCliOutputTest {
       .schedule(Schedule.DAYS)
       .reverse(false)
       .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
+      .created(Instant.parse("2019-01-01T00:00:00Z"))
       .build();
   private static final String EXPECTED_OUTPUT =
       "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"

@@ -150,6 +150,8 @@ public class DatastoreStorage implements Closeable {
   public static final String PROPERTY_DESCRIPTION = "description";
   public static final String PROPERTY_TRIGGER_PARAMETERS = "triggerParameters";
   public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
+  public static final String PROPERTY_CREATED = "created";
+  public static final String PROPERTY_LAST_MODIFIED = "lastModified";
 
   public static final String PROPERTY_STATE = "state";
   public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
@@ -845,7 +847,8 @@ public class DatastoreStorage implements Closeable {
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
-        .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE));
+        .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE))
+        .created(timestampToInstant(entity.getTimestamp(PROPERTY_CREATED)));
 
     if (entity.contains(PROPERTY_DESCRIPTION)) {
       builder.description(entity.getString(PROPERTY_DESCRIPTION));

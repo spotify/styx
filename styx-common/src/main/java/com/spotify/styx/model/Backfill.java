@@ -51,6 +51,8 @@ public interface Backfill {
 
   Optional<TriggerParameters> triggerParameters();
 
+  Instant created();
+
   BackfillBuilder builder();
 
   static BackfillBuilder newBuilder() {

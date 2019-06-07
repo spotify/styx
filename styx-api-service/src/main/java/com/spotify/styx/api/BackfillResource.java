@@ -30,6 +30,7 @@ import static com.spotify.styx.util.TimeUtil.instantsInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
+import com.cronutils.utils.VisibleForTesting;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
@@ -105,11 +106,22 @@ public final class BackfillResource implements Closeable {
 
   private final ForkJoinPool forkJoinPool;
   private final WorkflowActionAuthorizer workflowActionAuthorizer;
+  private final CurrentTimer currentTimer;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
                           WorkflowValidator workflowValidator,
                           Time time,
                           WorkflowActionAuthorizer workflowActionAuthorizer) {
+    this(schedulerServiceBaseUrl, storage, workflowValidator, time, workflowActionAuthorizer,
+        Instant::now);
+  }
+
+  @VisibleForTesting
+  BackfillResource(String schedulerServiceBaseUrl, Storage storage,
+                                  WorkflowValidator workflowValidator,
+                                  Time time,
+                                  WorkflowActionAuthorizer workflowActionAuthorizer,
+                                  CurrentTimer currentTimer) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
@@ -117,6 +129,7 @@ public final class BackfillResource implements Closeable {
     this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
         "workflowActionAuthorizer");
     this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
+    this.currentTimer = currentTimer;
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator authenticator) {
@@ -391,7 +404,8 @@ public final class BackfillResource implements Closeable {
         .description(input.description())
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
-        .halted(false);
+        .halted(false)
+        .created(currentTimer.getCurrentTime());
 
     final Backfill backfill = builder.build();
 
@@ -494,5 +508,10 @@ public final class BackfillResource implements Closeable {
 
     return ReplayEvents.getBackfillRunStateData(wfi, storage, backfill.id())
         .orElse(RunStateData.create(wfi, UNKNOWN, StateData.zero()));
+  }
+
+  @FunctionalInterface
+  interface CurrentTimer{
+    Instant getCurrentTime();
   }
 }

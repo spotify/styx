@@ -154,6 +154,7 @@ public class InMemStorageTest {
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
+        .created(Instant.parse("2019-01-01T00:00:00Z"))
         .build();
 
     storage.storeBackfill(backfill);

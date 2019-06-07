@@ -110,6 +110,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
       .concurrency(2)
       .nextTrigger(Instant.parse("2015-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
+      .created(Instant.parse("2019-01-01T00:00:00Z"))
       .build();
 
   private static RunSpec naturalRunSpec(String executionId, String imageName, List<String> args,

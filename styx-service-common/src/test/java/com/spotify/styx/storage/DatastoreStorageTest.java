@@ -26,6 +26,7 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
+import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CREATED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
@@ -151,6 +152,8 @@ public class DatastoreStorageTest {
 
   private static final Resource RESOURCE1 = Resource.create("resource1", 1L);
   private static final Resource RESOURCE2 = Resource.create("resource2", 2L);
+
+  private static final Instant currentTime = Instant.parse("2019-01-01T00:00:00Z");
 
   static final Instant TIMESTAMP = Instant.parse("2017-01-01T00:00:00Z");
 
@@ -712,7 +715,8 @@ public class DatastoreStorageTest {
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(DAYS);
+        .schedule(DAYS)
+        .created(currentTime);
 
     if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
@@ -740,7 +744,9 @@ public class DatastoreStorageTest {
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(DAYS).build();
+        .schedule(DAYS)
+        .created(currentTime)
+        .build();
 
     final Key key = DatastoreStorage.backfillKey(datastore.newKeyFactory(), backfill.id());
     Entity.Builder builder = Entity.newBuilder(key)
@@ -752,7 +758,8 @@ public class DatastoreStorageTest {
         .set(PROPERTY_SCHEDULE, backfill.schedule().toString())
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
-        .set(PROPERTY_HALTED, backfill.halted());
+        .set(PROPERTY_HALTED, backfill.halted())
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()));
 
     datastore.put(builder.build());
 
@@ -770,6 +777,7 @@ public class DatastoreStorageTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(DAYS)
+        .created(currentTime)
         .build();
 
     storage.storeBackfill(backfill);

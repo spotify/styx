@@ -95,6 +95,7 @@ public class PrettyCliOutputTest {
         .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(Instant.parse("2019-01-01T00:00:00Z"))
         .build();
   }
 
