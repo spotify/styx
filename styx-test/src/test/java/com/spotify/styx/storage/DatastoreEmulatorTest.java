@@ -28,14 +28,22 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import org.hamcrest.Matchers;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.contrib.java.lang.system.EnvironmentVariables;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreEmulatorTest {
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
+  @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
+
+  @Rule public final ExpectedException exception = ExpectedException.none();
 
   private Datastore[] clients() {
     return new Datastore[]{
@@ -55,5 +63,14 @@ public class DatastoreEmulatorTest {
     datastoreEmulator.reset();
     var readEntityAfterReset = client.get(key);
     assertThat(readEntityAfterReset, is(nullValue()));
+  }
+
+  @Test
+  public void shouldFailIfNotGcloudEmulator() {
+    environmentVariables.clear("PATH");
+    var emulator = new DatastoreEmulator();
+    exception.expect(AssertionError.class);
+    exception.expectMessage(Matchers.startsWith("Not using gcloud sdk datastore emulator"));
+    emulator.before();
   }
 }

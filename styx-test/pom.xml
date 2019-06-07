@@ -50,5 +50,9 @@
       <groupId>pl.pragmatists</groupId>
       <artifactId>JUnitParams</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
+    </dependency>
   </dependencies>
 </project>
