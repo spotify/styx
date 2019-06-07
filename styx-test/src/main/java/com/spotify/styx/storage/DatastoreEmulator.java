@@ -25,8 +25,8 @@ import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.cloud.testing.BaseEmulatorHelper;
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
+import javaslang.control.Try;
 import org.junit.rules.ExternalResource;
 
 public class DatastoreEmulator extends ExternalResource {
@@ -49,21 +49,13 @@ public class DatastoreEmulator extends ExternalResource {
 
   @Override
   protected void before() {
-    try {
-      helper.start();
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException(e);
-    }
+    Try.run(helper::start).get();
     assertGcloudDatastoreEmulator();
   }
 
   @Override
   protected void after() {
-    try {
-      helper.stop();
-    } catch (IOException | InterruptedException | TimeoutException e) {
-      throw new RuntimeException(e);
-    }
+    Try.run(helper::stop).get();
   }
 
   public DatastoreOptions options() {
