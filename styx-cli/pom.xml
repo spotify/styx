@@ -14,7 +14,6 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-cli-unshaded</artifactId>
-      <version>${project.version}</version>
     </dependency>
   </dependencies>
 

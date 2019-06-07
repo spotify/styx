@@ -14,7 +14,6 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-service-common</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <dependency>
@@ -70,7 +69,6 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

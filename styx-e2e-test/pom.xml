@@ -14,17 +14,14 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-scheduler-service</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-api-service</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-cli-unshaded</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.spotify</groupId>
@@ -63,7 +60,6 @@
     <dependency>
       <groupId>com.spotify</groupId>
       <artifactId>styx-test</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
