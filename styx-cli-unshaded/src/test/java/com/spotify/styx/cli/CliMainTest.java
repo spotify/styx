@@ -215,6 +215,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -259,6 +260,7 @@ public class CliMainTest {
         .schedule(Schedule.DAYS)
         .triggerParameters(expectedTriggerParameters)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -310,6 +312,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -347,6 +350,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -384,6 +388,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -420,6 +425,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
@@ -448,6 +454,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
@@ -476,6 +483,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     when(client.backfillEditConcurrency(backfillId, 1))
@@ -504,6 +512,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
@@ -535,6 +544,7 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(

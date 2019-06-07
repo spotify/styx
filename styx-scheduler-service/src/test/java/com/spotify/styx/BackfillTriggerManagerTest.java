@@ -106,6 +106,7 @@ public class BackfillTriggerManagerTest {
       .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
       .created(currentTime)
+      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -119,6 +120,7 @@ public class BackfillTriggerManagerTest {
       .nextTrigger(Instant.parse("2016-12-05T21:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
       .created(currentTime)
+      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_3 = Backfill.newBuilder()
@@ -131,6 +133,7 @@ public class BackfillTriggerManagerTest {
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
       .created(currentTime)
+      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_4 = Backfill.newBuilder()
@@ -144,6 +147,7 @@ public class BackfillTriggerManagerTest {
       .nextTrigger(Instant.parse("2016-12-02T02:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
       .created(currentTime)
+      .lastModified(currentTime)
       .build();
 
   private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
