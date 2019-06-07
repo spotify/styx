@@ -31,8 +31,6 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.DatastoreOptions;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -57,6 +55,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.StorageFactory;
@@ -75,7 +74,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.IntPredicate;
-import java.util.logging.Level;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
@@ -84,6 +82,7 @@ import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +95,8 @@ public class StyxSchedulerServiceFixture {
 
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
 
-  private LocalDatastoreHelper localDatastore;
+  @Rule public final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
   private Time time = () -> now;
 
   private Datastore datastore;
@@ -131,21 +131,7 @@ public class StyxSchedulerServiceFixture {
   @Before
   public void setUp() throws Exception {
 
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    try {
-      localDatastore.start();
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-    datastore = localDatastore.getOptions()
-        // Enable retries
-        .toBuilder().setRetrySettings(DatastoreOptions.getDefaultRetrySettings()).build()
-        .getService();
+    datastore = datastoreEmulator.client();
     storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
 
     StorageFactory storageFactory = (env, stats) -> storage;
@@ -182,14 +168,6 @@ public class StyxSchedulerServiceFixture {
   @After
   public void tearDown() throws Exception {
     serviceHelper.close();
-
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
   }
 
   void injectEvent(Event event) throws IsClosedException, InterruptedException, ExecutionException, TimeoutException {

@@ -77,7 +77,6 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
@@ -116,13 +115,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import java.util.logging.Level;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -226,7 +223,8 @@ public class DatastoreStorageTest {
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
       WORKFLOW_CONFIGURATION);
 
-  private static LocalDatastoreHelper helper;
+  @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
   private DatastoreStorage storage;
   private CheckedDatastore datastore;
   private Datastore datastoreClient;
@@ -238,32 +236,10 @@ public class DatastoreStorageTest {
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    // TODO: the datastore emulator behavior wrt conflicts etc differs from the real datastore
-    helper = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    helper.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    datastoreClient = helper.getOptions().toBuilder()
+    datastoreClient = datastoreEmulator.options().toBuilder()
         .setRetrySettings(RETRY_SETTINGS)
         .build()
         .getService();
@@ -274,7 +250,7 @@ public class DatastoreStorageTest {
 
   @After
   public void tearDown() throws Exception {
-    helper.reset();
+    datastoreEmulator.reset();
     storage.close();
   }
 
@@ -522,9 +498,8 @@ public class DatastoreStorageTest {
   }
 
   private List<Entity> entitiesOfKind(String kind) {
-    Datastore datastore = helper.getOptions().getService();
     EntityQuery query = Query.newEntityQueryBuilder().setKind(kind).build();
-    QueryResults<Entity> keys = datastore.run(query);
+    QueryResults<Entity> keys = datastoreClient.run(query);
     List<Entity> entities = new ArrayList<>();
     while (keys.hasNext()) {
       entities.add(keys.next());
@@ -556,7 +531,7 @@ public class DatastoreStorageTest {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
         .build();
-    helper.getOptions().getService().put(config);
+    datastoreClient.put(config);
 
     assertThat(storage.config().globalDockerRunnerId(), is("foobar"));
   }
@@ -566,7 +541,7 @@ public class DatastoreStorageTest {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             List.of()).build();
-    helper.getOptions().getService().put(config);
+    datastoreClient.put(config);
     assertThat(storage.config().clientBlacklist(), is(empty()));
   }
 
@@ -576,7 +551,7 @@ public class DatastoreStorageTest {
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
             List.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
-    helper.getOptions().getService().put(config);
+    datastoreClient.put(config);
     List<String> blacklist = storage.config().clientBlacklist();
     assertThat(blacklist.size(), is(3));
     assertThat(blacklist.get(0), is("v1"));

@@ -29,18 +29,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.datastore.Datastore;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
+import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.logging.Level;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -49,8 +49,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterSnapshotFactoryTest {
 
+  @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
   private static final String RESOURCE_ID = "resourceid-1";
-  private static LocalDatastoreHelper helper;
   private static Datastore datastore;
   private static Connection connection;
 
@@ -58,14 +59,8 @@ public class ShardedCounterSnapshotFactoryTest {
   private ShardedCounterSnapshotFactory counterSnapshotFactory;
 
   @BeforeClass
-  public static void setUpClass() throws IOException, InterruptedException {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    helper = LocalDatastoreHelper.create(1.0);
-    helper.start();
-    datastore = helper.getOptions().getService();
+  public static void setUpClass() {
+    datastore = datastoreEmulator.client();
     connection = Mockito.mock(Connection.class);
     storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
   }
@@ -73,13 +68,6 @@ public class ShardedCounterSnapshotFactoryTest {
   @AfterClass
   public static void tearDownClass() throws Exception {
     connection.close();
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
   }
 
   @Before
@@ -89,8 +77,8 @@ public class ShardedCounterSnapshotFactoryTest {
   }
 
   @After
-  public void tearDown() throws IOException {
-    helper.reset();
+  public void tearDown() {
+    datastoreEmulator.reset();
   }
 
   @Test
