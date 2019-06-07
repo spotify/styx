@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.isA;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.ListProjectsResponse;
 import com.google.api.services.iam.v1.Iam;
+import com.google.common.base.Throwables;
 import com.spotify.styx.api.AuthenticatorFactory.DefaultAuthenticatorFactory;
 import java.io.IOException;
 import org.junit.Before;
@@ -108,12 +110,15 @@ public class AuthenticatorFactoryTest {
   @Test
   public void shouldFailToCreateAuthenticator() throws IOException {
     final AuthenticatorConfiguration configuration = AuthenticatorConfiguration.builder().service("test").build();
-    final IOException exception = new IOException();
+    final RuntimeException exception = new RuntimeException();
     when(projectsList.execute()).thenThrow(exception);
-    expectedException.expect(RuntimeException.class);
-    expectedException.expectCause(is(exception));
-
-    authenticatorFactory.apply(configuration);
+    try {
+      authenticatorFactory.apply(configuration);
+      fail();
+    } catch (Exception e) {
+      var rootCause = Throwables.getRootCause(e);
+      assertThat(rootCause, is(exception));
+    }
   }
 
   @Test

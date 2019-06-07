@@ -25,17 +25,24 @@ import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.StopStrategy;
+import com.github.rholder.retry.WaitStrategies;
+import com.github.rholder.retry.WaitStrategy;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -113,6 +120,14 @@ public class AuthenticatorTest {
           new HttpResponseException.Builder(404, "Not found", new HttpHeaders()),
           new GoogleJsonError().set("status", "NOT_FOUND"));
 
+  private static final GoogleJsonResponseException QUOTA_EXHAUSTED =
+      new GoogleJsonResponseException(
+          new HttpResponseException.Builder(429, "per-user search quota temporarily exhausted", new HttpHeaders()),
+          new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
+
+  private static final WaitStrategy RETRY_WAIT_STRATEGY = WaitStrategies.noWait();
+  private static final StopStrategy RETRY_STOP_STRATEGY = StopStrategies.stopAfterAttempt(3);
+
   private Authenticator validator;
 
   @Rule public final ExpectedException expectedException = ExpectedException.none();
@@ -134,6 +149,8 @@ public class AuthenticatorTest {
     when(verifier.verify(anyString())).thenReturn(idToken);
 
     when(cloudResourceManager.projects().getAncestry(any(), any())).thenReturn(projectsGetAncestry);
+    when(iam.projects().serviceAccounts().get(any())).thenReturn(serviceAccountsGet);
+    verify(iam).projects();
 
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     mockAncestryResponse(BAR_PROJECT, resourceId(BAR_PROJECT), FOLDER_RESOURCE);
@@ -152,7 +169,8 @@ public class AuthenticatorTest {
         .thenReturn(listProjectsResponse1)
         .thenReturn(listProjectsResponse2);
 
-    validator = new Authenticator(verifier, cloudResourceManager, iam, CONFIGURATION);
+    validator = new Authenticator(verifier, cloudResourceManager, iam, CONFIGURATION,
+        RETRY_WAIT_STRATEGY, RETRY_STOP_STRATEGY);
     validator.cacheResources();
   }
 
@@ -171,10 +189,26 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailToLoadCache() throws IOException {
+    reset(projectsList);
     final IOException exception = new IOException();
-    when(projectsList.execute()).thenThrow(exception);
-    expectedException.expect(is(exception));
+    doThrow(exception).when(projectsList).execute();
+    try {
+      validator.cacheResources();
+      fail("Expected exception");
+    } catch (IOException e) {
+      assertThat(e.getCause().getCause(), is(exception));
+    }
+    verify(projectsList, times(3)).execute();
+  }
+
+  @Test
+  public void shouldRetryToLoadCacheOnQuotaExhausted() throws IOException {
+    reset(projectsList);
+    when(projectsList.execute())
+        .thenThrow(QUOTA_EXHAUSTED)
+        .thenReturn(new ListProjectsResponse().setProjects(PROJECTS));
     validator.cacheResources();
+    verify(projectsList, times(2)).execute();
   }
 
   @Test
@@ -254,35 +288,35 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailToGetProject() throws IOException {
-    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(new IOException());
+    doThrow(new IOException()).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
     verifyZeroInteractions(iam);
+    verify(projectsGetAncestry, times(3)).execute();
   }
 
   @Test
   public void shouldFailForNonExistProject() throws IOException {
-    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(NOT_FOUND);
+    doThrow(NOT_FOUND).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
+    verify(projectsGetAncestry).execute();
     verifyZeroInteractions(iam);
   }
 
   @Test
   public void shouldFailIfNoPermissionGettingProject() throws IOException {
-    when(cloudResourceManager.projects().getAncestry(any(), any())).thenThrow(PERMISSION_DENIED);
+    doThrow(PERMISSION_DENIED).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(cloudResourceManager.projects()).getAncestry(eq("barfoo"), any());
     verifyZeroInteractions(iam);
+    verify(projectsGetAncestry).execute();
   }
 
   @Test
@@ -306,7 +340,6 @@ public class AuthenticatorTest {
   public void shouldGetProjectFromIAMAndThenHitProjectCache() throws IOException {
     mockAncestryResponse(FOO_PROJECT, resourceId(FOO_PROJECT), ORGANIZATION_RESOURCE);
     when(serviceAccountsGet.execute()).thenReturn(SERVICE_ACCOUNT);
-    when(iam.projects().serviceAccounts().get(anyString())).thenReturn(serviceAccountsGet);
     idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
@@ -316,31 +349,31 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailToGetProjectFromIAM() throws IOException {
-    when(iam.projects().serviceAccounts().get(anyString())).thenThrow(new IOException());
+    doThrow(new IOException()).when(serviceAccountsGet).execute();
     idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(iam.projects().serviceAccounts()).get(anyString());
+    verify(serviceAccountsGet, times(3)).execute();
     verifyZeroInteractions(projectsGetAncestry);
   }
 
   @Test
   public void shouldFailForNonExistServiceAccount() throws IOException {
-    when(iam.projects().serviceAccounts().get(anyString())).thenThrow(NOT_FOUND);
+    doThrow(NOT_FOUND).when(serviceAccountsGet).execute();
     idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(iam.projects().serviceAccounts()).get(anyString());
+    verify(serviceAccountsGet).execute();
     verifyZeroInteractions(projectsGetAncestry);
   }
 
   @Test
   public void shouldFailIfNoPermissionGettingServiceAccountFromIAM() throws IOException {
-    when(iam.projects().serviceAccounts().get(anyString())).thenThrow(PERMISSION_DENIED);
+    doThrow(PERMISSION_DENIED).when(serviceAccountsGet).execute();
     idTokenPayload.setEmail("foo@developer.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verify(iam.projects().serviceAccounts()).get(anyString());
+    verify(serviceAccountsGet).execute();
     verifyZeroInteractions(projectsGetAncestry);
   }
 
