@@ -20,14 +20,21 @@
 
 package com.spotify.styx.e2e_tests;
 
+import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
+import static com.github.rholder.retry.WaitStrategies.exponentialWait;
 import static com.spotify.styx.e2e_tests.EndToEndTestBase.SCHEDULER_SERVICE_NAME;
 import static com.spotify.styx.e2e_tests.TestNamespaces.isExpiredTestNamespace;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.RetryerBuilder;
 import com.spotify.styx.StyxScheduler;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.api.model.Namespace;
 import java.time.Instant;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +56,7 @@ public class KubernetesCleanupTest {
     var schedulerConfig = ConfigFactory.load(SCHEDULER_SERVICE_NAME);
     var k8s = StyxScheduler.getKubernetesClient(schedulerConfig, "default");
 
-    var expiredNamespaces = k8s.namespaces().list().getItems().stream()
+    var expiredNamespaces = retry(() -> k8s.namespaces().list()).getItems().stream()
         .filter(ns -> isExpiredTestNamespace(ns.getMetadata().getName(), NOW))
         .collect(toList());
 
@@ -57,17 +64,30 @@ public class KubernetesCleanupTest {
       var name = namespace.getMetadata().getName();
       log.info("Deleting expired k8s test namespace: {}", name);
       // Forcibly delete any lingering pods to allow kubernetes to remove the namespace
-      k8s.inNamespace(name).pods().withGracePeriod(0).delete();
+      retry(() -> k8s.inNamespace(name).pods().withGracePeriod(0).delete());
       // Skip namespace delete request if it is already terminating
       if (namespace.getStatus().getPhase().equalsIgnoreCase("Terminating")) {
         log.debug("Namespace already terminating");
         continue;
       }
       try {
-        k8s.namespaces().delete(namespace);
+        retry(() -> k8s.namespaces().delete(namespace));
       } catch (Exception e) {
         log.error("Failed to delete expired test namespace: {}", name, e);
       }
+    }
+  }
+
+  private static <T> T retry(Callable<T> callable) {
+    var retryer = RetryerBuilder.<T>newBuilder()
+        .retryIfException()
+        .withWaitStrategy(exponentialWait())
+        .withStopStrategy(stopAfterDelay(30, SECONDS))
+        .build();
+    try {
+      return retryer.call(callable);
+    } catch (ExecutionException | RetryException e) {
+      throw new RuntimeException(e);
     }
   }
 }
