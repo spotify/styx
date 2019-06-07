@@ -22,16 +22,14 @@ package com.spotify.styx.api;
 
 import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
 import static com.github.rholder.retry.WaitStrategies.exponentialWait;
+import static com.spotify.styx.util.GoogleApiClientUtil.executeWithRetries;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.github.rholder.retry.RetryException;
-import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategy;
 import com.github.rholder.retry.WaitStrategy;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.Ancestor;
 import com.google.api.services.cloudresourcemanager.model.GetAncestryRequest;
@@ -50,10 +48,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.hadoop.hbase.shaded.com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,36 +119,12 @@ public class Authenticator {
     this.retryStopStrategy = Objects.requireNonNull(retryStopStrategy, "retryStopStrategy");
   }
 
-  <T> T executeWithRetries(AbstractGoogleJsonClientRequest<T> request) throws IOException {
-    var retryer = RetryerBuilder.<T>newBuilder()
-        .retryIfException(Authenticator::isRetryableRequestFailure)
-        .withWaitStrategy(retryWaitStrategy)
-        .withStopStrategy(retryStopStrategy)
-        .build();
-    try {
-      return retryer.call(request::execute);
-    } catch (RetryException e) {
-      throw new IOException(e);
-    } catch (ExecutionException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw new IOException(e);
-    }
-  }
-
-  private static boolean isRetryableRequestFailure(Throwable t) {
-    if (t instanceof GoogleJsonResponseException) {
-      var statusCode = ((GoogleJsonResponseException) t).getStatusCode();
-      return statusCode == 429 || statusCode / 100 == 5;
-    }
-    return t instanceof IOException;
-  }
-
   void cacheResources() throws IOException {
     final CloudResourceManager.Projects.List request = cloudResourceManager.projects().list();
 
     ListProjectsResponse response;
     do {
-      response = executeWithRetries(request);
+      response = executeWithRetries(request, retryWaitStrategy, retryStopStrategy);
       if (response.getProjects() == null) {
         continue;
       }
@@ -302,7 +274,7 @@ public class Authenticator {
   private String getProjectIdOfServiceAccount(String email) throws IOException {
     var request = iam.projects().serviceAccounts().get("projects/-/serviceAccounts/" + email);
     try {
-      var serviceAccount = executeWithRetries(request);
+      var serviceAccount = executeWithRetries(request, retryWaitStrategy, retryStopStrategy);
       return serviceAccount.getProjectId();
     } catch (GoogleJsonResponseException e) {
       if (e.getStatusCode() == 404) {
@@ -319,7 +291,7 @@ public class Authenticator {
     final GetAncestryResponse ancestry;
     var request = cloudResourceManager.projects().getAncestry(projectId, new GetAncestryRequest());
     try {
-      ancestry = executeWithRetries(request);
+      ancestry = executeWithRetries(request, retryWaitStrategy, retryStopStrategy);
     } catch (GoogleJsonResponseException e) {
       if (e.getStatusCode() == 404) {
         logger.debug("Project {} doesn't exist", projectId, e);

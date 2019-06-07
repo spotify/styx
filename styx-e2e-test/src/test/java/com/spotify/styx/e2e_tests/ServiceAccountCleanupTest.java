@@ -20,6 +20,8 @@
 
 package com.spotify.styx.e2e_tests;
 
+import static com.spotify.styx.util.GoogleApiClientUtil.executeWithRetries;
+
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.services.iam.v1.Iam;
@@ -60,9 +62,9 @@ public class ServiceAccountCleanupTest {
       }
       log.info("Deleting old test service account: {}", account.getEmail());
       try {
-        iam.projects().serviceAccounts()
-            .delete("projects/styx-oss-test/serviceAccounts/" + account.getEmail())
-            .execute();
+        var request = iam.projects().serviceAccounts()
+            .delete("projects/styx-oss-test/serviceAccounts/" + account.getEmail());
+        executeWithRetries(request);
       } catch (Throwable e) {
         log.error("Failed to delete old test service account: {}", account.getEmail(), e);
       }
@@ -73,9 +75,9 @@ public class ServiceAccountCleanupTest {
     var accounts = new ArrayList<ServiceAccount>();
     String pageToken = null;
     do {
-      var listResponse = iam.projects().serviceAccounts().list("projects/styx-oss-test")
-          .setPageToken(pageToken)
-          .execute();
+      var request = iam.projects().serviceAccounts().list("projects/styx-oss-test")
+          .setPageToken(pageToken);
+      var listResponse = executeWithRetries(request);
       accounts.addAll(listResponse.getAccounts());
       pageToken = listResponse.getNextPageToken();
     } while (pageToken != null);
