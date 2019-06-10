@@ -78,6 +78,11 @@
       <groupId>com.squareup.okio</groupId>
       <artifactId>okio</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.api-client</groupId>
+      <artifactId>google-api-client</artifactId>
+      <version>1.28.0</version>
+    </dependency>
 
     <!-- test deps -->
     <dependency>
