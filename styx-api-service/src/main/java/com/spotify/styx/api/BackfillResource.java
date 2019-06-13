@@ -248,7 +248,7 @@ public final class BackfillResource implements Closeable {
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
-        storage.storeBackfill(backfill.builder().halted(true).build());
+        storage.storeBackfill(backfill.builder().halted(true).lastModified(currentTimer.getCurrentTime()).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
