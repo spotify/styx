@@ -52,22 +52,22 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
+import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InOrder;
@@ -78,10 +78,12 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class ShardedCounterTest {
 
+  @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
   private static final String COUNTER_ID1 = "resource_counter_1";
   private static final String COUNTER_ID2 = "resource_counter_2";
+  private static final String COUNTER_ID3 = "resource_counter_3";
 
-  private static LocalDatastoreHelper helper;
   private static CounterSnapshotFactory counterSnapshotFactory;
   private static ShardedCounter shardedCounter;
   private static Datastore datastore;
@@ -91,14 +93,8 @@ public class ShardedCounterTest {
   @Mock private Stats stats;
 
   @BeforeClass
-  public static void setUpClass() throws IOException, InterruptedException {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    helper = LocalDatastoreHelper.create(1.0);
-    helper.start();
-    datastore = helper.getOptions().getService();
+  public static void setUpClass() {
+    datastore = datastoreEmulator.client();
     connection = mock(Connection.class);
     storage = new AggregateStorage(connection, datastore, Duration.ZERO);
   }
@@ -106,13 +102,6 @@ public class ShardedCounterTest {
   @AfterClass
   public static void tearDownClass() throws Exception {
     connection.close();
-    if (helper != null) {
-      try {
-        helper.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
   }
 
   @Before
@@ -124,8 +113,8 @@ public class ShardedCounterTest {
   }
 
   @After
-  public void tearDown() throws IOException {
-    helper.reset();
+  public void tearDown() {
+    datastoreEmulator.reset();
   }
 
   @Test
@@ -156,15 +145,14 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateLimit() throws IOException {
-    helper.reset();
-    assertNull(getLimitFromStorage(COUNTER_ID1));
+    assertNull(getLimitFromStorage(COUNTER_ID3));
 
     storage.runInTransactionWithRetries(transaction -> {
-      shardedCounter.updateLimit(transaction, COUNTER_ID1, 500);
+      shardedCounter.updateLimit(transaction, COUNTER_ID3, 500);
       return null;
     });
 
-    assertEquals(500L, getLimitFromStorage(COUNTER_ID1).getLong(PROPERTY_LIMIT));
+    assertEquals(500L, getLimitFromStorage(COUNTER_ID3).getLong(PROPERTY_LIMIT));
   }
 
   @Test

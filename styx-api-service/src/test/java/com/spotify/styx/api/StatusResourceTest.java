@@ -34,7 +34,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.datastore.testing.LocalDatastoreHelper;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -54,16 +53,15 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
 import com.spotify.styx.storage.BigtableStorage;
+import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.logging.Level;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 public class StatusResourceTest extends VersionedApiTest {
@@ -84,7 +82,8 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
-  private static LocalDatastoreHelper localDatastore;
+  @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
   private Connection bigtable = setupBigTableMockTable();
 
   private Storage storage;
@@ -99,36 +98,15 @@ public class StatusResourceTest extends VersionedApiTest {
     super(StatusResource.BASE, version);
   }
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    final java.util.logging.Logger datastoreEmulatorLogger =
-        java.util.logging.Logger.getLogger(LocalDatastoreHelper.class.getName());
-    datastoreEmulatorLogger.setLevel(Level.OFF);
-
-    localDatastore = LocalDatastoreHelper.create(1.0); // 100% global consistency
-    localDatastore.start();
-  }
-
-  @AfterClass
-  public static void tearDownClass() {
-    if (localDatastore != null) {
-      try {
-        localDatastore.stop(org.threeten.bp.Duration.ofSeconds(30));
-      } catch (Throwable e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   @After
   public void tearDown() throws Exception {
-    localDatastore.reset();
+    datastoreEmulator.reset();
   }
 
   @Override
   protected void init(Environment environment) {
     accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
-    storage = spy(new AggregateStorage(bigtable, localDatastore.getOptions().getService(),
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client(),
         Duration.ZERO));
     final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
