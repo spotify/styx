@@ -116,10 +116,6 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static Instant currentTime = Instant.parse("2019-01-01T00:00:00Z");
 
-  private Instant getCurrentTime() {
-    return currentTime;
-  }
-
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -197,7 +193,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
         new BackfillResource(SCHEDULER_BASE, storage, workflowValidator,
-            () -> Instant.parse("2018-10-17T00:00:00.000Z"), workflowActionAuthorizer, this::getCurrentTime));
+            () -> Instant.parse("2018-10-17T00:00:00.000Z"), workflowActionAuthorizer,
+            () -> this.currentTime));
     environment.routingEngine()
         .registerRoutes(backfillResource.routes(requestAuthenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
@@ -891,28 +888,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldHaltBackfill() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
-
-    WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
-    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
-    storeRunningWorkflowInstance(wfi, BACKFILL_1.id());
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
-    assertThat(response.status().reasonPhrase(),
-        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
-
-    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
-    verify(serviceHelper.stubClient(), times(1)).send(any());
-  }
-
-  @Test
-  public void shouldHaltBackfillUpdateLastModified() throws Exception {
+  public void shouldHaltBackfillAndUpdateLastModified() throws Exception {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
@@ -1194,7 +1170,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnDifferentTimestampWhenUpdateBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
-    var previousTime = this.getCurrentTime();
+    var previousTime = this.currentTime;
     var updateTime = Instant.parse("2019-10-16T00:00:00Z");
 
     this.currentTime = updateTime;

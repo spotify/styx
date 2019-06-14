@@ -106,14 +106,14 @@ public final class BackfillResource implements Closeable {
 
   private final ForkJoinPool forkJoinPool;
   private final WorkflowActionAuthorizer workflowActionAuthorizer;
-  private final CurrentTimer currentTimer;
+  private final Time currentTimer;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
                           WorkflowValidator workflowValidator,
                           Time time,
                           WorkflowActionAuthorizer workflowActionAuthorizer) {
     this(schedulerServiceBaseUrl, storage, workflowValidator, time, workflowActionAuthorizer,
-        Instant::now);
+        time);
   }
 
   @VisibleForTesting
@@ -121,7 +121,7 @@ public final class BackfillResource implements Closeable {
                                   WorkflowValidator workflowValidator,
                                   Time time,
                                   WorkflowActionAuthorizer workflowActionAuthorizer,
-                                  CurrentTimer currentTimer) {
+                                  Time currentTimer) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
@@ -248,7 +248,7 @@ public final class BackfillResource implements Closeable {
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
-        storage.storeBackfill(backfill.builder().halted(true).lastModified(currentTimer.getCurrentTime()).build());
+        storage.storeBackfill(backfill.builder().halted(true).lastModified(currentTimer.get()).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
@@ -405,8 +405,8 @@ public final class BackfillResource implements Closeable {
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
         .halted(false)
-        .created(currentTimer.getCurrentTime())
-        .lastModified(currentTimer.getCurrentTime());
+        .created(currentTimer.get())
+        .lastModified(currentTimer.get());
 
     final Backfill backfill = builder.build();
 
@@ -431,7 +431,7 @@ public final class BackfillResource implements Closeable {
         final BackfillBuilder backfillBuilder = oldBackfill.builder();
         backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
         backfillInput.description().ifPresent(backfillBuilder::description);
-        backfillBuilder.lastModified(currentTimer.getCurrentTime());
+        backfillBuilder.lastModified(currentTimer.get());
         return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {
@@ -510,10 +510,5 @@ public final class BackfillResource implements Closeable {
 
     return ReplayEvents.getBackfillRunStateData(wfi, storage, backfill.id())
         .orElse(RunStateData.create(wfi, UNKNOWN, StateData.zero()));
-  }
-
-  @FunctionalInterface
-  interface CurrentTimer{
-    Instant getCurrentTime();
   }
 }
