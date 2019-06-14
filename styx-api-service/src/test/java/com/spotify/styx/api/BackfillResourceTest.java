@@ -929,7 +929,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
-    assertThat(storage.backfill(BACKFILL_1.id()).get().lastModified(), equalTo(currentTime));
+    assertThat(storage.backfill(BACKFILL_1.id()).get().lastModified().get(), equalTo(currentTime));
     verify(serviceHelper.stubClient(), times(1)).send(any());
   }
 
@@ -1188,7 +1188,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
     assertThat(postedBackfill.reverse(), equalTo(false));
-    assertThat(postedBackfill.created(), equalTo(currentTime));
+    assertThat(postedBackfill.created().get(), equalTo(currentTime));
   }
 
   @Test
@@ -1211,7 +1211,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
         response.payload().get().toByteArray(), Backfill.class);
-    assertThat(postedBackfill.lastModified(), equalTo(updateTime));
+    assertThat(postedBackfill.lastModified().get(), equalTo(updateTime));
 
     // Restore the old timestamp
     this.currentTime = previousTime;

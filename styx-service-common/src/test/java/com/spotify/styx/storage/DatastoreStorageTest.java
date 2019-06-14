@@ -762,8 +762,8 @@ public class DatastoreStorageTest {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
-        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()))
-        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified()));
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created().get()))
+        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified().get()));
 
     datastore.put(builder.build());
 

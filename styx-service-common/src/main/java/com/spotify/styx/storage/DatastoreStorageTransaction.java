@@ -234,10 +234,12 @@ public class DatastoreStorageTransaction implements StorageTransaction {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
-        .set(PROPERTY_REVERSE, backfill.reverse())
-        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created()))
-        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified()));
+        .set(PROPERTY_REVERSE, backfill.reverse());
 
+    backfill.created().ifPresent(x -> builder.set(PROPERTY_CREATED,
+        instantToTimestamp(backfill.created().get())));
+    backfill.lastModified().ifPresent(x -> builder.set(PROPERTY_LAST_MODIFIED,
+        instantToTimestamp(backfill.lastModified().get())));
     backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
         .newBuilder(x).setExcludeFromIndexes(true).build()));
 

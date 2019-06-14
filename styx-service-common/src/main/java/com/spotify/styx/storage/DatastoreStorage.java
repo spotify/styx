@@ -847,9 +847,7 @@ public class DatastoreStorage implements Closeable {
         .schedule(Schedule.parse(entity.getString(PROPERTY_SCHEDULE)))
         .allTriggered(entity.getBoolean(PROPERTY_ALL_TRIGGERED))
         .halted(entity.getBoolean(PROPERTY_HALTED))
-        .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE))
-        .created(timestampToInstant(entity.getTimestamp(PROPERTY_CREATED)))
-        .lastModified(timestampToInstant(entity.getTimestamp(PROPERTY_LAST_MODIFIED)));
+        .reverse(read(entity, PROPERTY_REVERSE, Boolean.FALSE));
 
     if (entity.contains(PROPERTY_DESCRIPTION)) {
       builder.description(entity.getString(PROPERTY_DESCRIPTION));
@@ -858,6 +856,14 @@ public class DatastoreStorage implements Closeable {
     if (entity.contains(PROPERTY_TRIGGER_PARAMETERS)) {
       builder.triggerParameters(OBJECT_MAPPER.readValue(
           entity.getString(PROPERTY_TRIGGER_PARAMETERS), TriggerParameters.class));
+    }
+
+    if (entity.contains(PROPERTY_CREATED)) {
+      builder.created(timestampToInstant(entity.getTimestamp(PROPERTY_CREATED)));
+    }
+
+    if (entity.contains(PROPERTY_LAST_MODIFIED)) {
+      builder.lastModified(timestampToInstant(entity.getTimestamp(PROPERTY_LAST_MODIFIED)));
     }
 
     return builder.build();
