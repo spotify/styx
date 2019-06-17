@@ -30,7 +30,6 @@ import static com.spotify.styx.util.TimeUtil.instantsInRange;
 import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
-import com.cronutils.utils.VisibleForTesting;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
@@ -106,22 +105,11 @@ public final class BackfillResource implements Closeable {
 
   private final ForkJoinPool forkJoinPool;
   private final WorkflowActionAuthorizer workflowActionAuthorizer;
-  private final Time currentTimer;
 
   public BackfillResource(String schedulerServiceBaseUrl, Storage storage,
                           WorkflowValidator workflowValidator,
                           Time time,
                           WorkflowActionAuthorizer workflowActionAuthorizer) {
-    this(schedulerServiceBaseUrl, storage, workflowValidator, time, workflowActionAuthorizer,
-        time);
-  }
-
-  @VisibleForTesting
-  BackfillResource(String schedulerServiceBaseUrl, Storage storage,
-                                  WorkflowValidator workflowValidator,
-                                  Time time,
-                                  WorkflowActionAuthorizer workflowActionAuthorizer,
-                                  Time currentTimer) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl, "schedulerServiceBaseUrl");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
@@ -129,7 +117,6 @@ public final class BackfillResource implements Closeable {
     this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
         "workflowActionAuthorizer");
     this.forkJoinPool = register(closer, new ForkJoinPool(CONCURRENCY), "backfill-resource");
-    this.currentTimer = currentTimer;
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator authenticator) {
@@ -248,7 +235,7 @@ public final class BackfillResource implements Closeable {
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
-        storage.storeBackfill(backfill.builder().halted(true).lastModified(currentTimer.get()).build());
+        storage.storeBackfill(backfill.builder().halted(true).lastModified(time.get()).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
@@ -405,8 +392,8 @@ public final class BackfillResource implements Closeable {
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
         .halted(false)
-        .created(currentTimer.get())
-        .lastModified(currentTimer.get());
+        .created(time.get())
+        .lastModified(time.get());
 
     final Backfill backfill = builder.build();
 
@@ -431,7 +418,7 @@ public final class BackfillResource implements Closeable {
         final BackfillBuilder backfillBuilder = oldBackfill.builder();
         backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
         backfillInput.description().ifPresent(backfillBuilder::description);
-        backfillBuilder.lastModified(currentTimer.get());
+        backfillBuilder.lastModified(time.get());
         return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {

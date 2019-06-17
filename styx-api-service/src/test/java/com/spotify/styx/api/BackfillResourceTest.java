@@ -114,7 +114,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   private static final WorkflowId WORKFLOW_ID_1 = WorkflowId.create("component", "workflow1");
   private static final WorkflowId WORKFLOW_ID_2 = WorkflowId.create("component", "workflow2");
 
-  private static Instant currentTime = Instant.parse("2019-01-01T00:00:00Z");
+  private static Instant currentTime = Instant.parse("2018-10-17T00:00:00.000Z");
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -193,8 +193,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
         new BackfillResource(SCHEDULER_BASE, storage, workflowValidator,
-            () -> Instant.parse("2018-10-17T00:00:00.000Z"), workflowActionAuthorizer,
-            () -> this.currentTime));
+            () -> this.currentTime, workflowActionAuthorizer));
     environment.routingEngine()
         .registerRoutes(backfillResource.routes(requestAuthenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));

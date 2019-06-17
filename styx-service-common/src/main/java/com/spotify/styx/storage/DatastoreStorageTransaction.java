@@ -237,9 +237,9 @@ public class DatastoreStorageTransaction implements StorageTransaction {
         .set(PROPERTY_REVERSE, backfill.reverse());
 
     backfill.created().ifPresent(x -> builder.set(PROPERTY_CREATED,
-        instantToTimestamp(backfill.created().get())));
+        instantToTimestamp(x)));
     backfill.lastModified().ifPresent(x -> builder.set(PROPERTY_LAST_MODIFIED,
-        instantToTimestamp(backfill.lastModified().get())));
+        instantToTimestamp(x)));
     backfill.description().ifPresent(x -> builder.set(PROPERTY_DESCRIPTION, StringValue
         .newBuilder(x).setExcludeFromIndexes(true).build()));
 
