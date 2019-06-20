@@ -708,7 +708,7 @@ public class DatastoreStorageTest {
       "false, false",
       "_, true"})
   @Test
-  public void shouldStoreAndReadBackfill(String reverse, boolean withTriggerParameters) throws Exception {
+  public void shouldStoreAndReadBackfillWithoutCreatedAndModifiedTS(String reverse, boolean withTriggerParameters) throws Exception {
     final BackfillBuilder builder = Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -716,9 +716,7 @@ public class DatastoreStorageTest {
         .workflowId(WorkflowId.create("component", "workflow2"))
         .concurrency(2)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(DAYS)
-        .created(currentTime)
-        .lastModified(currentTime);
+        .schedule(DAYS);
 
     if (!reverse.trim().equals("_")) {
       builder.reverse(Boolean.parseBoolean(reverse));
