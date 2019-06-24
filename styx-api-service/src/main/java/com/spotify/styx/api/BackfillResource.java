@@ -377,6 +377,7 @@ public final class BackfillResource implements Closeable {
               .withReasonPhrase("these partitions are already active: " + alreadyActiveMessage));
     }
 
+    var timestamp = time.get();
     builder
         .id(id)
         .allTriggered(false)
@@ -392,8 +393,8 @@ public final class BackfillResource implements Closeable {
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
         .halted(false)
-        .created(time.get())
-        .lastModified(time.get());
+        .created(timestamp)
+        .lastModified(timestamp);
 
     final Backfill backfill = builder.build();
 

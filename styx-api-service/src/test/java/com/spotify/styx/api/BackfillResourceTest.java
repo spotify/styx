@@ -890,6 +890,11 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldHaltBackfillAndUpdateLastModified() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var previousTime = this.currentTime;
+    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
+
+    this.currentTime = updateTime;
+
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
         .to(SCHEDULER_BASE + "/api/v0/events");
@@ -906,6 +911,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
     assertThat(storage.backfill(BACKFILL_1.id()).get().lastModified().get(), equalTo(currentTime));
     verify(serviceHelper.stubClient(), times(1)).send(any());
+
+    this.currentTime = previousTime;
   }
 
   private void storeRunningWorkflowInstance(WorkflowInstance wfi, String backfillId) throws IOException {

@@ -94,8 +94,6 @@ public class BackfillTriggerManagerTest {
   private static final WorkflowId WORKFLOW_ID1 =
       WorkflowId.create("styx1", "example1");
 
-  private static final Instant currentTime = Instant.parse("2019-01-02T22:00:00Z");
-
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2016-12-02T22:00:00Z"))
@@ -105,8 +103,6 @@ public class BackfillTriggerManagerTest {
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T22:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -119,8 +115,6 @@ public class BackfillTriggerManagerTest {
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-05T21:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_3 = Backfill.newBuilder()
@@ -132,8 +126,6 @@ public class BackfillTriggerManagerTest {
       .schedule(Schedule.HOURS)
       .nextTrigger(Instant.parse("2016-12-02T00:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_4 = Backfill.newBuilder()
@@ -146,8 +138,6 @@ public class BackfillTriggerManagerTest {
       .reverse(true)
       .nextTrigger(Instant.parse("2016-12-02T02:00:00Z"))
       .triggerParameters(TRIGGER_PARAMETERS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
