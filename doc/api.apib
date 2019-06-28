@@ -678,12 +678,14 @@ Workflow Instance belonging to a Backfill entity.
 
 Resources related to inspect detailed status of Workflow Instances.
 
-## Active States [/{version}/status/activeStates]
+## Active States [/{version}/status/activeStates{?component,workflow}]
 
 + Parameters
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
+    + component: `styx-canary` (optional, string) - Component ID
+    + workflow: `StyxCanary`  (optional, string) - Workflow ID - requires Component ID to also be specified
 
 ### Get Active States [GET]
 
