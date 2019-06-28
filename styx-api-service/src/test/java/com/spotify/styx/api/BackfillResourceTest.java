@@ -137,8 +137,6 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T23:00:00Z"))
       .schedule(Schedule.HOURS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_3 = Backfill.newBuilder()
@@ -149,8 +147,6 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_4 = Backfill.newBuilder()
@@ -161,8 +157,6 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(2)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_5 = Backfill.newBuilder()
@@ -174,8 +168,6 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T05:00:00Z"))
       .schedule(Schedule.HOURS)
-      .created(currentTime)
-      .lastModified(currentTime)
       .build();
 
   private final WorkflowValidator workflowValidator = mock(WorkflowValidator.class);
@@ -1171,6 +1163,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.halted(), equalTo(false));
     assertThat(postedBackfill.reverse(), equalTo(false));
     assertThat(postedBackfill.created().get(), equalTo(currentTime));
+    assertThat(postedBackfill.lastModified().get(), equalTo(currentTime));
   }
 
   @Test

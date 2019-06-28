@@ -63,7 +63,8 @@ public class PlainCliOutputTest {
       .build();
   private static final String EXPECTED_OUTPUT =
       "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
-        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z Description FOO=bar\n";
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description "
+      + "FOO=bar\n";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
