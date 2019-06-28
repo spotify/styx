@@ -100,7 +100,7 @@ public class PrettyCliOutputTest {
         .build();
   }
 
-  private static Backfill backfill_no_createTS(String description) {
+  private static Backfill backfillNoCreateTS(String description) {
     return Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -218,7 +218,7 @@ public class PrettyCliOutputTest {
   @Test
   public void shouldPrintBackfillsNoCreateTS() {
     cliOutput.printBackfills(
-        List.of(BackfillPayload.create(backfill_no_createTS(LONG_DESCRIPTION), Optional.empty())),
+        List.of(BackfillPayload.create(backfillNoCreateTS(LONG_DESCRIPTION), Optional.empty())),
         false);
     assertEquals(EXPECTED_HEADER_WITH_TRUNCATED_DESCRIPTION
                  + "                  backfill-2   false          false            2  "
