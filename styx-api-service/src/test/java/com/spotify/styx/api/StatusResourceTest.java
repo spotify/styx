@@ -87,7 +87,7 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
-  private static final RunState THIRD_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
+  private static final RunState THIRD_PERSISTENT_STATE = RunState.create(THIRD_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
