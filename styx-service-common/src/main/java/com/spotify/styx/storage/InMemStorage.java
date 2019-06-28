@@ -348,6 +348,15 @@ public class InMemStorage implements Storage {
   }
 
   @Override
+  public Map<WorkflowInstance, RunState> readActiveStates(String componentId, String workflowId)
+      throws IOException {
+    return activeStatesMap.entrySet().stream()
+        .filter((entry) -> componentId.equals(entry.getKey().workflowId().componentId())
+                           && workflowId.equals(entry.getKey().workflowId().id()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
   public Map<WorkflowInstance, RunState> readActiveStatesByTriggerId(String triggerId)
       throws IOException {
     return activeStatesMap.entrySet().stream()

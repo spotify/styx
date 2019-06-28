@@ -451,6 +451,16 @@ public class DatastoreStorage implements Closeable {
     return queryActiveStates(query);
   }
 
+  Map<WorkflowInstance, RunState> readActiveStates(String componentId, String workflowId) throws IOException {
+    final EntityQuery query =
+        Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
+            .setFilter(CompositeFilter.and(PropertyFilter.eq(PROPERTY_COMPONENT, componentId),
+            PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId)))
+            .build();
+
+    return queryActiveStates(query);
+  }
+
   public Map<WorkflowInstance, RunState> activeStatesByTriggerId(
       String triggerId) throws IOException {
     final EntityQuery query =

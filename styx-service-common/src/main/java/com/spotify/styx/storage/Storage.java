@@ -180,6 +180,19 @@ public interface Storage extends Closeable {
       throws IOException;
 
   /**
+   * Return a map of all active {@link WorkflowInstance}s to their {@link RunState},
+   * for a workflow with the specified workflowId and component id.
+   *
+   * <p>A {@link WorkflowInstance} is active if there has been at least one call to
+   * {@link #writeActiveState(WorkflowInstance, RunState)} and no calls to
+   * {@link #deleteActiveState(WorkflowInstance)}.
+   *
+   * @return The map of workflow instances to {@link RunState}
+   */
+  Map<WorkflowInstance, RunState> readActiveStates(String componentId, String workflowId)
+    throws IOException;
+
+  /**
    * Read an active workflow instance.
    */
   Optional<RunState> readActiveState(WorkflowInstance workflowInstance)
