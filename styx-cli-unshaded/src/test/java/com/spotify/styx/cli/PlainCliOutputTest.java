@@ -92,6 +92,29 @@ public class PlainCliOutputTest {
   }
 
   @Test
+  public void shouldPrintBackfillNoCreateTS() {
+    var backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .reverse(false)
+        .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
+        .build();
+    var expectedOutput =
+        "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z   Description "
+        + "FOO=bar\n";
+    cliOutput.printBackfill(backfill, true);
+    assertEquals(expectedOutput,
+        outContent.toString());
+  }
+
+  @Test
   public void shouldPrintBackfills() {
     cliOutput.printBackfills(List.of(BackfillPayload.create(BACKFILL, Optional.empty())), true);
     assertEquals(EXPECTED_OUTPUT,
