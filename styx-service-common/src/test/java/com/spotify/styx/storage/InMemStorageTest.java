@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.WorkflowState.patchEnabled;
 import static com.spotify.styx.storage.DatastoreStorageTest.FULLY_POPULATED_RUNSTATE;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -140,6 +141,16 @@ public class InMemStorageTest {
 
     final Map<WorkflowInstance, RunState> activeStates =
         storage.readActiveStatesByTriggerId("foobar");
+
+    assertThat(activeStates, is(Map.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
+  }
+
+  @Test
+  public void shouldReturnAllActiveStatesForAWorkflow() throws IOException {
+    storage.writeActiveState(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE);
+
+    final Map<WorkflowInstance, RunState> activeStates =
+        storage.readActiveStates(WORKFLOW_ID.componentId(), WORKFLOW_ID.id());
 
     assertThat(activeStates, is(Map.of(WORKFLOW_INSTANCE, FULLY_POPULATED_RUNSTATE)));
   }

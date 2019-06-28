@@ -462,6 +462,19 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldReturnActiveStatesForAWORKFLOW() throws Exception {
+    storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
+    storage.writeActiveState(WORKFLOW_INSTANCE3, RUN_STATE3);
+
+    assertThat(entitiesOfKind(DatastoreStorage.KIND_ACTIVE_WORKFLOW_INSTANCE), hasSize(2));
+
+    final Map<WorkflowInstance, RunState> activeStates =
+        storage.readActiveStates(WORKFLOW_ID2.componentId(), WORKFLOW_ID2.id());
+
+    assertThat(activeStates, is(Map.of(WORKFLOW_INSTANCE2, RUN_STATE2)));
+  }
+
+  @Test
   public void readActiveStatesShouldPropagateIOException() throws Exception {
     final IOException cause = new IOException("foobar");
     doThrow(cause).when(datastore).query(any());
