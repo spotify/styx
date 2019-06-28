@@ -58,10 +58,13 @@ public class PlainCliOutputTest {
       .schedule(Schedule.DAYS)
       .reverse(false)
       .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
+      .created(Instant.parse("2019-01-01T00:00:00Z"))
+      .lastModified(Instant.parse("2019-06-01T00:00:00Z"))
       .build();
   private static final String EXPECTED_OUTPUT =
       "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
-        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z Description FOO=bar\n";
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description "
+      + "FOO=bar\n";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
@@ -85,6 +88,29 @@ public class PlainCliOutputTest {
   public void shouldPrintBackfill() {
     cliOutput.printBackfill(BACKFILL, true);
     assertEquals(EXPECTED_OUTPUT,
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillNoCreateTS() {
+    var backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .reverse(false)
+        .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
+        .build();
+    var expectedOutput =
+        "backfill-2 component workflow2 false false 2 2017-01-01T00:00:00Z"
+        + " 2017-01-02T00:00:00Z false 2017-01-01T00:00:00Z   Description "
+        + "FOO=bar\n";
+    cliOutput.printBackfill(backfill, true);
+    assertEquals(expectedOutput,
         outContent.toString());
   }
 

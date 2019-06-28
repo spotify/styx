@@ -56,7 +56,8 @@ import org.fusesource.jansi.Ansi;
 class PrettyCliOutput implements CliOutput {
 
   private static final String BACKFILL_FORMAT =
-      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %-<description-length>s %s";
+      "%28s  %6s  %13s %12s  %-20s  %-20s  %-7s  %-20s  %-<cid-length>s  %-<wid-length>s %-20s %-20s "
+      + "%-<description-length>s %s";
 
   private static final String WORKFLOW_FORMAT =
       "%-<cid-length>s  %-<wid-length>s";
@@ -153,6 +154,8 @@ class PrettyCliOutput implements CliOutput {
         toParameter(schedule, backfill.nextTrigger()),
         workflowId.componentId(),
         workflowId.id(),
+        backfill.created().map(create -> create.toString()).orElse(""),
+        backfill.lastModified().map(lastModified -> lastModified.toString()).orElse(""),
         formatLongField(backfill.description(), noTruncate),
         formatLongField(backfill.triggerParameters()
                 .map(triggerParameters -> formatMap(triggerParameters.env())),
@@ -186,6 +189,8 @@ class PrettyCliOutput implements CliOutput {
         "NEXT TRIGGER",
         COMPONENT_HEADER,
         WORKFLOW_HEADER,
+        "CREATED",
+        "LAST MODIFIED",
         DESCRIPTION_HEADER,
         "TRIGGER ENV"));
   }

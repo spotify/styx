@@ -235,7 +235,7 @@ public final class BackfillResource implements Closeable {
       if (backfillOptional.isPresent()) {
         final Backfill backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
-        storage.storeBackfill(backfill.builder().halted(true).build());
+        storage.storeBackfill(backfill.builder().halted(true).lastModified(time.get()).build());
         return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
       } else {
         return CompletableFuture.completedFuture(
@@ -377,6 +377,7 @@ public final class BackfillResource implements Closeable {
               .withReasonPhrase("these partitions are already active: " + alreadyActiveMessage));
     }
 
+    var timestamp = time.get();
     builder
         .id(id)
         .allTriggered(false)
@@ -391,7 +392,9 @@ public final class BackfillResource implements Closeable {
         .description(input.description())
         .reverse(input.reverse())
         .triggerParameters(input.triggerParameters())
-        .halted(false);
+        .halted(false)
+        .created(timestamp)
+        .lastModified(timestamp);
 
     final Backfill backfill = builder.build();
 
@@ -416,6 +419,7 @@ public final class BackfillResource implements Closeable {
         final BackfillBuilder backfillBuilder = oldBackfill.builder();
         backfillInput.concurrency().ifPresent(backfillBuilder::concurrency);
         backfillInput.description().ifPresent(backfillBuilder::description);
+        backfillBuilder.lastModified(time.get());
         return tx.store(backfillBuilder.build());
       });
     } catch (ResourceNotFoundException e) {

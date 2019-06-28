@@ -114,6 +114,8 @@ public class BackfillResourceTest extends VersionedApiTest {
   private static final WorkflowId WORKFLOW_ID_1 = WorkflowId.create("component", "workflow1");
   private static final WorkflowId WORKFLOW_ID_2 = WorkflowId.create("component", "workflow2");
 
+  private static Instant currentTime = Instant.parse("2018-10-17T00:00:00.000Z");
+
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
       .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -122,6 +124,8 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
+      .created(currentTime)
+      .lastModified(currentTime)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -181,7 +185,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
         new BackfillResource(SCHEDULER_BASE, storage, workflowValidator,
-            () -> Instant.parse("2018-10-17T00:00:00.000Z"), workflowActionAuthorizer));
+            () -> this.currentTime, workflowActionAuthorizer));
     environment.routingEngine()
         .registerRoutes(backfillResource.routes(requestAuthenticator).map(r ->
             r.withMiddleware(Middlewares.exceptionAndRequestIdHandler())));
@@ -875,8 +879,13 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldHaltBackfill() throws Exception {
+  public void shouldHaltBackfillAndUpdateLastModified() throws Exception {
     sinceVersion(Api.Version.V3);
+
+    var previousTime = this.currentTime;
+    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
+
+    this.currentTime = updateTime;
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.ACCEPTED))
@@ -892,7 +901,10 @@ public class BackfillResourceTest extends VersionedApiTest {
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    assertThat(storage.backfill(BACKFILL_1.id()).get().lastModified().get(), equalTo(currentTime));
     verify(serviceHelper.stubClient(), times(1)).send(any());
+
+    this.currentTime = previousTime;
   }
 
   private void storeRunningWorkflowInstance(WorkflowInstance wfi, String backfillId) throws IOException {
@@ -1120,6 +1132,64 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
     assertThat(postedBackfill.reverse(), equalTo(false));
+  }
+
+  @Test
+  public void shouldPostBackfillGenerateCreatedTimestamp() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    final String json = "{\"start\":\"2018-10-16T00:00:00Z\"," +
+                        "\"end\":\"2018-10-17T02:00:00Z\"," +
+                        "\"component\":\"component\"," +
+                        "\"workflow\":\"workflow2\","+
+                        "\"concurrency\":1}";
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path("") + "?allowFuture=true", ByteString.encodeUtf8(json)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
+    assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-17T02:00:00Z")));
+    assertThat(postedBackfill.workflowId(), equalTo(WorkflowId.create("component", "workflow2")));
+    assertThat(postedBackfill.concurrency(), equalTo(1));
+    assertThat(postedBackfill.description(), equalTo(Optional.empty()));
+    assertThat(postedBackfill.nextTrigger(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
+    assertThat(postedBackfill.schedule(), equalTo(Schedule.HOURS));
+    assertThat(postedBackfill.allTriggered(), equalTo(false));
+    assertThat(postedBackfill.halted(), equalTo(false));
+    assertThat(postedBackfill.reverse(), equalTo(false));
+    assertThat(postedBackfill.created().get(), equalTo(currentTime));
+    assertThat(postedBackfill.lastModified().get(), equalTo(currentTime));
+  }
+
+  @Test
+  public void shouldReturnDifferentTimestampWhenUpdateBackfill() throws Exception {
+    sinceVersion(Api.Version.V3);
+    var previousTime = this.currentTime;
+    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
+
+    this.currentTime = updateTime;
+
+    final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
+        .id(BACKFILL_1.id())
+        .description("updated")
+        .build();
+
+    final Response<ByteString> response =
+        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), Json.serialize(backfillInput)));
+
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
+        response.payload().get().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.lastModified().get(), equalTo(updateTime));
+
+    // Restore the old timestamp
+    this.currentTime = previousTime;
   }
 
   private Connection setupBigTableMockTable() {

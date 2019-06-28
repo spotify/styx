@@ -92,6 +92,7 @@ public class CliMainTest {
   @Mock WorkflowValidator validator;
 
   private String requestId = UUID.randomUUID().toString();
+  private static final Instant currentTime = Instant.parse("2019-01-01T00:00:00Z");
 
   @Before
   public void setUp() {
@@ -213,6 +214,8 @@ public class CliMainTest {
         .concurrency(1)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -256,6 +259,8 @@ public class CliMainTest {
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
         .triggerParameters(expectedTriggerParameters)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -306,6 +311,8 @@ public class CliMainTest {
         .concurrency(1)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -342,6 +349,8 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -378,6 +387,8 @@ public class CliMainTest {
         .concurrency(1)
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     final BackfillInput expectedInput = BackfillInput.newBuilder()
@@ -413,6 +424,8 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
@@ -440,6 +453,8 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillPayload backfillPayload = BackfillPayload.create(backfill,
@@ -467,6 +482,8 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
 
     when(client.backfillEditConcurrency(backfillId, 1))
@@ -494,8 +511,40 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
+    final BackfillsPayload backfillsPayload = BackfillsPayload.create(
+        List.of(BackfillPayload.create(backfill, Optional.empty())));
+
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+        .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
+
+    CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
+
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
+  }
+
+  @Test
+  public void testBackfillListWithoutCreatedTS() {
+    final String component = "quux";
+    final String workflow = "foo";
+    final String start = "2017-01-01T00:00:00Z";
+    final String end = "2017-01-30T00:00:00Z";
+
+    final Backfill backfill = Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse(start))
+        .end(Instant.parse(end))
+        .workflowId(WorkflowId.create(component, workflow))
+        .concurrency(1)
+        .description("Description")
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .build();
+
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
@@ -524,6 +573,8 @@ public class CliMainTest {
         .description("Description")
         .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
         .schedule(Schedule.DAYS)
+        .created(currentTime)
+        .lastModified(currentTime)
         .build();
     
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(

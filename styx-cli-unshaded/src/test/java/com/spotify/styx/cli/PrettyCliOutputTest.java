@@ -65,17 +65,17 @@ public class PrettyCliOutputTest {
   private static final String EXPECTED_HEADER =
       "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
       + "START (INCL)          END (EXCL)            REVERSE  NEXT TRIGGER          COMPONENT"
-      + "  WORKFLOW  DESCRIPTION TRIGGER ENV\n";
+      + "  WORKFLOW  CREATED              LAST MODIFIED        DESCRIPTION TRIGGER ENV\n";
 
   private static final String EXPECTED_HEADER_WITH_FULL_DESCRIPTION =
       "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
       + "START (INCL)          END (EXCL)            REVERSE  NEXT TRIGGER          COMPONENT"
-      + "  WORKFLOW  DESCRIPTION                                  TRIGGER ENV\n";
+      + "  WORKFLOW  CREATED              LAST MODIFIED        DESCRIPTION                                  TRIGGER ENV\n";
 
   private static final String EXPECTED_HEADER_WITH_TRUNCATED_DESCRIPTION =
       "                 BACKFILL ID  HALTED  ALL TRIGGERED  CONCURRENCY  "
       + "START (INCL)          END (EXCL)            REVERSE  NEXT TRIGGER          COMPONENT"
-      + "  WORKFLOW  DESCRIPTION             TRIGGER ENV\n";
+      + "  WORKFLOW  CREATED              LAST MODIFIED        DESCRIPTION             TRIGGER ENV\n";
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
@@ -84,6 +84,23 @@ public class PrettyCliOutputTest {
   private CliOutput cliOutput;
 
   private static Backfill backfill(String description) {
+    return Backfill.newBuilder()
+        .id("backfill-2")
+        .start(Instant.parse("2017-01-01T00:00:00Z"))
+        .end(Instant.parse("2017-01-02T00:00:00Z"))
+        .workflowId(WorkflowId.create("component", "workflow2"))
+        .concurrency(2)
+        .reverse(false)
+        .description(description)
+        .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
+        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
+        .schedule(Schedule.DAYS)
+        .created(Instant.parse("2019-01-01T00:00:00Z"))
+        .lastModified(Instant.parse("2019-06-01T00:00:00Z"))
+        .build();
+  }
+
+  private static Backfill backfillNoCreateTS(String description) {
     return Backfill.newBuilder()
         .id("backfill-2")
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -121,7 +138,8 @@ public class PrettyCliOutputTest {
         .build(), false);
     assertEquals("                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is... BAR=foo FOO=bar FOOB...\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is... BAR=foo FOO=bar "
+                 + "FOOB...\n",
         outContent.toString());
   }
 
@@ -130,7 +148,7 @@ public class PrettyCliOutputTest {
     cliOutput.printBackfill(backfill(SHORT_DESCRIPTION), false);
     assertEquals("                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description FOO=bar\n",
         outContent.toString());
   }
 
@@ -145,7 +163,8 @@ public class PrettyCliOutputTest {
         .build(), true);
     assertEquals("                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is long enough to truncate BAR=foo FOO=bar FOOBAR=foobar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is long enough to "
+                 + "truncate BAR=foo FOO=bar FOOBAR=foobar\n",
         outContent.toString());
   }
 
@@ -157,7 +176,7 @@ public class PrettyCliOutputTest {
                  "                  backfill-2   false          false          " 
                  + "  2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is... FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is... FOO=bar\n",
         outContent.toString());
   }
 
@@ -169,7 +188,7 @@ public class PrettyCliOutputTest {
                  "                  backfill-2   false          false          " 
                  + "  2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description FOO=bar\n",
         outContent.toString());
   }
 
@@ -180,7 +199,7 @@ public class PrettyCliOutputTest {
     assertEquals(EXPECTED_HEADER_WITH_FULL_DESCRIPTION +
                  "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is long enough to truncate FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is long enough to truncate FOO=bar\n",
         outContent.toString());
   }
 
@@ -192,7 +211,19 @@ public class PrettyCliOutputTest {
     assertEquals(EXPECTED_HEADER_WITH_TRUNCATED_DESCRIPTION
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is... FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is... FOO=bar\n",
+        outContent.toString());
+  }
+
+  @Test
+  public void shouldPrintBackfillsNoCreateTS() {
+    cliOutput.printBackfills(
+        List.of(BackfillPayload.create(backfillNoCreateTS(LONG_DESCRIPTION), Optional.empty())),
+        false);
+    assertEquals(EXPECTED_HEADER_WITH_TRUNCATED_DESCRIPTION
+                 + "                  backfill-2   false          false            2  "
+                 + "2017-01-01            2017-01-02            false    2017-01-01            component  "
+                 + "workflow2                                           Description which is... FOO=bar\n",
         outContent.toString());
   }
 
@@ -204,7 +235,7 @@ public class PrettyCliOutputTest {
     assertEquals(EXPECTED_HEADER_WITH_FULL_DESCRIPTION
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            component  "
-                 + "workflow2 Description which is long enough to truncate FOO=bar\n",
+                 + "workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z Description which is long enough to truncate FOO=bar\n",
         outContent.toString());
   }
 
@@ -216,7 +247,7 @@ public class PrettyCliOutputTest {
     assertEquals(EXPECTED_HEADER
                  + "                  backfill-2   false          false            2  "
                  + "2017-01-01            2017-01-02            false    2017-01-01            "
-                 + "component  workflow2 N/A         FOO=bar\n",
+                 + "component  workflow2 2019-01-01T00:00:00Z 2019-06-01T00:00:00Z N/A         FOO=bar\n",
         outContent.toString());
   }
 
