@@ -462,7 +462,7 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldReturnActiveStatesForAWORKFLOW() throws Exception {
+  public void shouldReturnActiveStatesForAWorkflow() throws Exception {
     storage.writeActiveState(WORKFLOW_INSTANCE2, RUN_STATE2);
     storage.writeActiveState(WORKFLOW_INSTANCE3, RUN_STATE3);
 
