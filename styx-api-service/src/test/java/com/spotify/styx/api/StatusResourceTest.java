@@ -68,9 +68,14 @@ public class StatusResourceTest extends VersionedApiTest {
 
   private static final String COMPONENT_ID = "styx";
   private static final String ID = "test";
+  private static final String THRID_WF_ID = "foo";
   private static final String PARAMETER = "1234";
   private static final Trigger TRIGGER = Trigger.unknown("foobar");
   private static final String OTHER_COMPONENT_ID = "styx-other";
+
+  private static final WorkflowInstance  THIRD_WFI =
+      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, THRID_WF_ID), PARAMETER);
+
   private static final WorkflowInstance WFI =
       WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
   private static final WorkflowInstance OTHER_WFI =
@@ -80,6 +85,9 @@ public class StatusResourceTest extends VersionedApiTest {
       StateData.zero(), Instant.now(), 42L);
 
   private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
+      StateData.zero(), Instant.now(), 84L);
+
+  private static final RunState THIRD_PERSISTENT_STATE = RunState.create(THIRD_WFI, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
@@ -177,7 +185,8 @@ public class StatusResourceTest extends VersionedApiTest {
 
     storage.writeActiveState(WFI, PERSISTENT_STATE);
     storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    assertThat(storage.readActiveStates().entrySet(), hasSize(2));
+    storage.writeActiveState(THIRD_WFI, THIRD_PERSISTENT_STATE);
+    assertThat(storage.readActiveStates().entrySet(), hasSize(3));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
@@ -188,8 +197,35 @@ public class StatusResourceTest extends VersionedApiTest {
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
+    assertThat(parsed.activeStates(), hasSize(2));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(THRID_WF_ID));
+    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
+    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().id(), is(ID));
+  }
+
+  @Test
+  public void testFilterActiveStatesOnWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.writeActiveState(WFI, PERSISTENT_STATE);
+    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
+    storage.writeActiveState(THIRD_WFI, THIRD_PERSISTENT_STATE);
+    assertThat(storage.readActiveStates().entrySet(), hasSize(3));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET",
+            path("/activeStates?component=" + COMPONENT_ID + "&workflow=" + ID)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    String json = response.payload().get().utf8();
+    RunStateDataPayload
+        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+
     assertThat(parsed.activeStates(), hasSize(1));
     assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(ID));
   }
 
   @Test
@@ -204,6 +240,17 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
+  }
+
+  @Test
+  public void testGetActiveStatesFailedDueToMissingComponentId() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/activeStates?workflow=" + ID)));
+
+    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
+    assertThat(response.status().reasonPhrase(), containsString("No component id specified!"));
   }
 
   @Test

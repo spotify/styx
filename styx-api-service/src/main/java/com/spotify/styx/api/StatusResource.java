@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toList;
 import com.google.api.client.util.Lists;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
+import com.spotify.apollo.Status;
 import com.spotify.apollo.entity.EntityMiddleware;
 import com.spotify.apollo.entity.JacksonEntityCodec;
 import com.spotify.apollo.route.AsyncHandler;
@@ -34,6 +35,7 @@ import com.spotify.apollo.route.Middleware;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
+import com.spotify.styx.api.util.InvalidParametersException;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -47,11 +49,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import okio.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * API endpoints for the retrieving events and active states
  */
 public class StatusResource {
+
+  private static final Logger log = LoggerFactory.getLogger(StatusResource.class);
 
   static final String BASE = "/status";
 
@@ -69,7 +75,7 @@ public class StatusResource {
 
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Stream.of(
         Route.with(
-            em.serializerDirect(RunStateDataPayload.class),
+            em.serializerResponse(RunStateDataPayload.class),
             "GET", BASE + "/activeStates",
             this::activeStates),
         Route.with(
@@ -112,23 +118,40 @@ public class StatusResource {
     return rc.pathArgs().get(name);
   }
 
-  private RunStateDataPayload activeStates(RequestContext requestContext) {
+  private Response<RunStateDataPayload> activeStates(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
+    final Optional<String> workflowOpt = requestContext.request().parameter("workflow");
+    final Map<WorkflowInstance, RunState> activeStates;
 
     final List<RunStateData> runStates = Lists.newArrayList();
     try {
-
-      final Map<WorkflowInstance, RunState> activeStates = componentOpt.isPresent()
-          ? storage.readActiveStates(componentOpt.get())
-          : storage.readActiveStates();
-
-      runStates.addAll(
-          activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
+      activeStates = getActiveStates(componentOpt, workflowOpt);
+    } catch (InvalidParametersException e) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      var errorMsg = "Could not read Active states: " + e;
+      log.error(errorMsg);
+      return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(errorMsg));
     }
+    runStates.addAll(
+        activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
 
-    return RunStateDataPayload.create(runStates);
+    return Response.forPayload(RunStateDataPayload.create(runStates));
+  }
+
+  private Map<WorkflowInstance, RunState> getActiveStates(Optional<String> componentOpt, Optional<String> workflowOpt)
+      throws IOException {
+    if (workflowOpt.isPresent()) {
+      if (componentOpt.isPresent()){
+        return storage.readActiveStates(componentOpt.get(), workflowOpt.get());
+      } else {
+        throw new InvalidParametersException("No component id specified!");
+      }
+    } else if(componentOpt.isPresent()) {
+      return storage.readActiveStates(componentOpt.get());
+    } else {
+      return storage.readActiveStates();
+    }
   }
 
   private RunStateData runStateToRunStateData(RunState state) {
