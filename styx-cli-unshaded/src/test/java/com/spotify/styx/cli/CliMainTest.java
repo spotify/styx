@@ -153,6 +153,27 @@ public class CliMainTest {
   }
 
   @Test
+  public void testWorkflowCreateInvalidStructure() throws Exception {
+    final Path workflowsFile = fileFromResource("wf-missing-schedule.yaml");
+    try {
+      CliMain.run(cliContext, "workflow", "create", "-f", workflowsFile.toString(), "foo");
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.InputError));
+    }
+    verify(cliOutput).printError(
+        "Workflow configuration doesn't conform to the expected structure, problem: "
+            + "schedule\n at [Source: (File); line: 4, column: 1]\n"
+            + "Minimal valid example: \n"
+            + "========================\n"
+            + "id: bar\n"
+            + "schedule: DAYS\n"
+            + "docker_image: busybox\n"
+            + "docker_args: [echo, bar]\n"
+            + "========================\n");
+  }
+
+
+  @Test
   public void testWorkflowCreateInvalid() throws Exception {
     final String component = "quux";
 
