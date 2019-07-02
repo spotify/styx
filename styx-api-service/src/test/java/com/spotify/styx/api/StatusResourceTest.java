@@ -263,7 +263,7 @@ public class StatusResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void testGetActiveStatesFailedDueToStorageIOException() throws Exception {
+  public void testGetMultiComponentsActiveStatesFailedDueToStorageIOException() throws Exception {
     sinceVersion(Api.Version.V3);
 
     IOException ioException = new IOException("forced failure");
@@ -271,6 +271,22 @@ public class StatusResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/activeStates")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+    assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
+  }
+
+  @Test
+  public void testGetActiveStatesFailedDueToStorageIOException() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    IOException ioException = new IOException("forced failure");
+    when(storage.readActiveStates(anyString())).thenThrow(ioException);
+
+    Response<ByteString> response =
+        awaitResponse(
+            serviceHelper.request(
+                "GET", path("/activeStates?components=" + C_ID_1 + "," + C_ID_3)));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response.status().reasonPhrase(), containsString(": " + ioException.toString()));
