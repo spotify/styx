@@ -40,6 +40,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
 import com.spotify.styx.api.RunStateDataPayload.RunStateData;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.ServiceAccountUsageAuthorizationResult;
+import com.spotify.styx.api.util.ApiTestUtil;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -66,28 +67,33 @@ import org.junit.Test;
 
 public class StatusResourceTest extends VersionedApiTest {
 
-  private static final String COMPONENT_ID = "styx";
-  private static final String ID = "test";
-  private static final String THRID_WF_ID = "foo";
+  private static final String C_ID_1 = "styx";
+  private static final String WF_ID_1 = "test";
+  private static final String WF_ID_2 = "foo";
   private static final String PARAMETER = "1234";
   private static final Trigger TRIGGER = Trigger.unknown("foobar");
-  private static final String OTHER_COMPONENT_ID = "styx-other";
+  private static final String C_ID_2 = "styx-second";
+  private static final String C_ID_3 = "styx-third";
 
-  private static final WorkflowInstance  THIRD_WFI =
-      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, THRID_WF_ID), PARAMETER);
+  private static final WorkflowInstance WFI_1 =
+      WorkflowInstance.create(WorkflowId.create(C_ID_1, WF_ID_1), PARAMETER);
+  private static final WorkflowInstance WFI_2 =
+      WorkflowInstance.create(WorkflowId.create(C_ID_2, WF_ID_1), PARAMETER);
+  private static final WorkflowInstance WFI_3 =
+      WorkflowInstance.create(WorkflowId.create(C_ID_1, WF_ID_2), PARAMETER);
+  private static final WorkflowInstance WFI_4 =
+      WorkflowInstance.create(WorkflowId.create(C_ID_3, WF_ID_1), PARAMETER);
 
-  private static final WorkflowInstance WFI =
-      WorkflowInstance.create(WorkflowId.create(COMPONENT_ID, ID), PARAMETER);
-  private static final WorkflowInstance OTHER_WFI =
-      WorkflowInstance.create(WorkflowId.create(OTHER_COMPONENT_ID, ID), PARAMETER);
-
-  private static final RunState PERSISTENT_STATE = RunState.create(WFI, State.RUNNING,
+  private static final RunState PERSISTENT_STATE_1 = RunState.create(WFI_1, State.RUNNING,
       StateData.zero(), Instant.now(), 42L);
 
-  private static final RunState OTHER_PERSISTENT_STATE = RunState.create(OTHER_WFI, State.RUNNING,
+  private static final RunState PERSISTENT_STATE_2 = RunState.create(WFI_2, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
-  private static final RunState THIRD_PERSISTENT_STATE = RunState.create(THIRD_WFI, State.RUNNING,
+  private static final RunState PERSISTENT_STATE_3 = RunState.create(WFI_3, State.RUNNING,
+      StateData.zero(), Instant.now(), 84L);
+
+  private static final RunState PERSISTENT_STATE_4 = RunState.create(WFI_4, State.RUNNING,
       StateData.zero(), Instant.now(), 84L);
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
@@ -127,9 +133,9 @@ public class StatusResourceTest extends VersionedApiTest {
   public void testEventsRoundtrip() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI, TRIGGER, TriggerParameters.zero()), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI, "exec0", "img0"), 1L, 1L));
-    storage.writeEvent(SequenceEvent.create(Event.started(WFI), 2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI_1, TRIGGER, TriggerParameters.zero()), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.created(WFI_1, "exec0", "img0"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.started(WFI_1), 2L, 2L));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/events/styx/test/1234")));
@@ -147,8 +153,8 @@ public class StatusResourceTest extends VersionedApiTest {
   public void testGetAllActiveStates() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeActiveState(WFI, PERSISTENT_STATE);
-    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
+    storage.writeActiveState(WFI_1, PERSISTENT_STATE_1);
+    storage.writeActiveState(WFI_2, PERSISTENT_STATE_2);
     assertThat(storage.readActiveStates().entrySet(), hasSize(2));
 
     Response<ByteString> response =
@@ -162,16 +168,16 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(parsed.activeStates(), containsInAnyOrder(
         RunStateData.newBuilder()
-            .workflowInstance(PERSISTENT_STATE.workflowInstance())
-            .state(PERSISTENT_STATE.state().name())
-            .stateData(PERSISTENT_STATE.data())
-            .latestTimestamp(PERSISTENT_STATE.timestamp())
+            .workflowInstance(PERSISTENT_STATE_1.workflowInstance())
+            .state(PERSISTENT_STATE_1.state().name())
+            .stateData(PERSISTENT_STATE_1.data())
+            .latestTimestamp(PERSISTENT_STATE_1.timestamp())
             .build(),
         RunStateData.newBuilder()
-            .workflowInstance(OTHER_PERSISTENT_STATE.workflowInstance())
-            .state(OTHER_PERSISTENT_STATE.state().name())
-            .stateData(OTHER_PERSISTENT_STATE.data())
-            .latestTimestamp(OTHER_PERSISTENT_STATE.timestamp())
+            .workflowInstance(PERSISTENT_STATE_2.workflowInstance())
+            .state(PERSISTENT_STATE_2.state().name())
+            .stateData(PERSISTENT_STATE_2.data())
+            .latestTimestamp(PERSISTENT_STATE_2.timestamp())
             .build()
     ));
   }
@@ -181,15 +187,15 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance OTHER_WFI =
-        WorkflowInstance.create(WorkflowId.create(COMPONENT_ID + "-other", ID), PARAMETER);
+        WorkflowInstance.create(WorkflowId.create(C_ID_1 + "-other", WF_ID_1), PARAMETER);
 
-    storage.writeActiveState(WFI, PERSISTENT_STATE);
-    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    storage.writeActiveState(THIRD_WFI, THIRD_PERSISTENT_STATE);
+    storage.writeActiveState(WFI_1, PERSISTENT_STATE_1);
+    storage.writeActiveState(OTHER_WFI, PERSISTENT_STATE_2);
+    storage.writeActiveState(WFI_3, PERSISTENT_STATE_3);
     assertThat(storage.readActiveStates().entrySet(), hasSize(3));
 
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + COMPONENT_ID)));
+        awaitResponse(serviceHelper.request("GET", path("/activeStates?component=" + C_ID_1)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
@@ -198,24 +204,52 @@ public class StatusResourceTest extends VersionedApiTest {
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(2));
-    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
-    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(THRID_WF_ID));
-    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
-    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().id(), is(ID));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(C_ID_1));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(WF_ID_2));
+    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().componentId(), is(C_ID_1));
+    assertThat(parsed.activeStates().get(1).workflowInstance().workflowId().id(), is(WF_ID_1));
+  }
+
+  @Test
+  public void testGetActiveStatesForMultiComponent() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    storage.writeActiveState(WFI_1, PERSISTENT_STATE_1);
+    storage.writeActiveState(WFI_2, PERSISTENT_STATE_2);
+    storage.writeActiveState(WFI_3, PERSISTENT_STATE_3);
+    storage.writeActiveState(WFI_4, PERSISTENT_STATE_4);
+    assertThat(storage.readActiveStates().entrySet(), hasSize(4));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", path("/activeStates?components=" + C_ID_1 + "," + C_ID_3)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+
+    String json = response.payload().get().utf8();
+    RunStateDataPayload
+        parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
+
+    assertThat(parsed.activeStates(), hasSize(3));
+
+    var activeStates = ApiTestUtil.groupStatesByWorkflow(parsed.activeStates());
+
+    assertThat(activeStates.get(WorkflowId.create(C_ID_1, WF_ID_1)).size(), is(1));
+    assertThat(activeStates.get(WorkflowId.create(C_ID_1, WF_ID_2)).size(), is(1));
+    assertThat(activeStates.get(WorkflowId.create(C_ID_3, WF_ID_1)).size(), is(1));
   }
 
   @Test
   public void testFilterActiveStatesOnWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    storage.writeActiveState(WFI, PERSISTENT_STATE);
-    storage.writeActiveState(OTHER_WFI, OTHER_PERSISTENT_STATE);
-    storage.writeActiveState(THIRD_WFI, THIRD_PERSISTENT_STATE);
+    storage.writeActiveState(WFI_1, PERSISTENT_STATE_1);
+    storage.writeActiveState(WFI_2, PERSISTENT_STATE_2);
+    storage.writeActiveState(WFI_3, PERSISTENT_STATE_3);
     assertThat(storage.readActiveStates().entrySet(), hasSize(3));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET",
-            path("/activeStates?component=" + COMPONENT_ID + "&workflow=" + ID)));
+            path("/activeStates?component=" + C_ID_1 + "&workflow=" + WF_ID_1)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
@@ -224,8 +258,8 @@ public class StatusResourceTest extends VersionedApiTest {
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
     assertThat(parsed.activeStates(), hasSize(1));
-    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(COMPONENT_ID));
-    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(ID));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().componentId(), is(C_ID_1));
+    assertThat(parsed.activeStates().get(0).workflowInstance().workflowId().id(), is(WF_ID_1));
   }
 
   @Test
@@ -247,7 +281,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("GET", path("/activeStates?workflow=" + ID)));
+        awaitResponse(serviceHelper.request("GET", path("/activeStates?workflow=" + WF_ID_1)));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response.status().reasonPhrase(), containsString("No component id specified!"));

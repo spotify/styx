@@ -678,7 +678,7 @@ Workflow Instance belonging to a Backfill entity.
 
 Resources related to inspect detailed status of Workflow Instances.
 
-## Active States [/{version}/status/activeStates{?component,workflow}]
+## Active States [/{version}/status/activeStates{?component,workflow,components}]
 
 + Parameters
     + version: `v3` (enum[string]) - API version
@@ -686,6 +686,8 @@ Resources related to inspect detailed status of Workflow Instances.
             + `v3`
     + component: `styx-canary` (optional, string) - Component ID
     + workflow: `StyxCanary`  (optional, string) - Workflow ID - requires Component ID to also be specified
+    + components: `styx-canary,styx-canary1,styx-canary3` (optional, string) - Component IDs, IDs should be comma
+    separated.
 
 ### Get Active States [GET]
 

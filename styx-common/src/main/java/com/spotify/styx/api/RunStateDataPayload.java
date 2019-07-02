@@ -43,6 +43,9 @@ public interface RunStateDataPayload {
     Comparator<RunStateData> PARAMETER_COMPARATOR =
         Comparator.comparing(a -> a.workflowInstance().parameter());
 
+    Comparator<RunStateData> WORKFLOW_COMPARATOR =
+        Comparator.comparing(a -> a.workflowInstance().toString());
+
     WorkflowInstance workflowInstance();
 
     String state();
