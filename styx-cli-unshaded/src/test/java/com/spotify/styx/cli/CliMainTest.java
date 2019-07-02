@@ -172,6 +172,19 @@ public class CliMainTest {
             + "========================\n");
   }
 
+  @Test
+  public void testWorkflowCreateBadInput() throws Exception {
+    final Path workflowsFile = fileFromResource("bad-content.yaml");
+    try {
+      CliMain.run(cliContext, "workflow", "create", "-f", workflowsFile.toString(), "foo");
+    } catch (CliExitException e) {
+      assertThat(e.status(), is(ExitStatus.InputError));
+    }
+    verify(cliOutput).printError(contains(
+        "Workflow configuration doesn't conform to the expected structure, "
+            + "Cannot deserialize instance of"));
+  }
+
 
   @Test
   public void testWorkflowCreateInvalid() throws Exception {

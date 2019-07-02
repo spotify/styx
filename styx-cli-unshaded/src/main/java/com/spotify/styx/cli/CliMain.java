@@ -449,7 +449,7 @@ public final class CliMain {
           errorMessage + e.getMessage().substring(e.getMessage().indexOf("problem")) + validExample,
           e);
     }
-    throw new InputErrorException(errorMessage, e);
+    throw new InputErrorException(errorMessage + e.getMessage(), e);
   }
 
   private void workflowEnable() throws ExecutionException, InterruptedException {
