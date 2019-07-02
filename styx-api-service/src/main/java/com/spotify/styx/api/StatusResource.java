@@ -129,7 +129,7 @@ public class StatusResource {
 
     final List<RunStateData> runStates = Lists.newArrayList();
     try {
-        activeStates = componentsOpt.isPresent() ? getActiveStates(componentsOpt.get()):
+      activeStates = componentsOpt.isPresent() ? getActiveStates(componentsOpt.get()):
                        getActiveStates(componentOpt, workflowOpt);
 
     } catch (InvalidParametersException e) {
