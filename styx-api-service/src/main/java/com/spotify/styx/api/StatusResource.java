@@ -25,6 +25,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.util.Lists;
+import com.google.common.collect.ImmutableMap;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -43,6 +44,7 @@ import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,11 +123,14 @@ public class StatusResource {
   private Response<RunStateDataPayload> activeStates(RequestContext requestContext) {
     final Optional<String> componentOpt = requestContext.request().parameter("component");
     final Optional<String> workflowOpt = requestContext.request().parameter("workflow");
+    final Optional<String> componentsOpt = requestContext.request().parameter("components");
     final Map<WorkflowInstance, RunState> activeStates;
 
     final List<RunStateData> runStates = Lists.newArrayList();
     try {
-      activeStates = getActiveStates(componentOpt, workflowOpt);
+      activeStates = componentsOpt.isPresent() ? getActiveStates(componentsOpt.get()):
+                       getActiveStates(componentOpt, workflowOpt);
+
     } catch (InvalidParametersException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
@@ -137,6 +142,29 @@ public class StatusResource {
         activeStates.values().stream().map(this::runStateToRunStateData).collect(toList()));
 
     return Response.forPayload(RunStateDataPayload.create(runStates));
+  }
+
+  private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) throws IOException {
+    final List<String> components = Arrays.asList(componentsStr.split(","));
+    final ImmutableMap.Builder<WorkflowInstance, RunState> mapBuilder = ImmutableMap.builder();
+
+    final List<Optional<IOException>> exceptions = components.parallelStream().map( componentId -> {
+      Optional<IOException> exception = Optional.empty();
+      try{
+        final Map<WorkflowInstance, RunState> stateMap = storage.readActiveStates(componentId);
+        for (WorkflowInstance instance : stateMap.keySet()) {
+          mapBuilder.put(instance, stateMap.get(instance));
+        }
+      } catch (IOException e) {
+        exception = Optional.of(e);
+      }
+      return exception;
+      }).filter(Optional::isPresent).collect(toList());
+    if (!exceptions.isEmpty()) {
+      throw exceptions.get(0).get();
+    }
+
+    return mapBuilder.build();
   }
 
   private Map<WorkflowInstance, RunState> getActiveStates(Optional<String> componentOpt, Optional<String> workflowOpt)
