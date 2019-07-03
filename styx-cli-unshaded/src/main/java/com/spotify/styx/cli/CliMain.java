@@ -46,6 +46,7 @@ import com.spotify.styx.cli.CliExitException.ExitStatus;
 import com.spotify.styx.cli.CliMain.CliContext.Output;
 import com.spotify.styx.client.ApiErrorException;
 import com.spotify.styx.client.ClientErrorException;
+import com.spotify.styx.client.InputErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.client.StyxClientFactory;
 import com.spotify.styx.model.Backfill;
@@ -306,6 +307,9 @@ public final class CliMain {
           // parsing unknown command will fail so this would only catch non-exhaustive switches
           throw new ArgumentParserException("Unrecognized command: " + command, parser.parser);
       }
+    } catch (InputErrorException e) {
+      cliOutput.printError(e.getMessage());
+      throw CliExitException.of(ExitStatus.InputError);
     } catch (ArgumentParserException e) {
       parser.parser.handleError(e);
       throw CliExitException.of(ExitStatus.ArgumentError);
@@ -399,7 +403,12 @@ public final class CliMain {
       iterator = workflowReader.readValues(file);
     }
 
-    final List<WorkflowConfiguration> configurations = iterator.readAll();
+    final List<WorkflowConfiguration> configurations;
+    try {
+      configurations = iterator.readAll();
+    } catch (IOException e) {
+      throw createInputErrorException(e);
+    }
 
     boolean invalid = false;
     for (WorkflowConfiguration configuration : configurations) {
@@ -424,6 +433,23 @@ public final class CliMain {
       cliOutput.printMessage("Workflow " + created.workflowId() + " in component "
           + created.componentId() + " created.");
     }
+  }
+
+  private InputErrorException createInputErrorException(IOException e) {
+    String errorMessage = "Workflow configuration doesn't conform to the expected structure, ";
+    String validExample = "\nMinimal valid example: \n"
+            + "========================\n"
+            + "id: bar\n"
+            + "schedule: DAYS\n"
+            + "docker_image: busybox\n"
+            + "docker_args: [echo, bar]\n"
+            + "========================\n";
+    if (e.getMessage().contains("problem:")) {
+      throw new InputErrorException(
+          errorMessage + e.getMessage().substring(e.getMessage().indexOf("problem")) + validExample,
+          e);
+    }
+    throw new InputErrorException(errorMessage + e.getMessage(), e);
   }
 
   private void workflowEnable() throws ExecutionException, InterruptedException {

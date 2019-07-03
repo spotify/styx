@@ -1,0 +1,5 @@
+id: foo
+docker_image: busybox
+docker_args: [echo, foo]
+schedule: DAYS
+null

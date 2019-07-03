@@ -28,7 +28,8 @@ class CliExitException extends RuntimeException {
     ArgumentError(2),
     ClientError(3),
     ApiError(4),
-    AuthError(5);
+    AuthError(5),
+    InputError(6);
 
     final int code;
 
