@@ -181,8 +181,7 @@ public class CliMainTest {
       assertThat(e.status(), is(ExitStatus.InputError));
     }
     verify(cliOutput).printError(contains(
-        "Workflow configuration doesn't conform to the expected structure, "
-            + "Cannot deserialize instance of"));
+        "Workflow configuration doesn't conform to the expected structure, "));
   }
 
 
