@@ -47,10 +47,12 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
@@ -133,6 +135,8 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
     assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
+    assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));
+    assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(Optional.of(Duration.ZERO)));
   }
 
   @Test
@@ -202,6 +206,8 @@ public class ExecutionDescriptionHandlerTest {
         .commitSha(COMMIT_SHA)
         .dockerImage(DOCKER_IMAGE)
         .dockerArgs(Arrays.asList(args))
+        .env("foo", "bar")
+        .runningTimeout(Duration.ZERO)
         .build();
   }
 }

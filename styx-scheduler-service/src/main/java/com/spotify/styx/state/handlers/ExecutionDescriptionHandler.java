@@ -138,6 +138,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .serviceAccount(workflow.configuration().serviceAccount())
         .commitSha(workflow.configuration().commitSha())
         .env(env)
+        .runningTimeout(workflow.configuration().runningTimeout())
         .build();
   }
 
