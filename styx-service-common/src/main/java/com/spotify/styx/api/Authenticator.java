@@ -150,38 +150,38 @@ public class Authenticator {
     try {
       googleIdToken = verifyIdToken(token);
     } catch (IOException e) {
-      logger.warn("Failed to verify token");
+      logger.warn("Rejecting auth token: Failed to verify token", e);
       return null;
     }
 
     if (googleIdToken == null) {
-      logger.debug("Invalid id token: verifyIdToken returned null");
+      logger.warn("Rejecting auth token: verifyIdToken returned null");
       return null;
     }
 
     final String email = googleIdToken.getPayload().getEmail();
     if (email == null) {
-      logger.debug("No email in id token");
+      logger.warn("Rejecting auth token: No email in id token");
       return null;
     }
 
     final String domain = getDomain(email);
     if (domain == null) {
-      logger.warn("Invalid email address {}", email);
+      logger.warn("Rejecting auth token: Invalid email address {}", email);
       return null;
     } else if (domainWhitelist.contains(domain)) {
-      logger.debug("Domain {} in whitelist", domain);
+      logger.debug("Validating auth token: Domain {} in whitelist", domain);
       return googleIdToken;
     }
 
     if (validatedEmailCache.getIfPresent(email) != null) {
-      logger.debug("Cache hit for {}", email);
+      logger.debug("Validating auth token: Cache hit for {}", email);
       return googleIdToken;
     }
 
     // Is this a GCP service account?
     if (!SERVICE_ACCOUNT_PATTERN.matcher(email).matches()) {
-      logger.debug("Not a service account: {}", email);
+      logger.warn("Rejecting auth token: Not a service account: {}", email);
       return null;
     }
 
@@ -192,7 +192,7 @@ public class Authenticator {
         // TODO: Remove this null check and require tokens to have a target audience
         && googleIdToken.getPayload().getAudience() != null) {
       if (!googleIdToken.verifyAudience(allowedAudiences)) {
-        logger.warn("ID token wasn't intended for Styx");
+        logger.warn("Rejecting auth token: ID token wasn't intended for Styx");
         return null;
       }
     }
@@ -201,7 +201,7 @@ public class Authenticator {
     try {
       projectId = checkServiceAccountProject(email);
     } catch (IOException e) {
-      logger.info("Cannot authenticate {}", email);
+      logger.warn("Rejecting auth token: Cannot authenticate {}", email);
       return null;
     }
 
@@ -210,6 +210,7 @@ public class Authenticator {
       return googleIdToken;
     }
 
+    logger.warn("Rejecting auth token");
     return null;
   }
 
@@ -236,6 +237,7 @@ public class Authenticator {
     try {
       return googleIdTokenVerifier.verify(token);
     } catch (GeneralSecurityException e) {
+      logger.warn("Caught GeneralSecurityException when validating token", e);
       return null;
     }
   }
