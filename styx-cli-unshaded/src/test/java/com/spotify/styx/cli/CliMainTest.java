@@ -118,6 +118,7 @@ public class CliMainTest {
 
   @Test
   public void testWorkflowList() {
+    @SuppressWarnings("unchecked")
     final List<Workflow> payload = mock(List.class);
     when(client.workflows())
         .thenReturn(CompletableFuture.completedFuture(payload));

@@ -35,6 +35,7 @@ import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -89,8 +90,8 @@ class PlainCliOutput implements CliOutput {
         backfill.end(),
         backfill.reverse(),
         backfill.nextTrigger(),
-        backfill.created().map( create -> create.toString()).orElse(""),
-        backfill.lastModified().map( lastModified -> lastModified.toString()).orElse(""),
+        backfill.created().map(Instant::toString).orElse(""),
+        backfill.lastModified().map(Instant::toString).orElse(""),
         backfill.description().orElse(""),
         backfill.triggerParameters().map(triggerParameters -> formatMap(
             triggerParameters.env())).orElse("")));
