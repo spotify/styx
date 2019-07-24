@@ -23,12 +23,11 @@ package com.spotify.styx.util;
 import static com.spotify.styx.util.ShardedCounter.NUM_SHARDS;
 import static com.spotify.styx.util.ShardedCounterSnapshotFactory.TRANSACTION_GROUP_SIZE;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
@@ -52,7 +51,6 @@ public class ShardedCounterSnapshotFactoryTest {
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
   private static final String RESOURCE_ID = "resourceid-1";
-  private static Datastore datastore;
   private static Connection connection;
 
   private static Storage storage;
@@ -60,7 +58,7 @@ public class ShardedCounterSnapshotFactoryTest {
 
   @BeforeClass
   public static void setUpClass() {
-    datastore = datastoreEmulator.client();
+    var datastore = datastoreEmulator.client();
     connection = Mockito.mock(Connection.class);
     storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
   }

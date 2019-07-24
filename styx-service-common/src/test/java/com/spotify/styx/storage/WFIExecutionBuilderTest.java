@@ -38,8 +38,6 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.EventUtil;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -73,7 +71,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testHaltEventAfterTriggerEvent() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.halt(), c++, ts("07:56"))
     );
@@ -83,18 +81,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     true,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "HALTED", Optional.empty())
                             )
                         )
@@ -109,7 +107,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testRunErrorEventAfterTriggerEvent() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.runError("Error message"), c++, ts("07:56"))
     );
@@ -119,18 +117,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     false,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "FAILED", Optional.of("Error message"))
                             )
                         )
@@ -149,7 +147,7 @@ public class WFIExecutionBuilderTest {
         .env("FOO", "foo",
             "BAR", "bar")
         .build();
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
         SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
@@ -186,18 +184,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Arrays.asList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     triggerParameters,
                     true,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("07:58"), "MISSING_DEPS", Optional.empty())
@@ -207,7 +205,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.empty(),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("08:58"), "SUCCESS", Optional.empty())
@@ -220,12 +218,12 @@ public class WFIExecutionBuilderTest {
                     time("09:55"),
                     TriggerParameters.zero(),
                     false,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-10"),
                             Optional.of("img3"),
                             Optional.of("sha3"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("09:58"), "FAILED", Optional.of("Exit code: 1"))
@@ -235,7 +233,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-11"),
                             Optional.of("img4"),
                             Optional.of("sha4"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
                             )
@@ -251,7 +249,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testFailureNoExitCode() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -266,18 +264,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Arrays.asList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     false,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("07:58"), "FAILED", Optional.of("Exit code unknown"))
@@ -294,7 +292,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testTimeout() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -315,18 +313,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     false,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("07:58"), "TIMEOUT", Optional.empty())
@@ -336,7 +334,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
                             )
@@ -352,7 +350,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testReceiveTimeoutWithMissingTriggerExecution() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.timeout(), c++, ts("07:54")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -365,18 +363,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "UNKNOWN",
                     time("07:54"),
                     TriggerParameters.zero(),
                     false,
-                    Collections.singletonList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty())
                             )
@@ -392,7 +390,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testRunError() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -412,18 +410,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     false,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
                             )
                         ),
@@ -431,7 +429,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("08:59"), "FAILED", Optional.of("Second failure"))
@@ -448,7 +446,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testHaltAndReTrigger() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -468,18 +466,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Arrays.asList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     true,
-                    Collections.singletonList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "HALTED", Optional.empty())
                             )
@@ -491,12 +489,12 @@ public class WFIExecutionBuilderTest {
                     time("08:56"),
                     TriggerParameters.zero(),
                     false,
-                    Collections.singletonList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-10"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
                             )
@@ -512,7 +510,7 @@ public class WFIExecutionBuilderTest {
   @Test
   public void testStop() {
     long c = 0L;
-    List<SequenceEvent> events = Arrays.asList(
+    List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
         SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
@@ -533,18 +531,18 @@ public class WFIExecutionBuilderTest {
     WorkflowInstanceExecutionData expected =
         WorkflowInstanceExecutionData.create(
             WORKFLOW_INSTANCE,
-            Collections.singletonList(
+            List.of(
                 Trigger.create(
                     "trig0",
                     time("07:55"),
                     TriggerParameters.zero(),
                     true,
-                    Arrays.asList(
+                    List.of(
                         Execution.create(
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
                             )
                         ),
@@ -552,7 +550,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
-                            Arrays.asList(
+                            List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("08:59"), "FAILED", Optional.of("Second failure"))

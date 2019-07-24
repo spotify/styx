@@ -82,10 +82,10 @@ public final class Middlewares {
     return innerHandler -> jsonAsync().apply(Middleware.syncToAsync(innerHandler));
   }
 
-  public static Middleware<AsyncHandler<? extends Response<?>>, AsyncHandler<Response<ByteString>>>
+  static Middleware<AsyncHandler<? extends Response<?>>, AsyncHandler<Response<ByteString>>>
       jsonAsync() {
     return innerHandler -> innerHandler.map(response -> {
-      if (!response.payload().isPresent()) {
+      if (response.payload().isEmpty()) {
         // noinspection unchecked
         return (Response<ByteString>) response;
       }
@@ -105,7 +105,7 @@ public final class Middlewares {
     });
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> clientValidator(
+  static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> clientValidator(
       Supplier<List<String>> supplier) {
     return innerHandler -> requestContext -> {
       if (requestContext.request().header("User-Agent")
@@ -131,7 +131,7 @@ public final class Middlewares {
           ? requestIdHeader
           : UUID.randomUUID().toString().replace("-", ""); // UUID with no dashes, easier to deal with
 
-      try (MDC.MDCCloseable mdc = MDCUtil.safePutCloseable(REQUEST_ID, requestId)) {
+      try (MDC.MDCCloseable ignored = MDCUtil.safePutCloseable(REQUEST_ID, requestId)) {
         return innerHandler.invoke(requestContext).handle((r, t) -> {
           final Response<T> response;
           if (t != null) {
@@ -175,12 +175,12 @@ public final class Middlewares {
     return CharMatcher.anyOf("\n\r").replaceFrom(reason.toString(), ' ');
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
+  static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       RequestAuthenticator authenticator) {
     return httpLogger(LOG, authenticator);
   }
 
-  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
+  static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> httpLogger(
       Logger log,
       RequestAuthenticator authenticator) {
     return innerHandler -> requestContext -> {
@@ -278,7 +278,7 @@ public final class Middlewares {
       RequestAuthenticator authenticator) {
     return h -> rc -> {
       final Optional<GoogleIdToken> idToken = auth(rc, authenticator).user();
-      if (!"GET".equals(rc.request().method()) && !idToken.isPresent()) {
+      if (!"GET".equals(rc.request().method()) && idToken.isEmpty()) {
         return completedFuture(
             Response.forStatus(Status.UNAUTHORIZED.withReasonPhrase("Unauthorized access")));
       }

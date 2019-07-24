@@ -58,7 +58,7 @@ public class WorkflowActionAuthorizer {
   public void authorizeWorkflowAction(AuthContext ac, Workflow workflow) {
     final GoogleIdToken idToken = ac.user().orElseThrow(AssertionError::new);
     final Optional<String> serviceAccount = workflow.configuration().serviceAccount();
-    if (!serviceAccount.isPresent()) {
+    if (serviceAccount.isEmpty()) {
       return;
     }
     serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), serviceAccount.get(), idToken);

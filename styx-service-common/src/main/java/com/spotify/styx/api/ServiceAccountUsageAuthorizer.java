@@ -472,11 +472,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     private static <T> List<T> emptyListIfNull(List<T> list) {
-      if (list == null) {
-        return Collections.emptyList();
-      } else {
-        return list;
-      }
+      return Objects.requireNonNullElse(list, List.of());
     }
   }
 

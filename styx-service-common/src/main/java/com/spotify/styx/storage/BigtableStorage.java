@@ -65,10 +65,10 @@ public class BigtableStorage {
 
   public static final TableName EVENTS_TABLE_NAME = TableName.valueOf("styx_events");
 
-  public static final byte[] EVENT_CF = Bytes.toBytes("event");
-  public static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
+  private static final byte[] EVENT_CF = Bytes.toBytes("event");
+  private static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
-  public static final int MAX_BIGTABLE_RETRIES = 100;
+  static final int MAX_BIGTABLE_RETRIES = 100;
 
   private final Connection connection;
   private final Duration retryBaseDelay;
@@ -177,11 +177,7 @@ public class BigtableStorage {
       throws IOException {
     final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
     final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    if (lastStoredEvent.isPresent()) {
-      return Optional.of(lastStoredEvent.get().counter());
-    } else {
-      return Optional.empty();
-    }
+    return lastStoredEvent.map(SequenceEvent::counter);
   }
 
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
@@ -200,7 +196,7 @@ public class BigtableStorage {
           try {
             return executionData(workflowInstance);
           } catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
           }
         })
         .sorted(WorkflowInstanceExecutionData.COMPARATOR)
@@ -234,7 +230,7 @@ public class BigtableStorage {
         try {
           Thread.sleep(retryBaseDelay.toMillis());
         } catch (InterruptedException e1) {
-          throw Throwables.propagate(e1);
+          throw new RuntimeException(e1);
         }
       } catch (Throwable e) {
         Throwables.throwIfUnchecked(e);

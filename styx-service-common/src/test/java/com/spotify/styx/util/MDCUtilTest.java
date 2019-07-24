@@ -54,12 +54,12 @@ public class MDCUtilTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     MDC.clear();
   }
 
   @AfterClass
-  public static void tearDownClass() throws Exception {
+  public static void tearDownClass() {
     EXECUTOR_SERVICE.shutdownNow();
   }
 
@@ -127,7 +127,7 @@ public class MDCUtilTest {
   @Test
   @Repeat(times = 10000, threads = 4)
   public void safePutCloseable() {
-    try (MDCCloseable mdc = MDCUtil.safePutCloseable("foo", "bar")) {
+    try (MDCCloseable ignored = MDCUtil.safePutCloseable("foo", "bar")) {
       assertThat(MDC.get("foo"), is("bar"));
     }
     assertThat(MDC.get("foo"), is(nullValue()));

@@ -38,10 +38,10 @@ public final class Connections {
 
   private static final Logger LOG = LoggerFactory.getLogger(Connections.class);
 
-  public static final String DATASTORE_PROJECT = "styx.datastore.project-id";
-  public static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
-  public static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
-  public static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
+  static final String DATASTORE_PROJECT = "styx.datastore.project-id";
+  static final String DATASTORE_NAMESPACE = "styx.datastore.namespace";
+  private static final String BIGTABLE_PROJECT_ID = "styx.bigtable.project-id";
+  private static final String BIGTABLE_INSTANCE_ID = "styx.bigtable.instance-id";
 
   private Connections() {
   }

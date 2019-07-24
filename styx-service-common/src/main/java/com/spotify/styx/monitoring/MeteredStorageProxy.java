@@ -30,7 +30,7 @@ import javaslang.control.Try;
  */
 public class MeteredStorageProxy extends MeteredProxy<Storage> {
 
-  MeteredStorageProxy(Storage delegate, Stats stats, Time time) {
+  private MeteredStorageProxy(Storage delegate, Stats stats, Time time) {
     super(delegate, stats, time);
   }
 

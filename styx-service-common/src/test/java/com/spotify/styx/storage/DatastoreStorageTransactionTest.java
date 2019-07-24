@@ -63,14 +63,13 @@ public class DatastoreStorageTransactionTest {
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
-  private CheckedDatastore datastore;
   private DatastoreStorage storage;
 
   private ExecutorService executor = Executors.newCachedThreadPool();
 
   @Before
   public void setUp() throws Exception {
-    datastore = spy(new CheckedDatastore(datastoreEmulator.client()));
+    var datastore = spy(new CheckedDatastore(datastoreEmulator.client()));
     storage = new DatastoreStorage(datastore);
   }
 

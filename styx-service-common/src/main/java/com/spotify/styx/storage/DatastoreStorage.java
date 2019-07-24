@@ -118,68 +118,67 @@ public class DatastoreStorage implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatastoreStorage.class);
 
-  public static final String KIND_STYX_CONFIG = "StyxConfig";
-  public static final String KIND_WORKFLOW = "Workflow";
-  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
-  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD = "ActiveWorkflowInstanceIndexShard";
-  public static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY = "ActiveWorkflowInstanceIndexShardEntry";
-  public static final String KIND_BACKFILL = "Backfill";
+  private static final String KIND_STYX_CONFIG = "StyxConfig";
+  private static final String KIND_WORKFLOW = "Workflow";
+  static final String KIND_ACTIVE_WORKFLOW_INSTANCE = "ActiveWorkflowInstance";
+  private static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD = "ActiveWorkflowInstanceIndexShard";
+  private static final String KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY = "ActiveWorkflowInstanceIndexShardEntry";
+  private static final String KIND_BACKFILL = "Backfill";
 
-  public static final String PROPERTY_CONFIG_ENABLED = "enabled";
-  public static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
-  public static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
-  public static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
-  public static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
+  private static final String PROPERTY_CONFIG_ENABLED = "enabled";
+  static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
+  private static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
+  static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
+  private static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
 
-  public static final String PROPERTY_WORKFLOW_JSON = "json";
-  public static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
-  public static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
-  public static final String PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER = "nextNaturalOffsetTrigger";
-  public static final String PROPERTY_COUNTER = "counter";
-  public static final String PROPERTY_COMPONENT = "component";
-  public static final String PROPERTY_WORKFLOW = "workflow";
-  public static final String PROPERTY_PARAMETER = "parameter";
-  public static final String PROPERTY_CONCURRENCY = "concurrency";
-  public static final String PROPERTY_START = "start";
-  public static final String PROPERTY_END = "end";
-  public static final String PROPERTY_NEXT_TRIGGER = "nextTrigger";
-  public static final String PROPERTY_SCHEDULE = "schedule";
-  public static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
-  public static final String PROPERTY_HALTED = "halted";
-  public static final String PROPERTY_REVERSE = "reverse";
-  public static final String PROPERTY_DESCRIPTION = "description";
-  public static final String PROPERTY_TRIGGER_PARAMETERS = "triggerParameters";
-  public static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
-  public static final String PROPERTY_CREATED = "created";
-  public static final String PROPERTY_LAST_MODIFIED = "lastModified";
+  static final String PROPERTY_WORKFLOW_JSON = "json";
+  private static final String PROPERTY_WORKFLOW_ENABLED = "enabled";
+  private static final String PROPERTY_NEXT_NATURAL_TRIGGER = "nextNaturalTrigger";
+  private static final String PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER = "nextNaturalOffsetTrigger";
+  static final String PROPERTY_COUNTER = "counter";
+  static final String PROPERTY_COMPONENT = "component";
+  static final String PROPERTY_WORKFLOW = "workflow";
+  static final String PROPERTY_PARAMETER = "parameter";
+  static final String PROPERTY_CONCURRENCY = "concurrency";
+  static final String PROPERTY_START = "start";
+  static final String PROPERTY_END = "end";
+  static final String PROPERTY_NEXT_TRIGGER = "nextTrigger";
+  static final String PROPERTY_SCHEDULE = "schedule";
+  static final String PROPERTY_ALL_TRIGGERED = "allTriggered";
+  static final String PROPERTY_HALTED = "halted";
+  static final String PROPERTY_REVERSE = "reverse";
+  static final String PROPERTY_DESCRIPTION = "description";
+  static final String PROPERTY_TRIGGER_PARAMETERS = "triggerParameters";
+  private static final String PROPERTY_SUBMISSION_RATE_LIMIT = "submissionRateLimit";
+  static final String PROPERTY_CREATED = "created";
+  static final String PROPERTY_LAST_MODIFIED = "lastModified";
 
-  public static final String PROPERTY_STATE = "state";
-  public static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
-  public static final String PROPERTY_STATE_TRIGGER_TYPE = "triggerType";
-  public static final String PROPERTY_STATE_TRIGGER_ID = "triggerId";
-  public static final String PROPERTY_STATE_TRIES = "tries";
-  public static final String PROPERTY_STATE_CONSECUTIVE_FAILURES = "consecutiveFailures";
-  public static final String PROPERTY_STATE_RETRY_COST = "retryCost";
-  public static final String PROPERTY_STATE_MESSAGES = "messages";
-  public static final String PROPERTY_STATE_RETRY_DELAY_MILLIS = "retryDelayMillis";
-  public static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
-  public static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
-  public static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
-  public static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
-  public static final String PROPERTY_STATE_TRIGGER_PARAMETERS = "triggerParameters";
+  private static final String PROPERTY_STATE = "state";
+  private static final String PROPERTY_STATE_TIMESTAMP = "stateTimestamp";
+  private static final String PROPERTY_STATE_TRIGGER_TYPE = "triggerType";
+  private static final String PROPERTY_STATE_TRIGGER_ID = "triggerId";
+  private static final String PROPERTY_STATE_TRIES = "tries";
+  private static final String PROPERTY_STATE_CONSECUTIVE_FAILURES = "consecutiveFailures";
+  private static final String PROPERTY_STATE_RETRY_COST = "retryCost";
+  private static final String PROPERTY_STATE_MESSAGES = "messages";
+  private static final String PROPERTY_STATE_RETRY_DELAY_MILLIS = "retryDelayMillis";
+  private static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
+  private static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
+  private static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
+  private static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
+  private static final String PROPERTY_STATE_TRIGGER_PARAMETERS = "triggerParameters";
 
-  public static final String KEY_GLOBAL_CONFIG = "styxGlobal";
+  private static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
-  public static final boolean DEFAULT_CONFIG_ENABLED = true;
-  public static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
-  public static final boolean DEFAULT_WORKFLOW_ENABLED = false;
-  public static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
-  public static final boolean DEFAULT_CONFIG_EXECUTION_GATING_ENABLED = false;
+  private static final boolean DEFAULT_CONFIG_ENABLED = true;
+  private static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
+  private static final boolean DEFAULT_WORKFLOW_ENABLED = false;
+  private static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
 
-  public static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
+  private static final int ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS = 128;
 
-  public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ = 1000;
-  public static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE = 500;
+  private static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ = 1000;
+  private static final int MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_WRITE = 500;
 
   private static final int REQUEST_CONCURRENCY = 32;
 
@@ -287,7 +286,7 @@ public class DatastoreStorage implements Closeable {
     runInTransactionWithRetries(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec));
   }
 
-  public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
+  Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     final Map<Workflow, TriggerInstantSpec> map = Maps.newHashMap();
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
@@ -388,7 +387,7 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
-  public Set<WorkflowInstance> listActiveInstances() throws IOException {
+  Set<WorkflowInstance> listActiveInstances() throws IOException {
     var timeout = CompletableFuture.runAsync(() -> {}, delayedExecutor(30, SECONDS));
     return listActiveInstances0(timeout);
   }
@@ -461,7 +460,7 @@ public class DatastoreStorage implements Closeable {
     return queryActiveStates(query);
   }
 
-  public Map<WorkflowInstance, RunState> activeStatesByTriggerId(
+  Map<WorkflowInstance, RunState> activeStatesByTriggerId(
       String triggerId) throws IOException {
     final EntityQuery query =
         Query.newEntityQueryBuilder().setKind(KIND_ACTIVE_WORKFLOW_INSTANCE)
@@ -521,7 +520,7 @@ public class DatastoreStorage implements Closeable {
     return runInTransactionWithRetries(tx -> tx.writeActiveState(workflowInstance, state));
   }
 
-  static List<Key> activeWorkflowInstanceIndexShardKeys(KeyFactory keyFactory) {
+  private static List<Key> activeWorkflowInstanceIndexShardKeys(KeyFactory keyFactory) {
     return IntStream.range(0, ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARDS)
         .mapToObj(DatastoreStorage::activeWorkflowInstanceIndexShardName)
         .map(name -> keyFactory.setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD).newKey(name))
@@ -616,7 +615,7 @@ public class DatastoreStorage implements Closeable {
     runInTransactionWithRetries(tx -> tx.patchState(workflowId, state));
   }
 
-  public WorkflowState workflowState(WorkflowId workflowId) throws IOException {
+  WorkflowState workflowState(WorkflowId workflowId) throws IOException {
     final WorkflowState.Builder builder = WorkflowState.builder();
 
     var workflowEntity = getWorkflowOpt(datastore, datastore::newKeyFactory, workflowId);
@@ -685,7 +684,7 @@ public class DatastoreStorage implements Closeable {
    *
    * @return an optional containing the property value if it existed, empty otherwise.
    */
-  static Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
+  private static Optional<Instant> getOptInstantProperty(Optional<Entity> entity, String property) {
     return entity
         .filter(w -> w.contains(property))
         .map(workflow -> timestampToInstant(workflow.getTimestamp(property)));
@@ -698,7 +697,7 @@ public class DatastoreStorage implements Closeable {
    * @param key        The key for which to create a new builder if the entity is not present
    * @return an entity builder either based of the given entity or a new one using the key.
    */
-  static Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
+  private static Entity.Builder asBuilderOrNew(Optional<Entity> entityOpt, Key key) {
     return entityOpt
         .map(c -> Entity.newBuilder(key, c))
         .orElse(Entity.newBuilder(key));
@@ -888,19 +887,19 @@ public class DatastoreStorage implements Closeable {
         .map(Value::get);
   }
 
-  static <T> Optional<T> readOpt(Entity entity, String property) {
+  private static <T> Optional<T> readOpt(Entity entity, String property) {
     return entity.contains(property)
         ? Optional.of(entity.<Value<T>>getValue(property).get())
         : Optional.empty();
   }
 
-  static <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
+  private static <T> Optional<T> readOptJson(Entity entity, String property, Class<T> cls) throws IOException {
     return entity.contains(property)
         ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), cls))
         : Optional.empty();
   }
 
-  static <T> Optional<T> readOptJson(Entity entity, String property, TypeReference valueTypeRef)
+  private static <T> Optional<T> readOptJson(Entity entity, String property, TypeReference valueTypeRef)
       throws IOException {
     return entity.contains(property)
         ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), valueTypeRef))
@@ -911,7 +910,7 @@ public class DatastoreStorage implements Closeable {
     return DatastoreStorage.<T>readOpt(entity, property).orElse(defaultValue);
   }
 
-  static StringValue jsonValue(Object o) throws JsonProcessingException {
+  private static StringValue jsonValue(Object o) throws JsonProcessingException {
     return StringValue
         .newBuilder(OBJECT_MAPPER.writeValueAsString(o))
         .setExcludeFromIndexes(true)

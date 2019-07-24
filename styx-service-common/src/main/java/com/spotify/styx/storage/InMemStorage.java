@@ -45,7 +45,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -61,18 +60,8 @@ public class InMemStorage implements Storage {
   private final ConcurrentMap<WorkflowId, WorkflowState> workflowStatePerWorkflowId = Maps
       .newConcurrentMap();
 
-  public final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
-  public final Map<WorkflowInstance, RunState> activeStatesMap = Maps.newHashMap();
-
-  public final CountDownLatch countDown;
-
-  public InMemStorage() {
-    this(0);
-  }
-
-  public InMemStorage(int expectedWorkflowExecutionInfoStored) {
-    this.countDown = new CountDownLatch(expectedWorkflowExecutionInfoStored);
-  }
+  private final List<SequenceEvent> writtenEvents = Lists.newCopyOnWriteArrayList();
+  private final Map<WorkflowInstance, RunState> activeStatesMap = Maps.newHashMap();
 
   @Override
   public void close() {

@@ -178,7 +178,7 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldDenyAccessIfPrincipalIsBlacklisted() throws IOException {
+  public void shouldDenyAccessIfPrincipalIsBlacklisted() {
     reset(iam);
     reset(crm);
     reset(directory);
