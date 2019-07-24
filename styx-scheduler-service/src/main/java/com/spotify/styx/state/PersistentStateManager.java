@@ -98,7 +98,7 @@ public class PersistentStateManager implements StateManager {
         DEFAULT_LOG);
   }
 
-  public PersistentStateManager(
+  PersistentStateManager(
       Time time,
       ExecutorService executor,
       Storage storage,

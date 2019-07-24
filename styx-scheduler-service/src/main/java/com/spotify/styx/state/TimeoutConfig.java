@@ -31,7 +31,7 @@ import java.util.Objects;
  */
 public class TimeoutConfig {
 
-  public static final String DEFAULT_TTL_KEY = "default";
+  private static final String DEFAULT_TTL_KEY = "default";
 
   private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;

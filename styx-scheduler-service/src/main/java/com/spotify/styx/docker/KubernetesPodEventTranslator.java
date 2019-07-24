@@ -253,7 +253,7 @@ final class KubernetesPodEventTranslator {
 
       case "Succeeded":
       case "Failed":
-        if (!mainContainerStatusOpt.isPresent()) {
+        if (mainContainerStatusOpt.isEmpty()) {
           return Optional.of(Event.runError(workflowInstance, "Could not find our container in pod"));
         }
 

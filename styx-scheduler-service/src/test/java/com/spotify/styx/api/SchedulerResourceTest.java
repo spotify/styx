@@ -543,7 +543,7 @@ public class SchedulerResourceTest {
     assertThat(triggeredInstant, isEmpty());
   }
 
-  void failtriggeringOnException(Workflow wf, Exception e, StatusType preferredStatusType) throws Exception {
+  private void failtriggeringOnException(Workflow wf, Exception e, StatusType preferredStatusType) throws Exception {
     when(storage.workflow(wf.id())).thenReturn(Optional.of(wf));
     TriggerRequest toTrigger = TriggerRequest.of(wf.id(), "2015-12-31");
 

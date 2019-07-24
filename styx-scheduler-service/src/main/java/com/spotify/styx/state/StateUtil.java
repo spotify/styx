@@ -48,17 +48,17 @@ public final class StateUtil {
     throw new UnsupportedOperationException();
   }
 
-  public static List<InstanceState> getActiveInstanceStates(
+  static List<InstanceState> getActiveInstanceStates(
       Map<WorkflowInstance, RunState> activeStatesMap) {
     return activeStatesMap.entrySet().stream()
         .map(entry -> InstanceState.create(entry.getKey(), entry.getValue()))
         .collect(toList());
   }
 
-  public static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
-                                                           List<InstanceState> activeStates,
-                                                           Instant instant,
-                                                           TimeoutConfig ttl) {
+  static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
+                                                    List<InstanceState> activeStates,
+                                                    Instant instant,
+                                                    TimeoutConfig ttl) {
     return activeStates.parallelStream()
         .filter(entry -> {
           final Optional<Workflow> workflowOpt =
@@ -69,11 +69,11 @@ public final class StateUtil {
         .collect(toSet());
   }
 
-  public static ConcurrentMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
-                                                             List<InstanceState> activeStates,
-                                                             Set<WorkflowInstance> timedOutInstances,
-                                                             WorkflowResourceDecorator resourceDecorator,
-                                                             Map<WorkflowId, Workflow> workflows) {
+  static ConcurrentMap<String, Long> getResourceUsage(boolean globalConcurrencyEnabled,
+                                                      List<InstanceState> activeStates,
+                                                      Set<WorkflowInstance> timedOutInstances,
+                                                      WorkflowResourceDecorator resourceDecorator,
+                                                      Map<WorkflowId, Workflow> workflows) {
     return activeStates.parallelStream()
         .filter(entry -> !timedOutInstances.contains(entry.workflowInstance()))
         .filter(entry -> isConsumingResources(entry.runState().state()))

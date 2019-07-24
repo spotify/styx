@@ -24,11 +24,10 @@ import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anySetOf;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -176,7 +175,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldBeRateLimiting() throws Exception {
+  public void shouldBeRateLimiting() {
     when(rateLimiter.acquire()).thenReturn(1.0);
 
     setResourceLimit("r1", 2);
@@ -192,7 +191,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldExecuteRetryIfDelayHasPassed() throws Exception {
+  public void shouldExecuteRetryIfDelayHasPassed() {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
@@ -206,7 +205,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldReadRunStateCounterForEachTick() throws Exception {
+  public void shouldReadRunStateCounterForEachTick() {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     populateActiveStates(RunState.create(
@@ -225,7 +224,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldExecuteRetryIfDelayIsReset() throws Exception {
+  public void shouldExecuteRetryIfDelayIsReset() {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().retryDelayMillis(15_000L).tries(10).build();
@@ -245,7 +244,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldExecuteNewTriggers() throws Exception {
+  public void shouldExecuteNewTriggers() {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1));
 
     StateData stateData = StateData.newBuilder().tries(0).build();
@@ -273,7 +272,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldDequeueEvenWhenMissingWorkflows() throws Exception {
+  public void shouldDequeueEvenWhenMissingWorkflows() {
 
     workflows.clear();
 
@@ -301,7 +300,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldFailWhenUnknownResourceReference() throws Exception {
+  public void shouldFailWhenUnknownResourceReference() {
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "unknown"));
     populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, time.get()));
 
@@ -312,7 +311,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldFailWhenUnknownAndDepletedResources() throws Exception {
+  public void shouldFailWhenUnknownAndDepletedResources() {
     setResourceLimit("r1", 0);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1", "r2", "r3"));
 
@@ -360,7 +359,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldRecordAggregateResourceUsageAndDemand() throws Exception {
+  public void shouldRecordAggregateResourceUsageAndDemand() {
     setResourceLimit("r1", 2);
     setResourceLimit("r2", 3);
     initWorkflow(workflowUsingResources(WORKFLOW_ID1, "r1"));
@@ -462,11 +461,11 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldDecorateWorkflowInstanceResources() throws Exception {
+  public void shouldDecorateWorkflowInstanceResources() {
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
-        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySet()))
         .thenReturn(ImmutableSet.of("baz", "quux", "GLOBAL_STYX_CLUSTER"));
 
     when(config.globalConcurrency()).thenReturn(Optional.of(17L));
@@ -486,11 +485,11 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldCountDecoratedResourcesOnNonQueuedStates() throws Exception {
+  public void shouldCountDecoratedResourcesOnNonQueuedStates() {
 
     Workflow workflow = workflowUsingResources(WORKFLOW_ID1, "foo", "bar");
     when(resourceDecorator.decorateResources(
-        any(RunState.class), any(WorkflowConfiguration.class), anySetOf(String.class)))
+        any(RunState.class), any(WorkflowConfiguration.class), anySet()))
         .thenReturn(ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"));
 
     when(config.globalConcurrency()).thenReturn(Optional.of(17L));
@@ -525,7 +524,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldHandleDequeueFailures() throws Exception {
+  public void shouldHandleDequeueFailures() {
     var workflow1 = workflowUsingResources(WORKFLOW_ID1);
     var workflow2 = workflowUsingResources(WORKFLOW_ID2);
 
@@ -555,7 +554,7 @@ public class SchedulerTest {
 
 
   @Test
-  public void shouldHandleStateTransitionConflicts() throws Exception {
+  public void shouldHandleStateTransitionConflicts() {
     var workflow1 = workflowUsingResources(WORKFLOW_ID1);
     var workflow2 = workflowUsingResources(WORKFLOW_ID2);
 
@@ -585,7 +584,7 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldHandleCounterCapacityExceptions() throws Exception {
+  public void shouldHandleCounterCapacityExceptions() {
     var workflow1 = workflowUsingResources(WORKFLOW_ID1);
     var workflow2 = workflowUsingResources(WORKFLOW_ID2);
 

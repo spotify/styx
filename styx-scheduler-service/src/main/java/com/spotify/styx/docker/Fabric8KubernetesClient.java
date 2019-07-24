@@ -67,7 +67,7 @@ public interface Fabric8KubernetesClient {
 
     private final KubernetesClient client;
 
-    public Impl(KubernetesClient client) {
+    Impl(KubernetesClient client) {
       this.client = Objects.requireNonNull(client);
     }
 

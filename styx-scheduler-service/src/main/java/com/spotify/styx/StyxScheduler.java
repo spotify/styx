@@ -42,7 +42,6 @@ import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.cloud.datastore.Datastore;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -106,8 +105,6 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
-import io.opencensus.trace.Tracer;
-import io.opencensus.trace.Tracing;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -135,40 +132,38 @@ public class StyxScheduler implements AppInit {
 
   public static final String SERVICE_NAME = "styx-scheduler";
 
-  public static final String GKE_CLUSTER_PATH = "styx.gke";
-  public static final String GKE_CLUSTER_PROJECT_ID = "project-id";
-  public static final String GKE_CLUSTER_ZONE = "cluster-zone";
-  public static final String GKE_CLUSTER_ID = "cluster-id";
-  public static final String GKE_CLUSTER_NAMESPACE = "namespace";
+  private static final String GKE_CLUSTER_PATH = "styx.gke";
+  private static final String GKE_CLUSTER_PROJECT_ID = "project-id";
+  private static final String GKE_CLUSTER_ZONE = "cluster-zone";
+  private static final String GKE_CLUSTER_ID = "cluster-id";
+  private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-  public static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
-  public static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
-  public static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
-  public static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
-  public static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
+  private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
+  private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
+  private static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
+  private static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
+  private static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
   private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
-  public static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
-  public static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
-  public static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
-  public static final Duration DEFAULT_STATE_MANAGER_TICK_INTERVAL = Duration.ofSeconds(15);
-  public static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
-  public static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
-  public static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
-  public static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
-  public static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
-  public static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-  public static final RetryUtil DEFAULT_RETRY_UTIL =
+  private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
+  private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
+  static final Duration DEFAULT_SCHEDULER_TICK_INTERVAL = Duration.ofSeconds(2);
+  private static final Duration DEFAULT_STATE_MANAGER_TICK_INTERVAL = Duration.ofSeconds(15);
+  private static final Duration DEFAULT_TRIGGER_TICK_INTERVAL = Duration.ofSeconds(1);
+  private static final Duration CLEANER_TICK_INTERVAL = Duration.ofMinutes(30);
+  private static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
+  private static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
+  private static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
+  private static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
+  private static final RetryUtil DEFAULT_RETRY_UTIL =
       new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
-  public static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
-  static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
+  private static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
+  private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
-
-  private static final Tracer tracer = Tracing.getTracer();
 
   private final String serviceName;
   private final Time time;
@@ -676,7 +671,7 @@ public class StyxScheduler implements AppInit {
 
       return clientFactory.apply(httpClient, kubeConfig);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 

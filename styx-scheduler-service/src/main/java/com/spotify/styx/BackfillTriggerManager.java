@@ -106,7 +106,7 @@ class BackfillTriggerManager {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.BackfillTriggerManager.tick")
+    try (Scope ignored = tracer.spanBuilder("Styx.BackfillTriggerManager.tick")
         .setRecordEvents(true)
         .setSampler(Samplers.alwaysSample())
         .startScopedSpan()) {
@@ -114,7 +114,7 @@ class BackfillTriggerManager {
     }
   }
 
-  void tick0() {
+  private void tick0() {
     final Instant t0 = time.get();
 
     final List<Backfill> backfills;

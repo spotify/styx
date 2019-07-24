@@ -221,7 +221,7 @@ class KubernetesGCPServiceAccountSecretManager {
     }
   }
 
-  public void cleanup() throws IOException {
+  public void cleanup() {
     // Enumerate all secrets currently used by non-terminated pods
     final PodList pods = client.listPods();
     final Set<String> activeSecrets = pods.getItems().stream()

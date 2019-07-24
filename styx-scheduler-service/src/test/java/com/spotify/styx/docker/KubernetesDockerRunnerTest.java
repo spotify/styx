@@ -513,11 +513,11 @@ public class KubernetesDockerRunnerTest {
         SECRET_SPEC_WITH_CUSTOM_SECRET);
     assertThat(pod.getSpec().getVolumes().size(), is(1));
     assertThat(pod.getSpec().getVolumes().get(0).getName(),
-               is(RUN_SPEC_WITH_SECRET.secret().get().name()));
+               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().name()));
     assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getMountPath(),
-               is(RUN_SPEC_WITH_SECRET.secret().get().mountPath()));
+               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().mountPath()));
     assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getName(),
-               is(RUN_SPEC_WITH_SECRET.secret().get().name()));
+               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().name()));
   }
 
   @Test
@@ -640,7 +640,6 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldCompleteWithStatusCodeOnMainContainerTerminated(String phase, int code,
       boolean withKeepaliveContainer) throws Exception {
-    final String executionId = createdPod.getMetadata().getName();
 
     final PodStatus podStatus = podStatusNoContainer(phase);
 

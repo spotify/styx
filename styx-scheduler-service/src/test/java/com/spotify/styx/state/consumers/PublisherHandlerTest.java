@@ -50,7 +50,7 @@ public class PublisherHandlerTest {
   private static final String COMMIT_SHA = "cc9f6ca490e106ca9324bd34de5e3ad935b91bd6";
   private static final String DOCKER_IMAGE = "busybox:1.1";
 
-  public static final Retryer<Void> NO_RETRIES = RetryerBuilder.<Void>newBuilder()
+  private static final Retryer<Void> NO_RETRIES = RetryerBuilder.<Void>newBuilder()
       .withStopStrategy(StopStrategies.stopAfterAttempt(1))
       .build();
 
@@ -61,7 +61,7 @@ public class PublisherHandlerTest {
   @Mock private SequenceEvent sequenceEvent;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     publisher = mock(Publisher.class);
     publisherHandler = new PublisherHandler(publisher, stats);
   }
@@ -224,7 +224,7 @@ public class PublisherHandlerTest {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
       // nop
     }
   }

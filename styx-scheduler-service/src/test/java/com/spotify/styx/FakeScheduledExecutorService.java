@@ -23,9 +23,7 @@ package com.spotify.styx;
 import static java.util.stream.Collectors.toList;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
@@ -39,7 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 public class FakeScheduledExecutorService implements ScheduledExecutorService {
 
-  Stack<DelayedTask> delayedTasks = new Stack<>();
+  private Stack<DelayedTask> delayedTasks = new Stack<>();
 
   @AutoValue
   public static abstract class DelayedTask {
@@ -47,15 +45,6 @@ public class FakeScheduledExecutorService implements ScheduledExecutorService {
     public abstract Runnable runnable();
     public abstract long delay();
     public abstract TimeUnit unit();
-  }
-
-  public DelayedTask lastSubmittedTask() {
-    Preconditions.checkState(delayedTasks.size() > 0, "tasks empty)");
-    return delayedTasks.pop();
-  }
-
-  public List<DelayedTask> allTasks() {
-    return Lists.newArrayList(delayedTasks);
   }
 
   @Override

@@ -86,7 +86,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
   private PodList podList;
 
-  KubernetesDockerRunner kdr;
+  private KubernetesDockerRunner kdr;
 
   @Before
   public void setUp() {
