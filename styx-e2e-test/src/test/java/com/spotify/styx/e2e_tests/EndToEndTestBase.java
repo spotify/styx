@@ -81,18 +81,18 @@ public class EndToEndTestBase {
   static final Logger log = LoggerFactory.getLogger(EndToEndTestBase.class);
 
   static final String SCHEDULER_SERVICE_NAME = "styx-e2e-test-scheduler";
-  static final String API_SERVICE_NAME = "styx-e2e-test-api";
+  private static final String API_SERVICE_NAME = "styx-e2e-test-api";
 
-  final ExecutorService executor = Executors.newCachedThreadPool();
+  private final ExecutorService executor = Executors.newCachedThreadPool();
 
   static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter
       .ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
       .withZone(ZoneOffset.UTC);
 
-  final String testNamespace = TestNamespaces.createTestNamespace(Instant.now());
+  private final String testNamespace = TestNamespaces.createTestNamespace(Instant.now());
 
   // Service account IDs cannot be longer than 30 chars
-  final String workflowServiceAccountId = String.join("-", "e2e",
+  private final String workflowServiceAccountId = String.join("-", "e2e",
       TestNamespaces.testNamespaceTimeTimestamp(testNamespace),
       TestNamespaces.testNamespaceRandom(testNamespace));
 
@@ -281,7 +281,7 @@ public class EndToEndTestBase {
     return cliJson(Json.OBJECT_MAPPER.getTypeFactory().constructType(outputType), List.of(args));
   }
 
-  <T> T cliJson(JavaType outputType, List<String> args)
+  private <T> T cliJson(JavaType outputType, List<String> args)
       throws IOException, InterruptedException, CliException {
     var jsonArgs = new ArrayList<String>();
     jsonArgs.add("--json");
@@ -295,7 +295,7 @@ public class EndToEndTestBase {
     }
   }
 
-  byte[] cli(List<String> args) throws IOException, InterruptedException, CliException {
+  private byte[] cli(List<String> args) throws IOException, InterruptedException, CliException {
 
     var stdout = new ByteArrayOutputStream();
 
