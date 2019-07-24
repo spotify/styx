@@ -43,7 +43,7 @@ class ApiVersionTestUtils {
    * @return A hamcrest matcher as described above
    */
   static Matcher<Api.Version> isAtLeast(Api.Version lowerBound) {
-    return new TypeSafeMatcher<Api.Version>() {
+    return new TypeSafeMatcher<>() {
       @Override
       protected boolean matchesSafely(Api.Version item) {
         return item.ordinal() >= lowerBound.ordinal();
@@ -65,7 +65,7 @@ class ApiVersionTestUtils {
    * @return A hamcrest matcher as described above
    */
   static Matcher<Api.Version> isAtMost(Api.Version upperBound) {
-    return new TypeSafeMatcher<Api.Version>() {
+    return new TypeSafeMatcher<>() {
       @Override
       protected boolean matchesSafely(Api.Version item) {
         return item.ordinal() <= upperBound.ordinal();
@@ -87,7 +87,7 @@ class ApiVersionTestUtils {
    * @return A hamcrest matcher as described above
    */
   static Matcher<Api.Version> is(Api.Version version) {
-    return new TypeSafeMatcher<Api.Version>() {
+    return new TypeSafeMatcher<>() {
       @Override
       protected boolean matchesSafely(Api.Version item) {
         return item.ordinal() == version.ordinal();

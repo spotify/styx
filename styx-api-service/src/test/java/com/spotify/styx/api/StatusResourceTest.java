@@ -113,7 +113,7 @@ public class StatusResourceTest extends VersionedApiTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     datastoreEmulator.reset();
   }
 
@@ -143,7 +143,7 @@ public class StatusResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasPayload(any(ByteString.class)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     EventsPayload parsed = Json.OBJECT_MAPPER.readValue(json, EventsPayload.class);
 
     assertThat(parsed.events(), hasSize(3));
@@ -162,7 +162,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -199,7 +199,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -225,7 +225,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -253,7 +253,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -326,7 +326,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     TestServiceAccountUsageAuthorizationResponse
         parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
 

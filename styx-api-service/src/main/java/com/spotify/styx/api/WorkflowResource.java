@@ -143,7 +143,7 @@ public final class WorkflowResource {
   private Response<Workflow> createOrUpdateWorkflow(String componentId,
       RequestContext rc, AuthContext ac) {
     final Optional<ByteString> payload = rc.request().payload();
-    if (!payload.isPresent()) {
+    if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
     final WorkflowConfiguration workflowConfig;
@@ -265,11 +265,11 @@ public final class WorkflowResource {
     try {
       if (tail) {
         final Optional<Workflow> workflow = storage.workflow(workflowId);
-        if (!workflow.isPresent()) {
+        if (workflow.isEmpty()) {
           return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Could not find workflow."));
         }
         final WorkflowState workflowState = storage.workflowState(workflowId);
-        if (!workflowState.nextNaturalTrigger().isPresent()) {
+        if (workflowState.nextNaturalTrigger().isEmpty()) {
           return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
         }
         final Schedule schedule = workflow.get().configuration().schedule();

@@ -52,7 +52,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class WorkflowInitializerTest {
 
-  public static final Instant NOW = Instant.parse("2015-12-31T23:59:10.000Z");
+  private static final Instant NOW = Instant.parse("2015-12-31T23:59:10.000Z");
   private static final Consumer<Optional<Workflow>> PASS = wf -> {};
   private final Workflow HOURLY_WORKFLOW = Workflow.create("styx",
       TestData.HOURLY_WORKFLOW_CONFIGURATION);
