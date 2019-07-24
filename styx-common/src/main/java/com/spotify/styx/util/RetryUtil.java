@@ -35,8 +35,8 @@ public class RetryUtil {
   private final int maxExponent;
 
   public RetryUtil(Duration baseDelay, int maxExponent) {
-    this.baseDelay = Objects.requireNonNull(baseDelay);
-    this.maxExponent = Objects.requireNonNull(maxExponent);
+    this.baseDelay = Objects.requireNonNull(baseDelay, "baseDelay");
+    this.maxExponent = maxExponent;
   }
 
   public Duration calculateDelay(int consecutiveFailures) {

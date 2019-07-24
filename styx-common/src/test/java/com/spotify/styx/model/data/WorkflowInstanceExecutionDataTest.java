@@ -28,6 +28,7 @@ import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
@@ -72,7 +73,7 @@ public class WorkflowInstanceExecutionDataTest {
         Optional.empty(),
         Optional.empty(),
         Optional.empty(),
-        Arrays.asList(
+        List.of(
             ExecStatus.create(Instant.parse("2016-08-03T16:56:03.607Z"), "HALTED", Optional.empty())
         )
     );

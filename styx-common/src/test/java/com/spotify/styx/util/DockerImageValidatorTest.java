@@ -32,7 +32,7 @@ import org.junit.Test;
 
 public class DockerImageValidatorTest {
 
-  DockerImageValidator validator = new DockerImageValidator();
+  private DockerImageValidator validator = new DockerImageValidator();
 
   @Test
   public void testValidImagePasses() {
@@ -69,7 +69,7 @@ public class DockerImageValidatorTest {
   }
 
   @Test
-  public void testInvalidImagesFail() throws Exception {
+  public void testInvalidImagesFail() {
     assertEquals(newHashSet("Tag cannot be empty"),
         validator.validateImageReference("repo:"));
 

@@ -29,7 +29,7 @@ import org.junit.Test;
 public class StateDataTest {
 
   @Test
-  public void testMessage() throws Exception {
+  public void testMessage() {
     assertThat(StateData.newBuilder().build().message(),
         is(Optional.empty()));
 

@@ -46,7 +46,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
-      Pattern.compile("^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$",
+      Pattern.compile("^[_A-Za-z0-9-+]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$",
           Pattern.CASE_INSENSITIVE);
 
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);

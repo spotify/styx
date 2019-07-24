@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,7 +34,7 @@ public class DockerImageValidator {
 
   private static final Pattern DOMAIN_PATTERN =
       Pattern.compile("^(?:(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9]))"
-          + "(\\.(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])))*)\\.?$");
+                      + "(\\.(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])))*)\\.?$");
 
   private static final Pattern IPV4_PATTERN =
       Pattern.compile("^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$");
@@ -206,7 +206,7 @@ public class DockerImageValidator {
       if (!NAME_COMPONENT_PATTERN.matcher(name).matches()) {
         errors.add(
             format("Invalid image name (%s), only %s is allowed for each slash-separated "
-                    + "name component (failed on \"%s\")",
+                   + "name component (failed on \"%s\")",
                 imageName, NAME_COMPONENT_PATTERN, name)
         );
         return false;
