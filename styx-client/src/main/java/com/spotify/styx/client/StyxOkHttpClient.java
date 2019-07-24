@@ -113,10 +113,6 @@ class StyxOkHttpClient implements StyxClient {
     return create(apiHost, FutureOkHttpClient.create(client), GoogleIdTokenAuth.of(credentials));
   }
 
-  static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleCredentials credentials) {
-    return new StyxOkHttpClient(apiHost, client, GoogleIdTokenAuth.of(credentials));
-  }
-
   static StyxClient create(String apiHost, FutureOkHttpClient client, GoogleIdTokenAuth auth) {
     return new StyxOkHttpClient(apiHost, client, auth);
   }
@@ -136,6 +132,7 @@ class StyxOkHttpClient implements StyxClient {
         .thenApply(response -> {
           final JsonNode jsonNode;
           try (final ResponseBody responseBody = response.body()) {
+            assert responseBody != null;
             jsonNode = Json.OBJECT_MAPPER.readTree(responseBody.bytes());
           } catch (IOException e) {
             throw new RuntimeException("Invalid json returned from API", e);
@@ -371,6 +368,7 @@ class StyxOkHttpClient implements StyxClient {
   private <T> CompletionStage<T> execute(Request request, Class<T> tClass) {
     return execute(request).thenApply(response -> {
       try (final ResponseBody responseBody = response.body()) {
+        assert responseBody != null;
         return Json.OBJECT_MAPPER.readValue(responseBody.bytes(), tClass);
       } catch (IOException e) {
         throw new RuntimeException("Error while reading the received payload: " + e.getMessage(), e);
