@@ -266,29 +266,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailOnDockerImageInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"docker_image\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void shouldFailOnCommitShaAndDockerImageInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"commit_sha\": \"foobar\","
-                                                                  + "\"docker_image\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
   public void shouldFailToPatchStateOfNonexistWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 

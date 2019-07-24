@@ -24,7 +24,6 @@ import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
@@ -206,7 +205,7 @@ public final class WorkflowResource {
   private Response<WorkflowState> patchState(String componentId, String id, Request request,
                                              AuthContext ac) {
     final Optional<ByteString> payload = request.payload();
-    if (!payload.isPresent()) {
+    if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
 
@@ -215,12 +214,6 @@ public final class WorkflowResource {
 
     final WorkflowState patchState;
     try {
-      final JsonNode json = OBJECT_MAPPER.readTree(payload.get().toByteArray());
-      if (json.has("commit_sha") || json.has("docker_image")) {
-        // TODO: remove this when nobody is doing PATCH with these fields (added 2017-11-08)
-        return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(
-            "Invalid payload: commit_sha and docker_image not allowed."));
-      }
       patchState = OBJECT_MAPPER.readValue(payload.get().toByteArray(), WorkflowState.class);
     } catch (IOException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Invalid payload."));
