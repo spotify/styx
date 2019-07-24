@@ -141,7 +141,7 @@ public class StyxOkHttpClientTest {
   @Mock FutureOkHttpClient client;
   @Mock GoogleIdTokenAuth auth;
 
-  StyxClient styx;
+  private StyxClient styx;
 
   @Captor ArgumentCaptor<Request> requestCaptor;
 
@@ -211,7 +211,8 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldGetBackfills() throws Exception {
-    final BackfillsPayload payload = BackfillsPayload.create(Arrays.asList(BackfillPayload.create(BACKFILL, Optional.empty())));
+    final BackfillsPayload payload = BackfillsPayload.create(
+        List.of(BackfillPayload.create(BACKFILL, Optional.empty())));
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
     final CompletableFuture<BackfillsPayload> r =
@@ -226,7 +227,7 @@ public class StyxOkHttpClientTest {
   }
 
   @Test
-  public void shouldHaltBackfill() throws Exception {
+  public void shouldHaltBackfill() {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
     final CompletableFuture<Void> r =
@@ -339,7 +340,7 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldGetEventsForWorkflowInstance() throws Exception {
-    final EventsPayload events = EventsPayload.create(Arrays.asList(
+    final EventsPayload events = EventsPayload.create(List.of(
         EventsPayload.TimestampedEvent
             .create(Event.stop(WorkflowInstance.create(WORKFLOW_1.id(), "foo")), 123)));
     when(client.send(any(Request.class)))
@@ -352,11 +353,11 @@ public class StyxOkHttpClientTest {
     final URI uri = URI.create(API_URL + "/status/events/component/workflow/2017-01-01T00");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
-    assertThat(r.join(), is(Arrays.asList(EventInfo.create(123, "stop", ""))));
+    assertThat(r.join(), is(List.of(EventInfo.create(123, "stop", ""))));
   }
 
   @Test
-  public void shouldFailWithBadEventJson() throws Exception {
+  public void shouldFailWithBadEventJson() {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(responseBuilder(HTTP_OK).body(ResponseBody.create(APPLICATION_JSON, "{invalid json is invalid".getBytes())).build()));
     final CompletableFuture<List<EventInfo>> r =
@@ -374,7 +375,7 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldWorkWithUnknownEvents() throws Exception {
-    final EventsPayload events = EventsPayload.create(Arrays.asList(
+    final EventsPayload events = EventsPayload.create(List.of(
         EventsPayload.TimestampedEvent
             .create(Event.stop(WorkflowInstance.create(WORKFLOW_1.id(), "foo")), 123)));
     final String badJson = Json.serialize(events).utf8().replace("stop", "stahp");
@@ -391,12 +392,12 @@ public class StyxOkHttpClientTest {
     final URI uri = URI.create(API_URL + "/status/events/component/workflow/2017-01-01T00");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
-    assertThat(r.join(), is(Arrays.asList(EventInfo.create(123, "stahp", ""))));
+    assertThat(r.join(), is(List.of(EventInfo.create(123, "stahp", ""))));
   }
 
   @Test
   public void shouldGetActiveStatesForComponent() throws Exception {
-    final RunStateDataPayload runStateDataPayload = RunStateDataPayload.create(Arrays.asList());
+    final RunStateDataPayload runStateDataPayload = RunStateDataPayload.create(List.of());
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, runStateDataPayload)));
     final CompletableFuture<RunStateDataPayload> r =

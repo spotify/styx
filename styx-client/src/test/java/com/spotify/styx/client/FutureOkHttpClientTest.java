@@ -96,7 +96,7 @@ public class FutureOkHttpClientTest {
   }
 
   @Test
-  public void testSomethingGoesWrong() throws IOException {
+  public void testSomethingGoesWrong() {
     final FutureOkHttpClient client = FutureOkHttpClient.create(okHttpClient);
     when(okHttpClient.newCall(any())).thenReturn(call);
     final ArgumentCaptor<Callback> argumentCaptor = ArgumentCaptor.forClass(Callback.class);

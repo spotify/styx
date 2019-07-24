@@ -42,7 +42,9 @@ class OkHttpTestUtil {
   static ByteString bytesOfRequestBody(Request request) {
     final Buffer sink = new Buffer();
     try {
-      request.body().writeTo(sink);
+      var body = request.body();
+      assert body != null;
+      body.writeTo(sink);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

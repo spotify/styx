@@ -215,6 +215,7 @@ public class GoogleIdTokenAuthTest {
   @Test
   public void testUserCredentialsWithAccessTokenFails() throws IOException,
                                                                GeneralSecurityException {
+    assert credentials != null;
     Assume.assumeThat(credentials, is(instanceOf(UserCredentials.class)));
     credentials.refresh();
     final GoogleCredentials accessTokenCredentials = GoogleCredentials.newBuilder()
