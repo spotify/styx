@@ -255,17 +255,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailOnCommitShaInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"commit_sha\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
   public void shouldFailToPatchStateOfNonexistWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
