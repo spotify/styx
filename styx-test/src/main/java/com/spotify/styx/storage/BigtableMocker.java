@@ -21,7 +21,7 @@
 package com.spotify.styx.storage;
 
 import static java.util.stream.Collectors.toList;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -61,7 +61,7 @@ public class BigtableMocker {
     this.bigtable = bigtable;
   }
 
-  public void addRowsToTable(TableName tableName, List<Cell> moreCells) throws IOException {
+  private void addRowsToTable(TableName tableName, List<Cell> moreCells) throws IOException {
     tableCells.merge(
         tableName,
         moreCells,
@@ -73,7 +73,7 @@ public class BigtableMocker {
     finalizeMocking();
   }
 
-  public void removeRowsFromTable(TableName tableName, List<Cell> removeCells) throws IOException {
+  private void removeRowsFromTable(TableName tableName, List<Cell> removeCells) throws IOException {
     tableCells.computeIfPresent(tableName, (key, value) -> {
       List<Cell> newCells = Lists.newArrayList();
       value.removeAll(removeCells);
