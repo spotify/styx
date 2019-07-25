@@ -117,6 +117,11 @@ public class BigtableStorage implements Closeable {
         .build();
   }
 
+  @Override
+  public void close() throws IOException {
+    closer.close();
+  }
+
   SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
     try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
       final Scan scan = new Scan()
@@ -276,10 +281,5 @@ public class BigtableStorage implements Closeable {
 
   private static TreeSet<SequenceEvent> newSortedEventSet() {
     return Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
-  }
-
-  @Override
-  public void close() throws IOException {
-    closer.close();
   }
 }
