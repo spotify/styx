@@ -31,7 +31,7 @@ public class TestLogger extends RunListener {
 
   private final Logger log;
 
-  TestLogger() {
+  public TestLogger() {
     this(LoggerFactory.getLogger(TestLogger.class));
   }
 
