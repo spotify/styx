@@ -73,7 +73,6 @@ public class BigTableStorageTest {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-
   private Connection bigtable;
   private BigtableStorage storage;
 
