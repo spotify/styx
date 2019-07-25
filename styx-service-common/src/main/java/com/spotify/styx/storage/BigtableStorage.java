@@ -230,6 +230,7 @@ public class BigtableStorage {
         try {
           Thread.sleep(retryBaseDelay.toMillis());
         } catch (InterruptedException e1) {
+          Thread.currentThread().interrupt();
           throw new RuntimeException(e1);
         }
       } catch (Throwable e) {
