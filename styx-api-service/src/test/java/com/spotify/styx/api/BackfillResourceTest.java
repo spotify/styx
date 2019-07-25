@@ -75,7 +75,6 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -180,8 +179,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client(),
-        Duration.ZERO));
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()
+    ));
 
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(

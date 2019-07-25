@@ -33,7 +33,6 @@ import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
-import java.time.Duration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -60,7 +59,7 @@ public class ShardedCounterSnapshotFactoryTest {
   public static void setUpClass() {
     var datastore = datastoreEmulator.client();
     connection = Mockito.mock(Connection.class);
-    storage = Mockito.spy(new AggregateStorage(connection, datastore, Duration.ZERO));
+    storage = Mockito.spy(new AggregateStorage(connection, datastore));
   }
 
   @AfterClass

@@ -157,7 +157,6 @@ public class StyxScheduler implements AppInit {
   private static final Duration RUNTIME_CONFIG_UPDATE_INTERVAL = Duration.ofSeconds(5);
   private static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofMinutes(3);
   private static final int DEFAULT_RETRY_MAX_EXPONENT = 4;
-  private static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
   private static final RetryUtil DEFAULT_RETRY_UTIL =
       new RetryUtil(DEFAULT_RETRY_BASE_DELAY, DEFAULT_RETRY_MAX_EXPONENT);
   private static final double DEFAULT_SUBMISSION_RATE_PER_SEC = 1000D;
@@ -581,7 +580,7 @@ public class StyxScheduler implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config, stats);
-    return new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT);
+    return new AggregateStorage(bigTable, datastore);
   }
 
   private static DockerRunner createDockerRunner(

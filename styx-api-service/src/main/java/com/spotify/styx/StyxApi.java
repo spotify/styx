@@ -83,8 +83,6 @@ public class StyxApi implements AppInit {
   private static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  private static final Duration DEFAULT_RETRY_BASE_DELAY_BT = Duration.ofSeconds(1);
-
   private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
   private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
@@ -242,7 +240,7 @@ public class StyxApi implements AppInit {
 
     final Connection bigTable = closer.register(createBigTableConnection(config));
     final Datastore datastore = createDatastore(config, stats);
-    return closer.register(new AggregateStorage(bigTable, datastore, DEFAULT_RETRY_BASE_DELAY_BT));
+    return closer.register(new AggregateStorage(bigTable, datastore));
   }
 
   private static Stats stats(Environment environment) {

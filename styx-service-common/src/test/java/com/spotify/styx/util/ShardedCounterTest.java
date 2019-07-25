@@ -59,7 +59,6 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
@@ -96,7 +95,7 @@ public class ShardedCounterTest {
   public static void setUpClass() {
     datastore = datastoreEmulator.client();
     connection = mock(Connection.class);
-    storage = new AggregateStorage(connection, datastore, Duration.ZERO);
+    storage = new AggregateStorage(connection, datastore);
   }
 
   @AfterClass
