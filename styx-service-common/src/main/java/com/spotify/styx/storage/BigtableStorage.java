@@ -22,6 +22,8 @@ package com.spotify.styx.storage;
 
 import static com.spotify.styx.serialization.Json.deserializeEvent;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.util.CloserUtil.register;
+import static java.util.stream.Collectors.toList;
 
 import com.github.rholder.retry.Attempt;
 import com.github.rholder.retry.RetryException;
@@ -34,12 +36,16 @@ import com.github.rholder.retry.WaitStrategy;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
+import com.google.common.io.Closer;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
+import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import io.grpc.Context;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -47,9 +53,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import okio.ByteString;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
@@ -66,7 +75,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A backend for {@link AggregateStorage} backed by Google Bigtable
  */
-public class BigtableStorage {
+public class BigtableStorage implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(BigtableStorage.class);
 
@@ -75,19 +84,30 @@ public class BigtableStorage {
   private static final byte[] EVENT_CF = Bytes.toBytes("event");
   private static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
+  private static final int REQUEST_CONCURRENCY = 32;
+
   private static final WaitStrategy DEFAULT_WAIT_STRATEGY = WaitStrategies.fixedWait(1, TimeUnit.SECONDS);
   private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterAttempt(100);
 
+  private final Closer closer = Closer.create();
+
   private final Connection connection;
   private final Retryer<Void> retryer;
+  private final Executor executor;
 
   BigtableStorage(Connection connection) {
-    this(connection, DEFAULT_WAIT_STRATEGY, DEFAULT_RETRY_STOP_STRATEGY);
+    this(connection, new ForkJoinPool(REQUEST_CONCURRENCY), DEFAULT_WAIT_STRATEGY, DEFAULT_RETRY_STOP_STRATEGY);
   }
 
   @VisibleForTesting
-  BigtableStorage(Connection connection, WaitStrategy waitStrategy, StopStrategy retryStopStrategy) {
+  BigtableStorage(Connection connection,
+                  ExecutorService executor,
+                  WaitStrategy waitStrategy,
+                  StopStrategy retryStopStrategy) {
     this.connection = Objects.requireNonNull(connection, "connection");
+
+    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(
+        register(closer, Objects.requireNonNull(executor, "executor"), "bigtable-storage")));
 
     retryer = RetryerBuilder.<Void>newBuilder()
         .retryIfExceptionOfType(IOException.class)
@@ -220,16 +240,19 @@ public class BigtableStorage {
 
   private List<WorkflowInstanceExecutionData> executionData(
       Set<WorkflowInstance> workflowInstancesSet) {
-    return workflowInstancesSet.parallelStream()
-        .map(workflowInstance -> {
+    return workflowInstancesSet.stream()
+        .map(workflowInstance -> asyncIO(() -> {
           try {
             return executionData(workflowInstance);
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
-        })
+        }))
+        .collect(toList())
+        .stream()
+        .map(CompletableFuture::join)
         .sorted(WorkflowInstanceExecutionData.COMPARATOR)
-        .collect(Collectors.toList());
+        .collect(toList());
   }
 
   private SequenceEvent parseEventResult(Result r) throws IOException {
@@ -238,6 +261,10 @@ public class BigtableStorage {
     final byte[] value = r.getValue(EVENT_CF, EVENT_QUALIFIER);
     final Event event = deserializeEvent(ByteString.of(value));
     return SequenceEvent.parseKey(key, event, timestamp);
+  }
+
+  private <T> CompletableFuture<T> asyncIO(IOOperation<T> f) {
+    return f.executeAsync(executor);
   }
 
   private static <T> void onRequestAttempt(Attempt<T> attempt) {
@@ -249,5 +276,10 @@ public class BigtableStorage {
 
   private static TreeSet<SequenceEvent> newSortedEventSet() {
     return Sets.newTreeSet(SequenceEvent.COUNTER_COMPARATOR);
+  }
+
+  @Override
+  public void close() throws IOException {
+    closer.close();
   }
 }

@@ -42,6 +42,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.Rule;
 import org.junit.Test;
@@ -76,10 +78,13 @@ public class BigTableStorageTest {
   private Connection bigtable;
   private BigtableStorage storage;
 
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
   public void setUp(int numFailures) throws Exception {
     bigtable = setupBigTableMockTable(numFailures);
     storage =
-        new BigtableStorage(bigtable, WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(MAX_BIGTABLE_RETRIES));
+        new BigtableStorage(bigtable, executor, WaitStrategies.noWait(),
+            StopStrategies.stopAfterAttempt(MAX_BIGTABLE_RETRIES));
   }
 
   private Connection setupBigTableMockTable(int numFailures) throws IOException {

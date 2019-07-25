@@ -200,7 +200,8 @@ public class DatastoreStorage implements Closeable {
                    ExecutorService executor, Logger log) {
     this.datastore = Objects.requireNonNull(datastore);
     this.storageTransactionFactory = Objects.requireNonNull(storageTransactionFactory);
-    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(register(closer, executor, "datastore-storage")));
+    this.executor = MDCUtil.withMDC(Context.currentContextExecutor(
+        register(closer, Objects.requireNonNull(executor, "executor"), "datastore-storage")));
     this.log = Objects.requireNonNull(log, "log");
   }
 

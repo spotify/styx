@@ -61,6 +61,7 @@ public class AggregateStorage implements Storage {
 
   @Override
   public void close() throws IOException {
+    bigtableStorage.close();
     datastoreStorage.close();
   }
 
