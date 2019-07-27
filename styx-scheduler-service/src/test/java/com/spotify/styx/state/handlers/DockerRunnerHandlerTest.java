@@ -193,33 +193,6 @@ public class DockerRunnerHandlerTest {
     verifyNoMoreInteractions(stateManager);
   }
 
-  @Test
-  public void shouldPerformCleanupOnFailed() {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
-        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
-
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
-  }
-
-  @Test
-  public void shouldPerformCleanupOnFailedThroughTransitions() {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, State.FAILED, StateData.newBuilder()
-        .executionId(TEST_EXECUTION_ID)
-        .build());
-
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
-  }
-
   @Parameters({"SUBMITTED", "RUNNING"})
   @Test
   public void shouldPollWhenStarted(State state) {

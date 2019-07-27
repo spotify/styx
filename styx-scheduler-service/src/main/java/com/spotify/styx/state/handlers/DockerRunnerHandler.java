@@ -102,16 +102,6 @@ public class DockerRunnerHandler implements OutputHandler {
         dockerRunner.poll(state);
         break;
 
-      case TERMINATED:
-      case FAILED:
-      case ERROR:
-        // TODO: remove this effectively unused cleanup?
-        if (state.data().executionId().isPresent()) {
-          final String executionId = state.data().executionId().get();
-          dockerRunner.cleanup(state.workflowInstance(), executionId);
-        }
-        break;
-
       default:
         // do nothing
     }

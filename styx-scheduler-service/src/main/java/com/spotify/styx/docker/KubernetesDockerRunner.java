@@ -409,12 +409,6 @@ class KubernetesDockerRunner implements DockerRunner {
         .collect(toList());
   }
 
-  @Override
-  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    // do not cleanup pod along with state machine transition and let polling thread
-    // take care of it
-  }
-
   @VisibleForTesting
   boolean shouldDeletePodWithRunState(WorkflowInstance workflowInstance, Pod pod, RunState runState) {
     // Precondition: The run states were fetched after the pods

@@ -26,7 +26,6 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -579,53 +578,6 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", List.of("other", "args"),
         Map.of("QUUX", "quux"))));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class CleansUpDockerRunsWhenTerminatingTest extends SystemTest {
-  @Test
-  public void cleansUpDockerRunsWhenTerminating() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
-    RunSpec runSpec = getDockerRuns().get(0)._2;
-
-    injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class CleansUpDockerRunsWhenFailingTest extends SystemTest {
-  @Test
-  public void cleansUpDockerRunsWhenFailing() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
-    RunSpec runSpec = getDockerRuns().get(0)._2;
-
-    injectEvent(Event.runError(workflowInstance, "Something failed"));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
   }
   }
 

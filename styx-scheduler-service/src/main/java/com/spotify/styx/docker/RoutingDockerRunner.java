@@ -63,11 +63,6 @@ class RoutingDockerRunner implements DockerRunner {
   }
 
   @Override
-  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    runner().cleanup(workflowInstance, executionId);
-  }
-
-  @Override
   public void close() throws IOException {
     final Closer closer = Closer.create();
     dockerRunners.values().forEach(closer::register);

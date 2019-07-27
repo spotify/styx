@@ -101,7 +101,6 @@ public class StyxSchedulerServiceFixture {
 
   // captured fields from fakes
   private Queue<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
-  Queue<String> dockerCleans = new ConcurrentLinkedQueue<>();
   Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
 
   // service and helper
@@ -333,11 +332,6 @@ public class StyxSchedulerServiceFixture {
       @Override
       public void cleanup() {
         // nop
-      }
-
-      @Override
-      public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-        dockerCleans.add(executionId);
       }
 
       @Override
