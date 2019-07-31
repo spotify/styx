@@ -20,20 +20,30 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.FAILED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
+import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.VALID_SHA;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.RetryUtil;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -49,17 +59,29 @@ public class TerminationHandlerTest {
   private static final Instant NOW = Instant.now();
   private static final long COUNTER = 17;
 
+  @Mock Storage storage;
   @Mock StateManager stateManager;
   @Mock RetryUtil retryUtil;
 
   private TerminationHandler terminationHandler;
 
+  private static final Workflow WORKFLOW =
+      Workflow.create(TestData.WORKFLOW_ID.componentId(), HOURLY_WORKFLOW_CONFIGURATION);
+  private static final Workflow WORKFLOW_WITH_RETRY_CONDITION =
+      Workflow.create(TestData.WORKFLOW_ID.componentId(), WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .dockerImage("busybox")
+          .schedule(HOURS)
+          .retryCondition("exitCode == 1")
+          .build());
   private static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-04-04");
 
   @Before
-  public void setUp() {
-    terminationHandler = new TerminationHandler(retryUtil, stateManager);
+  public void setUp() throws IOException {
+    when(storage.workflow(WORKFLOW_INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
+    terminationHandler = new TerminationHandler(retryUtil, storage, stateManager);
   }
 
   @Test
@@ -126,11 +148,107 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldFailOnFailFastExitCodeReceived() {
-    StateData data = data(1, 1.0, Optional.of(50));
-    RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(maxedTerm);
+  public void shouldStopOnFailFastExitCodeReceived() {
+    var data = data(1, 1.0, Optional.of(50));
+    var failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
+    terminationHandler.transitionInto(failed);
     verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+  }
+
+  @Test
+  public void shouldStopOnWorkflowNotFound() throws IOException {
+    var data = data(1, 1.0, Optional.empty());
+    var failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
+    when(storage.workflow(WORKFLOW_INSTANCE.workflowId())).thenReturn(Optional.empty());
+    terminationHandler.transitionInto(failed);
+    verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+  }
+
+  @Test
+  public void shouldScheduleRetryOnReadingWorkflowFailed() throws IOException {
+    var data = data(1, 1.0, Optional.of(1));
+    var failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
+    Duration expectedDelay = Duration.ofMillis(4711);
+    when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
+    when(storage.workflow(WORKFLOW_INSTANCE.workflowId())).thenThrow(new IOException());
+    terminationHandler.transitionInto(failed);
+    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
+  }
+
+  @Test
+  public void shouldScheduleRetryOnRetryConditionMet() throws IOException {
+    var data = data(1, 1.0, Optional.of(1));
+    var nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
+    Duration expectedDelay = Duration.ofMillis(4711);
+    when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
+    when(storage.workflow(WORKFLOW_INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW_WITH_RETRY_CONDITION));
+    terminationHandler.transitionInto(nonZeroTerm);
+    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
+  }
+
+  @Test
+  public void shouldStopOnRetryConditionNotMet() throws IOException {
+    var data = data(1, 1.0, Optional.of(2));
+    var nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
+    when(storage.workflow(WORKFLOW_INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW_WITH_RETRY_CONDITION));
+    terminationHandler.transitionInto(nonZeroTerm);
+    verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+  }
+
+  @Test
+  public void shouldEvaluateToTrue() {
+    final boolean result = TerminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.newBuilder()
+                .tries(3)
+                .consecutiveFailures(2)
+                .trigger(Trigger.natural())
+                .build()),
+        Optional.of(1),
+        "exitCode == 1 && (tries < 3 || consecutiveFailures < 4) && triggerType == \"natural\"");
+    assertThat(result, is(true));
+  }
+
+  @Test
+  public void shouldFailToEvaluate() {
+    final boolean result = TerminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.zero()),
+        Optional.of(1),
+        "foo -> bar");
+    assertThat(result, is(false));
+  }
+
+  @Test
+  public void shouldEvaluateToFalseWhenMissingExitCode() {
+    final boolean result = TerminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.zero()),
+        Optional.empty(),
+        "exitCode == 1");
+    assertThat(result, is(false));
+  }
+
+  @Test
+  public void shouldEvaluateToFalseWhenMissingTriggerType() {
+    final boolean result = TerminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.newBuilder()
+                .tries(3)
+                .consecutiveFailures(2)
+                .build()),
+        Optional.of(1),
+        "exitCode == 1 && (tries < 3 || consecutiveFailures < 4) && triggerType == \"natural\"");
+    assertThat(result, is(false));
+  }
+
+  @Test
+  public void shouldEvaluateToFalseIfRetryConditionIsNotBooleanExpression() {
+    final boolean result = TerminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED, StateData.zero()),
+        Optional.of(1),
+        "21 * 2");
+    assertThat(result, is(false));
   }
 
   private StateData data(int tries, double cost, Optional<Integer> lastExit) {

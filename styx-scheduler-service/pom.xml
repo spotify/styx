@@ -65,6 +65,10 @@
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-container</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache-extras.beanshell</groupId>
+      <artifactId>bsh</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>

@@ -389,7 +389,7 @@ public class StyxScheduler implements AppInit {
     // These output handlers will be invoked in order.
     outputHandlers.addAll(OutputHandler.tracing(List.of(
         new DockerRunnerHandler(dockerRunner, stateManager),
-        new TerminationHandler(retryUtil, stateManager),
+        new TerminationHandler(retryUtil, storage, stateManager),
         new MonitoringHandler(stats),
         new ExecutionDescriptionHandler(storage, stateManager, workflowValidator),
 

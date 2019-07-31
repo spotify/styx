@@ -67,6 +67,8 @@ public interface WorkflowConfiguration {
 
   Optional<Duration> runningTimeout();
 
+  Optional<String> retryCondition();
+
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);
 

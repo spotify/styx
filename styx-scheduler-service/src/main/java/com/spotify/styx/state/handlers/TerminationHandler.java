@@ -20,21 +20,31 @@
 
 package com.spotify.styx.state.handlers;
 
+import bsh.EvalError;
+import bsh.Interpreter;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RetryUtil;
+import com.spotify.styx.util.TriggerUtil;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link OutputHandler} that manages scheduling generation of {@link Event}s
  * as a response to the {@link RunState.State#TERMINATED} and {@link RunState.State#FAILED} states.
  */
 public class TerminationHandler implements OutputHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TerminationHandler.class);
 
   // Retry cost is vaguely related to a max time period we're going to keep retrying a state.
   // See the different costs for failures and missing dependencies in RunState
@@ -44,11 +54,13 @@ public class TerminationHandler implements OutputHandler {
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
   private final RetryUtil retryUtil;
+  private final Storage storage;
   private final StateManager stateManager;
 
-  public TerminationHandler(RetryUtil retryUtil, StateManager stateManager) {
-    this.retryUtil = Objects.requireNonNull(retryUtil);
-    this.stateManager = Objects.requireNonNull(stateManager);
+  public TerminationHandler(RetryUtil retryUtil, Storage storage, StateManager stateManager) {
+    this.retryUtil = Objects.requireNonNull(retryUtil, "retryUtil");
+    this.storage = Objects.requireNonNull(storage, "storage");
+    this.stateManager = Objects.requireNonNull(stateManager, "stateManager");
   }
 
   @Override
@@ -76,7 +88,7 @@ public class TerminationHandler implements OutputHandler {
 
     if (state.data().retryCost() < MAX_RETRY_COST) {
       final Optional<Integer> exitCode = state.data().lastExit();
-      if (shouldFailFast(exitCode)) {
+      if (shouldFailFast(state, exitCode)) {
         stateManager.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
       } else {
         final long delayMillis;
@@ -96,7 +108,41 @@ public class TerminationHandler implements OutputHandler {
     return exitCode.map(c -> c == MISSING_DEPS_EXIT_CODE).orElse(false);
   }
 
-  private static boolean shouldFailFast(Optional<Integer> exitCode) {
-    return exitCode.map(c -> c == FAIL_FAST_EXIT_CODE).orElse(false);
+  private boolean shouldFailFast(RunState state, Optional<Integer> exitCode) {
+    if (exitCode.isPresent() && exitCode.orElseThrow() == FAIL_FAST_EXIT_CODE) {
+      return true;
+    }
+
+    final Optional<Workflow> workflow;
+    try {
+      workflow = storage.workflow(state.workflowInstance().workflowId());
+    } catch (IOException e) {
+      LOG.warn("Failed to read workflow  {}", state.workflowInstance().toKey(), e);
+      return false;
+    }
+
+    if (workflow.isEmpty()) {
+      return true;
+    }
+
+    return workflow.orElseThrow().configuration().retryCondition()
+        .map(s -> !retryConditionMet(state, exitCode, s))
+        .orElse(false);
+  }
+
+  static boolean retryConditionMet(RunState state,
+                                   Optional<Integer> exitCode,
+                                   String retryCondition) {
+    var interpreter = new Interpreter();
+    try {
+      interpreter.set("exitCode", exitCode.orElse(null));
+      interpreter.set("tries", state.data().tries());
+      interpreter.set("triggerType", state.data().trigger().map(TriggerUtil::triggerType).orElse(null));
+      interpreter.set("consecutiveFailures", state.data().consecutiveFailures());
+      final Object result = interpreter.eval(retryCondition);
+      return result instanceof Boolean && (boolean) result;
+    } catch (EvalError evalError) {
+      return false;
+    }
   }
 }
