@@ -106,12 +106,14 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
 public class KubernetesDockerRunnerTest {
 
   private static final String EXECUTION_ID = "badf00d";
+  private static final String RUNNER_ID = "test";
   private static final String POD_NAME = EXECUTION_ID;
   private static final String SERVICE_ACCOUNT = "sa@example.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
@@ -195,7 +197,6 @@ public class KubernetesDockerRunnerTest {
 
     when(debug.get()).thenReturn(false);
 
-    when(k8sClient.getPod(anyString())).thenReturn(Optional.empty());
     when(k8sClient.getPod(createdPod.getMetadata().getName())).thenReturn(Optional.of(createdPod));
     when(k8sClient.listPods()).thenReturn(podList);
     when(podList.getItems()).thenReturn(List.of(createdPod));
@@ -211,7 +212,7 @@ public class KubernetesDockerRunnerTest {
 
     when(time.get()).thenReturn(FIXED_INSTANT);
 
-    kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
+    kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
         executor);
     kdr.init();
@@ -240,11 +241,22 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldToleratePodAlreadyCreated() throws IOException {
+    Mockito.reset(k8sClient);
     when(k8sClient.createPod(any(Pod.class))).thenThrow(
         new KubernetesClientException("Already created", 409,
             new StatusBuilder().withReason("AlreadyExists").build()));
-    kdr.start(RUN_STATE, RUN_SPEC);
+    assertThat(kdr.start(RUN_STATE, RUN_SPEC), is(RUNNER_ID));
     verifyZeroInteractions(stateManager);
+  }
+
+  @Test
+  public void shouldThrowIOException() throws IOException {
+    Mockito.reset(k8sClient);
+    when(k8sClient.createPod(any(Pod.class))).thenThrow(
+        new KubernetesClientException("foobar", 500,
+            new StatusBuilder().withReason("foobar").build()));
+    exception.expectMessage("Failed to create Kubernetes pod");
+    kdr.start(RUN_STATE, RUN_SPEC);
   }
 
   @Test
@@ -554,7 +566,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldRunIfSecretExists() throws IOException {
     when(k8sClient.getSecret(any())).thenReturn(Optional.of(new SecretBuilder().build()));
-    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET);
+    assertThat(kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET), is(RUNNER_ID));
     verify(k8sClient).createPod(any());
   }
 

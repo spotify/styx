@@ -55,6 +55,10 @@ public class DockerRunnerHandler implements OutputHandler {
     this.stateManager = requireNonNull(stateManager);
   }
 
+  private boolean isUserError(Throwable e) {
+    return e instanceof InvalidExecutionException;
+  }
+
   @Override
   public void transitionInto(RunState state) {
     switch (state.state()) {
@@ -106,10 +110,6 @@ public class DockerRunnerHandler implements OutputHandler {
       default:
         // do nothing
     }
-  }
-
-  private boolean isUserError(Throwable e) {
-    return e instanceof InvalidExecutionException;
   }
 
   private RunSpec createRunSpec(RunState state) throws ResourceNotFoundException {
