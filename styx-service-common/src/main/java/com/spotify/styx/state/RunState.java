@@ -228,7 +228,7 @@ public abstract class RunState {
     }
 
     @Override
-    public RunState submitted(WorkflowInstance workflowInstance, String executionId) {
+    public RunState submitted(WorkflowInstance workflowInstance, String executionId, String runnerId) {
       switch (state()) {
         case SUBMITTING:
           return state(
@@ -237,6 +237,7 @@ public abstract class RunState {
                   .tries(data().tries() + 1)
                   // backwards compatibility
                   .executionId(data().executionId().orElse(executionId))
+                  .runnerId(runnerId)
                   .build());
 
         default:

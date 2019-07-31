@@ -143,6 +143,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private final ScheduledExecutorService scheduledExecutor;
 
+  private final String id;
   private final Fabric8KubernetesClient client;
   private final StateManager stateManager;
   private final Stats stats;
@@ -155,13 +156,14 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Time time;
   private final ExecutorService executor;
 
-  KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
+  KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
                          Set<String> secretWhitelist,
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
                          Time time, ScheduledExecutorService scheduledExecutor) {
+    this.id = Objects.requireNonNull(id, "id");
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -178,21 +180,23 @@ class KubernetesDockerRunner implements DockerRunner {
         register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
   }
 
-  KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
+  KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
-    this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
+    this(id, client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
         DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
   @Override
-  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
+  public String start(RunState runState, RunSpec runSpec) throws IOException {
+    var workflowInstance = runState.workflowInstance();
+
     // First make cheap check for if pod already exists
     var existingPod = client.getPod(runSpec.executionId());
     if (existingPod.isPresent()) {
       LOG.info("Pod already exists, not creating: {}: {}", workflowInstance, existingPod);
-      return;
+      return id;
     }
 
     // Set up secrets
@@ -214,6 +218,8 @@ class KubernetesDockerRunner implements DockerRunner {
         throw new IOException("Failed to create Kubernetes pod", kce);
       }
     }
+
+    return id;
   }
 
   @Override
@@ -779,7 +785,7 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean submitted(WorkflowInstance workflowInstance, String executionId) {
+    public Boolean submitted(WorkflowInstance workflowInstance, String executionId, String runnerId) {
       return false;
     }
 

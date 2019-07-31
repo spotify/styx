@@ -34,6 +34,7 @@ import com.spotify.styx.api.Authenticator;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
@@ -100,7 +101,7 @@ public class StyxSchedulerServiceFixture {
   private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
-  private Queue<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
+  private Queue<Tuple2<RunState, RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
   Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
 
   // service and helper
@@ -175,7 +176,7 @@ public class StyxSchedulerServiceFixture {
   /**
    * @return a best effort snapshot, without throwing ConcurrentModificationException.
    */
-  List<Tuple2<WorkflowInstance, DockerRunner.RunSpec>> getDockerRuns() {
+  List<Tuple2<RunState, RunSpec>> getDockerRuns() {
     return Lists.newArrayList(dockerRuns);
   }
 
@@ -320,8 +321,9 @@ public class StyxSchedulerServiceFixture {
     return new DockerRunner() {
 
       @Override
-      public void start(WorkflowInstance workflowInstance, RunSpec runSpec) {
-        dockerRuns.add(Tuple.of(workflowInstance, runSpec));
+      public String start(RunState runState, RunSpec runSpec) {
+        dockerRuns.add(Tuple.of(runState, runSpec));
+        return "fake";
       }
 
       @Override

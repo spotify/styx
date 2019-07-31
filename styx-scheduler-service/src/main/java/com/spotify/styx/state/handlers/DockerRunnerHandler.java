@@ -68,9 +68,10 @@ public class DockerRunnerHandler implements OutputHandler {
           return;
         }
 
+        final String runnerId;
         try {
           LOG.info("running:{}, spec:{}, state:{}", state.workflowInstance(), runSpec, state);
-          dockerRunner.start(state.workflowInstance(), runSpec);
+          runnerId = dockerRunner.start(state, runSpec);
         } catch (Throwable e) {
           try {
             final String msg = "Failed the docker starting procedure for " + state.workflowInstance();
@@ -87,7 +88,7 @@ public class DockerRunnerHandler implements OutputHandler {
         }
 
         // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
-        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
+        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId(), runnerId);
         try {
           stateManager.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {

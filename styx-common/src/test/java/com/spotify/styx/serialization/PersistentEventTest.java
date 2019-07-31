@@ -49,6 +49,7 @@ public class PersistentEventTest {
   private static final Trigger BACKFILL_TRIGGER3 = Trigger.backfill("trig3");
   private static final Trigger TRIGGER_UNKNOWN = Trigger.unknown("UNKNOWN");
   private static final WorkflowInstance INSTANCE1 = WorkflowInstance.create(WORKFLOW1, PARAMETER1);
+  public static final String RUNNER_ID = "test";
   private static final String POD_NAME = "test-event";
   private static final String DOCKER_IMAGE = "busybox:1.1";
   private static final String COMMIT_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
@@ -81,7 +82,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
     assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME));
-    assertRoundtrip(Event.submitted(INSTANCE1, POD_NAME));
+    assertRoundtrip(Event.submitted(INSTANCE1, POD_NAME, RUNNER_ID));
   }
 
   @Test
@@ -117,10 +118,11 @@ public class PersistentEventTest {
         is(Event.info(INSTANCE1, Message.info("InfoMessage"))));
     assertThat(
         deserializeEvent(json("submitted")),
-        is(Event.submitted(INSTANCE1, null)));
+        is(Event.submitted(INSTANCE1, null, null)));
     assertThat(
-        deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\"")),
-        is(Event.submitted(INSTANCE1, POD_NAME)));
+        deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\",\"runner_id\":\"" + RUNNER_ID
+                                           + "\"")),
+        is(Event.submitted(INSTANCE1, POD_NAME, RUNNER_ID)));
     assertThat(
         deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
             + "\"")),

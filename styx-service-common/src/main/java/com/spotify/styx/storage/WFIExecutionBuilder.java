@@ -156,7 +156,7 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void submitted(WorkflowInstance workflowInstance, String executionId) {
+    public Void submitted(WorkflowInstance workflowInstance, String executionId, String runnerId) {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
 

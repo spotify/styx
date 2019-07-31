@@ -164,6 +164,7 @@ public class DatastoreStorage implements Closeable {
   private static final String PROPERTY_STATE_RETRY_DELAY_MILLIS = "retryDelayMillis";
   private static final String PROPERTY_STATE_LAST_EXIT = "lastExit";
   private static final String PROPERTY_STATE_EXECUTION_ID = "executionId";
+  private static final String PROPERTY_STATE_RUNNER_ID = "runnerId";
   private static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
   private static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
   private static final String PROPERTY_STATE_TRIGGER_PARAMETERS = "triggerParameters";
@@ -506,6 +507,7 @@ public class DatastoreStorage implements Closeable {
         .retryDelayMillis(readOpt(entity, PROPERTY_STATE_RETRY_DELAY_MILLIS))
         .lastExit(DatastoreStorage.<Long>readOpt(entity, PROPERTY_STATE_LAST_EXIT).map(Long::intValue))
         .executionId(readOpt(entity, PROPERTY_STATE_EXECUTION_ID))
+        .runnerId(readOpt(entity, PROPERTY_STATE_RUNNER_ID))
         .executionDescription(readOptJson(entity, PROPERTY_STATE_EXECUTION_DESCRIPTION,
             ExecutionDescription.class))
         .resourceIds(readOptJson(entity, PROPERTY_STATE_RESOURCE_IDS,
@@ -574,6 +576,7 @@ public class DatastoreStorage implements Closeable {
       entity.set(PROPERTY_STATE_TRIGGER_ID, TriggerUtil.triggerId(trigger));
     });
     state.data().executionId().ifPresent(v -> entity.set(PROPERTY_STATE_EXECUTION_ID, v));
+    state.data().runnerId().ifPresent(v -> entity.set(PROPERTY_STATE_RUNNER_ID, v));
     if (state.data().triggerParameters().isPresent()) {
       entity.set(PROPERTY_STATE_TRIGGER_PARAMETERS, jsonValue(state.data().triggerParameters().get()));
     }

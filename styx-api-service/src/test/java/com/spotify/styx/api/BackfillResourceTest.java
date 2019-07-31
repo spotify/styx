@@ -358,7 +358,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
         StateData.newBuilder()
@@ -394,7 +394,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1", "test"),             4L, 4L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
         StateData.newBuilder()
             .trigger(Trigger.backfill(BACKFILL_2.id()))
@@ -428,7 +428,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi, Trigger.backfill("backfill-2"), TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING,
         StateData.newBuilder()
@@ -498,7 +498,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi, Trigger.backfill(backfillId), TRIGGER_PARAMETERS),          1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeEvent(SequenceEvent.create(Event.terminate(wfi, Optional.of(0)),               6L, 6L));
     storage.writeEvent(SequenceEvent.create(Event.success(wfi),                                 7L, 7L));
@@ -914,7 +914,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi, Trigger.backfill(backfillId), TRIGGER_PARAMETERS),          1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi),                                 5L, 5L));
     storage.writeActiveState(wfi, RunState.create(wfi, State.RUNNING, StateData.zero(), Instant.now(), 5L));
   }
@@ -934,7 +934,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi1, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                 5L, 5L));
     storage.writeActiveState(wfi1, RunState.create(wfi1, State.RUNNING,
         StateData.zero(), Instant.now(), 5L));
@@ -967,14 +967,14 @@ public class BackfillResourceTest extends VersionedApiTest {
         Event.triggerExecution(wfi1, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                 5L, 5L));
 
     storage.writeEvent(SequenceEvent.create(
         Event.triggerExecution(wfi2, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi2, RESOURCE_IDS),                   2L, 2L));
     storage.writeEvent(SequenceEvent.create(Event.submit(wfi2, EXECUTION_DESCRIPTION, "exec-2"), 3L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi2, "exec-2"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi2, "exec-2", "test"),             4L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(wfi2),                                 5L, 5L));
 
     storage.writeActiveState(wfi1, RunState.create(wfi1, State.RUNNING,

@@ -116,6 +116,7 @@ public class KubernetesDockerRunnerTest {
   private static final String SERVICE_ACCOUNT = "sa@example.com";
   private static final String SERVICE_ACCOUNT_SECRET = "sa-secret";
   private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(TestData.WORKFLOW_ID, "foo");
+  private static final RunState RUN_STATE = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTING, StateData.zero());
   private static final RunSpec RUN_SPEC = RunSpec.simple("eid0", "busybox");
   private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.builder()
       .executionId("eid1")
@@ -210,7 +211,7 @@ public class KubernetesDockerRunnerTest {
 
     when(time.get()).thenReturn(FIXED_INSTANT);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+    kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
         executor);
     kdr.init();
@@ -242,14 +243,14 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.createPod(any(Pod.class))).thenThrow(
         new KubernetesClientException("Already created", 409,
             new StatusBuilder().withReason("AlreadyExists").build()));
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(RUN_STATE, RUN_SPEC);
     verifyZeroInteractions(stateManager);
   }
 
   @Test
   public void shouldCheckIfPodExistsBeforeCreating() throws IOException {
     when(k8sClient.getPod(any())).thenReturn(Optional.of(createdPod));
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(RUN_STATE, RUN_SPEC);
     verify(k8sClient).getPod(RUN_SPEC.executionId());
     verifyNoMoreInteractions(k8sClient);
     verifyZeroInteractions(stateManager);
@@ -258,7 +259,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldUseExecutionIdForPodName() throws IOException {
     when(k8sClient.getPod(RUN_SPEC.executionId())).thenReturn(Optional.empty());
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(RUN_STATE, RUN_SPEC);
     verify(k8sClient).getPod(RUN_SPEC.executionId());
     verify(k8sClient).createPod(podCaptor.capture());
     var submittedPod = podCaptor.getValue();
@@ -268,7 +269,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldCreateMainContainerAndKeepaliveContainer() throws IOException {
     when(k8sClient.getPod(RUN_SPEC.executionId())).thenReturn(Optional.empty());
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(RUN_STATE, RUN_SPEC);
     verify(k8sClient).createPod(podCaptor.capture());
     var submittedPod = podCaptor.getValue();
     assertThat(submittedPod.getSpec().getContainers().size(), is(2));
@@ -499,12 +500,12 @@ public class KubernetesDockerRunnerTest {
 
   @Test(expected = InvalidExecutionException.class)
   public void shouldThrowIfSecretNotExist() throws IOException {
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET);
   }
 
   @Test(expected = InvalidExecutionException.class)
   public void shouldThrowIfMountToReservedPath() throws IOException {
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET_AND_SA);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET_AND_SA);
   }
 
   @Test
@@ -553,14 +554,14 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldRunIfSecretExists() throws IOException {
     when(k8sClient.getSecret(any())).thenReturn(Optional.of(new SecretBuilder().build()));
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET);
     verify(k8sClient).createPod(any());
   }
 
   @Test
   public void shouldNotRunIfUsingNonWhitelistedSecret() throws IOException {
     exception.expectMessage("Referenced secret 'secret-1' is not whitelisted");
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET);
   }
 
   @Test
@@ -574,7 +575,7 @@ public class KubernetesDockerRunnerTest {
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenReturn(SERVICE_ACCOUNT_SECRET);
 
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_SA);
 
     verify(serviceAccountSecretManager).ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
@@ -600,7 +601,7 @@ public class KubernetesDockerRunnerTest {
 
     exception.expect(is(error));
 
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA);
+    kdr.start(RUN_STATE, RUN_SPEC_WITH_SA);
   }
 
   @Test
@@ -610,7 +611,7 @@ public class KubernetesDockerRunnerTest {
 
     exception.expect(InvalidExecutionException.class);
     exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
-    kdr.start(WORKFLOW_INSTANCE, RunSpec.builder()
+    kdr.start(RUN_STATE, RunSpec.builder()
         .executionId("eid")
         .imageName("busybox")
         .secret(WorkflowConfiguration.Secret.create(secret, "/foo/bar"))
@@ -733,7 +734,7 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldGenerateStartedAndRecordSubmitToRunningTimeWhenContainerIsReady() throws Exception {
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(17));
-    kdr.start(WORKFLOW_INSTANCE, RunSpec.simple(POD_NAME, "busybox"));
+    kdr.start(RUN_STATE, RunSpec.simple(POD_NAME, "busybox"));
     verify(stats).recordSubmission(POD_NAME);
 
     when(time.nanoTime()).thenReturn(TimeUnit.SECONDS.toNanos(18));
@@ -753,7 +754,7 @@ public class KubernetesDockerRunnerTest {
 
   @Test
   public void shouldDiscardChangesForOldExecutions() throws Exception {
-    kdr.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    kdr.start(RUN_STATE, RUN_SPEC);
 
     // simulate event from different pod, but still with the same workflow instance annotation
     createdPod.getMetadata().setName(POD_NAME + "-other");

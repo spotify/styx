@@ -28,7 +28,7 @@ import static org.mockito.Mockito.verify;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Time;
 import java.io.IOException;
 import java.time.Instant;
@@ -48,7 +48,7 @@ public class MeteredDockerRunnerProxyTest {
   @Rule
   public ExpectedException expect = ExpectedException.none();
 
-  @Mock private WorkflowInstance workflowInstance;
+  @Mock private RunState runState;
   @Mock private RunSpec runSpec;
   @Mock private DockerRunner dockerRunner;
   @Mock private Stats stats;
@@ -68,21 +68,21 @@ public class MeteredDockerRunnerProxyTest {
 
   @Test
   public void instrumentDockerMethod() throws IOException {
-    proxy.start(workflowInstance, runSpec);
+    proxy.start(runState, runSpec);
 
-    verify(dockerRunner).start(workflowInstance, runSpec);
+    verify(dockerRunner).start(runState, runSpec);
     verify(stats).recordDockerOperation("start", 123, "success");
   }
 
   @Test
   public void surfaceExceptions() throws IOException {
     doThrow(new RuntimeException("with message")).when(dockerRunner)
-        .start(any(WorkflowInstance.class), any(RunSpec.class));
+        .start(any(RunState.class), any(RunSpec.class));
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");
 
-    proxy.start(workflowInstance, runSpec);
+    proxy.start(runState, runSpec);
   }
 
   @Test
@@ -91,7 +91,7 @@ public class MeteredDockerRunnerProxyTest {
         .when(dockerRunner).start(any(), any());
 
     try {
-      proxy.start(workflowInstance, runSpec);
+      proxy.start(runState, runSpec);
       fail("Expected exception");
     } catch (Exception ignored) {
     }
@@ -104,7 +104,7 @@ public class MeteredDockerRunnerProxyTest {
     doThrow(new RuntimeException()).when(dockerRunner).start(any(), any());
 
     try {
-      proxy.start(workflowInstance, runSpec);
+      proxy.start(runState, runSpec);
       fail("Expected exception");
     } catch (Exception ignored) {
     }

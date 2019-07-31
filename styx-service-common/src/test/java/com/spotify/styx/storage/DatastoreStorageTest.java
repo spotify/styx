@@ -199,6 +199,7 @@ public class DatastoreStorageTest {
           .lastExit(13)
           .trigger(Trigger.adhoc("foobar"))
           .executionId("foo-bar-17")
+          .runnerId("test")
           .executionDescription(ExecutionDescription.builder()
               .dockerImage("foo/bar:34234")
               .dockerArgs("foo", "the", "bar", "baz")

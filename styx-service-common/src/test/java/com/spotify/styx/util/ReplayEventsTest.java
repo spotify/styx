@@ -72,7 +72,7 @@ public class ReplayEventsTest {
         Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1"), TRIGGER_PARAMETERS),      1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                   2L, 2L));
     events.add(SequenceEvent.create(Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
-    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                     4L, 4L));
+    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1", "test"),             4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                 5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),               6L, 6L));
     events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                 7L, 7L));
@@ -101,7 +101,7 @@ public class ReplayEventsTest {
         Event.triggerExecution(WORKFLOW_INSTANCE, Trigger.backfill("bf-1"), TRIGGER_PARAMETERS),      1L, 1L));
     events.add(SequenceEvent.create(Event.dequeue(WORKFLOW_INSTANCE, RESOURCE_IDS),                   2L, 2L));
     // missing Event.submit(WORKFLOW_INSTANCE, EXECUTION_DESCRIPTION, "exec-1")
-    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1"),                     4L, 4L));
+    events.add(SequenceEvent.create(Event.submitted(WORKFLOW_INSTANCE, "exec-1", "test"),             4L, 4L));
     events.add(SequenceEvent.create(Event.started(WORKFLOW_INSTANCE),                                 5L, 5L));
     events.add(SequenceEvent.create(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)),               6L, 6L));
     events.add(SequenceEvent.create(Event.success(WORKFLOW_INSTANCE),                                 7L, 7L));
