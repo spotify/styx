@@ -40,7 +40,7 @@ public class RetryUtil {
   }
 
   public Duration calculateDelay(int consecutiveFailures) {
-    final int cappedTries = (consecutiveFailures < maxExponent) ? consecutiveFailures : maxExponent;
+    final int cappedTries = Math.min(consecutiveFailures, maxExponent);
     final int multiplier = Math.max(1, RANDOM.nextInt(1 << cappedTries));
 
     return baseDelay.multipliedBy(multiplier);
