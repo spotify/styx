@@ -336,7 +336,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    assertThat(getDockerRuns().get(0)._1, is(instance1));
+    assertThat(getDockerRuns().get(0)._1.workflowInstance(), is(instance1));
 
     workflowDeleted(HOURLY_WORKFLOW);
     tickTriggerManager();
