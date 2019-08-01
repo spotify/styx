@@ -39,9 +39,12 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PropertyPermission;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,6 +146,14 @@ public class TerminationHandler implements OutputHandler {
   }
 
   boolean retryConditionMet(RunState state,
+                            Optional<Integer> exitCode,
+                            String retryCondition) {
+    return AccessController
+        .doPrivileged((PrivilegedAction<Boolean>) () -> retryConditionMet0(state, exitCode, retryCondition),
+            null, new PropertyPermission("user.dir", "read"), new PropertyPermission("saveClasses", "read"));
+  }
+
+  private boolean retryConditionMet0(RunState state,
                             Optional<Integer> exitCode,
                             String retryCondition) {
     var ns = new NameSpace(bcm, state.data().executionId().orElseGet(() -> String.valueOf(UUID.randomUUID())));
