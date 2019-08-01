@@ -20,6 +20,8 @@
 
 package com.spotify.styx.state.handlers;
 
+import static java.lang.Boolean.TRUE;
+
 import bsh.EvalError;
 import bsh.Interpreter;
 import com.spotify.styx.model.Event;
@@ -139,8 +141,7 @@ public class TerminationHandler implements OutputHandler {
       interpreter.set("tries", state.data().tries());
       interpreter.set("triggerType", state.data().trigger().map(TriggerUtil::triggerType).orElse(null));
       interpreter.set("consecutiveFailures", state.data().consecutiveFailures());
-      final Object result = interpreter.eval(retryCondition);
-      return result instanceof Boolean && (boolean) result;
+      return TRUE.equals(interpreter.eval(retryCondition));
     } catch (EvalError evalError) {
       return false;
     }
