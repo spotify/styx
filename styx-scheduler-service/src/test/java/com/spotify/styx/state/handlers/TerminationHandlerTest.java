@@ -26,6 +26,7 @@ import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
 import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.VALID_SHA;
+import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -47,6 +48,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -197,21 +201,27 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldEvaluateToTrue() {
-    final boolean result = TerminationHandler.retryConditionMet(
-        RunState.create(WORKFLOW_INSTANCE, FAILED,
-            StateData.newBuilder()
-                .tries(3)
-                .consecutiveFailures(2)
-                .trigger(Trigger.natural())
-                .build()),
-        Optional.of(1),
-        "exitCode == 1 && (tries < 3 || consecutiveFailures < 4) && triggerType == \"natural\"");
-    assertThat(result, is(true));
+    var executorService = new ForkJoinPool(32);
+    var results = IntStream.range(0, 100)
+        .mapToObj(i -> CompletableFuture.supplyAsync(() -> terminationHandler.retryConditionMet(
+            RunState.create(WORKFLOW_INSTANCE, FAILED,
+                StateData.newBuilder()
+                    .tries(3)
+                    .consecutiveFailures(2)
+                    .trigger(Trigger.natural())
+                    .build()),
+            Optional.of(1),
+            "exitCode == 1 && (tries < 3 || consecutiveFailures < 4) && triggerType == \"natural\""), executorService))
+        .collect(toList())
+        .stream()
+        .map(CompletableFuture::join)
+        .collect(toList());
+    results.forEach(result -> assertThat(result, is(true)));
   }
 
   @Test
   public void shouldFailToEvaluate() {
-    final boolean result = TerminationHandler.retryConditionMet(
+    var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED,
             StateData.zero()),
         Optional.of(1),
@@ -221,7 +231,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldEvaluateToFalseWhenMissingExitCode() {
-    final boolean result = TerminationHandler.retryConditionMet(
+    var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED,
             StateData.zero()),
         Optional.empty(),
@@ -231,7 +241,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldEvaluateToFalseWhenMissingTriggerType() {
-    final boolean result = TerminationHandler.retryConditionMet(
+    var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED,
             StateData.newBuilder()
                 .tries(3)
@@ -244,7 +254,7 @@ public class TerminationHandlerTest {
 
   @Test
   public void shouldEvaluateToFalseIfRetryConditionIsNotBooleanExpression() {
-    final boolean result = TerminationHandler.retryConditionMet(
+    var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED, StateData.zero()),
         Optional.of(1),
         "21 * 2");

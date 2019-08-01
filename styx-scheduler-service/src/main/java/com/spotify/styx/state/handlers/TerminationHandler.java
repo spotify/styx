@@ -22,14 +22,19 @@ package com.spotify.styx.state.handlers;
 
 import static java.lang.Boolean.TRUE;
 
+import bsh.BshClassManager;
 import bsh.EvalError;
 import bsh.Interpreter;
+import bsh.NameSpace;
+import bsh.Primitive;
+import bsh.UtilEvalError;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.TriggerUtil;
@@ -37,6 +42,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,11 +64,15 @@ public class TerminationHandler implements OutputHandler {
   private final RetryUtil retryUtil;
   private final Storage storage;
   private final StateManager stateManager;
+  private final Interpreter interpreter;
+  private final BshClassManager bcm;
 
   public TerminationHandler(RetryUtil retryUtil, Storage storage, StateManager stateManager) {
     this.retryUtil = Objects.requireNonNull(retryUtil, "retryUtil");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.stateManager = Objects.requireNonNull(stateManager, "stateManager");
+    interpreter = new Interpreter();
+    bcm = BshClassManager.createClassManager(interpreter);
   }
 
   @Override
@@ -132,18 +142,35 @@ public class TerminationHandler implements OutputHandler {
         .orElse(false);
   }
 
-  static boolean retryConditionMet(RunState state,
-                                   Optional<Integer> exitCode,
-                                   String retryCondition) {
-    var interpreter = new Interpreter();
+  boolean retryConditionMet(RunState state,
+                            Optional<Integer> exitCode,
+                            String retryCondition) {
+    var ns = new NameSpace(bcm, state.data().executionId().orElseGet(() -> String.valueOf(UUID.randomUUID())));
     try {
-      interpreter.set("exitCode", exitCode.orElse(null));
-      interpreter.set("tries", state.data().tries());
-      interpreter.set("triggerType", state.data().trigger().map(TriggerUtil::triggerType).orElse(null));
-      interpreter.set("consecutiveFailures", state.data().consecutiveFailures());
-      return TRUE.equals(interpreter.eval(retryCondition));
-    } catch (EvalError evalError) {
+      ns.setVariable("exitCode", exitCodeOrPrimitiveNull(exitCode), false);
+      ns.setVariable("tries", state.data().tries(), false);
+      ns.setVariable("triggerType", triggerTypeOrPrimitiveNull(state.data().trigger()), false);
+      ns.setVariable("consecutiveFailures", state.data().consecutiveFailures(), false);
+      return TRUE.equals(interpreter.eval(retryCondition, ns));
+    } catch (EvalError | UtilEvalError e) {
+      LOG.debug("Failed to evaluate retry condition `{}`", retryCondition, e);
       return false;
+    }
+  }
+
+  private static Object exitCodeOrPrimitiveNull(Optional<Integer> exitCode) {
+    if (exitCode.isPresent()) {
+      return exitCode.orElseThrow();
+    } else {
+      return Primitive.NULL;
+    }
+  }
+
+  private static Object triggerTypeOrPrimitiveNull(Optional<Trigger> trigger) {
+    if (trigger.isPresent()) {
+      return TriggerUtil.triggerType(trigger.orElseThrow());
+    } else {
+      return Primitive.NULL;
     }
   }
 }
