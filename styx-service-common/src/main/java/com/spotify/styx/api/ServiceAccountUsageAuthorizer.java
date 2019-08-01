@@ -382,11 +382,15 @@ public interface ServiceAccountUsageAuthorizer {
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
         if (cause instanceof GoogleJsonResponseException) {
-          final int statusCode = ((GoogleJsonResponseException) cause).getStatusCode();
+          var statusCode = ((GoogleJsonResponseException) cause).getStatusCode();
           // hasMember API returns 404 if the group does not exist, while returning 400 if the principal
           // email does not exist or does not have the same domain as the group if it is enforced
-          if (statusCode == 400 || statusCode == 404) {
-            log.info("Failed to check membership for {} against group {}", principalEmail, group, cause);
+          if (statusCode == 400) {
+            log.info("Principal {} does not exist or belongs to different domain than group {}",
+                principalEmail, group, cause);
+            return false;
+          } else if (statusCode == 404) {
+            log.info("Group {} does not exist", group, cause);
             return false;
           }
         }
@@ -405,6 +409,7 @@ public interface ServiceAccountUsageAuthorizer {
         final Throwable cause = e.getCause();
         if (cause instanceof GoogleJsonResponseException
             && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
+          log.info("Project {} does not exist", projectId, cause);
           return Optional.empty();
         }
         throw new RuntimeException(e);
@@ -422,6 +427,7 @@ public interface ServiceAccountUsageAuthorizer {
         final Throwable cause = e.getCause();
         if (cause instanceof GoogleJsonResponseException
             && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
+          log.info("Service account {} does not exist", serviceAccount, cause);
           return Optional.empty();
         }
         throw new RuntimeException(e);
@@ -442,7 +448,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     private static <T> void onRequestAttempt(Attempt<T> attempt) {
-      if (attempt.hasException()) {
+      if (attempt.hasException() && isRetryableException(attempt.getExceptionCause())) {
         log.warn("Failed request attempt {}", attempt.getAttemptNumber(), attempt.getExceptionCause());
       }
     }
