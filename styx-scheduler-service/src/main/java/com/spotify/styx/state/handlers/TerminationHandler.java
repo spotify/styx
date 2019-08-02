@@ -28,6 +28,7 @@ import bsh.Interpreter;
 import bsh.NameSpace;
 import bsh.Primitive;
 import bsh.UtilEvalError;
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -145,12 +146,14 @@ public class TerminationHandler implements OutputHandler {
         .orElse(false);
   }
 
+  @VisibleForTesting
   boolean retryConditionMet(RunState state,
                             Optional<Integer> exitCode,
                             String retryCondition) {
     return AccessController
-        .doPrivileged((PrivilegedAction<Boolean>) () -> retryConditionMet0(state, exitCode, retryCondition),
-            null, new PropertyPermission("user.dir", "read"), new PropertyPermission("saveClasses", "read"));
+        .doPrivileged((PrivilegedAction<Boolean>) () -> retryConditionMet0(state, exitCode, retryCondition), null,
+            // minimum permission required for BeanShell to function
+            new PropertyPermission("saveClasses", "read"));
   }
 
   private boolean retryConditionMet0(RunState state,
