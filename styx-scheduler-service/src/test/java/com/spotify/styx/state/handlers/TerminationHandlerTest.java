@@ -53,6 +53,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -256,7 +257,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  //@Ignore("require enabling security manager: -Djava.security.manager -Djava.security.policy=security.policy")
+  @Ignore("require enabling security manager: -Djava.security.manager -Djava.security.policy=security.policy")
   public void shouldFailToEvaluateDueToMissingPermission() {
     var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED,
