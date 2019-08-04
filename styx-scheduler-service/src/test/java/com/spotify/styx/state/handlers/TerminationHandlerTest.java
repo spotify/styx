@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -52,7 +53,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -231,7 +231,32 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  @Ignore("require enabling security manager")
+  public void shouldFailToEvaluateDueToTimeout() {
+    var result = terminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.zero()),
+        Optional.of(1),
+        "Thread.sleep(2 * 1000); true");
+    assertThat(result, is(false));
+  }
+
+  @Test(expected = InterruptedException.class)
+  public void shouldFailToEvaluateDueToThreadInterrupted() throws InterruptedException {
+    var terminationHandler = new TerminationHandler(retryUtil, storage, stateManager,
+        MoreExecutors.newDirectExecutorService());
+    Thread.currentThread().interrupt();
+    var result = terminationHandler.retryConditionMet(
+        RunState.create(WORKFLOW_INSTANCE, FAILED,
+            StateData.zero()),
+        Optional.of(1),
+        "true");
+    assertThat(result, is(false));
+    assertThat(Thread.currentThread().isInterrupted(), is(true));
+    Thread.sleep(5000);
+  }
+
+  @Test
+  //@Ignore("require enabling security manager: -Djava.security.manager -Djava.security.policy=security.policy")
   public void shouldFailToEvaluateDueToMissingPermission() {
     var result = terminationHandler.retryConditionMet(
         RunState.create(WORKFLOW_INSTANCE, FAILED,

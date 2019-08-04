@@ -40,13 +40,22 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.RetryUtil;
 import com.spotify.styx.util.TriggerUtil;
 import java.io.IOException;
+import java.security.AccessControlContext;
 import java.security.AccessController;
+import java.security.CodeSource;
+import java.security.Permissions;
 import java.security.PrivilegedAction;
+import java.security.ProtectionDomain;
+import java.security.cert.Certificate;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.PropertyPermission;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,18 +74,42 @@ public class TerminationHandler implements OutputHandler {
   private static final int FAIL_FAST_EXIT_CODE = 50;
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
+  private static final int EVAL_TIMEOUT = 1;
+  private static final ExecutorService DEFAULT_EVAL_EXECUTOR;
+
+  static {
+    var perms = new Permissions();
+    // permissions required by PrivilegedThreadFactory
+    perms.add(new RuntimePermission("getClassLoader"));
+    perms.add(new RuntimePermission("setContextClassLoader"));
+    // minimum permission required by BeanShell
+    perms.add(new PropertyPermission("saveClasses", "read"));
+    var acc = new AccessControlContext(
+        new ProtectionDomain[]{ new ProtectionDomain(new CodeSource(null, (Certificate[]) null), perms) });
+
+    DEFAULT_EVAL_EXECUTOR = Executors.newCachedThreadPool(AccessController.doPrivileged(
+        (PrivilegedAction<ThreadFactory>) Executors::privilegedThreadFactory, acc));
+  }
+
   private final RetryUtil retryUtil;
   private final Storage storage;
   private final StateManager stateManager;
   private final Interpreter interpreter;
   private final BshClassManager bcm;
+  private final ExecutorService evalExecutor;
 
   public TerminationHandler(RetryUtil retryUtil, Storage storage, StateManager stateManager) {
+    this(retryUtil, storage, stateManager, DEFAULT_EVAL_EXECUTOR);
+  }
+
+  @VisibleForTesting
+  TerminationHandler(RetryUtil retryUtil, Storage storage, StateManager stateManager, ExecutorService evalExecutor) {
     this.retryUtil = Objects.requireNonNull(retryUtil, "retryUtil");
     this.storage = Objects.requireNonNull(storage, "storage");
     this.stateManager = Objects.requireNonNull(stateManager, "stateManager");
     interpreter = new Interpreter();
     bcm = BshClassManager.createClassManager(interpreter);
+    this.evalExecutor = Objects.requireNonNull(evalExecutor, "evalExecutor");
   }
 
   @Override
@@ -150,10 +183,17 @@ public class TerminationHandler implements OutputHandler {
   boolean retryConditionMet(RunState state,
                             Optional<Integer> exitCode,
                             String retryCondition) {
-    return AccessController
-        .doPrivileged((PrivilegedAction<Boolean>) () -> retryConditionMet0(state, exitCode, retryCondition), null,
-            // minimum permission required for BeanShell to function
-            new PropertyPermission("saveClasses", "read"));
+    var future = evalExecutor.submit(() -> retryConditionMet0(state, exitCode, retryCondition));
+    try {
+      return future.get(EVAL_TIMEOUT, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    } catch (Exception e) {
+      return false;
+    } finally {
+      future.cancel(true);
+    }
   }
 
   private boolean retryConditionMet0(RunState state,
