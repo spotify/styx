@@ -786,8 +786,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <!-- TODO: remove -D after openjdk fixes the bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 -->
-          <argLine>-Xmx256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true ${argLine}</argLine>
+          <argLine>-Xmx256m ${argLine}</argLine>
           <reuseForks>false</reuseForks>
           <forkCount>0.5C</forkCount>
           <excludes>
@@ -826,8 +825,7 @@
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
-          <!-- TODO: remove -D after openjdk fixes the bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 -->
-          <argLine>-Xmx256m -Djdk.net.URLClassPath.disableClassPathURLCheck=true ${argLine}</argLine>
+          <argLine>-Xmx256m ${argLine}</argLine>
           <reuseForks>false</reuseForks>
           <forkCount>1</forkCount>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
