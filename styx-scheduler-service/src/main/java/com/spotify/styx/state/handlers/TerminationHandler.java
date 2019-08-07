@@ -22,9 +22,9 @@ package com.spotify.styx.state.handlers;
 
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
 import java.util.Objects;
@@ -44,26 +44,24 @@ public class TerminationHandler implements OutputHandler {
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
   private final RetryUtil retryUtil;
-  private final StateManager stateManager;
 
-  public TerminationHandler(RetryUtil retryUtil, StateManager stateManager) {
+  public TerminationHandler(RetryUtil retryUtil) {
     this.retryUtil = Objects.requireNonNull(retryUtil);
-    this.stateManager = Objects.requireNonNull(stateManager);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public void transitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().map(v -> v.equals(0)).orElse(false)) {
-          stateManager.receiveIgnoreClosed(Event.success(state.workflowInstance()), state.counter());
+          eventRouter.receiveIgnoreClosed(Event.success(state.workflowInstance()), state.counter());
         } else {
-          checkRetry(state);
+          checkRetry(state, eventRouter);
         }
         break;
 
       case FAILED:
-        checkRetry(state);
+        checkRetry(state, eventRouter);
         break;
 
       default:
@@ -71,13 +69,13 @@ public class TerminationHandler implements OutputHandler {
     }
   }
 
-  private void checkRetry(RunState state) {
+  private void checkRetry(RunState state, EventRouter eventRouter) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
     if (state.data().retryCost() < MAX_RETRY_COST) {
       final Optional<Integer> exitCode = state.data().lastExit();
       if (shouldFailFast(exitCode)) {
-        stateManager.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
+        eventRouter.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
       } else {
         final long delayMillis;
         if (isMissingDependency(exitCode)) {
@@ -85,10 +83,10 @@ public class TerminationHandler implements OutputHandler {
         } else {
           delayMillis = retryUtil.calculateDelay(state.data().consecutiveFailures()).toMillis();
         }
-        stateManager.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis), state.counter());
+        eventRouter.receiveIgnoreClosed(Event.retryAfter(workflowInstance, delayMillis), state.counter());
       }
     } else {
-      stateManager.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
+      eventRouter.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
     }
   }
 

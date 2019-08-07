@@ -41,12 +41,12 @@ class MDCDecoratingHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState runState) {
+  public void transitionInto(RunState runState, EventRouter eventRouter) {
     try (var closer = Closer.create()) {
       closer.register(MDC.putCloseable(WFI_ID, runState.workflowInstance().toString()));
       closer.register(MDC.putCloseable(WFI_STATE_COUNTER, Long.toString(runState.counter())));
       closer.register(MDC.putCloseable(WFI_STATE_NAME, runState.state().toString()));
-      delegate.transitionInto(runState);
+      delegate.transitionInto(runState, eventRouter);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

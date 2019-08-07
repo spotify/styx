@@ -40,13 +40,14 @@ public class OutputHandlerTest {
   @Mock private OutputHandler outputHandler1;
   @Mock private OutputHandler outputHandler2;
   @Mock private RunState runState;
+  @Mock private EventRouter eventRouter;
 
   @Test
   public void fanOutput() {
     var outputHandler = OutputHandler.fanOutput(List.of(outputHandler1, outputHandler2));
-    outputHandler.transitionInto(runState);
-    verify(outputHandler1).transitionInto(runState);
-    verify(outputHandler2).transitionInto(runState);
+    outputHandler.transitionInto(runState, eventRouter);
+    verify(outputHandler1).transitionInto(runState, eventRouter);
+    verify(outputHandler2).transitionInto(runState, eventRouter);
   }
 
   @Test
@@ -56,8 +57,8 @@ public class OutputHandlerTest {
     when(runState.workflowInstance()).thenReturn(WORKFLOW_INSTANCE);
     when(runState.state()).thenReturn(RunState.State.RUNNING);
     when(runState.counter()).thenReturn(17L);
-    outputHandler.transitionInto(runState);
-    verify(outputHandler1).transitionInto(runState);
+    outputHandler.transitionInto(runState, eventRouter);
+    verify(outputHandler1).transitionInto(runState, eventRouter);
   }
 
   @Test
@@ -66,9 +67,9 @@ public class OutputHandlerTest {
     assertThat(outputHandlers.size(), is(2));
     assertThat(Proxy.isProxyClass(outputHandlers.get(0).getClass()), is(true));
     assertThat(Proxy.isProxyClass(outputHandlers.get(1).getClass()), is(true));
-    outputHandlers.get(0).transitionInto(runState);
-    verify(outputHandler1).transitionInto(runState);
-    outputHandlers.get(1).transitionInto(runState);
-    verify(outputHandler2).transitionInto(runState);
+    outputHandlers.get(0).transitionInto(runState, eventRouter);
+    verify(outputHandler1).transitionInto(runState, eventRouter);
+    outputHandlers.get(1).transitionInto(runState, eventRouter);
+    verify(outputHandler2).transitionInto(runState, eventRouter);
   }
 }

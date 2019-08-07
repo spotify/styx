@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.MonitoringHandler;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
@@ -45,6 +46,7 @@ public class MonitoringHandlerTest {
       WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-04-04T08");
 
   @Mock Stats stats;
+  @Mock EventRouter eventRouter;
 
   private MonitoringHandler monitoringHandler;
 
@@ -59,7 +61,7 @@ public class MonitoringHandlerTest {
     RunState state = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED,
         StateData.newBuilder().lastExit(20).build());
 
-    monitoringHandler.transitionInto(state);
+    monitoringHandler.transitionInto(state, eventRouter);
 
     verify(stats).recordExitCode(20);
   }
@@ -68,7 +70,7 @@ public class MonitoringHandlerTest {
   public void shouldNotMarkExitCodeIfNotPresent() {
     RunState state = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED);
 
-    monitoringHandler.transitionInto(state);
+    monitoringHandler.transitionInto(state, eventRouter);
 
     verify(stats, never()).recordExitCode(anyInt());
   }

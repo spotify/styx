@@ -139,7 +139,7 @@ public class PersistentStateManager implements StateManager {
   private void tickInstance(RunState state) {
     log.info("Ticking instance: {}: #{} {}", state.workflowInstance(), state.counter(), state.state());
     try {
-      outputHandler.transitionInto(state);
+      outputHandler.transitionInto(state, this);
     } catch (StateTransitionConflictException e) {
       log.debug("State transition conflict when ticking instance: {}", state.workflowInstance(), e);
     } catch (CounterCapacityException e) {
@@ -351,7 +351,7 @@ public class PersistentStateManager implements StateManager {
 
     // Execute output handler(s)
     try {
-      outputHandler.transitionInto(runState);
+      outputHandler.transitionInto(runState, this);
     } catch (StateTransitionConflictException e) {
       log.debug("State transition conflict when invoking output handler: {}", runState.workflowInstance(), e);
     }
