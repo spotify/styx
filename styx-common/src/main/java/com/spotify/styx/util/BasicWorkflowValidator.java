@@ -24,7 +24,10 @@ import static com.spotify.styx.util.WorkflowValidator.lowerLimit;
 import static com.spotify.styx.util.WorkflowValidator.upperLimit;
 import static java.lang.String.format;
 
+import bsh.ParseException;
+import bsh.Parser;
 import com.spotify.styx.model.Workflow;
+import java.io.StringReader;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
@@ -43,6 +46,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   private static final int MAX_SECRET_NAME_LENGTH = 253;
   private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  private static final int MAX_RETRY_CONDITION_LENGTH = 256;
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
@@ -131,6 +135,22 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     cfg.serviceAccount().ifPresent(serviceAccount -> {
       if (!validateServiceAccount(serviceAccount)) {
         e.add("service account is not a valid email address: " + serviceAccount);
+      }
+    });
+
+    upperLimit(e, cfg.retryCondition().map(String::length).orElse(0),
+        MAX_RETRY_CONDITION_LENGTH, "retry condition too long");
+    cfg.retryCondition().ifPresent(retryCondition -> {
+      var parser = new Parser(new StringReader(
+          retryCondition.endsWith(";")
+          ? retryCondition
+          : retryCondition + ";"));
+      try {
+        while (!parser.Line()) {
+          // noop
+        }
+      } catch (ParseException ex) {
+        e.add(format("invalid retry condition: %s", ex.getMessage()));
       }
     });
 

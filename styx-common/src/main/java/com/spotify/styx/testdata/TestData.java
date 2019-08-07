@@ -137,6 +137,7 @@ public final class TestData {
           .dockerArgs(List.of("x", "y"))
           .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
+          .retryCondition("exitCode == 1 && (tries < 3 || consecutiveFailures < 4) && triggerType == \"natural\"")
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =
