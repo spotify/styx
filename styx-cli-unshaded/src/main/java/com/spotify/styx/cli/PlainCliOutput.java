@@ -51,14 +51,14 @@ class PlainCliOutput implements CliOutput {
     SortedMap<WorkflowId, SortedSet<RunStateDataPayload.RunStateData>> groupedStates =
         CliUtil.groupStates(runStateDataPayload.activeStates());
 
-    groupedStates.forEach((workflowId, value) -> value.forEach(RunStateData -> {
-      final StateData stateData = RunStateData.stateData();
+    groupedStates.forEach((workflowId, value) -> value.forEach(runStateData -> {
+      final StateData stateData = runStateData.stateData();
       System.out.println(String.format(
           "%s %s %s %s %s %d %s",
           workflowId.componentId(),
           workflowId.id(),
-          RunStateData.workflowInstance().parameter(),
-          RunStateData.state(),
+          runStateData.workflowInstance().parameter(),
+          runStateData.state(),
           stateData.executionId().orElse("<no-execution-id>"),
           stateData.tries(),
           stateData.message().map(Message::line).orElse("No info")

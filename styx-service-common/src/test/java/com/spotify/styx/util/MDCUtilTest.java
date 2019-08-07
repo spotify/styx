@@ -68,7 +68,7 @@ public class MDCUtilTest {
   public void withMDCRunnable() throws ExecutionException, InterruptedException {
     MDC.put("foo", "bar");
     final CompletableFuture<String> value = new CompletableFuture<>();
-    EXECUTOR_SERVICE.submit(withMDC(() -> value.complete(MDC.get("foo"))));
+    EXECUTOR_SERVICE.submit(withMDC(() -> value.complete(MDC.get("foo")))).get();
     assertThat(value.get(), is("bar"));
   }
 

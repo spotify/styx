@@ -61,6 +61,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntPredicate;
 import javaslang.Tuple;
@@ -68,6 +69,7 @@ import javaslang.Tuple2;
 import org.apache.hadoop.hbase.client.Connection;
 import org.jmock.lib.concurrent.DeterministicScheduler;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -80,6 +82,8 @@ import org.slf4j.LoggerFactory;
 public class StyxSchedulerServiceFixture {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxSchedulerServiceFixture.class);
+  
+  private static ScheduledFuture<?> scheduledFuture;
 
   private Instant now = Instant.parse("1970-01-01T00:00:00Z");
 
@@ -112,7 +116,12 @@ public class StyxSchedulerServiceFixture {
     // balloon to several GB even though the JVM itself is configured to and reports that it is only using a few
     // hundred MB.
     // (T-T)
-    Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
+    scheduledFuture = Executors.newSingleThreadScheduledExecutor().scheduleWithFixedDelay(System::gc, 1, 1, SECONDS);
+  }
+  
+  @AfterClass
+  public static void tearDownClass() {
+    scheduledFuture.cancel(true);
   }
 
   @Before
@@ -278,14 +287,14 @@ public class StyxSchedulerServiceFixture {
   }
 
   void awaitNumberOfDockerRuns(int n) {
-    awaitNumberOfDockerRuns(i -> i == n);
+    awaitNumberOfDockerRuns0(i -> i == n);
   }
 
   void awaitNumberOfDockerRunsAtLeast(int n) {
-    awaitNumberOfDockerRuns(i -> i >= n);
+    awaitNumberOfDockerRuns0(i -> i >= n);
   }
 
-  private void awaitNumberOfDockerRuns(IntPredicate predicate) {
+  private void awaitNumberOfDockerRuns0(IntPredicate predicate) {
     await().atMost(30, SECONDS).until(() -> predicate.test(dockerRuns.size()));
   }
 

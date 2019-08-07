@@ -32,7 +32,6 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.spy;
 
@@ -118,7 +117,7 @@ public class DatastoreStorageTransactionTest {
       tx.store(shard2);
       return null;
     });
-    assertEquals(storage.shardsForCounter("res1").size(), 2);
+    assertThat(storage.shardsForCounter("res1").size(), is(2));
   }
 
   @Test

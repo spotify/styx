@@ -30,6 +30,7 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -359,7 +360,8 @@ public class StyxOkHttpClientTest {
   @Test
   public void shouldFailWithBadEventJson() {
     when(client.send(any(Request.class)))
-        .thenReturn(CompletableFuture.completedFuture(responseBuilder(HTTP_OK).body(ResponseBody.create(APPLICATION_JSON, "{invalid json is invalid".getBytes())).build()));
+        .thenReturn(CompletableFuture.completedFuture(responseBuilder(HTTP_OK)
+            .body(ResponseBody.create(APPLICATION_JSON, "{invalid json is invalid".getBytes(UTF_8))).build()));
     final CompletableFuture<List<EventInfo>> r =
         styx.eventsForWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
@@ -382,7 +384,7 @@ public class StyxOkHttpClientTest {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(
             responseBuilder(HTTP_OK).body(
-                ResponseBody.create(APPLICATION_JSON, badJson.getBytes()))
+                ResponseBody.create(APPLICATION_JSON, badJson.getBytes(UTF_8)))
                 .build()));
     final CompletableFuture<List<EventInfo>> r =
         styx.eventsForWorkflowInstance("component", "workflow", "2017-01-01T00").toCompletableFuture();
@@ -452,9 +454,10 @@ public class StyxOkHttpClientTest {
   public void componentAndWorkflowAreEncoded() {
     when(client.send(any(Request.class))).thenReturn(
         CompletableFuture.completedFuture(response(HTTP_OK)));
-    styx.workflow("f[ ]o-cmp", "bar-w[f]")
+    final CompletableFuture<Workflow> r = styx.workflow("f[ ]o-cmp", "bar-w[f]")
         .toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     final URI uri = URI.create(
         API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D");

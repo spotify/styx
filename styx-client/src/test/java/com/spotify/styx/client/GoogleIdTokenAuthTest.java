@@ -48,6 +48,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import okhttp3.mockwebserver.Dispatcher;
@@ -215,8 +216,7 @@ public class GoogleIdTokenAuthTest {
   @Test
   public void testUserCredentialsWithAccessTokenFails() throws IOException,
                                                                GeneralSecurityException {
-    assert credentials != null;
-    Assume.assumeThat(credentials, is(instanceOf(UserCredentials.class)));
+    Assume.assumeThat(Objects.requireNonNull(credentials), is(instanceOf(UserCredentials.class)));
     credentials.refresh();
     final GoogleCredentials accessTokenCredentials = GoogleCredentials.newBuilder()
         .setAccessToken(credentials.getAccessToken())

@@ -52,7 +52,7 @@ public class RoutingDockerRunnerTest {
 
   private int createCounter = 0;
   private Map<String, DockerRunner> createdRunners = Maps.newHashMap();
-  private Supplier<String> dockerId = mock(Supplier.class);
+  @Mock private Supplier<String> dockerId;
 
   private DockerRunner dockerRunner;
   @Mock private RunState runState;

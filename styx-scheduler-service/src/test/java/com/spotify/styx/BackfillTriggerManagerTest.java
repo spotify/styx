@@ -66,6 +66,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -548,8 +549,7 @@ public class BackfillTriggerManagerTest {
       verify(triggerListener, timeout(60_000))
           .event(any(), any(), eq(instant), any());
 
-      assert triggerProcessed != null;
-      triggerProcessed.complete(null);
+      Objects.requireNonNull(triggerProcessed).complete(null);
       verify(transaction, timeout(60_000))
           .store(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
     }

@@ -258,8 +258,8 @@ public class EndToEndTestBase {
   }
 
   private void stopStyx() throws InterruptedException {
-    styxApiInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
-    styxSchedulerInstance.thenAccept(instance -> instance.getSignaller().signalShutdown());
+    styxApiInstance.thenAccept(instance -> instance.getSignaller().signalShutdown()).getNow(null);
+    styxSchedulerInstance.thenAccept(instance -> instance.getSignaller().signalShutdown()).getNow(null);
     if (styxApiThread != null) {
       Try.run(() -> styxApiThread.get(30, SECONDS));
       styxApiThread.cancel(true);
@@ -333,7 +333,7 @@ public class EndToEndTestBase {
     WorkflowState state();
   }
 
-  class CliException extends Exception {
+  static class CliException extends Exception {
 
     final int code;
 

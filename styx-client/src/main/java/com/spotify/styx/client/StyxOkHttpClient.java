@@ -61,7 +61,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import okhttp3.HttpUrl.Builder;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -119,7 +119,7 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<RunStateDataPayload> activeStates(Optional<String> componentId) {
-    final Builder url = urlBuilder("status", "activeStates");
+    var url = urlBuilder("status", "activeStates");
     componentId.ifPresent(id -> url.addQueryParameter("component", id));
     return execute(forUri(url), RunStateDataPayload.class);
   }
@@ -247,8 +247,8 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Void> haltWorkflowInstance(String componentId,
                                                     String workflowId,
                                                     String parameter) {
-    final Builder url = urlBuilder("scheduler", "halt");
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(
+    var url = urlBuilder("scheduler", "halt");
+    var workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
@@ -259,8 +259,8 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Void> retryWorkflowInstance(String componentId,
                                                      String workflowId,
                                                      String parameter) {
-    final Builder url = urlBuilder("scheduler", "retry");
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(
+    var url = urlBuilder("scheduler", "retry");
+    var workflowInstance = WorkflowInstance.create(
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
@@ -283,13 +283,13 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<Resource> resource(String resourceId) {
-    final Builder url = urlBuilder("resources", resourceId);
+    var url = urlBuilder("resources", resourceId);
     return execute(forUri(url), Resource.class);
   }
 
   @Override
   public CompletionStage<ResourcesPayload> resourceList() {
-    final Builder url = urlBuilder("resources");
+    var url = urlBuilder("resources");
     return execute(forUri(url), ResourcesPayload.class);
   }
 
@@ -335,7 +335,7 @@ class StyxOkHttpClient implements StyxClient {
         .id(backfillId)
         .concurrency(concurrency)
         .build();
-    final Builder url = urlBuilder("backfills", backfillId);
+    var url = urlBuilder("backfills", backfillId);
     return execute(forUri(url, "PUT", editableBackfillInput), Backfill.class);
   }
 
@@ -347,7 +347,7 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<BackfillPayload> backfill(String backfillId, boolean includeStatus) {
-    final Builder url = urlBuilder("backfills", backfillId);
+    var url = urlBuilder("backfills", backfillId);
     url.addQueryParameter("status", Boolean.toString(includeStatus));
     return execute(forUri(url), BackfillPayload.class);
   }
@@ -357,7 +357,7 @@ class StyxOkHttpClient implements StyxClient {
                                                         Optional<String> workflowId,
                                                         boolean showAll,
                                                         boolean includeStatus) {
-    final Builder url = urlBuilder("backfills");
+    var url = urlBuilder("backfills");
     componentId.ifPresent(c -> url.addQueryParameter("component", c));
     workflowId.ifPresent(w -> url.addQueryParameter("workflow", w));
     url.addQueryParameter("showAll", Boolean.toString(showAll));
@@ -374,15 +374,6 @@ class StyxOkHttpClient implements StyxClient {
         throw new RuntimeException("Error while reading the received payload: " + e.getMessage(), e);
       }
     });
-  }
-
-  private Request decorateRequest(Request request, String requestId, Optional<String> authToken) {
-    final Request.Builder builder = request
-        .newBuilder()
-        .addHeader("User-Agent", STYX_CLIENT_VERSION)
-        .addHeader("X-Request-Id", requestId);
-    authToken.ifPresent(t -> builder.addHeader("Authorization", "Bearer " + t));
-    return builder.build();
   }
 
   private CompletionStage<Response> execute(Request request) {
@@ -409,15 +400,24 @@ class StyxOkHttpClient implements StyxClient {
         }
         if (!response.isSuccessful()) {
           throw new ApiErrorException(response.code() + " " + response.message(), response.code(),
-                                      authToken.isPresent(), effectiveRequestId);
+              authToken.isPresent(), effectiveRequestId);
         }
         return response;
       }
     });
   }
 
-  private Builder urlBuilder(String... pathSegments) {
-    final Builder builder = new Builder()
+  private Request decorateRequest(Request request, String requestId, Optional<String> authToken) {
+    var builder = request
+        .newBuilder()
+        .addHeader("User-Agent", STYX_CLIENT_VERSION)
+        .addHeader("X-Request-Id", requestId);
+    authToken.ifPresent(t -> builder.addHeader("Authorization", "Bearer " + t));
+    return builder.build();
+  }
+
+  private HttpUrl.Builder urlBuilder(String... pathSegments) {
+    var builder = new HttpUrl.Builder()
         .scheme(apiHost.getScheme())
         .host(apiHost.getHost())
         .addPathSegment("api")

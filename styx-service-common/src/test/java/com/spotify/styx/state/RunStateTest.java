@@ -49,7 +49,7 @@ import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -86,7 +86,7 @@ public class RunStateTest {
   private StateTransitioner transitioner;
   @Mock private Time time;
 
-  class StateTransitioner {
+  static class StateTransitioner {
 
     private final Time time;
     private final OutputHandler outputHandler;
@@ -118,7 +118,7 @@ public class RunStateTest {
 
   @Before
   public void setUp() {
-    outputs = new LinkedList<>();
+    outputs = new ArrayList<>();
     transitioner = new StateTransitioner(time, this::record);
     when(time.get()).thenReturn(Instant.now());
   }

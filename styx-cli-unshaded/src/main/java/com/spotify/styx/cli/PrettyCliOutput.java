@@ -163,16 +163,6 @@ class PrettyCliOutput implements CliOutput {
             noTruncate)));
   }
 
-  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
-    final String format = WORKFLOW_FORMAT
-        .replaceAll("<cid-length>", String.valueOf(cidLength))
-        .replaceAll("<wid-length>", String.valueOf(widLength));
-
-    System.out.println(String.format(format,
-                                     workflow.componentId(),
-                                     workflow.workflowId()));
-  }
-
   private void printBackfillHeader(int cidLength, int widLength, int descriptionLength) {
     final String format = BACKFILL_FORMAT
         .replaceAll("<cid-length>", String.valueOf(cidLength))
@@ -288,6 +278,16 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("Next Trigger (offset): " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
   }
 
+  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
+        workflow.componentId(),
+        workflow.workflowId()));
+  }
+
   @Override
   public void printWorkflows(List<Workflow> workflows) {
     final int cidLength = workflows.stream()
@@ -332,8 +332,8 @@ class PrettyCliOutput implements CliOutput {
     }
   }
 
-  private Ansi getAnsiForState(RunStateData RunStateData) {
-    final String state = RunStateData.state();
+  private Ansi getAnsiForState(RunStateData runStateData) {
+    final String state = runStateData.state();
     switch (state) {
       case "WAITING":
       case "NEW":

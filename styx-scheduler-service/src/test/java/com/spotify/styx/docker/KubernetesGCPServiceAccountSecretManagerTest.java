@@ -370,7 +370,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldNotRemoveServiceAccountSecretsCreatedWithin48Hours() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(48)).toString();
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofDays(2)).toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
     final Secret secret2 = fakeServiceAccountKeySecret(

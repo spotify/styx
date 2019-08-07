@@ -61,6 +61,6 @@ public class StorageTest {
     }
   }
 
-  private class FooException extends Exception {
+  private static class FooException extends Exception {
   }
 }

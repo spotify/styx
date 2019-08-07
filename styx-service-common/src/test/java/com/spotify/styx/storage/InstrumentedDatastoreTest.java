@@ -225,7 +225,7 @@ public class InstrumentedDatastoreTest {
   @Test
   public void runInTransaction() {
     when(datastore.runInTransaction(any())).then(a ->
-        a.<TransactionCallable>getArgument(0)
+        a.<TransactionCallable<String>>getArgument(0)
             .run(transaction));
 
     var foobar = instrumentedDatastore.runInTransaction(tx -> {
@@ -242,7 +242,7 @@ public class InstrumentedDatastoreTest {
   @Test
   public void runInTransactionWithOptions() {
     when(datastore.runInTransaction(any(), any())).then(a ->
-        a.<TransactionCallable>getArgument(0)
+        a.<TransactionCallable<String>>getArgument(0)
             .run(transaction));
 
     var transactionOptions = TransactionOptions.newBuilder().build();

@@ -195,7 +195,7 @@ public class PublisherHandlerTest {
     verify(stats, times(2)).recordPublishingError("deployed", "RUNNING");
   }
 
-  private class FailingPublisher implements Publisher {
+  private static class FailingPublisher implements Publisher {
 
     private final Publisher delegate;
     private final int maxFails;

@@ -24,9 +24,10 @@ import static java.util.stream.Collectors.toList;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Throwables;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -37,7 +38,7 @@ import java.util.concurrent.TimeoutException;
 
 public class FakeScheduledExecutorService implements ScheduledExecutorService {
 
-  private Stack<DelayedTask> delayedTasks = new Stack<>();
+  private Deque<DelayedTask> delayedTasks = new ArrayDeque<>();
 
   @AutoValue
   public static abstract class DelayedTask {
@@ -62,7 +63,8 @@ public class FakeScheduledExecutorService implements ScheduledExecutorService {
           try {
             callable.call();
           } catch (Exception e) {
-            throw Throwables.propagate(e);
+            Throwables.throwIfUnchecked(e);
+            throw new RuntimeException(e);
           }
         }, delay, unit));
 

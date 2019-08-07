@@ -63,10 +63,6 @@ class OkHttpTestUtil {
     return responseBuilder(new Request.Builder().url("http://example.org").build(), code);
   }
 
-  static Response response(int code) {
-    return responseBuilder(code).build();
-  }
-
   static Response.Builder responseBuilder(Request request, int code, Object body) throws JsonProcessingException {
     return responseBuilder(request, code)
         .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
@@ -75,6 +71,10 @@ class OkHttpTestUtil {
   static Response.Builder responseBuilder(int code, Object body) throws JsonProcessingException {
     return responseBuilder(code)
         .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
+  }
+
+  static Response response(int code) {
+    return responseBuilder(code).build();
   }
 
   static Response response(int code, Object body) throws JsonProcessingException {

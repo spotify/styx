@@ -93,7 +93,7 @@ public class TracingProxyTest {
     void bar();
   }
 
-  class FooImpl implements Foo {
+  private static class FooImpl implements Foo {
 
     @Override
     public void bar() {
@@ -101,7 +101,7 @@ public class TracingProxyTest {
     }
   }
 
-  class ThrowingFooImpl implements Foo {
+  private static class ThrowingFooImpl implements Foo {
 
     @Override
     public void bar() {

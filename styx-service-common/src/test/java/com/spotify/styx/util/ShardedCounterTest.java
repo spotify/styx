@@ -119,7 +119,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateCounterEmpty() throws IOException {
-    assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
+    assertThat(shardedCounter.getCounter(COUNTER_ID1), is(0L));
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
     // assert all shards exist
@@ -568,8 +568,8 @@ public class ShardedCounterTest {
   }
 
   private void updateLimitInStorage(String counterId, long limit) {
-    datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
-        (counterId)))
+    datastore.put(Entity.newBuilder(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
+        (counterId))
         .set(PROPERTY_LIMIT, limit)
         .build());
   }

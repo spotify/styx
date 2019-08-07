@@ -81,8 +81,13 @@ public class GrpcContextUtilTest {
     final CompletableFuture<String> value = new CompletableFuture<>();
     final Runnable runnable = () -> value.complete(TEST_KEY.get());
     Context.current().withValue(TEST_KEY, "foobar")
-        .run(() -> sut.submit(runnable));
-    assertThat(value.get(30, SECONDS), is("foobar"));
+        .run(() -> {
+          try {
+            sut.submit(runnable).get(30, SECONDS);
+          } catch (Exception ignored) {
+          }
+        });
+    assertThat(value.get(), is("foobar"));
   }
 
   @Test
@@ -90,8 +95,13 @@ public class GrpcContextUtilTest {
     final CompletableFuture<String> value = new CompletableFuture<>();
     final Runnable runnable = () -> value.complete(TEST_KEY.get());
     Context.current().withValue(TEST_KEY, "foobar")
-        .run(() -> sut.submit(runnable, "quux"));
-    assertThat(value.get(30, SECONDS), is("foobar"));
+        .run(() -> {
+          try {
+            sut.submit(runnable, "quux").get(30, SECONDS);
+          } catch (Exception ignored) {
+          }
+        });
+    assertThat(value.get(), is("foobar"));
   }
 
   @Test
@@ -139,7 +149,7 @@ public class GrpcContextUtilTest {
     final CompletableFuture<String> value = new CompletableFuture<>();
     final Runnable runnable = () -> value.complete(TEST_KEY.get());
     Context.current().withValue(TEST_KEY, "foobar")
-        .run(() -> CompletableFuture.runAsync(runnable, sut));
+        .run(() -> CompletableFuture.runAsync(runnable, sut).getNow(null));
     assertThat(value.get(30, SECONDS), is("foobar"));
   }
 

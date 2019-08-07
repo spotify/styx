@@ -138,15 +138,15 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
-    shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
+    shouldFailIfDockerRunnerRaisesException0(new IOException("Testing exception."));
   }
 
   @Test
   public void shouldFailIfDockerRunnerRaisesUserErrorInvalidExecutionException() throws Exception {
-    shouldFailIfDockerRunnerRaisesException(new InvalidExecutionException("PEBKAC"));
+    shouldFailIfDockerRunnerRaisesException0(new InvalidExecutionException("PEBKAC"));
   }
 
-  private void shouldFailIfDockerRunnerRaisesException(Throwable throwable)
+  private void shouldFailIfDockerRunnerRaisesException0(Throwable throwable)
       throws IOException, IsClosedException {
     doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));

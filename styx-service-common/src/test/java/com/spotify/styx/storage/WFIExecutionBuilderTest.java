@@ -24,7 +24,6 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
-import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.SequenceEvent;
@@ -53,7 +52,7 @@ public class WFIExecutionBuilderTest {
       UNKNOWN_TRIGGER0 = com.spotify.styx.state.Trigger.unknown("trig0");
   private static final com.spotify.styx.state.Trigger
       UNKNOWN_TRIGGER1 = com.spotify.styx.state.Trigger.unknown("trig1");
-  private static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
+  private static final Set<String> RESOURCE_IDS = Set.of("foo-resource", "bar-resource");
 
   private ExecutionDescription desc(String dockerImage, String commitSha) {
     return ExecutionDescription.builder()

@@ -26,7 +26,7 @@ import static org.junit.Assert.assertThat;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpResponseException.Builder;
+import com.google.api.client.http.HttpResponseException;
 import org.junit.Test;
 
 public class GcpUtilTest {
@@ -40,16 +40,16 @@ public class GcpUtilTest {
   @Test
   public void responseIsPermissionDenied() {
     final Throwable permissionDenied = new GoogleJsonResponseException(
-        new Builder(403, "Forbidden", new HttpHeaders()), PERMISSION_DENIED_ERROR);
+        new HttpResponseException.Builder(403, "Forbidden", new HttpHeaders()), PERMISSION_DENIED_ERROR);
     assertThat(GcpUtil.isPermissionDenied(permissionDenied), is(true));
   }
 
   @Test
   public void notFoundResponseIsNotPermissionDenied() {
     assertThat(GcpUtil.isPermissionDenied(new GoogleJsonResponseException(
-        new Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
+        new HttpResponseException.Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
     assertThat(GcpUtil.isPermissionDenied(new GoogleJsonResponseException(
-        new Builder(404, "Not Found", new HttpHeaders()), null)), is(false));
+        new HttpResponseException.Builder(404, "Not Found", new HttpHeaders()), null)), is(false));
   }
 
   @Test
@@ -66,16 +66,16 @@ public class GcpUtilTest {
   @Test
   public void responseIsResourceExhausted() {
     final Throwable resourceExhausted = new GoogleJsonResponseException(
-        new Builder(429, "Too Many Requests", new HttpHeaders()), RESOURCE_EXHAUSTED_ERROR);
+        new HttpResponseException.Builder(429, "Too Many Requests", new HttpHeaders()), RESOURCE_EXHAUSTED_ERROR);
     assertThat(GcpUtil.isResourceExhausted(resourceExhausted), is(true));
   }
 
   @Test
   public void notFoundResponseIsNotPResourceExhausted() {
     assertThat(GcpUtil.isResourceExhausted(new GoogleJsonResponseException(
-        new Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
+        new HttpResponseException.Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
     assertThat(GcpUtil.isResourceExhausted(new GoogleJsonResponseException(
-        new Builder(404, "Not Found", new HttpHeaders()), null)), is(false));
+        new HttpResponseException.Builder(404, "Not Found", new HttpHeaders()), null)), is(false));
   }
 
   @Test
