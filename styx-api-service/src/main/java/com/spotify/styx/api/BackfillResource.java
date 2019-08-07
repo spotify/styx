@@ -51,7 +51,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
-import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -275,9 +274,8 @@ public final class BackfillResource implements Closeable {
   private CompletionStage<Boolean> haltActiveBackfillInstance(WorkflowInstance workflowInstance,
                                                               Client client) {
     try {
-      final ByteString payload = serialize(Event.halt(workflowInstance));
-      final Request request = Request.forUri(schedulerApiUrl("events"), "POST")
-          .withPayload(payload);
+      final Request request = Request.forUri(schedulerApiUrl("halt"), "POST")
+          .withPayload(serialize(workflowInstance));
       return client.send(request)
           .thenApply(response -> response.status().family().equals(SUCCESSFUL));
     } catch (JsonProcessingException e) {

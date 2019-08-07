@@ -26,6 +26,7 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
+import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static org.hamcrest.Matchers.equalTo;
@@ -47,6 +48,7 @@ import static org.mockito.internal.verification.VerificationModeFactory.times;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
@@ -596,7 +598,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     reset(storage);
 
     final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(input)));
+        awaitResponse(serviceHelper.request("POST", path(""), serialize(input)));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
@@ -642,7 +644,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     reset(storage);
 
     final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), Json.serialize(backfillInput)));
+        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), serialize(backfillInput)));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
     assertThat(storage.backfill(BACKFILL_1.id()).get().description(), is(not(Optional.of("updated"))));
@@ -779,7 +781,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         StateData.zero(), Instant.now(), 0L));
 
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(backfillInput)));
+        awaitResponse(serviceHelper.request("POST", path(""), serialize(backfillInput)));
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
@@ -858,8 +860,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T05");
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T04");
@@ -888,8 +890,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     this.currentTime = updateTime;
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
@@ -922,8 +924,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
@@ -945,7 +947,9 @@ public class BackfillResourceTest extends VersionedApiTest {
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
-    verify(serviceHelper.stubClient(), times(1)).send(any());
+    verify(serviceHelper.stubClient(), times(1)).send(Request.forUri(SCHEDULER_BASE + "/api/v0/halt", "POST")
+        .withPayload(serialize(wfi1))
+        .withService("backfill-test"));
   }
 
   @Test
@@ -1204,7 +1208,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         .build();
 
     final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), Json.serialize(backfillInput)));
+        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), serialize(backfillInput)));
 
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
