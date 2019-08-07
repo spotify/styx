@@ -512,10 +512,12 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    // TODO: verify that decorateResources was called for the expected instances
-    // Resources are decorated on dequeue
-    verify(resourceDecorator, times(2)).decorateResources(any(RunState.class), eq(workflow.configuration()),
-        eq(ImmutableSet.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
+    verify(resourceDecorator).decorateResources(eq(RunState.create(i0, State.QUEUED, time.get())),
+        eq(workflow.configuration()),
+        eq(Set.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
+    verify(resourceDecorator).decorateResources(eq(RunState.create(i4, State.QUEUED, time.get())),
+        eq(workflow.configuration()),
+        eq(Set.of("foo", "bar", "GLOBAL_STYX_CLUSTER")));
 
     verify(stateManager, times(2)).receiveIgnoreClosed(argThat(
         either(is(Event.dequeue(i0, ImmutableSet.of("baz", "GLOBAL_STYX_CLUSTER"))))

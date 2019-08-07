@@ -224,8 +224,8 @@ public class StyxSchedulerServiceFixture {
     storage.delete(workflow.id());
   }
 
+  // duplicate of WorkflowInitializer.initializeNaturalTrigger
   private TriggerInstantSpec initializeNaturalTrigger(Workflow workflow) {
-    // TODO: duplicate of WorkflowInitializer.initializeNaturalTrigger
     final Instant now = time.get();
     final Instant offsetNow = workflow.configuration().subtractOffset(now);
     final Schedule schedule = workflow.configuration().schedule();

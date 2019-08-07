@@ -51,7 +51,6 @@ public final class MetricsStats implements Stats {
   static final SemanticMetricBuilder<Histogram> HISTOGRAM = new SemanticMetricBuilder<>() {
     @Override
     public Histogram newMetric() {
-      // TODO: What time window do we want?
       return new Histogram(new SlidingTimeWindowArrayReservoir(30, TimeUnit.SECONDS));
     }
 

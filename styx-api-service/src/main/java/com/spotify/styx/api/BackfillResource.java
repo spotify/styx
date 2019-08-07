@@ -358,8 +358,6 @@ public final class BackfillResource implements Closeable {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(validationError.get()));
     }
 
-    // Forbid backfill creation if there are already active instances in the backfill range
-    // TODO: Does this make sense?
     final Schedule schedule = workflow.configuration().schedule();
 
     final List<Instant> instants = instantsInRange(input.start(), input.end(), schedule);
