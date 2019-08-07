@@ -236,7 +236,12 @@ public final class BackfillResource implements Closeable {
         final Backfill backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
         storage.storeBackfill(backfill.builder().halted(true).lastModified(time.get()).build());
-        return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
+        var graceful = rc.request().parameter("graceful").orElse("false").equalsIgnoreCase("true");
+        if (!graceful) {
+          return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
+        } else {
+          return CompletableFuture.completedFuture(Response.ok());
+        }
       } else {
         return CompletableFuture.completedFuture(
             Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found")));
