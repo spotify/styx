@@ -234,7 +234,21 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
-    final URI uri = URI.create(API_URL + "/backfills/backfill");
+    final URI uri = URI.create(API_URL + "/backfills/backfill?graceful=false");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("DELETE"));
+  }
+
+  @Test
+  public void shouldHaltBackfillGracefullly() {
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
+    final CompletableFuture<Void> r =
+        styx.backfillHalt("backfill", true).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/backfills/backfill?graceful=true");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("DELETE"));
   }

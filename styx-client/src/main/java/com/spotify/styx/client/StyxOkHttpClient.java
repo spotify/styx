@@ -344,8 +344,14 @@ class StyxOkHttpClient implements StyxClient {
 
   @Override
   public CompletionStage<Void> backfillHalt(String backfillId) {
-    return execute(forUri(urlBuilder("backfills", backfillId), "DELETE"))
-        .thenApply(response -> null);
+    return backfillHalt(backfillId, false);
+  }
+
+  @Override
+  public CompletionStage<Void> backfillHalt(String backfillId, boolean graceful) {
+    var url = urlBuilder("backfills", backfillId);
+    url.addQueryParameter("graceful", Boolean.toString(graceful));
+    return execute(forUri(url, "DELETE")).thenApply(response -> null);
   }
 
   @Override

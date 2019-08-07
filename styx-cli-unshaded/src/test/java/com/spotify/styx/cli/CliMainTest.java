@@ -623,6 +623,30 @@ public class CliMainTest {
   }
 
   @Test
+  public void testBackfillHalt() {
+    var backfillId = "backfill-2";
+
+    when(client.backfillHalt(backfillId, false))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "backfill", "halt", backfillId);
+
+    verify(client).backfillHalt(backfillId, false);
+  }
+
+  @Test
+  public void testBackfillHaltGracefully() {
+    var backfillId = "backfill-2";
+
+    when(client.backfillHalt(backfillId, true))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    CliMain.run(cliContext, "backfill", "halt", backfillId, "--graceful");
+
+    verify(client).backfillHalt(backfillId, true);
+  }
+
+  @Test
   @Parameters({
       "n",
       "N",
