@@ -42,9 +42,9 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -76,7 +76,7 @@ public class BasicWorkflowValidatorTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Collections.emptyList());
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of());
     sut = new BasicWorkflowValidator(dockerImageValidator);
   }
 
@@ -114,7 +114,7 @@ public class BasicWorkflowValidatorTest {
   @Test
 
   public void validateInvalidDockerImage() {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(List.of("foo", "bar"));
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of("foo", "bar"));
     final List<String> errors = sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
     assertThat(errors, contains("invalid image: foo", "invalid image: bar"));
   }
