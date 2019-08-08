@@ -25,6 +25,8 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.googleapis.auth.oauth2.GooglePublicKeysManager;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.webtoken.JsonWebSignature;
@@ -33,25 +35,32 @@ import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.time.Instant;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
-public class GoogleIdTokenParserTest {
-
+public class GoogleIdTokenVerifierTest {
   private PrivateKey privateKey;
+  private GoogleIdTokenVerifier verifier;
 
   @Before
   public void setUp() throws Exception {
-    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+    final var keyGen = KeyPairGenerator.getInstance("RSA");
     keyGen.initialize(571);
     KeyPair pair = keyGen.generateKeyPair();
     privateKey = pair.getPrivate();
+
+    final var keysManager = new GooglePublicKeysManager(Utils.getDefaultTransport(), Utils.getDefaultJsonFactory());
+    stubPublicKey(keysManager, pair.getPublic());
+
+    verifier = new GoogleIdTokenVerifier(keysManager);
   }
 
   @Test
-  public void shouldParseTokensFromComputeEngine() throws GeneralSecurityException, IOException {
-    var parsedToken = GoogleIdToken.parse(Utils.getDefaultJsonFactory(), createToken());
+  public void shouldVerifyTokensFromComputeEngine() throws GeneralSecurityException, IOException {
+    var parsedToken = verifier.verify(createToken());
 
     assertThat(parsedToken, is(notNullValue()));
   }
@@ -80,5 +89,22 @@ public class GoogleIdTokenParserTest {
 
     var header = new JsonWebSignature.Header().setAlgorithm("RS256");
     return JsonWebSignature.signUsingRsaSha256(privateKey, Utils.getDefaultJsonFactory(), header, payload);
+  }
+
+  /*
+   * Force use custom public key to avoid to request keys from Certificate Authorities.
+   */
+  private void stubPublicKey(GooglePublicKeysManager keysManager, PublicKey publicKey)
+      throws NoSuchFieldException, IllegalAccessException {
+    // Reflection is used because final methods make it impossible to mock
+    setField(keysManager, "publicKeys", List.of(publicKey));
+    setField(keysManager, "expirationTimeMilliseconds", Long.MAX_VALUE);
+  }
+
+  private void setField(GooglePublicKeysManager keysManager, String name, Object publicKey1)
+      throws NoSuchFieldException, IllegalAccessException {
+    final var field = GooglePublicKeysManager.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(keysManager, publicKey1);
   }
 }
