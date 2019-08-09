@@ -101,10 +101,10 @@ public class GoogleIdTokenVerifierTest {
     setField(keysManager, "expirationTimeMilliseconds", Long.MAX_VALUE);
   }
 
-  private void setField(GooglePublicKeysManager keysManager, String name, Object publicKey1)
+  private void setField(GooglePublicKeysManager keysManager, String name, Object value)
       throws NoSuchFieldException, IllegalAccessException {
     final var field = GooglePublicKeysManager.class.getDeclaredField(name);
     field.setAccessible(true);
-    field.set(keysManager, publicKey1);
+    field.set(keysManager, value);
   }
 }
