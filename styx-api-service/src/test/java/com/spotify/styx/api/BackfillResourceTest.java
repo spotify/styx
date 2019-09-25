@@ -179,8 +179,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()
-    ));
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()));
 
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
