@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
@@ -100,8 +101,11 @@ public class StyxSchedulerTest {
     MockitoAnnotations.initMocks(this);
     when(kubernetesClientFactory.apply(any(), any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
+  }
 
-    StyxScheduler.newBuilder().build();
+  @Test
+  public void testBuildStyxScheduler() {
+    assertThat(StyxScheduler.newBuilder().build(), notNullValue());
   }
 
   @Test
