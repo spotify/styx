@@ -95,8 +95,6 @@ public class StyxSchedulerTest {
   @Mock private Stats stats;
   @Mock private Time time;
 
-  public StyxSchedulerTest() {}
-
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
