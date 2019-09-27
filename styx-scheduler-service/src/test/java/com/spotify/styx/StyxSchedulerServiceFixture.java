@@ -53,7 +53,6 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -128,7 +127,7 @@ public class StyxSchedulerServiceFixture {
   public void setUp() {
 
     final Datastore datastore = datastoreEmulator.client();
-    storage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+    storage = new AggregateStorage(bigtable, datastore);
 
     StorageFactory storageFactory = (env, stats) -> storage;
     StatsFactory statsFactory = (env) -> Stats.NOOP;

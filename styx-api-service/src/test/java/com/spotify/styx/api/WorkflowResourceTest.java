@@ -157,7 +157,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    rawStorage = new AggregateStorage(bigtable, datastore, Duration.ZERO);
+    rawStorage = new AggregateStorage(bigtable, datastore);
     storage = spy(rawStorage);
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));

@@ -57,7 +57,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -120,8 +119,7 @@ public class StatusResourceTest extends VersionedApiTest {
   @Override
   protected void init(Environment environment) {
     accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
-    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client(),
-        Duration.ZERO));
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()));
     final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
