@@ -26,7 +26,6 @@ import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
-import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static org.hamcrest.Matchers.equalTo;
@@ -597,7 +596,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     reset(storage);
 
     final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path(""), serialize(input)));
+        awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(input)));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
@@ -643,7 +642,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     reset(storage);
 
     final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), serialize(backfillInput)));
+        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), Json.serialize(backfillInput)));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
     assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().description(), is(not(Optional.of("updated"))));
@@ -780,7 +779,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         StateData.zero(), Instant.now(), 0L));
 
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("POST", path(""), serialize(backfillInput)));
+        awaitResponse(serviceHelper.request("POST", path(""), Json.serialize(backfillInput)));
 
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.CLIENT_ERROR)));
@@ -950,7 +949,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
     verify(serviceHelper.stubClient(), times(1)).send(Request.forUri(SCHEDULER_BASE + "/api/v0/halt", "POST")
-        .withPayload(serialize(wfi1))
+        .withPayload(Json.serialize(wfi1))
         .withService("backfill-test"));
   }
 
@@ -1212,7 +1211,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     final Response<ByteString> response;
     try {
       response = awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()),
-          serialize(backfillInput)));
+          Json.serialize(backfillInput)));
     } finally {
       this.currentTime = previousTime;
     }
