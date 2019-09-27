@@ -137,7 +137,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Container> containers = pod.getSpec().getContainers();
     Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
         .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
-    assertThat(terminationLogVar.get().getValue(), is("/dev/termination-log"));
+    assertThat(terminationLogVar.orElseThrow().getValue(), is("/dev/termination-log"));
   }
 
   @Test
@@ -157,7 +157,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     List<Container> containers = pod.getSpec().getContainers();
     Optional<EnvVar> terminationLogVar = containers.get(0).getEnv().stream()
         .filter(e -> TERMINATION_LOG.equals(e.getName())).findAny();
-    assertThat(terminationLogVar.get().getValue(), is("/dev/termination-log"));
+    assertThat(terminationLogVar.orElseThrow().getValue(), is("/dev/termination-log"));
   }
 
   @Test

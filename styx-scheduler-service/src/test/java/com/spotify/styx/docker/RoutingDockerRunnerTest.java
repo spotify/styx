@@ -44,21 +44,21 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class RoutingDockerRunnerTest {
 
-  static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
+  private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
       TestData.WORKFLOW_ID, "param");
-  static final String MOCK_EXEC_ID = "mock-run-id-0";
-  static final DockerRunner.RunSpec RUN_SPEC =
+  private static final String MOCK_EXEC_ID = "mock-run-id-0";
+  private static final DockerRunner.RunSpec RUN_SPEC =
       DockerRunner.RunSpec.simple(MOCK_EXEC_ID, "busybox");
 
-  int createCounter = 0;
-  Map<String, DockerRunner> createdRunners = Maps.newHashMap();
-  Supplier<String> dockerId = mock(Supplier.class);
+  private int createCounter = 0;
+  private Map<String, DockerRunner> createdRunners = Maps.newHashMap();
+  @Mock private Supplier<String> dockerId;
 
-  DockerRunner dockerRunner;
+  private DockerRunner dockerRunner;
   @Mock private RunState runState;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     dockerRunner = new RoutingDockerRunner(this::create, dockerId);
   }
 
@@ -72,7 +72,7 @@ public class RoutingDockerRunnerTest {
   }
 
   @Test
-  public void testUsesCreatesRunnerOnPoll() throws Exception {
+  public void testUsesCreatesRunnerOnPoll() {
     when(dockerId.get()).thenReturn("default");
     dockerRunner.poll(runState);
 
@@ -81,7 +81,7 @@ public class RoutingDockerRunnerTest {
   }
 
   @Test
-  public void testUsesDefaultRunnerOnWorkflowCleanup() throws Exception {
+  public void testUsesDefaultRunnerOnWorkflowCleanup() {
     when(dockerId.get()).thenReturn("default");
     dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
 
@@ -113,7 +113,7 @@ public class RoutingDockerRunnerTest {
 
   @Test
   public void testSwitchesDockerRunner() throws Exception {
-    Mockito.reset(dockerId);
+    Mockito.<Supplier>reset(dockerId);
     when(dockerId.get()).thenReturn("id-1", "id-2");
 
     dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
@@ -125,7 +125,7 @@ public class RoutingDockerRunnerTest {
 
   @Test
   public void testCreatedRunnersAreClosed() throws Exception {
-    Mockito.reset(dockerId);
+    Mockito.<Supplier>reset(dockerId);
     when(dockerId.get()).thenReturn("id-1", "id-2");
 
     dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);

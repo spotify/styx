@@ -24,11 +24,12 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -54,8 +55,6 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
-import com.spotify.styx.storage.StorageTransaction;
-import com.spotify.styx.util.Shard;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.typesafe.config.Config;
@@ -80,9 +79,9 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class StyxSchedulerTest {
 
+  private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
   @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
-  @Captor private ArgumentCaptor<Shard> shardArgumentCaptor;
   @Captor private ArgumentCaptor<Gauge<Long>> longGaugeCaptor;
   @Captor private ArgumentCaptor<Gauge<Double>> doubleGaugeCaptor;
 
@@ -91,22 +90,22 @@ public class StyxSchedulerTest {
   @Mock(answer = RETURNS_DEEP_STUBS) private Container gkeClient;
   @Mock private Container.Projects.Locations.Clusters.Get gkeClusterGet;
   @Mock private Storage storage;
-  @Mock private StorageTransaction transaction;
   @Mock private PersistentStateManager stateManager;
   @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
   @Mock private RateLimiter submissionRateLimiter;
   @Mock private Stats stats;
   @Mock private Time time;
 
-  private StyxScheduler styxScheduler;
-
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(kubernetesClientFactory.apply(any(), any())).thenReturn(kubernetesClient);
     when(gkeClient.projects().locations().clusters().get(any())).thenReturn(gkeClusterGet);
+  }
 
-    styxScheduler = StyxScheduler.newBuilder().build();
+  @Test
+  public void testBuildStyxScheduler() {
+    assertThat(StyxScheduler.newBuilder().build(), notNullValue());
   }
 
   @Test
@@ -129,7 +128,7 @@ public class StyxSchedulerTest {
       configMap.put("styx.k8s.request-timeout", k8sRequestTimeoutConfig);
       expectedK8sRequestTimeout = Integer.parseInt(k8sRequestTimeoutConfig);
     } else {
-      expectedK8sRequestTimeout = StyxScheduler.DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS;
+      expectedK8sRequestTimeout = DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS;
     }
 
     final Config config = ConfigFactory.parseMap(configMap.build());

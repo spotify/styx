@@ -72,7 +72,7 @@ public class StateInitializingTriggerTest {
   private TriggerListener trigger;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     trigger = new StateInitializingTrigger(stateManager);
   }
 
@@ -123,7 +123,7 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
-  public void shouldDoNothingIfDockerImageMissing() throws Exception {
+  public void shouldDoNothingIfDockerImageMissing() {
     final WorkflowConfiguration configuration =
         WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
             .dockerImage(Optional.empty())

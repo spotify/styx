@@ -27,8 +27,8 @@ import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -124,7 +124,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   @Mock PodList podList;
   @Captor ArgumentCaptor<Secret> secretCaptor;
 
-  KubernetesGCPServiceAccountSecretManager sut;
+  private KubernetesGCPServiceAccountSecretManager sut;
 
   @Before
   public void setUp() {
@@ -180,9 +180,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     ServiceAccountKey jsonKey = new ServiceAccountKey();
     jsonKey.setName("key.json");
     jsonKey.setPrivateKeyData("json-private-key-data");
-    ServiceAccountKey p12Key = new ServiceAccountKey();
-    p12Key.setName("key.p12");
-    p12Key.setPrivateKeyData("p12-private-key-data");
     when(serviceAccountKeyManager.createJsonKey(any(String.class))).thenReturn(jsonKey);
     when(serviceAccountKeyManager.createP12Key(any(String.class))).thenThrow(new IOException());
 
@@ -373,7 +370,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   @Test
   public void shouldNotRemoveServiceAccountSecretsCreatedWithin48Hours() throws Exception {
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofHours(48)).toString();
+    final String creationTimestamp = CLOCK.instant().minus(Duration.ofDays(2)).toString();
     final Secret secret1 = fakeServiceAccountKeySecret(
         SERVICE_ACCOUNT, PAST_SECRET_EPOCH, "json-key-1", "p12-key-1", creationTimestamp);
     final Secret secret2 = fakeServiceAccountKeySecret(

@@ -67,7 +67,6 @@ import com.spotify.metrics.core.SemanticMetricRegistry;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
@@ -192,7 +191,6 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordExitCode() {
-    WorkflowId workflowId = WorkflowId.create("component", "workflow");
     when(registry.meter(EXIT_CODE_RATE.tagged("exit-code", "0"))).thenReturn(meter);
     stats.recordExitCode(0);
     verify(meter).mark();

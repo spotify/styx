@@ -161,7 +161,7 @@ public class StatusResource {
       return exception;
       }).filter(Optional::isPresent).collect(toList());
     if (!exceptions.isEmpty()) {
-      throw exceptions.get(0).get();
+      throw exceptions.get(0).orElseThrow();
     }
 
     return mapBuilder.build();

@@ -47,6 +47,7 @@ import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -83,26 +84,26 @@ class PrettyCliOutput implements CliOutput {
                                      "TRIES",
                                      "PREVIOUS EXECUTION MESSAGE"));
 
-    CliUtil.groupStates(runStateDataPayload.activeStates()).entrySet().forEach(entry -> {
+    CliUtil.groupStates(runStateDataPayload.activeStates()).forEach((key, value) -> {
       System.out.println();
       System.out.println(String.format("%s %s",
-                                       colored(CYAN, entry.getKey().componentId()),
-                                       colored(BLUE, entry.getKey().id())));
-      entry.getValue().forEach(runStateData -> {
+          colored(CYAN, key.componentId()),
+          colored(BLUE, key.id())));
+      value.forEach(runStateData -> {
         final StateData stateData = runStateData.stateData();
         final Ansi ansiState = getAnsiForState(runStateData);
 
         final Message lastMessage =
             stateData.message().orElse(Message.create(Message.MessageLevel.UNKNOWN, "No info"));
         final Ansi ansiMessage = colored(messageColor(lastMessage.level()),
-                                         lastMessage.line());
+            lastMessage.line());
 
         System.out.println(String.format("  %-20s %-20s %-47s %-7d %s",
-                                         runStateData.workflowInstance().parameter(),
-                                         ansiState,
-                                         stateData.executionId().orElse("<no-execution-id>"),
-                                         stateData.tries(),
-                                         ansiMessage));
+            runStateData.workflowInstance().parameter(),
+            ansiState,
+            stateData.executionId().orElse("<no-execution-id>"),
+            stateData.tries(),
+            ansiMessage));
       });
     });
   }
@@ -154,22 +155,12 @@ class PrettyCliOutput implements CliOutput {
         toParameter(schedule, backfill.nextTrigger()),
         workflowId.componentId(),
         workflowId.id(),
-        backfill.created().map(create -> create.toString()).orElse(""),
+        backfill.created().map(Instant::toString).orElse(""),
         backfill.lastModified().map(lastModified -> lastModified.toString()).orElse(""),
         formatLongField(backfill.description(), noTruncate),
         formatLongField(backfill.triggerParameters()
                 .map(triggerParameters -> formatMap(triggerParameters.env())),
             noTruncate)));
-  }
-
-  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
-    final String format = WORKFLOW_FORMAT
-        .replaceAll("<cid-length>", String.valueOf(cidLength))
-        .replaceAll("<wid-length>", String.valueOf(widLength));
-
-    System.out.println(String.format(format,
-                                     workflow.componentId(),
-                                     workflow.workflowId()));
   }
 
   private void printBackfillHeader(int cidLength, int widLength, int descriptionLength) {
@@ -287,6 +278,16 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("Next Trigger (offset): " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));
   }
 
+  private void printWorkflow(Workflow workflow, int cidLength, int widLength) {
+    final String format = WORKFLOW_FORMAT
+        .replaceAll("<cid-length>", String.valueOf(cidLength))
+        .replaceAll("<wid-length>", String.valueOf(widLength));
+
+    System.out.println(String.format(format,
+        workflow.componentId(),
+        workflow.workflowId()));
+  }
+
   @Override
   public void printWorkflows(List<Workflow> workflows) {
     final int cidLength = workflows.stream()
@@ -331,20 +332,23 @@ class PrettyCliOutput implements CliOutput {
     }
   }
 
-  private Ansi getAnsiForState(RunStateData RunStateData) {
-    final String state = RunStateData.state();
+  private Ansi getAnsiForState(RunStateData runStateData) {
+    final String state = runStateData.state();
     switch (state) {
-      case "WAITING":    return coloredBright(BLACK, state);
-      case "NEW":        return coloredBright(BLACK, state);
-      case "QUEUED":     return coloredBright(BLACK, state);
-      case "PREPARE":    return colored(CYAN, state);
-      case "SUBMITTING": return colored(CYAN, state);
-      case "SUBMITTED":  return colored(CYAN, state);
+      case "WAITING":
+      case "NEW":
+      case "QUEUED":
+      case "TERMINATED":
+        return coloredBright(BLACK, state);
+      case "PREPARE":
+      case "SUBMITTING":
+      case "SUBMITTED":
+        return colored(CYAN, state);
       case "RUNNING":    return coloredBright(BLUE, state);
-      case "TERMINATED": return coloredBright(BLACK, state);
       case "FAILED":     return colored(RED, state);
-      case "UNKNOWN":    return coloredBright(RED, state);
-      case "ERROR":      return coloredBright(RED, state);
+      case "UNKNOWN":
+      case "ERROR":
+        return coloredBright(RED, state);
       case "DONE":       return coloredBright(GREEN, state);
       default:           return colored(DEFAULT, state);
     }

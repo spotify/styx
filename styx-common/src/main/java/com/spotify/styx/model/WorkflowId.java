@@ -35,7 +35,7 @@ import java.util.Comparator;
 public abstract class WorkflowId {
 
   public static final Comparator<WorkflowId> KEY_COMPARATOR =
-      (a, b) -> a.toKey().compareTo(b.toKey());
+      Comparator.comparing(WorkflowId::toKey);
 
   @JsonProperty
   public abstract String componentId();

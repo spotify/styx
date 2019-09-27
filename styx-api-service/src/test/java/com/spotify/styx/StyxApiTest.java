@@ -48,7 +48,7 @@ public class StyxApiTest {
         .setServiceName(StyxApi.SERVICE_NAME)
         .setStatsFactory(env -> mock(Stats.class))
         .setStorageFactory((env, stats) -> mock(Storage.class))
-        .setWorkflowConsumerFactory((env, stats) -> ((wfa, wfb) -> {}))
+        .setWorkflowConsumerFactory((env, stats) -> (wfa, wfb) -> {})
         .setServiceAccountUsageAuthorizerFactory((cfg, sn) -> mock(ServiceAccountUsageAuthorizer.class))
         .build();
     ServiceHelper serviceHelper = ServiceHelper.create(styxApi, StyxApi.SERVICE_NAME)

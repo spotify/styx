@@ -77,7 +77,7 @@ public class MDCUtil {
    * Wrap a {@link Callable} to use the {@link MDC} from the calling thread.
    */
   public static <V> Callable<V> withMDC(Callable<V> r) {
-    return new Callable<V>() {
+    return new Callable<>() {
 
       private final Map<String, String> contextMap = safeCopyOfContextMap();
 

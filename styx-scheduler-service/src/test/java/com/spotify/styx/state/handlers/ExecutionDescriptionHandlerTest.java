@@ -82,7 +82,7 @@ public class ExecutionDescriptionHandlerTest {
   @Mock WorkflowValidator workflowValidator;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
     toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);

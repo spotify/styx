@@ -35,10 +35,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -119,7 +119,7 @@ public class ShardedCounterTest {
 
   @Test
   public void shouldCreateCounterEmpty() throws IOException {
-    assertEquals(shardedCounter.getCounter(COUNTER_ID1), 0L);
+    assertThat(shardedCounter.getCounter(COUNTER_ID1), is(0L));
     QueryResults<Entity> results = getShardsForCounter(COUNTER_ID1);
 
     // assert all shards exist
@@ -563,22 +563,13 @@ public class ShardedCounterTest {
         .newKey(counterId + "-" + shardIndex);
   }
 
-  private static void deleteAllOfKind(Datastore datastore, String kind) {
-    QueryResults<Entity> results = datastore.run(EntityQuery.newEntityQueryBuilder()
-        .setKind(kind)
-        .build());
-    while (results.hasNext()) {
-      datastore.delete(results.next().getKey());
-    }
-  }
-
   private Entity getLimitFromStorage(String counterId) {
     return datastore.get(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(counterId));
   }
 
   private void updateLimitInStorage(String counterId, long limit) {
-    datastore.put(Entity.newBuilder((datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
-        (counterId)))
+    datastore.put(Entity.newBuilder(datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey
+        (counterId))
         .set(PROPERTY_LIMIT, limit)
         .build());
   }

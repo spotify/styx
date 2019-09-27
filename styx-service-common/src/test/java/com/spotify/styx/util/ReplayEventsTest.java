@@ -84,14 +84,14 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     RunStateData restoredRunStateData =
-        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").get();
+        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").orElseThrow();
 
     assertThat(restoredRunStateData.state(), is("DONE"));
     assertThat(restoredRunStateData.stateData().lastExit(), isPresent());
-    assertThat(restoredRunStateData.stateData().lastExit().get(), is(0));
+    assertThat(restoredRunStateData.stateData().lastExit().orElseThrow(), is(0));
 
-    assertThat(restoredRunStateData.initialTimestamp().get(), is(1L));
-    assertThat(restoredRunStateData.latestTimestamp().get(), is(7L));
+    assertThat(restoredRunStateData.initialTimestamp().orElseThrow(), is(1L));
+    assertThat(restoredRunStateData.latestTimestamp().orElseThrow(), is(7L));
   }
 
   @Test
@@ -113,14 +113,14 @@ public class ReplayEventsTest {
     when(storage.readEvents(WORKFLOW_INSTANCE)).thenReturn(events);
 
     RunStateData restoredRunStateData =
-        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").get();
+        ReplayEvents.getBackfillRunStateData(WORKFLOW_INSTANCE, storage, "bf-1").orElseThrow();
 
     assertThat(restoredRunStateData.state(), is("DONE"));
     assertThat(restoredRunStateData.stateData().lastExit(), isPresent());
-    assertThat(restoredRunStateData.stateData().lastExit().get(), is(0));
+    assertThat(restoredRunStateData.stateData().lastExit().orElseThrow(), is(0));
 
-    assertThat(restoredRunStateData.initialTimestamp().get(), is(1L));
-    assertThat(restoredRunStateData.latestTimestamp().get(), is(7L));
+    assertThat(restoredRunStateData.initialTimestamp().orElseThrow(), is(1L));
+    assertThat(restoredRunStateData.latestTimestamp().orElseThrow(), is(7L));
   }
 
   @Test

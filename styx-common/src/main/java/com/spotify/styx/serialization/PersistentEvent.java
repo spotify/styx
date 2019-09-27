@@ -211,8 +211,8 @@ class PersistentEvent {
     }
 
     private Trigger trigger() {
-      if (this.trigger.isPresent()) {
-        return this.trigger.get();
+      if (trigger.isPresent()) {
+        return trigger.get();
       } else if (triggerId.isPresent()) {
         return Trigger.unknown(triggerId.get());
       } else {

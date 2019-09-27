@@ -23,8 +23,6 @@ package com.spotify.styx.state;
 import com.google.common.io.Closer;
 import java.io.IOException;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
@@ -32,11 +30,9 @@ import org.slf4j.MDC;
  */
 class MDCDecoratingHandler implements OutputHandler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MDCDecoratingHandler.class);
-
-  static final String WFI_ID = "wfi-id";
-  static final String WFI_STATE_COUNTER = "wfi-state-counter";
-  static final String WFI_STATE_NAME = "wfi-state-name";
+  private static final String WFI_ID = "wfi-id";
+  private static final String WFI_STATE_COUNTER = "wfi-state-counter";
+  private static final String WFI_STATE_NAME = "wfi-state-name";
 
   private final OutputHandler delegate;
 

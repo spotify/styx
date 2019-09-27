@@ -36,8 +36,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -49,7 +49,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -218,10 +217,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "next_natural_offset_trigger", equalTo("2016-08-10T08:00:01Z"));
 
     final WorkflowState workflowState = storage.workflowState(WORKFLOW.id());
-    assertThat(workflowState.enabled().get(), is(true));
-    assertThat(workflowState.nextNaturalTrigger().get().toString(),
+    assertThat(workflowState.enabled().orElseThrow(), is(true));
+    assertThat(workflowState.nextNaturalTrigger().orElseThrow().toString(),
                equalTo("2016-08-10T07:00:01Z"));
-    assertThat(workflowState.nextNaturalOffsetTrigger().get().toString(),
+    assertThat(workflowState.nextNaturalOffsetTrigger().orElseThrow().toString(),
                equalTo("2016-08-10T08:00:01Z"));
   }
 
@@ -252,40 +251,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "enabled", equalTo(true));
 
     assertThat(storage.enabled(WORKFLOW.id()), is(true));
-  }
-
-  @Test
-  public void shouldFailOnCommitShaInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"commit_sha\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void shouldFailOnDockerImageInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"docker_image\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
-  }
-
-  @Test
-  public void shouldFailOnCommitShaAndDockerImageInPatch() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-                                            ByteString.encodeUtf8("{\"commit_sha\": \"foobar\","
-                                                                  + "\"docker_image\": \"foobar\"}")));
-
-    assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
   @Test
@@ -663,7 +628,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     verify(workflowConsumer).accept(Optional.empty(), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
+    assertThat(deserialize(response.payload().orElseThrow(), Workflow.class), equalTo(WORKFLOW));
   }
 
   @Test
@@ -682,7 +647,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     verify(workflowConsumer).accept(Optional.of(EXISTING_WORKFLOW), Optional.of(WORKFLOW));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(deserialize(response.payload().get(), Workflow.class), equalTo(WORKFLOW));
+    assertThat(deserialize(response.payload().orElseThrow(), Workflow.class), equalTo(WORKFLOW));
   }
 
   @Test
@@ -873,7 +838,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     return bigtable;
   }

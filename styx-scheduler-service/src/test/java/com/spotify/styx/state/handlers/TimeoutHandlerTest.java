@@ -65,7 +65,7 @@ public class TimeoutHandlerTest {
   private TimeoutHandler timeoutHandler;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     MockitoAnnotations.initMocks(this);
     when(workflows.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
   }
@@ -77,7 +77,7 @@ public class TimeoutHandlerTest {
 
   @Parameters(source = State.class)
   @Test
-  public void shouldTimeoutActiveState(State state) throws Exception {
+  public void shouldTimeoutActiveState(State state) {
     assumeFalse(state.isTerminal());
     setUpWithTimeoutSeconds(5);
     var runState = RunState.create(WORKFLOW_INSTANCE, state, now, counter);
@@ -88,7 +88,7 @@ public class TimeoutHandlerTest {
 
   @Parameters(source = State.class)
   @Test
-  public void shouldNotTimeoutTerminalState(State state) throws Exception {
+  public void shouldNotTimeoutTerminalState(State state) {
     assumeTrue(state.isTerminal());
     setUpWithTimeoutSeconds(0);
     now = now.plus(5, ChronoUnit.SECONDS);
@@ -99,7 +99,7 @@ public class TimeoutHandlerTest {
 
   @Parameters(source = State.class)
   @Test
-  public void shouldNotTransitionIfNotTimedOut(State state) throws Exception {
+  public void shouldNotTransitionIfNotTimedOut(State state) {
     setUpWithTimeoutSeconds(20);
     var runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, now, counter);
     timeoutHandler.transitionInto(runState);

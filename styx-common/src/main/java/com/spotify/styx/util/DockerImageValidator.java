@@ -22,8 +22,8 @@ package com.spotify.styx.util;
 
 import static java.lang.String.format;
 
-import java.util.Collection;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,7 +34,7 @@ public class DockerImageValidator {
 
   private static final Pattern DOMAIN_PATTERN =
       Pattern.compile("^(?:(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9]))"
-          + "(\\.(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])))*)\\.?$");
+                      + "(\\.(?:[a-zA-Z0-9]|(?:[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])))*)\\.?$");
 
   private static final Pattern IPV4_PATTERN =
       Pattern.compile("^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$");
@@ -54,14 +54,14 @@ public class DockerImageValidator {
 
   private static final Pattern DIGIT_PERIOD = Pattern.compile("^[0-9.]+$");
 
-  public Collection<String> validateImageReference(final String imageRef) {
-    final Collection<String> errors = new HashSet<>();
+  public Set<String> validateImageReference(final String imageRef) {
+    final Set<String> errors = new HashSet<>();
     validateImageReference(imageRef, errors);
     return errors;
   }
 
   @SuppressWarnings("ConstantConditions")
-  private boolean validateImageReference(final String imageRef, final Collection<String> errors) {
+  private boolean validateImageReference(final String imageRef, final Set<String> errors) {
     boolean valid = true;
 
     final String repo;
@@ -121,7 +121,7 @@ public class DockerImageValidator {
     return valid;
   }
 
-  private boolean validateTag(final String tag, final Collection<String> errors) {
+  private boolean validateTag(final String tag, final Set<String> errors) {
     if (tag.isEmpty()) {
       errors.add("Tag cannot be empty");
       return false;
@@ -133,7 +133,7 @@ public class DockerImageValidator {
     return true;
   }
 
-  private boolean validateDigest(final String digest, final Collection<String> errors) {
+  private boolean validateDigest(final String digest, final Set<String> errors) {
     if (digest.isEmpty()) {
       errors.add("Digest cannot be empty");
       return false;
@@ -158,7 +158,7 @@ public class DockerImageValidator {
     return true;
   }
 
-  private boolean validateEndpoint(final String endpoint, final Collection<String> errors) {
+  private boolean validateEndpoint(final String endpoint, final Set<String> errors) {
     final String[] parts = endpoint.split(":", 2);
     if (!validateAddress(parts[0], errors)) {
       return false;
@@ -166,7 +166,7 @@ public class DockerImageValidator {
     if (parts.length > 1) {
       final int port;
       try {
-        port = Integer.valueOf(parts[1]);
+        port = Integer.parseInt(parts[1]);
       } catch (NumberFormatException e) {
         errors.add(format("Invalid port in endpoint: \"%s\"", endpoint));
         return false;
@@ -179,7 +179,7 @@ public class DockerImageValidator {
     return true;
   }
 
-  private boolean validateAddress(final String address, final Collection<String> errors) {
+  private boolean validateAddress(final String address, final Set<String> errors) {
     if (IPV4_PATTERN.matcher(address).matches()) {
       return true;
     } else if (!DOMAIN_PATTERN.matcher(address).matches() || DIGIT_PERIOD.matcher(address).find()) {
@@ -192,7 +192,7 @@ public class DockerImageValidator {
   private boolean validateRepositoryName(
       final String imageName,
       final String repositoryName,
-      final Collection<String> errors) {
+      final Set<String> errors) {
 
     /*
     From https://github.com/docker/docker/commit/ea98cf74aad3c2633268d5a0b8a2f80b331ddc0b:
@@ -206,7 +206,7 @@ public class DockerImageValidator {
       if (!NAME_COMPONENT_PATTERN.matcher(name).matches()) {
         errors.add(
             format("Invalid image name (%s), only %s is allowed for each slash-separated "
-                    + "name component (failed on \"%s\")",
+                   + "name component (failed on \"%s\")",
                 imageName, NAME_COMPONENT_PATTERN, name)
         );
         return false;

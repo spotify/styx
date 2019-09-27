@@ -32,7 +32,7 @@ import java.util.Comparator;
 public abstract class WorkflowInstance {
 
   public static final Comparator<WorkflowInstance> KEY_COMPARATOR =
-      (a, b) -> a.toKey().compareTo(b.toKey());
+      Comparator.comparing(WorkflowInstance::toKey);
 
   @JsonProperty
   public abstract WorkflowId workflowId();

@@ -25,9 +25,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.contains;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -118,6 +118,7 @@ public class CliMainTest {
 
   @Test
   public void testWorkflowList() {
+    @SuppressWarnings("unchecked")
     final List<Workflow> payload = mock(List.class);
     when(client.workflows())
         .thenReturn(CompletableFuture.completedFuture(payload));
@@ -157,6 +158,7 @@ public class CliMainTest {
     final Path workflowsFile = fileFromResource("wf-missing-schedule.yaml");
     try {
       CliMain.run(cliContext, "workflow", "create", "-f", workflowsFile.toString(), "foo");
+      fail();
     } catch (CliExitException e) {
       assertThat(e.status(), is(ExitStatus.InputError));
     }
@@ -177,6 +179,7 @@ public class CliMainTest {
     final Path workflowsFile = fileFromResource("bad-content.yaml");
     try {
       CliMain.run(cliContext, "workflow", "create", "-f", workflowsFile.toString(), "foo");
+      fail();
     } catch (CliExitException e) {
       assertThat(e.status(), is(ExitStatus.InputError));
     }

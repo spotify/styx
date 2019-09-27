@@ -23,7 +23,7 @@ package com.spotify.styx.state.handlers;
 import static com.spotify.styx.state.RunState.State.FAILED;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.handlers.TerminationHandler.MAX_RETRY_COST;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,12 +58,12 @@ public class TerminationHandlerTest {
       WorkflowInstance.create(TestData.WORKFLOW_ID, "2016-04-04");
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     terminationHandler = new TerminationHandler(retryUtil, stateManager);
   }
 
   @Test
-  public void shouldCompleteOnZeroExitCode() throws Exception {
+  public void shouldCompleteOnZeroExitCode() {
     StateData data = data(1, 1.0, Optional.of(0));
     RunState zeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     terminationHandler.transitionInto(zeroTerm);
@@ -71,7 +71,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldScheduleRetryOnNonZero() throws Exception {
+  public void shouldScheduleRetryOnNonZero() {
     StateData data = data(1, 1.0, Optional.of(1));
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
@@ -81,7 +81,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldScheduleRetryOnMissingExitCode() throws Exception {
+  public void shouldScheduleRetryOnMissingExitCode() {
     StateData data = data(1, 1.0, Optional.empty());
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
@@ -91,7 +91,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldScheduleRetryOnFail() throws Exception {
+  public void shouldScheduleRetryOnFail() {
     StateData data = data(1, 1.0, Optional.of(1));
     RunState failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
@@ -101,7 +101,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldStopOnNonZeroMaxRetriesReached() throws Exception {
+  public void shouldStopOnNonZeroMaxRetriesReached() {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     terminationHandler.transitionInto(maxedTerm);
@@ -109,7 +109,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldStopOnFailMaxRetriesReached() throws Exception {
+  public void shouldStopOnFailMaxRetriesReached() {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
     terminationHandler.transitionInto(maxedTerm);
@@ -117,7 +117,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldScheduleRetryOf10MinutesOnMissingDependencies() throws Exception {
+  public void shouldScheduleRetryOf10MinutesOnMissingDependencies() {
     StateData data = data(1, 1.0, Optional.of(20));
     RunState missingDeps = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     terminationHandler.transitionInto(missingDeps);
@@ -126,7 +126,7 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldFailOnFailFastExitCodeReceived() throws Exception {
+  public void shouldFailOnFailFastExitCodeReceived() {
     StateData data = data(1, 1.0, Optional.of(50));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
     terminationHandler.transitionInto(maxedTerm);

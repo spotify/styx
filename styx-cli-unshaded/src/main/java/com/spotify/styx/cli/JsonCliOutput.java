@@ -23,7 +23,6 @@ package com.spotify.styx.cli;
 import static java.util.stream.Collectors.toMap;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Throwables;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
 import com.spotify.styx.model.Backfill;
@@ -45,7 +44,7 @@ class JsonCliOutput implements CliOutput {
     try {
       System.out.println(Json.serialize(object).utf8());
     } catch (JsonProcessingException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 

@@ -34,7 +34,7 @@ public class ServiceAccountKeyManager {
 
   private final Iam iam;
 
-  public ServiceAccountKeyManager(Iam iam) {
+  ServiceAccountKeyManager(Iam iam) {
     this.iam = iam;
   }
 

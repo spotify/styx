@@ -73,7 +73,6 @@ import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
-import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
@@ -155,8 +154,6 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Duration podDeletionDelay;
   private final Time time;
   private final ExecutorService executor;
-
-  private Watch watcher;
 
   KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
@@ -537,12 +534,12 @@ class KubernetesDockerRunner implements DockerRunner {
     final PodWatcher watcher = new PodWatcher();
     scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
 
-    this.watcher = closer.register(client.watchPods(watcher));
+    closer.register(client.watchPods(watcher));
   }
 
   private void cleanupPods() {
     try {
-      try (Scope ss = tracer.spanBuilder("Styx.KubernetesDockerRunner.cleanupPods")
+      try (Scope ignored = tracer.spanBuilder("Styx.KubernetesDockerRunner.cleanupPods")
           .setRecordEvents(true)
           .setSampler(Samplers.alwaysSample())
           .startScopedSpan()) {
@@ -604,7 +601,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private Optional<RunState> lookupPodRunState(Pod pod, WorkflowInstance workflowInstance) {
     final Optional<RunState> runStateOpt = stateManager.getActiveState(workflowInstance);
-    if (!runStateOpt.isPresent()) {
+    if (runStateOpt.isEmpty()) {
       LOG.debug("Pod event for unknown or inactive workflow instance {}", workflowInstance);
       return Optional.empty();
     }
@@ -615,7 +612,7 @@ class KubernetesDockerRunner implements DockerRunner {
     final String podName = pod.getMetadata().getName();
 
     final Optional<String> executionIdOpt = runState.data().executionId();
-    if (!executionIdOpt.isPresent()) {
+    if (executionIdOpt.isEmpty()) {
       LOG.debug("Pod event for state with no current executionId: {}", podName);
       return false;
     }
@@ -703,7 +700,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
       // Ignore non-styx pods
       final Optional<WorkflowInstance> workflowInstance = readPodWorkflowInstance(pod);
-      if (!workflowInstance.isPresent()) {
+      if (workflowInstance.isEmpty()) {
         return;
       }
 
@@ -739,7 +736,7 @@ class KubernetesDockerRunner implements DockerRunner {
       var pod = podOpt.orElseThrow();
 
       final Optional<RunState> runState = lookupPodRunState(pod, instance);
-      if (!runState.isPresent()) {
+      if (runState.isEmpty()) {
         return;
       }
 

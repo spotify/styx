@@ -37,7 +37,7 @@ class TestNamespaces {
 
   static final String TEST_NAMESPACE_PREFIX = "styx-e2e-test";
 
-  static final Pattern TEST_NAMESPACE_PATTERN = Pattern.compile(
+  private static final Pattern TEST_NAMESPACE_PATTERN = Pattern.compile(
       TEST_NAMESPACE_PREFIX + "-(?<timestamp>\\w+-\\w+)-(?<random>\\w+)");
 
   private TestNamespaces() {
@@ -72,10 +72,7 @@ class TestNamespaces {
     }
     // Consider test namespaces to be expired after a reasonable TTL in order to not
     // interfere with concurrently executing tests.
-    if (timestamp.isAfter(now.minus(TEST_NAMESPACE_TTL))) {
-      return false;
-    }
-    return true;
+    return !timestamp.isAfter(now.minus(TEST_NAMESPACE_TTL));
   }
 
   static String testNamespaceTimeTimestamp(String namespace) {

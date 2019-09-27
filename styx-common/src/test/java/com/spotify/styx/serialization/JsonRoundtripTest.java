@@ -23,7 +23,6 @@ package com.spotify.styx.serialization;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.testdata.TestData;
@@ -40,18 +39,17 @@ public class JsonRoundtripTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonRoundtripTest.class);
 
-  private static final Map<String, Schedule> LEGACY_SCHEDULE_TESTS =
-      ImmutableMap.<String, Schedule>builder()
-          .put("hourly", Schedule.HOURS)
-          .put("HOURLY", Schedule.HOURS)
-          .put("hOuRlY", Schedule.HOURS)
-          .put("weekly", Schedule.WEEKS)
-          .put("WEEKLY", Schedule.WEEKS)
-          .put("wEeKlY", Schedule.WEEKS)
-          .put("daily", Schedule.DAYS)
-          .put("DAILY", Schedule.DAYS)
-          .put("dAiLy", Schedule.DAYS)
-          .build();
+  private static final Map<String, Schedule> LEGACY_SCHEDULE_TESTS = Map.ofEntries(
+      Map.entry("hourly", Schedule.HOURS),
+      Map.entry("HOURLY", Schedule.HOURS),
+      Map.entry("hOuRlY", Schedule.HOURS),
+      Map.entry("weekly", Schedule.WEEKS),
+      Map.entry("WEEKLY", Schedule.WEEKS),
+      Map.entry("wEeKlY", Schedule.WEEKS),
+      Map.entry("daily", Schedule.DAYS),
+      Map.entry("DAILY", Schedule.DAYS),
+      Map.entry("dAiLy", Schedule.DAYS)
+  );
 
   @Test
   public void testRoundtripSchedule() throws Exception {

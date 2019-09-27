@@ -54,21 +54,21 @@ public abstract class VersionedApiTest {
 
   @Rule public ServiceHelper serviceHelper;
 
-  protected final String basePath;
+  private final String basePath;
   protected final Api.Version version;
 
-  protected VersionedApiTest(String basePath, Api.Version version) {
+  VersionedApiTest(String basePath, Api.Version version) {
     this(basePath, version, "styx");
   }
 
-  protected VersionedApiTest(String basePath, Api.Version version, String serviceName) {
+  VersionedApiTest(String basePath, Api.Version version, String serviceName) {
     this.basePath = basePath;
     this.version = version;
     this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName))
         .startTimeoutSeconds(30);
   }
 
-  protected VersionedApiTest(String basePath, Api.Version version, String serviceName, StubClient stubClient) {
+  VersionedApiTest(String basePath, Api.Version version, String serviceName, StubClient stubClient) {
     this.basePath = basePath;
     this.version = version;
     this.serviceHelper = closer.register(ServiceHelper.create(this::init, serviceName, stubClient))
@@ -100,7 +100,7 @@ public abstract class VersionedApiTest {
    *
    * @param version The version from which the tests are valid
    */
-  protected void sinceVersion(Api.Version version) {
+  void sinceVersion(Api.Version version) {
     assumeThat(this.version, isAtLeast(version));
   }
 
@@ -110,7 +110,7 @@ public abstract class VersionedApiTest {
    *
    * @param version The version from which the tests are valid
    */
-  protected void tillVersion(Api.Version version) {
+  void tillVersion(Api.Version version) {
     assumeThat(this.version, isAtMost(version));
   }
 
@@ -120,7 +120,7 @@ public abstract class VersionedApiTest {
    *
    * @param version The version from which the tests are valid
    */
-  protected void isVersion(Api.Version version) {
+  void isVersion(Api.Version version) {
     assumeThat(this.version, is(version));
   }
 
@@ -130,11 +130,11 @@ public abstract class VersionedApiTest {
    * @param path The additional path to add to the base path
    * @return a string that can be used to make api calls
    */
-  protected String path(String path) {
+  String path(String path) {
     return version.prefix() + basePath + path;
   }
 
-  protected Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
+  Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
       throws InterruptedException, ExecutionException, TimeoutException {
     return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
   }

@@ -449,7 +449,7 @@ public class PersistentStateManagerTest {
         INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17);
     when(storage.readActiveState(INSTANCE)).thenReturn(Optional.of(runState));
 
-    RunState returnedRunState = stateManager.getActiveState(INSTANCE).get();
+    RunState returnedRunState = stateManager.getActiveState(INSTANCE).orElseThrow();
 
     assertThat(runState, equalTo(returnedRunState));
   }

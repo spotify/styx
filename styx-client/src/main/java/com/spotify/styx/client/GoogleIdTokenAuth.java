@@ -73,7 +73,7 @@ class GoogleIdTokenAuth {
   private final HttpTransport httpTransport;
   private final Optional<GoogleCredentials> credentials;
 
-  GoogleIdTokenAuth(HttpTransport httpTransport, Optional<GoogleCredentials> credentials) {
+  private GoogleIdTokenAuth(HttpTransport httpTransport, Optional<GoogleCredentials> credentials) {
     this.httpTransport = Objects.requireNonNull(httpTransport, "httpTransport");
     this.credentials = Objects.requireNonNull(credentials, "credentials");
   }

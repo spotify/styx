@@ -83,7 +83,7 @@ public class ShardedCounterSnapshotFactory implements CounterSnapshotFactory {
       storage.runInTransactionWithRetries(tx -> {
         for (int index = startIndex; index < endIndex; index++) {
           final Optional<Shard> shard = tx.shard(counterId, index);
-          if (!shard.isPresent()) {
+          if (shard.isEmpty()) {
             tx.store(Shard.create(counterId, index, 0));
           }
         }

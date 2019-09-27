@@ -209,7 +209,7 @@ public final class BackfillResource implements Closeable {
       log.warn(message, e);
       return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase("Error in internal storage"));
     }
-    if (!backfillOpt.isPresent()) {
+    if (backfillOpt.isEmpty()) {
       return Response.forStatus(Status.NOT_FOUND);
     }
     final Backfill backfill = backfillOpt.get();
@@ -283,8 +283,9 @@ public final class BackfillResource implements Closeable {
   private static boolean isActiveState(RunStateData runStateData) {
     final String state  = runStateData.state();
     switch (state) {
-      case UNKNOWN: return false;
-      case WAITING: return false;
+      case UNKNOWN:
+      case WAITING:
+        return false;
       default:      return !RunState.State.valueOf(state).isTerminal();
     }
   }
@@ -292,7 +293,7 @@ public final class BackfillResource implements Closeable {
   private Optional<String> validate(RequestContext rc,
                                     BackfillInput input,
                                     Workflow workflow) {
-    if (!workflow.configuration().dockerImage().isPresent()) {
+    if (workflow.configuration().dockerImage().isEmpty()) {
       return Optional.of("Workflow is missing docker image");
     }
 

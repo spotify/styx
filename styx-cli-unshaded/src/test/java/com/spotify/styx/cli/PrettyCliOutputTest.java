@@ -101,17 +101,9 @@ public class PrettyCliOutputTest {
   }
 
   private static Backfill backfillNoCreateTS(String description) {
-    return Backfill.newBuilder()
-        .id("backfill-2")
-        .start(Instant.parse("2017-01-01T00:00:00Z"))
-        .end(Instant.parse("2017-01-02T00:00:00Z"))
-        .workflowId(WorkflowId.create("component", "workflow2"))
-        .concurrency(2)
-        .reverse(false)
-        .description(description)
-        .triggerParameters(TriggerParameters.builder().env("FOO", "bar").build())
-        .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
-        .schedule(Schedule.DAYS)
+    return backfill(description).builder()
+        .created(Optional.empty())
+        .lastModified(Optional.empty())
         .build();
   }
 

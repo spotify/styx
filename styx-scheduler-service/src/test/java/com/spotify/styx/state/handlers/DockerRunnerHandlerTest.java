@@ -24,7 +24,7 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -138,15 +138,15 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldFailIfDockerRunnerRaisesException() throws Exception {
-    shouldFailIfDockerRunnerRaisesException(new IOException("Testing exception."));
+    shouldFailIfDockerRunnerRaisesException0(new IOException("Testing exception."));
   }
 
   @Test
   public void shouldFailIfDockerRunnerRaisesUserErrorInvalidExecutionException() throws Exception {
-    shouldFailIfDockerRunnerRaisesException(new InvalidExecutionException("PEBKAC"));
+    shouldFailIfDockerRunnerRaisesException0(new InvalidExecutionException("PEBKAC"));
   }
 
-  void shouldFailIfDockerRunnerRaisesException(Throwable throwable)
+  private void shouldFailIfDockerRunnerRaisesException0(Throwable throwable)
       throws IOException, IsClosedException {
     doThrow(throwable).when(dockerRunner)
         .start(any(WorkflowInstance.class), any(RunSpec.class));

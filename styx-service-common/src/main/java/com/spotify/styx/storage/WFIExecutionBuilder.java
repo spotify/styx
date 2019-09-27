@@ -57,7 +57,7 @@ class WFIExecutionBuilder {
   @Nullable private Instant triggerTs;
   @Nullable private Instant eventTs;
 
-  private final EventVisitor visitor = new Reducer();
+  private final EventVisitor<Void> visitor = new Reducer();
 
   private enum Status {
     FAILED,
@@ -191,8 +191,8 @@ class WFIExecutionBuilder {
       final Optional<String> message;
       if (Status.FAILED == status) {
         message = exitCode
-            .map(c -> Optional.of("Exit code: " + c))
-            .orElse(Optional.of("Exit code unknown"));
+            .map(c -> "Exit code: " + c)
+            .or(() -> Optional.of("Exit code unknown"));
       } else {
         message = Optional.empty();
       }
