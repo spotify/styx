@@ -50,7 +50,7 @@ final class StateInitializingTrigger implements TriggerListener {
   @Override
   public void event(Workflow workflow, Trigger trigger, Instant instant,
                     TriggerParameters parameters) {
-    if (!workflow.configuration().dockerImage().isPresent()) {
+    if (workflow.configuration().dockerImage().isEmpty()) {
       LOG.warn("{} has no docker image, skipping", workflow.id());
       return;
     }

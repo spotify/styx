@@ -49,7 +49,7 @@ import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import java.time.Instant;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,8 +76,6 @@ public class RunStateTest {
       .dockerArgs("--date", "{}", "--bar")
       .build();
 
-  private static final String COMMIT_SHA = "sha_1";
-
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
   private static final Trigger NATURAL_TRIGGER1 = Trigger.natural();
 
@@ -88,7 +86,7 @@ public class RunStateTest {
   private StateTransitioner transitioner;
   @Mock private Time time;
 
-  class StateTransitioner {
+  static class StateTransitioner {
 
     private final Time time;
     private final OutputHandler outputHandler;
@@ -119,8 +117,8 @@ public class RunStateTest {
   }
 
   @Before
-  public void setUp() throws Exception {
-    outputs = new LinkedList<>();
+  public void setUp() {
+    outputs = new ArrayList<>();
     transitioner = new StateTransitioner(time, this::record);
     when(time.get()).thenReturn(Instant.now());
   }
@@ -140,7 +138,7 @@ public class RunStateTest {
   }
 
   @Test // for backwards compatibility
-  public void testTimeTriggerAndRetry() throws Exception {
+  public void testTimeTriggerAndRetry() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.timeTrigger());
     transitioner.receive(eventFactory.started());
@@ -157,7 +155,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testTimeTriggerAndRetry2() throws Exception {
+  public void testTimeTriggerAndRetry2() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
@@ -179,7 +177,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRunErrorOnCreating() throws Exception {
+  public void testRunErrorOnCreating() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.timeTrigger());
     transitioner.receive(eventFactory.started());
@@ -200,7 +198,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testSetTrigger() throws Exception {
+  public void testSetTrigger() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(NATURAL_TRIGGER1));
 
@@ -213,7 +211,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testSetExecutionId() throws Exception {
+  public void testSetExecutionId() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -239,32 +237,32 @@ public class RunStateTest {
   }
 
   @Test
-  public void testSubmitSetsExecutionId() throws Exception {
+  public void testSubmitSetsExecutionId() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTING));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(), equalTo(TEST_EXECUTION_ID_1));
 
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(), equalTo(TEST_EXECUTION_ID_1));
 
     transitioner.receive(eventFactory.started());
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RUNNING));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(), equalTo(TEST_EXECUTION_ID_1));
 
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(999));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().get(), equalTo(TEST_EXECUTION_ID_2));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(), equalTo(TEST_EXECUTION_ID_2));
   }
 
   @Test
-  public void testSetsRetryDelay() throws Exception {
+  public void testSetsRetryDelay() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -287,7 +285,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryDelayFromQueued() throws Exception {
+  public void testRetryDelayFromQueued() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
@@ -308,7 +306,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromRunError() throws Exception {
+  public void testRetryFromRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -324,7 +322,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testManyRetriesFromRunError() throws Exception {
+  public void testManyRetriesFromRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -343,7 +341,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testMissingDependenciesAddsToCost() throws Exception {
+  public void testMissingDependenciesAddsToCost() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -363,7 +361,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testMissingDependenciesIncrementsTries() throws Exception {
+  public void testMissingDependenciesIncrementsTries() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -383,7 +381,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testErrorsAddsToCost() throws Exception {
+  public void testErrorsAddsToCost() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -402,7 +400,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testFatalFromRunError() throws Exception {
+  public void testFatalFromRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -415,7 +413,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testSuccessFromTerm() throws Exception {
+  public void testSuccessFromTerm() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -431,7 +429,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromTerm() throws Exception {
+  public void testRetryFromTerm() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -448,7 +446,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testManyRetriesFromTerm() throws Exception {
+  public void testManyRetriesFromTerm() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -470,7 +468,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testFatalFromTerm() throws Exception {
+  public void testFatalFromTerm() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -485,7 +483,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromStartedThenRunError() throws Exception {
+  public void testRetryFromStartedThenRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -501,7 +499,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testFatalFromStartedThenRunError() throws Exception {
+  public void testFatalFromStartedThenRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -515,7 +513,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testFailedFromTimeout() throws Exception {
+  public void testFailedFromTimeout() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -529,7 +527,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetriggerOfPartition() throws Exception {
+  public void testRetriggerOfPartition() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -548,7 +546,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRunErrorEmitsMessage() throws Exception {
+  public void testRunErrorEmitsMessage() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
@@ -562,11 +560,11 @@ public class RunStateTest {
 
     final Message expectedMessage = Message.create(MessageLevel.ERROR, "Error");
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().messages(), contains(expectedMessage));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().get(), is(expectedMessage));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().orElseThrow(), is(expectedMessage));
   }
 
   @Test
-  public void testKeepsLastMessage() throws Exception {
+  public void testKeepsLastMessage() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.info(Message.info("info message")));
@@ -574,11 +572,11 @@ public class RunStateTest {
 
     final Message expectedMessage = Message.warning("warning message");
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().messages(), contains(expectedMessage));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().get(), is(expectedMessage));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().message().orElseThrow(), is(expectedMessage));
   }
 
   @Test
-  public void testInfoTransitionsToSameState() throws Exception {
+  public void testInfoTransitionsToSameState() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.info(Message.info("hello")));
@@ -589,7 +587,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRunErrorFromQueuedState() throws Exception {
+  public void testRunErrorFromQueuedState() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.runError("Unknown resources"));
@@ -600,18 +598,18 @@ public class RunStateTest {
   }
 
   @Test
-  public void testStoresExecutedDockerImage() throws Exception {
+  public void testStoresExecutedDockerImage() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "1"));
 
     assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().get().dockerImage(),
+        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage(),
         equalTo(DOCKER_IMAGE + "1"));
   }
 
   @Test
-  public void testStoresLastExecutedDockerImage() throws Exception {
+  public void testStoresLastExecutedDockerImage() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "1"));
@@ -621,12 +619,12 @@ public class RunStateTest {
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "2"));
 
     assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().get().dockerImage(),
+        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage(),
         equalTo(DOCKER_IMAGE + "2"));
   }
 
   @Test
-  public void testStoresResourcesFromDequeueThroughRunError() throws Exception {
+  public void testStoresResourcesFromDequeueThroughRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
@@ -651,7 +649,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testStoresResourcesFromDequeueThroughTerminate() throws Exception {
+  public void testStoresResourcesFromDequeueThroughTerminate() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
@@ -668,7 +666,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testStoresResourcesFromDequeueThroughTimeout() throws Exception {
+  public void testStoresResourcesFromDequeueThroughTimeout() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 
@@ -683,7 +681,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testStoresNoResourcesWhenNotDequeued() throws Exception {
+  public void testStoresNoResourcesWhenNotDequeued() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
 

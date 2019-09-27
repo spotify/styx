@@ -42,7 +42,9 @@ class OkHttpTestUtil {
   static ByteString bytesOfRequestBody(Request request) {
     final Buffer sink = new Buffer();
     try {
-      request.body().writeTo(sink);
+      var body = request.body();
+      assert body != null;
+      body.writeTo(sink);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -61,10 +63,6 @@ class OkHttpTestUtil {
     return responseBuilder(new Request.Builder().url("http://example.org").build(), code);
   }
 
-  static Response response(int code) {
-    return responseBuilder(code).build();
-  }
-
   static Response.Builder responseBuilder(Request request, int code, Object body) throws JsonProcessingException {
     return responseBuilder(request, code)
         .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
@@ -73,6 +71,10 @@ class OkHttpTestUtil {
   static Response.Builder responseBuilder(int code, Object body) throws JsonProcessingException {
     return responseBuilder(code)
         .body(ResponseBody.create(APPLICATION_JSON, Json.serialize(body).toByteArray()));
+  }
+
+  static Response response(int code) {
+    return responseBuilder(code).build();
   }
 
   static Response response(int code, Object body) throws JsonProcessingException {

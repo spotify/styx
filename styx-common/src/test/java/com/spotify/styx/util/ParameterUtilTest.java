@@ -159,16 +159,16 @@ public class ParameterUtilTest {
     }
   }
 
-  static ParseExample example(String toParse, Schedule schedule, Instant expected) {
+  private static ParseExample example(String toParse, Schedule schedule, Instant expected) {
     return new AutoValue_ParameterUtilTest_ParseExample(toParse, schedule, expected);
   }
 
-  static ParseExample example(String toParse, Schedule schedule) {
+  private static ParseExample example(String toParse, Schedule schedule) {
     return new AutoValue_ParameterUtilTest_ParseExample(toParse, schedule, null);
   }
 
   @AutoValue
-  public static abstract class ParseExample {
+  static abstract class ParseExample {
     abstract String toParse();
     abstract Schedule schedule();
     @Nullable abstract Instant expected();

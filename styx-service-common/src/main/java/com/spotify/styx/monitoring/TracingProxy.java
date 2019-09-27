@@ -62,7 +62,7 @@ public class TracingProxy implements InvocationHandler {
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     final String operation = method.getName();
     final SpanBuilder spanBuilder = tracer.spanBuilder(delegateName + "." + operation);
-    try (Scope ss = spanBuilder.startScopedSpan()) {
+    try (Scope ignored = spanBuilder.startScopedSpan()) {
       try {
         return method.invoke(delegate, args);
       } catch (InvocationTargetException e) {

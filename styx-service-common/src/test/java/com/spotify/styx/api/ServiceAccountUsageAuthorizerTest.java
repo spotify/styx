@@ -46,7 +46,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpResponseException.Builder;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
@@ -178,7 +178,7 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   @Test
-  public void shouldDenyAccessIfPrincipalIsBlacklisted() throws IOException {
+  public void shouldDenyAccessIfPrincipalIsBlacklisted() {
     reset(iam);
     reset(crm);
     reset(directory);
@@ -584,7 +584,8 @@ public class ServiceAccountUsageAuthorizerTest {
   }
 
   private static GoogleJsonResponseException googleJsonResponseException(int code) {
-    return new GoogleJsonResponseException(new Builder(code, "", new HttpHeaders()), new GoogleJsonError());
+    return new GoogleJsonResponseException(new HttpResponseException.Builder(code, "", new HttpHeaders()),
+        new GoogleJsonError());
   }
 
   private static String deniedMessage(String serviceAccount) {

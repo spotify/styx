@@ -23,7 +23,6 @@ package com.spotify.styx.cli;
 import static com.google.common.base.Throwables.getStackTraceAsString;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static net.sourceforge.argparse4j.impl.Arguments.append;
@@ -139,7 +138,7 @@ public final class CliMain {
     run(cliContext, ImmutableList.copyOf(args));
   }
 
-  static void run(CliContext cliContext, Collection<String> args) {
+  private static void run(CliContext cliContext, Collection<String> args) {
     final StyxCliParser parser = new StyxCliParser(cliContext);
     final Namespace namespace;
     final String apiHost;
@@ -368,8 +367,8 @@ public final class CliMain {
     if (cliContext.hasConsole() && !force) {
       final String reply = cliContext.consoleReadLine(
           "Sure you want to delete the workflow" + (workflows.size() > 1 ? "s" : "") + " "
-              + workflows.stream().collect(joining(", "))
-              + " in component " + component + "? [y/N] ").trim();
+          + String.join(", ", workflows)
+          + " in component " + component + "? [y/N] ").trim();
       if (!"y".equals(reply)) {
         throw CliExitException.of(ExitStatus.UnknownError);
       }
@@ -557,7 +556,7 @@ public final class CliMain {
 
   private void backfillShow() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.backfillShowId.getDest());
-    final boolean noTruncate = namespace.getBoolean((parser.backfillShowNoTruncate.getDest()));
+    final boolean noTruncate = namespace.getBoolean(parser.backfillShowNoTruncate.getDest());
 
     final BackfillPayload backfillPayload = styxClient.backfill(id, true).toCompletableFuture().get();
     cliOutput.printBackfillPayload(backfillPayload, noTruncate);
@@ -702,7 +701,7 @@ public final class CliMain {
   private static class ParserBase {
     final CliContext cliContext;
 
-    protected ParserBase(CliContext cliContext) {
+    ParserBase(CliContext cliContext) {
       this.cliContext = cliContext;
     }
   }

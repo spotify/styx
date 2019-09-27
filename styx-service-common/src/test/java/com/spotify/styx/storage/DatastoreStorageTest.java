@@ -144,7 +144,6 @@ public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
-  private static final WorkflowId WORKFLOW_ID2_OLD = WorkflowId.create("component", "endpoint2_old");
   private static final WorkflowId WORKFLOW_ID3 = WorkflowId.create("component2", "pointless");
 
   static final WorkflowInstance WORKFLOW_INSTANCE1 = WorkflowInstance.create(WORKFLOW_ID1, "2016-09-01");
@@ -184,10 +183,10 @@ public class DatastoreStorageTest {
   static final RunState RUN_STATE1 = RunState.create(WORKFLOW_INSTANCE1, State.NEW,
       STATE_DATA, TIMESTAMP, 43L);
 
-  static final RunState RUN_STATE2 = RunState.create(WORKFLOW_INSTANCE2, State.NEW,
+  private static final RunState RUN_STATE2 = RunState.create(WORKFLOW_INSTANCE2, State.NEW,
       STATE_DATA, TIMESTAMP, 84L);
 
-  static final RunState RUN_STATE3 = RunState.create(WORKFLOW_INSTANCE3, State.NEW,
+  private static final RunState RUN_STATE3 = RunState.create(WORKFLOW_INSTANCE3, State.NEW,
       STATE_DATA, TIMESTAMP, 17L);
 
 
@@ -232,7 +231,6 @@ public class DatastoreStorageTest {
   private DatastoreStorage storage;
   private CheckedDatastore datastore;
   private Datastore datastoreClient;
-  private CheckedDatastore innerDatastore;
 
   @Mock TransactionFunction<String, FooException> transactionFunction;
   @Mock Function<CheckedDatastoreTransaction, DatastoreStorageTransaction> storageTransactionFactory;
@@ -247,7 +245,7 @@ public class DatastoreStorageTest {
         .setRetrySettings(RETRY_SETTINGS)
         .build()
         .getService();
-    innerDatastore = new CheckedDatastore(datastoreClient);
+    var innerDatastore = new CheckedDatastore(datastoreClient);
     datastore = spy(innerDatastore);
     storage = new DatastoreStorage(datastore, DatastoreStorageTransaction::new, executor, logger);
   }
@@ -773,8 +771,8 @@ public class DatastoreStorageTest {
         .set(PROPERTY_NEXT_TRIGGER, instantToTimestamp(backfill.nextTrigger()))
         .set(PROPERTY_ALL_TRIGGERED, backfill.allTriggered())
         .set(PROPERTY_HALTED, backfill.halted())
-        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created().get()))
-        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified().get()));
+        .set(PROPERTY_CREATED, instantToTimestamp(backfill.created().orElseThrow()))
+        .set(PROPERTY_LAST_MODIFIED, instantToTimestamp(backfill.lastModified().orElseThrow()));
 
     datastore.put(builder.build());
 

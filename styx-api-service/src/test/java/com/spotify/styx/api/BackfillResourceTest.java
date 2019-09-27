@@ -34,8 +34,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -46,7 +46,6 @@ import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.common.base.Throwables;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -78,7 +77,6 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -103,20 +101,12 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   private static final String SCHEDULER_BASE = "http://localhost:12345";
 
-  private Connection bigtable = setupBigTableMockTable();
-
-  private Storage storage;
-
-  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
-  @Mock private GoogleIdToken idToken;
-  @Mock private RequestAuthenticator requestAuthenticator;
-
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
   private static final WorkflowId WORKFLOW_ID_1 = WorkflowId.create("component", "workflow1");
   private static final WorkflowId WORKFLOW_ID_2 = WorkflowId.create("component", "workflow2");
 
-  private static Instant currentTime = Instant.parse("2018-10-17T00:00:00.000Z");
+  private static final Instant INSTANT = Instant.parse("2018-10-17T00:00:00.000Z");
 
   private static final Backfill BACKFILL_1 = Backfill.newBuilder()
       .id("backfill-1")
@@ -126,8 +116,8 @@ public class BackfillResourceTest extends VersionedApiTest {
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T00:00:00Z"))
       .schedule(Schedule.HOURS)
-      .created(currentTime)
-      .lastModified(currentTime)
+      .created(INSTANT)
+      .lastModified(INSTANT)
       .build();
 
   private static final Backfill BACKFILL_2 = Backfill.newBuilder()
@@ -172,7 +162,17 @@ public class BackfillResourceTest extends VersionedApiTest {
       .schedule(Schedule.HOURS)
       .build();
 
+  private Connection bigtable = setupBigTableMockTable();
+
+  private Storage storage;
+
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
+
   private final WorkflowValidator workflowValidator = mock(WorkflowValidator.class);
+
+  private Instant currentTime = INSTANT;
 
   public BackfillResourceTest(Api.Version version) {
     super(BackfillResource.BASE, version, "backfill-test", spy(StubClient.class));
@@ -181,8 +181,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
   @Override
   protected void init(Environment environment) {
-    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client(),
-        Duration.ZERO));
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()));
 
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     final BackfillResource backfillResource = closer.register(
@@ -223,7 +222,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     datastoreEmulator.reset();
   }
 
@@ -563,7 +562,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
@@ -647,7 +646,7 @@ public class BackfillResourceTest extends VersionedApiTest {
         awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), serialize(backfillInput)));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
-    assertThat(storage.backfill(BACKFILL_1.id()).get().description(), is(not(Optional.of("updated"))));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().description(), is(not(Optional.of("updated"))));
   }
 
 
@@ -668,7 +667,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
@@ -699,7 +698,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2017-01-01T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2017-02-01T00:00:00Z")));
@@ -791,7 +790,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldUpdateBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().concurrency(), equalTo(1));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().concurrency(), equalTo(1));
 
     final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
         .id(BACKFILL_1.id())
@@ -810,7 +809,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertJson(response, "concurrency", equalTo(4));
     assertJson(response, "description", is("foobar"));
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get(), is(BACKFILL_1.builder()
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow(), is(BACKFILL_1.builder()
         .concurrency(4)
         .description("foobar")
         .build()));
@@ -876,7 +875,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
-    assertThat(storage.backfill(BACKFILL_5.id()).get().halted(), equalTo(true));
+    assertThat(storage.backfill(BACKFILL_5.id()).orElseThrow().halted(), equalTo(true));
     verify(serviceHelper.stubClient(), times(3)).send(any());
   }
 
@@ -884,10 +883,6 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldHaltBackfillAndUpdateLastModified() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    var previousTime = this.currentTime;
-    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
-
-    this.currentTime = updateTime;
 
     serviceHelper.stubClient()
         .respond(Response.forStatus(Status.OK))
@@ -897,16 +892,23 @@ public class BackfillResourceTest extends VersionedApiTest {
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
     storeRunningWorkflowInstance(wfi, BACKFILL_1.id());
 
-    Response<ByteString> response =
-        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+    var previousTime = this.currentTime;
+    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
+    this.currentTime = updateTime;
+
+    final Response<ByteString> response;
+    try {
+      response = awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id())));
+    } finally {
+      this.currentTime = previousTime;
+    }
+   
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
-    assertThat(storage.backfill(BACKFILL_1.id()).get().lastModified().get(), equalTo(currentTime));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().halted(), equalTo(true));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().lastModified().orElseThrow(), equalTo(updateTime));
     verify(serviceHelper.stubClient(), times(1)).send(any());
-
-    this.currentTime = previousTime;
   }
 
   private void storeRunningWorkflowInstance(WorkflowInstance wfi, String backfillId) throws IOException {
@@ -1013,7 +1015,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SERVER_ERROR)));
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().halted(), equalTo(true));
     verify(serviceHelper.stubClient(), times(2)).send(any());
   }
 
@@ -1118,7 +1120,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-18T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-19T00:00:00Z")));
@@ -1148,7 +1150,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-17T02:00:00Z")));
@@ -1178,7 +1180,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.id().matches("backfill-[\\d-]+"), is(true));
     assertThat(postedBackfill.start(), equalTo(Instant.parse("2018-10-16T00:00:00Z")));
     assertThat(postedBackfill.end(), equalTo(Instant.parse("2018-10-17T02:00:00Z")));
@@ -1190,34 +1192,36 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(postedBackfill.allTriggered(), equalTo(false));
     assertThat(postedBackfill.halted(), equalTo(false));
     assertThat(postedBackfill.reverse(), equalTo(false));
-    assertThat(postedBackfill.created().get(), equalTo(currentTime));
-    assertThat(postedBackfill.lastModified().get(), equalTo(currentTime));
+    assertThat(postedBackfill.created().orElseThrow(), equalTo(currentTime));
+    assertThat(postedBackfill.lastModified().orElseThrow(), equalTo(currentTime));
   }
 
   @Test
   public void shouldReturnDifferentTimestampWhenUpdateBackfill() throws Exception {
     sinceVersion(Api.Version.V3);
-    var previousTime = this.currentTime;
-    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
-
-    this.currentTime = updateTime;
 
     final EditableBackfillInput backfillInput = EditableBackfillInput.newBuilder()
         .id(BACKFILL_1.id())
         .description("updated")
         .build();
 
-    final Response<ByteString> response =
-        awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()), serialize(backfillInput)));
+    var previousTime = this.currentTime;
+    var updateTime = Instant.parse("2019-10-16T00:00:00Z");
+    this.currentTime = Instant.parse("2019-10-16T00:00:00Z");
+
+    final Response<ByteString> response;
+    try {
+      response = awaitResponse(serviceHelper.request("PUT", path("/" + BACKFILL_1.id()),
+          serialize(backfillInput)));
+    } finally {
+      this.currentTime = previousTime;
+    }
 
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
-        response.payload().get().toByteArray(), Backfill.class);
-    assertThat(postedBackfill.lastModified().get(), equalTo(updateTime));
-
-    // Restore the old timestamp
-    this.currentTime = previousTime;
+        response.payload().orElseThrow().toByteArray(), Backfill.class);
+    assertThat(postedBackfill.lastModified().orElseThrow(), equalTo(updateTime));
   }
 
   private Connection setupBigTableMockTable() {
@@ -1228,7 +1232,7 @@ public class BackfillResourceTest extends VersionedApiTest {
           .setupTable(BigtableStorage.EVENTS_TABLE_NAME)
           .finalizeMocking();
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     return bigtable;
   }

@@ -43,7 +43,7 @@ class Cleaner {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.Cleaner.tick")
+    try (Scope ignored = tracer.spanBuilder("Styx.Cleaner.tick")
         .setRecordEvents(true)
         .setSampler(Samplers.alwaysSample())
         .startScopedSpan()) {
@@ -51,7 +51,7 @@ class Cleaner {
     }
   }
 
-  void tick0() {
+  private void tick0() {
     try {
       dockerRunner.cleanup();
     } catch (IOException e) {

@@ -44,9 +44,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
-import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
-import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -68,6 +66,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -142,12 +141,9 @@ public class BackfillTriggerManagerTest {
 
   private static final Time TIME =  () -> Instant.parse("2016-12-02T22:00:00Z");
 
-  private List<Resource> resourceLimits = Lists.newArrayList();
-
   @Mock TriggerListener triggerListener;
   @Mock Storage storage;
   @Mock StorageTransaction transaction;
-  @Mock StyxConfig config;
   @Mock StateManager stateManager;
 
   private BackfillTriggerManager backfillTriggerManager;
@@ -547,14 +543,13 @@ public class BackfillTriggerManagerTest {
     for (int i = 0; i < BACKFILL_1.concurrency(); i++) {
       final Instant instant = instants.get(i);
 
-      final CompletableFuture<Void> triggerProcessed = triggerProcessingFutures.poll(1,
-                                                                                     TimeUnit.MINUTES);
+      final CompletableFuture<Void> triggerProcessed = triggerProcessingFutures.poll(1, TimeUnit.MINUTES);
       assertThat(triggerProcessingFutures.isEmpty(), is(true));
 
       verify(triggerListener, timeout(60_000))
           .event(any(), any(), eq(instant), any());
 
-      triggerProcessed.complete(null);
+      Objects.requireNonNull(triggerProcessed).complete(null);
       verify(transaction, timeout(60_000))
           .store(BACKFILL_1.builder().nextTrigger(instants.get(i + 1)).build());
     }

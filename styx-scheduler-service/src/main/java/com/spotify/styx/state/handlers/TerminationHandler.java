@@ -38,9 +38,9 @@ public class TerminationHandler implements OutputHandler {
 
   // Retry cost is vaguely related to a max time period we're going to keep retrying a state.
   // See the different costs for failures and missing dependencies in RunState
-  public static final double MAX_RETRY_COST = 50.0;
-  public static final int MISSING_DEPS_EXIT_CODE = 20;
-  public static final int FAIL_FAST_EXIT_CODE = 50;
+  static final double MAX_RETRY_COST = 50.0;
+  private static final int MISSING_DEPS_EXIT_CODE = 20;
+  private static final int FAIL_FAST_EXIT_CODE = 50;
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
 
   private final RetryUtil retryUtil;

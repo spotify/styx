@@ -46,7 +46,7 @@ public class RetryUtilTest {
     double average = delays.stream()
         .mapToLong(i -> i)
         .average()
-        .getAsDouble();
+        .orElseThrow();
 
     double expected = BASE_DELAY.toMillis() * (1 << (MAX_EXPONENT - 1));
     double diff = Math.abs(expected - average);

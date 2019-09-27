@@ -32,7 +32,7 @@ import org.junit.Test;
 public class TimeoutConfigTest {
 
   @Test
-  public void testDurations() throws Exception {
+  public void testDurations() {
     Config config = ConfigFactory.load("ttl");
     Config ttls = config.getConfig(StyxScheduler.STYX_STALE_STATE_TTL_CONFIG);
 

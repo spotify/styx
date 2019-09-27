@@ -394,7 +394,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     Workflow workflow;
     TriggerInstantSpec triggerInstantSpec;
 
-    workflow = storage.workflow(workflowInstance.workflowId()).get();
+    workflow = storage.workflow(workflowInstance.workflowId()).orElseThrow();
     assertThat(workflow.configuration().offset(), is(Optional.empty()));
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
@@ -421,7 +421,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T16");
     // this should store a new value for nextNaturalTrigger, 2016-03-14T16
     workflowChanges(HOURLY_WORKFLOW_WITH_ZERO_OFFSET);
-    workflow = storage.workflow(workflowInstance.workflowId()).get();
+    workflow = storage.workflow(workflowInstance.workflowId()).orElseThrow();
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
     assertThat(triggerInstantSpec.instant(),
@@ -450,7 +450,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T16");
     // this should store a the same value for nextNaturalTrigger, 2016-03-14T16
     workflowChanges(HOURLY_WORKFLOW_WITH_TWO_HOURS_OFFSET);
-    workflow = storage.workflow(workflowInstance.workflowId()).get();
+    workflow = storage.workflow(workflowInstance.workflowId()).orElseThrow();
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
     assertThat(triggerInstantSpec.instant(),
@@ -647,7 +647,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenTheTimeIs("2016-03-14T16:01:00Z");
     styxStarts();
 
-    RunState state = getState(workflowInstance).get();
+    RunState state = getState(workflowInstance).orElseThrow();
     Instant stateTime = Instant.ofEpochMilli(state.timestamp());
 
     assertThat(stateTime, is(Instant.parse("2016-03-14T15:17:49Z")));

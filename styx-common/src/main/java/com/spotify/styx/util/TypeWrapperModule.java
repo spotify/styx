@@ -60,7 +60,7 @@ public class TypeWrapperModule extends SimpleModule {
 
     private final Function<T, ?> wrapper;
 
-    protected DelegatingSerializer(Class<T> jsonClass, Function<T, ?> wrapper) {
+    private DelegatingSerializer(Class<T> jsonClass, Function<T, ?> wrapper) {
       super(jsonClass);
       this.wrapper = wrapper;
     }
@@ -76,7 +76,7 @@ public class TypeWrapperModule extends SimpleModule {
     private final Class<W> wrapperClass;
     private final Function<W, T> unwrapper;
 
-    protected DelegatingDeserializer(Class<T> valueClass, Class<W> wrapperClass, Function<W, T> unwrapper) {
+    private DelegatingDeserializer(Class<T> valueClass, Class<W> wrapperClass, Function<W, T> unwrapper) {
       super(valueClass);
       this.wrapperClass = wrapperClass;
       this.unwrapper = unwrapper;

@@ -31,23 +31,23 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
-public class JsonMatchers {
+class JsonMatchers {
 
   private JsonMatchers() {
     throw new UnsupportedOperationException();
   }
 
-  public static <T> void assertJson(Response<ByteString> response, String jsonPath,
-                                    Matcher<T> matcher) {
+  static <T> void assertJson(Response<ByteString> response, String jsonPath,
+                             Matcher<T> matcher) {
     assertThat(response, hasPayload(asByteString(hasJsonPath(jsonPath, matcher))));
   }
 
-  public static <T> void assertNoJson(Response<ByteString> response, String jsonPath) {
+  static void assertNoJson(Response<ByteString> response, String jsonPath) {
     assertThat(response, hasPayload(asByteString(hasNoJsonPath(jsonPath))));
   }
 
-  static Matcher<ByteString> asByteString(Matcher<? super String> strMatcher) {
-    return new TypeSafeMatcher<ByteString>() {
+  private static Matcher<ByteString> asByteString(Matcher<? super String> strMatcher) {
+    return new TypeSafeMatcher<>() {
       @Override
       protected boolean matchesSafely(ByteString byteString) {
         return strMatcher.matches(byteString.utf8());

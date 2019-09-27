@@ -23,9 +23,16 @@ package com.spotify.styx.storage;
 import static com.spotify.styx.serialization.Json.deserializeEvent;
 import static com.spotify.styx.serialization.Json.serialize;
 
-import com.google.cloud.datastore.DatastoreException;
+import com.github.rholder.retry.Attempt;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.StopStrategy;
+import com.github.rholder.retry.WaitStrategies;
+import com.github.rholder.retry.WaitStrategy;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
@@ -34,15 +41,15 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import javaslang.control.Try;
 import okio.ByteString;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
@@ -65,17 +72,29 @@ public class BigtableStorage {
 
   public static final TableName EVENTS_TABLE_NAME = TableName.valueOf("styx_events");
 
-  public static final byte[] EVENT_CF = Bytes.toBytes("event");
-  public static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
+  private static final byte[] EVENT_CF = Bytes.toBytes("event");
+  private static final byte[] EVENT_QUALIFIER = Bytes.toBytes("event");
 
-  public static final int MAX_BIGTABLE_RETRIES = 100;
+  private static final WaitStrategy DEFAULT_WAIT_STRATEGY = WaitStrategies.fixedWait(1, TimeUnit.SECONDS);
+  private static final StopStrategy DEFAULT_RETRY_STOP_STRATEGY = StopStrategies.stopAfterAttempt(100);
 
   private final Connection connection;
-  private final Duration retryBaseDelay;
+  private final Retryer<Void> retryer;
 
-  BigtableStorage(Connection connection, Duration retryBaseDelay) {
-    this.connection = Objects.requireNonNull(connection);
-    this.retryBaseDelay = Objects.requireNonNull(retryBaseDelay);
+  BigtableStorage(Connection connection) {
+    this(connection, DEFAULT_WAIT_STRATEGY, DEFAULT_RETRY_STOP_STRATEGY);
+  }
+
+  @VisibleForTesting
+  BigtableStorage(Connection connection, WaitStrategy waitStrategy, StopStrategy retryStopStrategy) {
+    this.connection = Objects.requireNonNull(connection, "connection");
+
+    retryer = RetryerBuilder.<Void>newBuilder()
+        .retryIfExceptionOfType(IOException.class)
+        .withWaitStrategy(Objects.requireNonNull(waitStrategy, "waitStrategy"))
+        .withStopStrategy(Objects.requireNonNull(retryStopStrategy, "retryStopStrategy"))
+        .withRetryListener(BigtableStorage::onRequestAttempt)
+        .build();
   }
 
   SortedSet<SequenceEvent> readEvents(WorkflowInstance workflowInstance) throws IOException {
@@ -93,18 +112,28 @@ public class BigtableStorage {
   }
 
   void writeEvent(SequenceEvent sequenceEvent) throws IOException {
-    storeWithRetries(() -> {
-      try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
-        final String workflowInstanceKey = sequenceEvent.event().workflowInstance().toKey();
-        final String keyString = String.format("%s#%08d", workflowInstanceKey, sequenceEvent.counter());
-        final byte[] key = Bytes.toBytes(keyString);
-        final Put put = new Put(key, sequenceEvent.timestamp());
+    try {
+      retryer.call(() -> {
+        try (final Table eventsTable = connection.getTable(EVENTS_TABLE_NAME)) {
+          final String workflowInstanceKey = sequenceEvent.event().workflowInstance().toKey();
+          final String keyString = String.format("%s#%08d", workflowInstanceKey, sequenceEvent.counter());
+          final byte[] key = Bytes.toBytes(keyString);
+          final Put put = new Put(key, sequenceEvent.timestamp());
 
-        final byte[] eventBytes = serialize(sequenceEvent.event()).toByteArray();
-        put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
-        eventsTable.put(put);
+          final byte[] eventBytes = serialize(sequenceEvent.event()).toByteArray();
+          put.addColumn(EVENT_CF, EVENT_QUALIFIER, eventBytes);
+          eventsTable.put(put);
+          return null;
+        }
+      });
+    } catch (ExecutionException | RetryException e) {
+      var cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      } else {
+        throw new RuntimeException(cause);
       }
-    });
+    }
   }
 
   List<WorkflowInstanceExecutionData> executionData(WorkflowId workflowId, String offset, int limit)
@@ -177,11 +206,7 @@ public class BigtableStorage {
       throws IOException {
     final Set<SequenceEvent> storedEvents = readEvents(workflowInstance);
     final Optional<SequenceEvent> lastStoredEvent = storedEvents.stream().reduce((a, b) -> b);
-    if (lastStoredEvent.isPresent()) {
-      return Optional.of(lastStoredEvent.get().counter());
-    } else {
-      return Optional.empty();
-    }
+    return lastStoredEvent.map(SequenceEvent::counter);
   }
 
   WorkflowInstanceExecutionData executionData(WorkflowInstance workflowInstance) throws IOException {
@@ -200,7 +225,7 @@ public class BigtableStorage {
           try {
             return executionData(workflowInstance);
           } catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
           }
         })
         .sorted(WorkflowInstanceExecutionData.COMPARATOR)
@@ -215,31 +240,10 @@ public class BigtableStorage {
     return SequenceEvent.parseKey(key, event, timestamp);
   }
 
-  private void storeWithRetries(Try.CheckedRunnable storingOperation) throws IOException {
-    int storeRetries = 0;
-    boolean succeeded = false;
-
-    while (storeRetries < MAX_BIGTABLE_RETRIES && !succeeded) {
-      try {
-        storingOperation.run();
-        succeeded = true;
-      } catch (ResourceNotFoundException e) {
-        throw e;
-      } catch (DatastoreException | IOException e) {
-        storeRetries++;
-        if (storeRetries == MAX_BIGTABLE_RETRIES) {
-          throw e;
-        }
-        LOG.warn(String.format("Failed to read/write from/to Bigtable (attempt #%d)", storeRetries), e);
-        try {
-          Thread.sleep(retryBaseDelay.toMillis());
-        } catch (InterruptedException e1) {
-          throw Throwables.propagate(e1);
-        }
-      } catch (Throwable e) {
-        Throwables.throwIfUnchecked(e);
-        throw new RuntimeException(e);
-      }
+  private static <T> void onRequestAttempt(Attempt<T> attempt) {
+    if (attempt.hasException()) {
+      LOG.warn(String.format("Failed to write to Bigtable (attempt #%d)", attempt.getAttemptNumber()),
+          attempt.getExceptionCause());
     }
   }
 

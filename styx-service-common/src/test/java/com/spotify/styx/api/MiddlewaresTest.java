@@ -130,15 +130,6 @@ public class MiddlewaresTest {
     return innerHandler;
   }
 
-  private <T> AsyncHandler<Response<T>> mockInnerHandler(RequestContext requestContext,
-                                                         Throwable throwable) {
-    // noinspection unchecked
-    AsyncHandler<Response<T>> innerHandler = mock(AsyncHandler.class);
-    // noinspection unchecked
-    when(innerHandler.invoke(requestContext)).thenThrow(throwable);
-    return innerHandler;
-  }
-
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
     assertThat(ClassEnforcer.assertNotInstantiable(Middlewares.class), is(true));
@@ -151,12 +142,14 @@ public class MiddlewaresTest {
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
-        RequestContexts.create(mock(Request.class), mock(Client.class),
-                               Collections.emptyMap(), System.nanoTime(),
-                               RequestMetadataImpl.create(Instant.EPOCH, 
-                                                          Optional.empty(), Optional.empty())));
+        RequestContexts.create(mock(Request.class),
+            mock(Client.class),
+            Collections.emptyMap(),
+            System.nanoTime(),
+            RequestMetadataImpl.create(Instant.EPOCH,
+                Optional.empty(), Optional.empty())));
 
-    assertThat(completionStage.toCompletableFuture().get().payload().get().utf8(),
+    assertThat(completionStage.toCompletableFuture().get().payload().orElseThrow().utf8(),
                is(
                    "{\"foo\":\"blah\"," +
                    "\"inner_object\":{" +
@@ -172,9 +165,10 @@ public class MiddlewaresTest {
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
-        RequestContexts.create(mock(Request.class), mock(Client.class), Collections.emptyMap()));
+        RequestContexts.create(mock(Request.class), mock(Client.class), Collections.emptyMap(), System.nanoTime(),
+            RequestMetadataImpl.create(Instant.EPOCH, Optional.empty(), Optional.empty())));
 
-    assertThat(completionStage.toCompletableFuture().get().payload().get().utf8(),
+    assertThat(completionStage.toCompletableFuture().get().payload().orElseThrow().utf8(),
                is(
                    "{\"foo\":\"blah\"," +
                    "\"inner_object\":{" +
@@ -190,7 +184,12 @@ public class MiddlewaresTest {
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
-        RequestContexts.create(mock(Request.class), mock(Client.class), Collections.emptyMap()));
+        RequestContexts.create(mock(Request.class),
+            mock(Client.class),
+            Collections.emptyMap(),
+            System.nanoTime(),
+            RequestMetadataImpl.create(Instant.EPOCH,
+                Optional.empty(), Optional.empty())));
 
     assertThat(completionStage.toCompletableFuture().get().payload().isPresent(), is(false));
   }
@@ -205,7 +204,12 @@ public class MiddlewaresTest {
     );
 
     CompletionStage<Response<ByteString>> completionStage = outerHandler.invoke(
-        RequestContexts.create(mock(Request.class), mock(Client.class), Collections.emptyMap()));
+        RequestContexts.create(mock(Request.class),
+            mock(Client.class),
+            Collections.emptyMap(),
+            System.nanoTime(),
+            RequestMetadataImpl.create(Instant.EPOCH,
+                Optional.empty(), Optional.empty())));
 
     Response<ByteString> response = completionStage.toCompletableFuture().get();
     assertThat(response.payload().isPresent(), is(false));
@@ -490,7 +494,7 @@ public class MiddlewaresTest {
   }
 
   @Test
-  public void testAuthedProvidesIdToken() throws Exception {
+  public void testAuthedProvidesIdToken() {
     final RequestContext requestContext = mock(RequestContext.class);
     final Request request = Request.forUri("/", "PUT")
         .withPayload(ByteString.encodeUtf8("hello"))
@@ -523,10 +527,10 @@ public class MiddlewaresTest {
     when(idTokenPayload.getEmail()).thenReturn(email);
 
     final Response<ByteString> response = Middlewares.authedEntity(authenticator, em.response(String.class))
-        .apply(ac -> rc -> payload -> Response.forPayload(payload + ac.user().get().getPayload().getEmail()))
+        .apply(ac -> rc -> payload -> Response.forPayload(payload + ac.user().orElseThrow().getPayload().getEmail()))
         .invoke(requestContext);
 
-    assertThat(Json.deserialize(response.payload().get(), String.class), is("hello " + email));
+    assertThat(Json.deserialize(response.payload().orElseThrow(), String.class), is("hello " + email));
   }
 
   @Test
@@ -554,7 +558,7 @@ public class MiddlewaresTest {
         email,
         Map.of(HttpHeaders.AUTHORIZATION, "<hidden>"),
         Map.of(),
-        request.payload().get().utf8());
+        request.payload().orElseThrow().utf8());
   }
 
   @Test

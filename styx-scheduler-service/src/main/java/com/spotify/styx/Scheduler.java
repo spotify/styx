@@ -113,7 +113,6 @@ public class Scheduler {
         LoggerFactory.getLogger(Scheduler.class));
   }
 
-
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
             ShardedCounter shardedCounter, Executor executor, Logger log) {
@@ -129,7 +128,7 @@ public class Scheduler {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.Scheduler.tick")
+    try (Scope ignored = tracer.spanBuilder("Styx.Scheduler.tick")
         .setRecordEvents(true)
         .setSampler(Samplers.alwaysSample())
         .startScopedSpan()) {

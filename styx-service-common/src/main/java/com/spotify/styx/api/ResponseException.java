@@ -36,7 +36,7 @@ class ResponseException extends RuntimeException {
 
   ResponseException(Response<?> response, Throwable cause) {
     super(cause);
-    Preconditions.checkArgument(!response.payload().isPresent());
+    Preconditions.checkArgument(response.payload().isEmpty());
     this.response = response;
   }
 

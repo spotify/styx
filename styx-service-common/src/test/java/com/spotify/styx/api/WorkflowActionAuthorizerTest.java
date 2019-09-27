@@ -90,7 +90,7 @@ public class WorkflowActionAuthorizerTest {
     when(ac.user()).thenReturn(Optional.of(idToken));
     assertThat(Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW.id())).isSuccess(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().get(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
   }
 
   @Test
@@ -111,7 +111,7 @@ public class WorkflowActionAuthorizerTest {
     when(ac.user()).thenReturn(Optional.of(idToken));
     assertThat(Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW)).isSuccess(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().get(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
   }
 
   @Test
@@ -124,7 +124,7 @@ public class WorkflowActionAuthorizerTest {
     final Try<Void> invocation = Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW));
     assertThat(invocation.isFailure(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().get(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
     assertThat(invocation.getCause(), is(cause));
   }
 }

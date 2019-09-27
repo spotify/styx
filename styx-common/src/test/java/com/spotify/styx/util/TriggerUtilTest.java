@@ -31,7 +31,7 @@ import org.junit.Test;
 public class TriggerUtilTest {
 
   @Test
-  public void testTriggerType() throws Exception {
+  public void testTriggerType() {
     assertThat(triggerType(Trigger.natural()), is("natural"));
     assertThat(triggerType(Trigger.adhoc("foo")), is("adhoc"));
     assertThat(triggerType(Trigger.backfill("bar")), is("backfill"));
@@ -39,7 +39,7 @@ public class TriggerUtilTest {
   }
 
   @Test
-  public void testTrigger() throws Exception {
+  public void testTrigger() {
     assertThat(trigger("natural", "natural-trigger"), is(Trigger.natural()));
     assertThat(trigger("adhoc", "foo"), is(Trigger.adhoc("foo")));
     assertThat(trigger("backfill", "bar"), is(Trigger.backfill("bar")));

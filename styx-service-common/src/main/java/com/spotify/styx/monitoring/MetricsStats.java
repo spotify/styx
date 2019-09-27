@@ -48,7 +48,7 @@ public final class MetricsStats implements Stats {
    * A variant of {@link SemanticMetricBuilder#HISTOGRAMS} that uses {@link SlidingTimeWindowArrayReservoir}
    * instead of {@link com.codahale.metrics.ExponentiallyDecayingReservoir}.
    */
-  static final SemanticMetricBuilder<Histogram> HISTOGRAM = new SemanticMetricBuilder<Histogram>() {
+  static final SemanticMetricBuilder<Histogram> HISTOGRAM = new SemanticMetricBuilder<>() {
     @Override
     public Histogram newMetric() {
       // TODO: What time window do we want?

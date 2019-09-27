@@ -64,7 +64,7 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
 
     // Get expected scheduled instance
     var workflowWithState = cliJson(WorkflowWithState.class, "workflow", "show", component1, workflowId1);
-    var nextNaturalTrigger = workflowWithState.state().nextNaturalTrigger().get();
+    var nextNaturalTrigger = workflowWithState.state().nextNaturalTrigger().orElseThrow();
     var instance = nextNaturalTrigger.truncatedTo(ChronoUnit.SECONDS).toString();
     log.info("Expected instance: {}", instance);
 

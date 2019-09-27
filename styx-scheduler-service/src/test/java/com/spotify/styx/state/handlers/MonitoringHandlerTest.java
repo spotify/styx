@@ -20,7 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -49,13 +49,13 @@ public class MonitoringHandlerTest {
   private MonitoringHandler monitoringHandler;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     stats = Mockito.mock(Stats.class);
     monitoringHandler = new MonitoringHandler(stats);
   }
 
   @Test
-  public void shouldMarkExitCode() throws Exception {
+  public void shouldMarkExitCode() {
     RunState state = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED,
         StateData.newBuilder().lastExit(20).build());
 
@@ -65,7 +65,7 @@ public class MonitoringHandlerTest {
   }
 
   @Test
-  public void shouldNotMarkExitCodeIfNotPresent() throws Exception {
+  public void shouldNotMarkExitCodeIfNotPresent() {
     RunState state = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED);
 
     monitoringHandler.transitionInto(state);

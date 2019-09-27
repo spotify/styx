@@ -35,6 +35,7 @@ import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.StateData;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -50,14 +51,14 @@ class PlainCliOutput implements CliOutput {
     SortedMap<WorkflowId, SortedSet<RunStateDataPayload.RunStateData>> groupedStates =
         CliUtil.groupStates(runStateDataPayload.activeStates());
 
-    groupedStates.forEach((workflowId, value) -> value.forEach(RunStateData -> {
-      final StateData stateData = RunStateData.stateData();
+    groupedStates.forEach((workflowId, value) -> value.forEach(runStateData -> {
+      final StateData stateData = runStateData.stateData();
       System.out.println(String.format(
           "%s %s %s %s %s %d %s",
           workflowId.componentId(),
           workflowId.id(),
-          RunStateData.workflowInstance().parameter(),
-          RunStateData.state(),
+          runStateData.workflowInstance().parameter(),
+          runStateData.state(),
           stateData.executionId().orElse("<no-execution-id>"),
           stateData.tries(),
           stateData.message().map(Message::line).orElse("No info")
@@ -89,8 +90,8 @@ class PlainCliOutput implements CliOutput {
         backfill.end(),
         backfill.reverse(),
         backfill.nextTrigger(),
-        backfill.created().map( create -> create.toString()).orElse(""),
-        backfill.lastModified().map( lastModified -> lastModified.toString()).orElse(""),
+        backfill.created().map(Instant::toString).orElse(""),
+        backfill.lastModified().map(Instant::toString).orElse(""),
         backfill.description().orElse(""),
         backfill.triggerParameters().map(triggerParameters -> formatMap(
             triggerParameters.env())).orElse("")));

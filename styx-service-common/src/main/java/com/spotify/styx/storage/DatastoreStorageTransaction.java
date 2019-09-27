@@ -75,7 +75,7 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   private final CheckedDatastoreTransaction tx;
 
-  public DatastoreStorageTransaction(CheckedDatastoreTransaction transaction) {
+  DatastoreStorageTransaction(CheckedDatastoreTransaction transaction) {
     this.tx = Objects.requireNonNull(transaction);
   }
 

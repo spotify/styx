@@ -33,12 +33,12 @@ public class RandomGenerator {
 
   public final Time time;
 
-  public RandomGenerator(Time time) {
+  RandomGenerator(Time time) {
     this.time = Objects.requireNonNull(time);
   }
 
   public String generateNumber() {
-    int num = RANDOM.nextInt(BOUND);
+    var num = RANDOM.nextInt(BOUND);
     return String.format("%05d", num);
   }
 

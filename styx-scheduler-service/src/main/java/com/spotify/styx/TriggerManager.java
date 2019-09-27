@@ -30,7 +30,6 @@ import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
@@ -95,7 +94,7 @@ class TriggerManager implements Closeable {
   }
 
   void tick() {
-    try (Scope ss = tracer.spanBuilder("Styx.TriggerManager.tick")
+    try (Scope ignored = tracer.spanBuilder("Styx.TriggerManager.tick")
         .setRecordEvents(true)
         .setSampler(Samplers.alwaysSample())
         .startScopedSpan()) {
@@ -103,7 +102,7 @@ class TriggerManager implements Closeable {
     }
   }
 
-  void tick0() {
+  private void tick0() {
     final Instant t0 = time.get();
 
     try {
@@ -183,7 +182,7 @@ class TriggerManager implements Closeable {
       LOG.error(
           "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",
           workflow.id(), nextTrigger);
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 

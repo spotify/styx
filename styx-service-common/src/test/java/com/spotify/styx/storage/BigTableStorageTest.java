@@ -23,8 +23,12 @@ package com.spotify.styx.storage;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -35,7 +39,6 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +63,8 @@ public class BigTableStorageTest {
   private static final Trigger TRIGGER2 = Trigger.unknown("triggerId2");
   private static final Trigger TRIGGER3 = Trigger.unknown("triggerId3");
 
+  private static final int MAX_BIGTABLE_RETRIES = 3;
+
   private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
       .env("FOO", "foo",
           "BAR", "bar")
@@ -68,11 +73,13 @@ public class BigTableStorageTest {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
+  private Connection bigtable;
   private BigtableStorage storage;
 
   public void setUp(int numFailures) throws Exception {
-    Connection bigtable = setupBigTableMockTable(numFailures);
-    storage = new BigtableStorage(bigtable, Duration.ZERO);
+    bigtable = setupBigTableMockTable(numFailures);
+    storage =
+        new BigtableStorage(bigtable, WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(MAX_BIGTABLE_RETRIES));
   }
 
   private Connection setupBigTableMockTable(int numFailures) throws IOException {
@@ -220,7 +227,7 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldProduceIOExceptionIfTooManyPutRetries() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES);
+    setUp(MAX_BIGTABLE_RETRIES);
 
     thrown.expect(IOException.class);
     thrown.expectMessage(containsString("Something went wrong in performing put operation"));
@@ -230,7 +237,20 @@ public class BigTableStorageTest {
 
   @Test
   public void shouldNotProduceIOExceptionIfPutRetrySucceeds() throws Exception {
-    setUp(BigtableStorage.MAX_BIGTABLE_RETRIES - 1);
+    setUp(MAX_BIGTABLE_RETRIES - 1);
+
+    storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
+  }
+
+  @Test
+  public void shouldProduceRuntimeExceptionWrappingRuntimeException() throws Exception {
+    setUp(0);
+
+    var e = new RuntimeException();
+    doThrow(e).when(bigtable).getTable(any());
+
+    thrown.expect(RuntimeException.class);
+    thrown.expectCause(is(e));
 
     storage.writeEvent(SequenceEvent.create(Event.success(WFI1), 1, 0));
   }

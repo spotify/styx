@@ -57,7 +57,6 @@ import com.spotify.styx.storage.BigtableStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.Storage;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -113,15 +112,14 @@ public class StatusResourceTest extends VersionedApiTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     datastoreEmulator.reset();
   }
 
   @Override
   protected void init(Environment environment) {
     accountUsageAuthorizer = mock(ServiceAccountUsageAuthorizer.class);
-    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client(),
-        Duration.ZERO));
+    storage = spy(new AggregateStorage(bigtable, datastoreEmulator.client()));
     final StatusResource statusResource = new StatusResource(storage, accountUsageAuthorizer);
 
     environment.routingEngine()
@@ -143,7 +141,7 @@ public class StatusResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasPayload(any(ByteString.class)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     EventsPayload parsed = Json.OBJECT_MAPPER.readValue(json, EventsPayload.class);
 
     assertThat(parsed.events(), hasSize(3));
@@ -162,7 +160,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -199,7 +197,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -225,7 +223,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -253,7 +251,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     RunStateDataPayload
         parsed = Json.OBJECT_MAPPER.readValue(json, RunStateDataPayload.class);
 
@@ -326,7 +324,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
-    String json = response.payload().get().utf8();
+    String json = response.payload().orElseThrow().utf8();
     TestServiceAccountUsageAuthorizationResponse
         parsed = Json.OBJECT_MAPPER.readValue(json, TestServiceAccountUsageAuthorizationResponse.class);
 

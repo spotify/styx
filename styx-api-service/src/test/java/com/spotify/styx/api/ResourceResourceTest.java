@@ -45,7 +45,6 @@ import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Map;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
@@ -73,8 +72,8 @@ public class ResourceResourceTest extends VersionedApiTest {
   protected void init(Environment environment) {
     storage = spy(new AggregateStorage(
         mock(Connection.class),
-        datastoreEmulator.client(),
-        Duration.ZERO));
+        datastoreEmulator.client()
+    ));
 
     ResourceResource resourceResource = new ResourceResource(storage);
 

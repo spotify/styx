@@ -189,7 +189,7 @@ public class SchedulerResource {
               "An error occurred while retrieving workflow specifications"));
     }
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
-    if (!workflow.configuration().dockerImage().isPresent()) {
+    if (workflow.configuration().dockerImage().isEmpty()) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
     }
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
