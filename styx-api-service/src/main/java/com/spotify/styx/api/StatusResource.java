@@ -50,10 +50,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javaslang.control.Try;
 import okio.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,12 +137,13 @@ public class StatusResource {
 
     final List<RunStateData> runStates = Lists.newArrayList();
     try {
-      activeStates = componentsOpt.isPresent() ? getActiveStates(componentsOpt.get()):
-                     getActiveStates(componentOpt, workflowOpt);
+      activeStates = componentsOpt.isPresent()
+                     ? getActiveStates(componentsOpt.get())
+                     : getActiveStates(componentOpt, workflowOpt);
 
     } catch (InvalidParametersException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       var errorMsg = "Could not read Active states: " + e;
       log.error(errorMsg);
       return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(errorMsg));
@@ -152,38 +154,28 @@ public class StatusResource {
     return Response.forPayload(RunStateDataPayload.create(runStates));
   }
 
-  private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) throws IOException {
-    final List<String> components = Arrays.asList(componentsStr.split(","));
-    final ConcurrentHashMap<WorkflowInstance, RunState> concurrentHashMap = new ConcurrentHashMap<>();
-
-    final List<Optional<IOException>> exceptions =
+  private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) {
+    var components = Arrays.asList(componentsStr.split(","));
+    var activeStatesOrExceptions =
         components.stream()
-            .map(
-                componentId ->
-                    forkJoinPool.submit(
-                        () -> {
-                          Optional<IOException> exception = Optional.empty();
-                          try {
-                            final Map<WorkflowInstance, RunState> stateMap =
-                                storage.readActiveStates(componentId);
-                            for (WorkflowInstance instance : stateMap.keySet()) {
-                              concurrentHashMap.put(instance, stateMap.get(instance));
-                            }
-                          } catch (IOException e) {
-                            exception = Optional.of(e);
-                          }
-                          return exception;
-                        }))
-            .collect(toList())
-            .stream()
+            .map( componentId -> forkJoinPool.submit(() -> {
+               return Try.of( () -> { return storage.readActiveStates(componentId); });
+              })
+            )
             .map(ForkJoinTask::join)
-            .filter(Optional::isPresent)
             .collect(toList());
-    if (!exceptions.isEmpty()) {
-      throw exceptions.get(0).orElseThrow();
-    }
 
-    return concurrentHashMap;
+    return activeStatesOrExceptions
+        .stream()
+        .map( entry -> {
+          if (entry.isFailure()) {
+            throw new RuntimeException(entry.getCause());
+          }
+          return entry.get();
+        })
+        .flatMap(map -> map.entrySet().stream())
+        .collect(Collectors.toMap( Map.Entry::getKey, Map.Entry::getValue));
+
   }
 
   private Map<WorkflowInstance, RunState> getActiveStates(Optional<String> componentOpt, Optional<String> workflowOpt)
