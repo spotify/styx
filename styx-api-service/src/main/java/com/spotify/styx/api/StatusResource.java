@@ -44,6 +44,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.storage.Storage;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -62,7 +63,7 @@ import org.slf4j.LoggerFactory;
 /**
  * API endpoints for the retrieving events and active states
  */
-public class StatusResource {
+public class StatusResource implements Closeable {
 
   private static final Logger log = LoggerFactory.getLogger(StatusResource.class);
   private static final int CONCURRENCY = 32;
@@ -104,6 +105,11 @@ public class StatusResource {
         .collect(toList());
 
     return Api.prefixRoutes(routes, V3);
+  }
+
+  @Override
+  public void close() throws IOException {
+    closer.close();
   }
 
   private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
