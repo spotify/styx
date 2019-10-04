@@ -51,7 +51,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.control.Try;
@@ -143,7 +142,7 @@ public class StatusResource {
 
     } catch (InvalidParametersException e) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase(e.getMessage()));
-    } catch (IOException | RuntimeException e) {
+    } catch (IOException e) {
       var errorMsg = "Could not read Active states: " + e;
       log.error(errorMsg);
       return Response.forStatus(Status.INTERNAL_SERVER_ERROR.withReasonPhrase(errorMsg));
@@ -154,7 +153,7 @@ public class StatusResource {
     return Response.forPayload(RunStateDataPayload.create(runStates));
   }
 
-  private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) {
+  private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) throws IOException {
     var components = Arrays.asList(componentsStr.split(","));
     var activeStatesOrExceptions = forkJoinPool.submit(() ->
         components.parallelStream()
@@ -162,9 +161,13 @@ public class StatusResource {
             .collect(toList()))
         .join();
 
-    return activeStatesOrExceptions
-        .stream()
-        .map(entry -> entry.getOrElseThrow((Function<Throwable, RuntimeException>) RuntimeException::new))
+    var sequence = Try.sequence(activeStatesOrExceptions);
+    if (sequence.isFailure()) {
+      throw new IOException(sequence.getCause());
+    }
+
+    return sequence.get()
+        .toJavaStream()
         .flatMap(map -> map.entrySet().stream())
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
