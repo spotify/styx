@@ -51,7 +51,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.control.Try;
@@ -156,26 +156,17 @@ public class StatusResource {
 
   private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) {
     var components = Arrays.asList(componentsStr.split(","));
-    var activeStatesOrExceptions =
-        components.stream()
-            .map( componentId -> forkJoinPool.submit(() -> {
-               return Try.of( () -> { return storage.readActiveStates(componentId); });
-              })
-            )
-            .map(ForkJoinTask::join)
-            .collect(toList());
+    var activeStatesOrExceptions = forkJoinPool.submit(() ->
+        components.parallelStream()
+            .map(componentId -> Try.of(() -> storage.readActiveStates(componentId)))
+            .collect(toList()))
+        .join();
 
     return activeStatesOrExceptions
         .stream()
-        .map( entry -> {
-          if (entry.isFailure()) {
-            throw new RuntimeException(entry.getCause());
-          }
-          return entry.get();
-        })
+        .map(entry -> entry.getOrElseThrow((Function<Throwable, RuntimeException>) RuntimeException::new))
         .flatMap(map -> map.entrySet().stream())
-        .collect(Collectors.toMap( Map.Entry::getKey, Map.Entry::getValue));
-
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private Map<WorkflowInstance, RunState> getActiveStates(Optional<String> componentOpt, Optional<String> workflowOpt)
