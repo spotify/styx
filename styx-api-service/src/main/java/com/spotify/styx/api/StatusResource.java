@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javaslang.control.Try;
@@ -161,12 +162,8 @@ public class StatusResource {
             .collect(toList()))
         .join();
 
-    var sequence = Try.sequence(activeStatesOrExceptions);
-    if (sequence.isFailure()) {
-      throw new IOException(sequence.getCause());
-    }
-
-    return sequence.get()
+    return Try.sequence(activeStatesOrExceptions)
+        .getOrElseThrow((Function<Throwable, IOException>) IOException::new)
         .toJavaStream()
         .flatMap(map -> map.entrySet().stream())
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
