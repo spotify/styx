@@ -161,7 +161,8 @@ class KubernetesDockerRunner implements DockerRunner {
                          Set<String> secretWhitelist,
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService scheduledExecutor) {
+                         Time time, ScheduledExecutorService scheduledExecutor,
+                         Duration closeTimeout) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -173,17 +174,19 @@ class KubernetesDockerRunner implements DockerRunner {
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
     this.scheduledExecutor =
-        register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor");
+        register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor", closeTimeout);
     this.executor = currentContextExecutorService(
-        register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
+        register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor", closeTimeout));
   }
 
+  @VisibleForTesting
   KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
+                         Debug debug, String styxEnvironment, Set<String> secretWhitelist,
+                         Duration closeTimeout) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
         DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY), closeTimeout);
   }
 
   @Override

@@ -212,7 +212,7 @@ public class KubernetesDockerRunnerTest {
 
     kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
-        executor);
+        executor, Duration.ZERO);
     kdr.init();
 
     verify(k8sClient).watchPods(any());
