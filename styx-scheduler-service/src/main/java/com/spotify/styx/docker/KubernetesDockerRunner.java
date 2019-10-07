@@ -73,6 +73,7 @@ import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
@@ -533,12 +534,15 @@ class KubernetesDockerRunner implements DockerRunner {
     scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
+    final Watch watch;
     try {
-      closer.register(client.watchPods(watcher));
-    } catch (KubernetesClientException e) {
-      LOG.warn("Failed to watch pods and will rely on polling.", e);
+      watch = client.watchPods(watcher);
+    } catch (Throwable t) {
+      LOG.warn("Failed to watch pods and will rely on polling.", t);
       return;
     }
+
+    closer.register(watch);
 
     scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
   }
