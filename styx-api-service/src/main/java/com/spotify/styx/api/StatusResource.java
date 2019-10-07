@@ -47,6 +47,7 @@ import com.spotify.styx.storage.Storage;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -161,7 +162,7 @@ public class StatusResource implements Closeable {
   }
 
   private Map<WorkflowInstance, RunState> getActiveStates(String componentsStr) throws IOException {
-    var components = Arrays.asList(componentsStr.split(","));
+    var components = new HashSet<>(Arrays.asList(componentsStr.split(",")));
     var activeStatesOrExceptions = forkJoinPool.submit(() ->
         components.parallelStream()
             .map(componentId -> Try.of(() -> storage.readActiveStates(componentId)))

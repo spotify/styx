@@ -219,7 +219,8 @@ public class StatusResourceTest extends VersionedApiTest {
     assertThat(storage.readActiveStates().entrySet(), hasSize(4));
 
     Response<ByteString> response =
-        awaitResponse(serviceHelper.request("GET", path("/activeStates?components=" + C_ID_1 + "," + C_ID_3)));
+        awaitResponse(serviceHelper.request("GET",
+            path("/activeStates?components=" + C_ID_1 + "," + C_ID_3 + "," + C_ID_1)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
 
