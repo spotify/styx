@@ -20,7 +20,6 @@
 
 package com.spotify.styx.docker;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
@@ -32,7 +31,6 @@ import com.spotify.styx.util.Debug;
 import io.norberg.automatter.AutoMatter;
 import java.io.Closeable;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,39 +119,13 @@ public interface DockerRunner extends Closeable {
                                  Debug debug,
                                  String styxEnvironment,
                                  Set<String> secretWhitelist) {
-    return kubernetes(kubernetesClient, stateManager, stats, serviceAccountKeyManager, debug, styxEnvironment,
-        secretWhitelist, Duration.ofSeconds(30));
-  }
-
-  @VisibleForTesting
-  static DockerRunner kubernetes(Fabric8KubernetesClient kubernetesClient,
-                                 StateManager stateManager,
-                                 Stats stats,
-                                 ServiceAccountKeyManager serviceAccountKeyManager,
-                                 Debug debug,
-                                 String styxEnvironment,
-                                 Set<String> secretWhitelist,
-                                 Duration closeTimeout) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
         new KubernetesDockerRunner(kubernetesClient, stateManager, stats,
-            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist, closeTimeout);
+            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist);
 
-    try {
-      dockerRunner.init();
-    } catch (Throwable t) {
-      var message = "Failed to initialize KubernetesDockerRunner";
-      LOG.error(message, t);
-
-      try {
-        dockerRunner.close();
-      } catch (IOException e) {
-        LOG.error("Failed to close KubernetesDockerRunner", e);
-      }
-
-      throw new RuntimeException(message, t);
-    }
+    dockerRunner.init();
 
     return dockerRunner;
   }

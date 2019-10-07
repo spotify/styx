@@ -161,8 +161,7 @@ class KubernetesDockerRunner implements DockerRunner {
                          Set<String> secretWhitelist,
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService scheduledExecutor,
-                         Duration closeTimeout) {
+                         Time time, ScheduledExecutorService scheduledExecutor) {
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
     this.stats = Objects.requireNonNull(stats);
@@ -174,19 +173,18 @@ class KubernetesDockerRunner implements DockerRunner {
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
     this.scheduledExecutor =
-        register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor", closeTimeout);
+        register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor");
     this.executor = currentContextExecutorService(
-        register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor", closeTimeout));
+        register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
   }
 
   @VisibleForTesting
   KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment, Set<String> secretWhitelist,
-                         Duration closeTimeout) {
+                         Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
     this(client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
         DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY), closeTimeout);
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
   @Override
@@ -535,9 +533,14 @@ class KubernetesDockerRunner implements DockerRunner {
     scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
-    scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
+    try {
+      closer.register(client.watchPods(watcher));
+    } catch (KubernetesClientException e) {
+      LOG.warn("Failed to watch pods and will rely on polling.", e);
+      return;
+    }
 
-    closer.register(client.watchPods(watcher));
+    scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
   }
 
   private void cleanupPods() {
