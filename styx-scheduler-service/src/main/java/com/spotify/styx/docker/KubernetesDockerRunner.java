@@ -73,6 +73,7 @@ import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.norberg.automatter.AutoMatter;
 import io.opencensus.common.Scope;
@@ -178,6 +179,7 @@ class KubernetesDockerRunner implements DockerRunner {
         register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
   }
 
+  @VisibleForTesting
   KubernetesDockerRunner(Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
@@ -532,9 +534,17 @@ class KubernetesDockerRunner implements DockerRunner {
     scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
-    scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
+    final Watch watch;
+    try {
+      watch = client.watchPods(watcher);
+    } catch (Throwable t) {
+      LOG.warn("Failed to watch pods and will rely on polling.", t);
+      return;
+    }
 
-    closer.register(client.watchPods(watcher));
+    closer.register(watch);
+
+    scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
   }
 
   private void cleanupPods() {
