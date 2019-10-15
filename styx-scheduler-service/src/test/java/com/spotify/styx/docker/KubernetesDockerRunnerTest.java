@@ -244,7 +244,7 @@ public class KubernetesDockerRunnerTest {
   public void shouldFailToInitialize() {
     var spiedExecutor = spy(executor);
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+    kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
         spiedExecutor);
     kdr.init();
