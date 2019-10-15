@@ -67,14 +67,9 @@ public class AggregateStorageTest {
   }
 
   @Test
-  public void shouldCloseDatastore() throws IOException {
+  public void shouldCloseAggregatedStorage() throws IOException {
     sut.close();
     verify(datastore).close();
-  }
-
-  @Test
-  public void shouldCloseBigTable() throws IOException {
-    sut.close();
     verify(bigtable).close();
   }
 
