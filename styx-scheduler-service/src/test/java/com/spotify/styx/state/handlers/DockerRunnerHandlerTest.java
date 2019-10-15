@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.docker.DockerRunner;
@@ -65,6 +66,7 @@ public class DockerRunnerHandlerTest {
   private DockerRunnerHandler dockerRunnerHandler;
 
   private static final String TEST_EXECUTION_ID = "execution_1";
+  private static final String TEST_RUNNER_ID = "test";
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
       .dockerImage(TEST_DOCKER_IMAGE)
@@ -74,12 +76,13 @@ public class DockerRunnerHandlerTest {
   @Mock DockerRunner dockerRunner;
   @Mock StateManager stateManager;
 
-  @Captor ArgumentCaptor<WorkflowInstance> instanceCaptor;
+  @Captor ArgumentCaptor<RunState> runStateCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
+    when(dockerRunner.start(any(RunState.class), any(RunSpec.class))).thenReturn(TEST_RUNNER_ID);
     dockerRunnerHandler = new DockerRunnerHandler(dockerRunner, stateManager);
   }
 
@@ -96,9 +99,9 @@ public class DockerRunnerHandlerTest {
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
+    verify(dockerRunner, timeout(60_000)).start(runStateCaptor.capture(), runSpecCaptor.capture());
 
-    assertThat(instanceCaptor.getValue(), is(workflowInstance));
+    assertThat(runStateCaptor.getValue(), is(runState));
     assertThat(runSpecCaptor.getValue().imageName(), is(TEST_DOCKER_IMAGE));
     assertThat(runSpecCaptor.getValue().executionId(), is(TEST_EXECUTION_ID));
   }
@@ -115,7 +118,7 @@ public class DockerRunnerHandlerTest {
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(dockerRunner, timeout(60_000)).start(instanceCaptor.capture(), runSpecCaptor.capture());
+    verify(dockerRunner, timeout(60_000)).start(runStateCaptor.capture(), runSpecCaptor.capture());
 
     assertThat(runSpecCaptor.getValue().args(), contains("--date", "2016-03-14T15" , "--bar"));
   }
@@ -132,7 +135,7 @@ public class DockerRunnerHandlerTest {
 
     dockerRunnerHandler.transitionInto(runState);
 
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID),
+    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID, TEST_RUNNER_ID),
         runState.counter());
   }
 
@@ -149,7 +152,7 @@ public class DockerRunnerHandlerTest {
   private void shouldFailIfDockerRunnerRaisesException0(Throwable throwable)
       throws IOException, IsClosedException {
     doThrow(throwable).when(dockerRunner)
-        .start(any(WorkflowInstance.class), any(RunSpec.class));
+        .start(any(RunState.class), any(RunSpec.class));
 
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
@@ -191,33 +194,6 @@ public class DockerRunnerHandlerTest {
 
     verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
     verifyNoMoreInteractions(stateManager);
-  }
-
-  @Test
-  public void shouldPerformCleanupOnFailed() {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, RunState.State.FAILED,
-        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
-
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(dockerRunner, timeout(60_000)).cleanup(workflowInstance, TEST_EXECUTION_ID);
-  }
-
-  @Test
-  public void shouldPerformCleanupOnFailedThroughTransitions() {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, State.FAILED, StateData.newBuilder()
-        .executionId(TEST_EXECUTION_ID)
-        .build());
-
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(dockerRunner).cleanup(workflowInstance, TEST_EXECUTION_ID);
   }
 
   @Parameters({"SUBMITTED", "RUNNING"})

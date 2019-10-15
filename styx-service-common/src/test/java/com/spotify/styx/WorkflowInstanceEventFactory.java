@@ -66,7 +66,7 @@ public class WorkflowInstanceEventFactory {
   }
 
   public Event submitted(String executionId) {
-    return Event.submitted(workflowInstance, executionId);
+    return Event.submitted(workflowInstance, executionId, "test");
   }
 
   public Event started() {

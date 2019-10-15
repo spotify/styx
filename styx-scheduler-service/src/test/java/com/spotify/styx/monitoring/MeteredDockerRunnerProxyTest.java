@@ -22,15 +22,15 @@ package com.spotify.styx.monitoring;
 
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.Time;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -48,7 +48,7 @@ public class MeteredDockerRunnerProxyTest {
   @Rule
   public ExpectedException expect = ExpectedException.none();
 
-  @Mock private WorkflowInstance workflowInstance;
+  @Mock private RunState runState;
   @Mock private RunSpec runSpec;
   @Mock private DockerRunner dockerRunner;
   @Mock private Stats stats;
@@ -67,22 +67,22 @@ public class MeteredDockerRunnerProxyTest {
   }
 
   @Test
-  public void instrumentDockerMethod() {
-    proxy.cleanup(workflowInstance, "barbaz");
+  public void instrumentDockerMethod() throws IOException {
+    proxy.start(runState, runSpec);
 
-    verify(dockerRunner).cleanup(workflowInstance, "barbaz");
-    verify(stats).recordDockerOperation("cleanup", 123, "success");
+    verify(dockerRunner).start(runState, runSpec);
+    verify(stats).recordDockerOperation("start", 123, "success");
   }
 
   @Test
-  public void surfaceExceptions() {
+  public void surfaceExceptions() throws IOException {
     doThrow(new RuntimeException("with message")).when(dockerRunner)
-        .cleanup(any(WorkflowInstance.class), anyString());
+        .start(any(RunState.class), any(RunSpec.class));
 
     expect.expect(RuntimeException.class);
     expect.expectMessage("with message");
 
-    proxy.cleanup(workflowInstance, "foo");
+    proxy.start(runState, runSpec);
   }
 
   @Test
@@ -91,7 +91,7 @@ public class MeteredDockerRunnerProxyTest {
         .when(dockerRunner).start(any(), any());
 
     try {
-      proxy.start(workflowInstance, runSpec);
+      proxy.start(runState, runSpec);
       fail("Expected exception");
     } catch (Exception ignored) {
     }
@@ -104,7 +104,7 @@ public class MeteredDockerRunnerProxyTest {
     doThrow(new RuntimeException()).when(dockerRunner).start(any(), any());
 
     try {
-      proxy.start(workflowInstance, runSpec);
+      proxy.start(runState, runSpec);
       fail("Expected exception");
     } catch (Exception ignored) {
     }

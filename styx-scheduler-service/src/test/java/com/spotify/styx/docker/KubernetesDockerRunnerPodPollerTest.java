@@ -99,7 +99,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.getPod(any())).thenReturn(Optional.empty());
     when(k8sClient.listPods()).thenReturn(podList);
 
-    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+    kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, Set.of());
   }
 

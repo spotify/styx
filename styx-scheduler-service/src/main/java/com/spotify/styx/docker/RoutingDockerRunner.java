@@ -22,12 +22,11 @@ package com.spotify.styx.docker;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
-import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * A {@link DockerRunner} that routes to several underlying instances that are created using the
@@ -38,33 +37,30 @@ import java.util.function.Supplier;
 class RoutingDockerRunner implements DockerRunner {
 
   private final DockerRunnerFactory dockerRunnerFactory;
-  private final Supplier<String> runnerId;
+  private final Function<RunState, String> runnerId;
 
   private final ConcurrentMap<String, DockerRunner> dockerRunners = Maps.newConcurrentMap();
 
-  RoutingDockerRunner(DockerRunnerFactory dockerRunnerFactory, Supplier<String> runnerId) {
+  RoutingDockerRunner(DockerRunnerFactory dockerRunnerFactory, Function<RunState, String> runnerId) {
     this.dockerRunnerFactory = Objects.requireNonNull(dockerRunnerFactory);
     this.runnerId = Objects.requireNonNull(runnerId);
   }
 
   @Override
-  public void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException {
-    runner().start(workflowInstance, runSpec);
+  public String start(RunState runState, RunSpec runSpec) throws IOException {
+    return runner(runState).start(runState, runSpec);
   }
 
   @Override
   public void poll(RunState runState) {
-    runner().poll(runState);
+    runner(runState).poll(runState);
   }
 
   @Override
   public void cleanup() throws IOException {
-    runner().cleanup();
-  }
-
-  @Override
-  public void cleanup(WorkflowInstance workflowInstance, String executionId) {
-    runner().cleanup(workflowInstance, executionId);
+    for (var v: dockerRunners.values()) {
+      v.cleanup();
+    }
   }
 
   @Override
@@ -74,7 +70,7 @@ class RoutingDockerRunner implements DockerRunner {
     closer.close();
   }
 
-  private DockerRunner runner() {
-    return dockerRunners.computeIfAbsent(runnerId.get(), dockerRunnerFactory);
+  private DockerRunner runner(RunState runState) {
+    return dockerRunners.computeIfAbsent(runnerId.apply(runState), dockerRunnerFactory);
   }
 }

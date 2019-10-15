@@ -685,7 +685,7 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldNotUpdateResourceCountersOnSubmitted() throws Exception {
     givenState(INSTANCE, State.SUBMITTING);
-    receiveEvent(Event.submitted(INSTANCE,"styx-run-1"));
+    receiveEvent(Event.submitted(INSTANCE,"styx-run-1", "test"));
     verify(transaction, never()).updateCounter(eq(shardedCounter), anyString(), anyInt());
   }
 

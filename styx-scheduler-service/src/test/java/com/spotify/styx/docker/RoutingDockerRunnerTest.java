@@ -29,11 +29,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
-import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.testdata.TestData;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,36 +43,31 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class RoutingDockerRunnerTest {
 
-  private static final WorkflowInstance WORKFLOW_INSTANCE = WorkflowInstance.create(
-      TestData.WORKFLOW_ID, "param");
-  private static final String MOCK_EXEC_ID = "mock-run-id-0";
-  private static final DockerRunner.RunSpec RUN_SPEC =
-      DockerRunner.RunSpec.simple(MOCK_EXEC_ID, "busybox");
-
   private int createCounter = 0;
   private Map<String, DockerRunner> createdRunners = Maps.newHashMap();
-  @Mock private Supplier<String> dockerId;
+
+  @Mock private Function<RunState, String> dockerId;
+  @Mock private RunState runState;
+  @Mock private RunSpec runSpec;
 
   private DockerRunner dockerRunner;
-  @Mock private RunState runState;
 
   @Before
   public void setUp() {
     dockerRunner = new RoutingDockerRunner(this::create, dockerId);
+    when(dockerId.apply(runState)).thenReturn("default");
   }
 
   @Test
   public void testUsesCreatesRunnerOnStart() throws Exception {
-    when(dockerId.get()).thenReturn("default");
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(runState, runSpec);
 
     assertThat(createdRunners, hasKey("default"));
-    verify(createdRunners.get("default")).start(WORKFLOW_INSTANCE, RUN_SPEC);
+    verify(createdRunners.get("default")).start(runState, runSpec);
   }
 
   @Test
   public void testUsesCreatesRunnerOnPoll() {
-    when(dockerId.get()).thenReturn("default");
     dockerRunner.poll(runState);
 
     assertThat(createdRunners, hasKey("default"));
@@ -81,17 +75,8 @@ public class RoutingDockerRunnerTest {
   }
 
   @Test
-  public void testUsesDefaultRunnerOnWorkflowCleanup() {
-    when(dockerId.get()).thenReturn("default");
-    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
-
-    assertThat(createdRunners, hasKey("default"));
-    verify(createdRunners.get("default")).cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
-  }
-
-  @Test
-  public void testUsesDefaultRunnerOnCleanup() throws Exception {
-    when(dockerId.get()).thenReturn("default");
+  public void testCleanup() throws Exception {
+    dockerRunner.start(runState, runSpec);
     dockerRunner.cleanup();
 
     assertThat(createdRunners, hasKey("default"));
@@ -100,11 +85,8 @@ public class RoutingDockerRunnerTest {
 
   @Test
   public void testCreatesOnlyOneRunnerPerDockerId() throws Exception {
-    when(dockerId.get()).thenReturn("default");
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
-    dockerRunner.cleanup(WORKFLOW_INSTANCE, MOCK_EXEC_ID);
+    dockerRunner.start(runState, runSpec);
+    dockerRunner.start(runState, runSpec);
 
     assertThat(createCounter, is(1));
     assertThat(createdRunners.keySet(), hasSize(1));
@@ -113,11 +95,11 @@ public class RoutingDockerRunnerTest {
 
   @Test
   public void testSwitchesDockerRunner() throws Exception {
-    Mockito.<Supplier>reset(dockerId);
-    when(dockerId.get()).thenReturn("id-1", "id-2");
+    Mockito.<Function>reset(dockerId);
+    when(dockerId.apply(runState)).thenReturn("id-1", "id-2");
 
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(runState, runSpec);
+    dockerRunner.start(runState, runSpec);
 
     assertThat(createdRunners, hasKey("id-1"));
     assertThat(createdRunners, hasKey("id-2"));
@@ -125,11 +107,11 @@ public class RoutingDockerRunnerTest {
 
   @Test
   public void testCreatedRunnersAreClosed() throws Exception {
-    Mockito.<Supplier>reset(dockerId);
-    when(dockerId.get()).thenReturn("id-1", "id-2");
+    Mockito.<Function>reset(dockerId);
+    when(dockerId.apply(runState)).thenReturn("id-1", "id-2");
 
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
-    dockerRunner.start(WORKFLOW_INSTANCE, RUN_SPEC);
+    dockerRunner.start(runState, runSpec);
+    dockerRunner.start(runState, runSpec);
     dockerRunner.close();
 
     assertThat(createCounter, is(2));

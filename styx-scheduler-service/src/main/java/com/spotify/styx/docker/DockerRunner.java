@@ -22,7 +22,6 @@ package com.spotify.styx.docker;
 
 import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
@@ -36,7 +35,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,10 +47,11 @@ public interface DockerRunner extends Closeable {
 
   /**
    * Starts a workflow instance asynchronously.
-   * @param workflowInstance The workflow instance that the run belongs to
+   * @param runState         The run state of the instance.
    * @param runSpec          Specification of what to run
+   * @return runner ID
    */
-  void start(WorkflowInstance workflowInstance, RunSpec runSpec) throws IOException;
+  String start(RunState runState, RunSpec runSpec) throws IOException;
 
   /**
    * Check the status of a workflow instance execution.
@@ -66,13 +65,6 @@ public interface DockerRunner extends Closeable {
    * should be removed.
    */
   void cleanup() throws IOException;
-
-  /**
-   * Execute cleanup operations for when an execution finishes.
-   * @param workflowInstance The workflow instance for which cleanup is called
-   * @param executionId The execution id for which the cleanup code is called
-   */
-  void cleanup(WorkflowInstance workflowInstance, String executionId);
 
   @AutoMatter
   interface RunSpec {
@@ -112,7 +104,8 @@ public interface DockerRunner extends Closeable {
     }
   }
 
-  static DockerRunner kubernetes(Fabric8KubernetesClient kubernetesClient,
+  static DockerRunner kubernetes(String id,
+                                 Fabric8KubernetesClient kubernetesClient,
                                  StateManager stateManager,
                                  Stats stats,
                                  ServiceAccountKeyManager serviceAccountKeyManager,
@@ -122,7 +115,7 @@ public interface DockerRunner extends Closeable {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager);
     final KubernetesDockerRunner dockerRunner =
-        new KubernetesDockerRunner(kubernetesClient, stateManager, stats,
+        new KubernetesDockerRunner(id, kubernetesClient, stateManager, stats,
             serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist);
 
     dockerRunner.init();
@@ -136,7 +129,7 @@ public interface DockerRunner extends Closeable {
    *
    * <p>The active docker runner id will be read from dockerId supplier on each routing decision.
    */
-  static DockerRunner routing(DockerRunnerFactory dockerRunnerFactory, Supplier<String> dockerId) {
+  static DockerRunner routing(DockerRunnerFactory dockerRunnerFactory, Function<RunState, String> dockerId) {
     return new RoutingDockerRunner(dockerRunnerFactory, dockerId);
   }
 

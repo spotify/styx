@@ -371,13 +371,13 @@ public class StyxScheduler implements AppInit {
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
-    final Supplier<String> dockerId = () -> styxConfig.get().globalDockerRunnerId();
+    final Function<RunState, String> runnerId = (runState) -> getRunnerId(runState, styxConfig);
     final Debug debug = () -> styxConfig.get().debugEnabled();
     var secretWhitelist =
         get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
-        dockerId);
+        runnerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
@@ -449,6 +449,11 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
+  }
+
+  @VisibleForTesting
+  static String getRunnerId(RunState runState, Supplier<StyxConfig> styxConfig) {
+    return runState.data().runnerId().orElseGet(() -> styxConfig.get().globalDockerRunnerId());
   }
 
   @VisibleForTesting
@@ -600,7 +605,7 @@ public class StyxScheduler implements AppInit {
     var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
-    return closer.register(DockerRunner.kubernetes(fabric8Client, stateManager, stats,
+    return closer.register(DockerRunner.kubernetes(id, fabric8Client, stateManager, stats,
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 

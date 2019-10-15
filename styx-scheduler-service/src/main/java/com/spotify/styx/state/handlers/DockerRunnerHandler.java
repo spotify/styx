@@ -55,6 +55,10 @@ public class DockerRunnerHandler implements OutputHandler {
     this.stateManager = requireNonNull(stateManager);
   }
 
+  private boolean isUserError(Throwable e) {
+    return e instanceof InvalidExecutionException;
+  }
+
   @Override
   public void transitionInto(RunState state) {
     switch (state.state()) {
@@ -68,9 +72,10 @@ public class DockerRunnerHandler implements OutputHandler {
           return;
         }
 
+        final String runnerId;
         try {
           LOG.info("running:{}, spec:{}, state:{}", state.workflowInstance(), runSpec, state);
-          dockerRunner.start(state.workflowInstance(), runSpec);
+          runnerId = dockerRunner.start(state, runSpec);
         } catch (Throwable e) {
           try {
             final String msg = "Failed the docker starting procedure for " + state.workflowInstance();
@@ -87,7 +92,7 @@ public class DockerRunnerHandler implements OutputHandler {
         }
 
         // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
-        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId());
+        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId(), runnerId);
         try {
           stateManager.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {
@@ -102,23 +107,9 @@ public class DockerRunnerHandler implements OutputHandler {
         dockerRunner.poll(state);
         break;
 
-      case TERMINATED:
-      case FAILED:
-      case ERROR:
-        // TODO: remove this effectively unused cleanup?
-        if (state.data().executionId().isPresent()) {
-          final String executionId = state.data().executionId().get();
-          dockerRunner.cleanup(state.workflowInstance(), executionId);
-        }
-        break;
-
       default:
         // do nothing
     }
-  }
-
-  private boolean isUserError(Throwable e) {
-    return e instanceof InvalidExecutionException;
   }
 
   private RunSpec createRunSpec(RunState state) throws ResourceNotFoundException {

@@ -26,7 +26,6 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -160,7 +159,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T12:45:00Z"));
 
@@ -171,7 +170,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(2);
 
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T15:15:00Z"));
   }
@@ -227,7 +226,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T12"));
 
@@ -238,7 +237,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(2);
 
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T13"));
 
@@ -249,7 +248,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(3);
 
-    workflowInstance = getDockerRuns().get(2)._1;
+    workflowInstance = getDockerRuns().get(2)._1.workflowInstance();
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T14"));
   }
@@ -302,7 +301,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
         RunState.State.QUEUED);
     tickScheduler();
     awaitNumberOfDockerRuns(1);
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     RunSpec runSpec = getDockerRuns().get(0)._2;
 
     assertThat(runSpec.env(), is(Map.of(
@@ -337,7 +336,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    assertThat(getDockerRuns().get(0)._1, is(instance1));
+    assertThat(getDockerRuns().get(0)._1.workflowInstance(), is(instance1));
 
     workflowDeleted(HOURLY_WORKFLOW);
     tickTriggerManager();
@@ -363,7 +362,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    workflowInstance = getDockerRuns().get(0)._1;
+    workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14T14"));
 
     workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14");
@@ -375,7 +374,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(2);
 
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14"));
   }
   }
@@ -409,7 +408,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    workflowInstance = getDockerRuns().get(0)._1;
+    workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14T14"));
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
@@ -436,7 +435,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(2);
 
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14T16"));
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
@@ -464,7 +463,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     // the instance 2016-03-14T16 is still active and should reach SUBMITTED state
     awaitWorkflowInstanceState(workflowInstance, RunState.State.SUBMITTED);
 
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14T16"));
 
     triggerInstantSpec = storage.workflowsWithNextNaturalTrigger().get(workflow);
@@ -492,7 +491,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
     awaitNumberOfDockerRuns(1);
 
-    workflowInstance = getDockerRuns().get(0)._1;
+    workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-13"));
 
     workflowInstance = create(HOURLY_WORKFLOW.id(), "2016-03-14T15");
@@ -504,7 +503,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     tickScheduler();
 
     awaitNumberOfDockerRuns(2);
-    workflowInstance = getDockerRuns().get(1)._1;
+    workflowInstance = getDockerRuns().get(1)._1.workflowInstance();
     assertThat(workflowInstance.parameter(), is("2016-03-14T15"));
   }
   }
@@ -522,7 +521,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(1, MINUTES);
     awaitNumberOfDockerRuns(1);
 
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", List.of("--hour", "2016-03-14T15"),
@@ -543,7 +542,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(1, MINUTES);
     awaitNumberOfDockerRuns(1);
 
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1.workflowInstance();
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(naturalRunSpec(runSpec.executionId(), "busybox", List.of("--hour", "2016-03-14T15"),
@@ -574,58 +573,11 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
     awaitNumberOfDockerRunsAtLeast(2);
 
-    WorkflowInstance workflowInstance2 = getDockerRuns().get(1)._1;
+    WorkflowInstance workflowInstance2 = getDockerRuns().get(1)._1.workflowInstance();
     RunSpec runSpec2 = getDockerRuns().get(1)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec2, is(naturalRunSpec(runSpec2.executionId(), "busybox:v777", List.of("other", "args"),
         Map.of("QUUX", "quux"))));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class CleansUpDockerRunsWhenTerminatingTest extends SystemTest {
-  @Test
-  public void cleansUpDockerRunsWhenTerminating() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
-    RunSpec runSpec = getDockerRuns().get(0)._2;
-
-    injectEvent(Event.started(workflowInstance));
-    injectEvent(Event.terminate(workflowInstance, Optional.of(20)));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
-  }
-  }
-
-  @RunWith(JUnitParamsRunner.class)
-  public static class CleansUpDockerRunsWhenFailingTest extends SystemTest {
-  @Test
-  public void cleansUpDockerRunsWhenFailing() throws Exception {
-    givenTheTimeIs("2016-03-14T15:59:01Z");
-    givenWorkflow(HOURLY_WORKFLOW);
-    givenWorkflowEnabledStateIs(HOURLY_WORKFLOW, true);
-    givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T15:00:00Z");
-
-    styxStarts();
-    timePasses(1, MINUTES);
-    awaitNumberOfDockerRuns(1);
-
-    WorkflowInstance workflowInstance = getDockerRuns().get(0)._1;
-    RunSpec runSpec = getDockerRuns().get(0)._2;
-
-    injectEvent(Event.runError(workflowInstance, "Something failed"));
-    awaitWorkflowInstanceState(workflowInstance, RunState.State.QUEUED);
-
-    assertThat(dockerCleans, contains(runSpec.executionId()));
   }
   }
 
@@ -674,7 +626,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     timePasses(1, MINUTES);
     awaitNumberOfDockerRuns(1);
 
-    WorkflowInstance workflowInstance2 = getDockerRuns().get(0)._1;
+    WorkflowInstance workflowInstance2 = getDockerRuns().get(0)._1.workflowInstance();
     RunSpec runSpec = getDockerRuns().get(0)._2;
     assertThat(workflowInstance2.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(runSpec, is(

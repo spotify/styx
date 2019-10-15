@@ -41,7 +41,7 @@ public interface EventVisitor<R> {
   R dequeue(@Getter WorkflowInstance workflowInstance, Set<String> resourceIds);
   R submit(@Getter WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
       @Nullable String executionId);
-  R submitted(@Getter WorkflowInstance workflowInstance, @Nullable String executionId);
+  R submitted(@Getter WorkflowInstance workflowInstance, @Nullable String executionId, @Nullable String runnerId);
   R started(@Getter WorkflowInstance workflowInstance);
   R terminate(@Getter WorkflowInstance workflowInstance, Optional<Integer> exitCode);
   R runError(@Getter WorkflowInstance workflowInstance, String message);

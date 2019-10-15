@@ -30,6 +30,7 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -44,6 +45,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -80,6 +82,8 @@ import org.mockito.MockitoAnnotations;
 public class StyxSchedulerTest {
 
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
+  private static final String TEST_RUNNER_ID = "test";
+
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
   @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
   @Captor private ArgumentCaptor<Gauge<Long>> longGaugeCaptor;
@@ -95,6 +99,7 @@ public class StyxSchedulerTest {
   @Mock private RateLimiter submissionRateLimiter;
   @Mock private Stats stats;
   @Mock private Time time;
+  @Mock private Supplier<StyxConfig> configSupplier;
 
   @Before
   public void setUp() throws Exception {
@@ -224,5 +229,20 @@ public class StyxSchedulerTest {
 
     verifyNoMoreInteractions(storage);
     verifyNoMoreInteractions(stateManager);
+  }
+
+  @Test
+  public void testGetRunnerIdFromRunState() {
+    var runState = RunState.create(mock(WorkflowInstance.class), State.SUBMITTED, StateData.newBuilder()
+        .runnerId(TEST_RUNNER_ID)
+        .build());
+    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is(TEST_RUNNER_ID));
+  }
+
+  @Test
+  public void testGetRunnerIdFromConfigSupplier() {
+    when(configSupplier.get()).thenReturn(StyxConfig.newBuilder().globalDockerRunnerId("default").build());
+    var runState = RunState.create(mock(WorkflowInstance.class), State.QUEUED, StateData.zero());
+    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is("default"));
   }
 }
