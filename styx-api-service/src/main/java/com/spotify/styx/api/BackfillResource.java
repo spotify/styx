@@ -79,7 +79,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -185,16 +184,14 @@ public final class BackfillResource implements Closeable {
       throw new RuntimeException(e);
     }
 
-    final List<BackfillPayload> backfillPayloads = backfills
-        .map(backfill -> forkJoinPool.submit(() -> BackfillPayload.create(
-            backfill,
-            includeStatuses
-            ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
-            : Optional.empty())))
-        .collect(toList())
-        .stream()
-        .map(ForkJoinTask::join)
-        .collect(toList());
+    final List<BackfillPayload> backfillPayloads = forkJoinPool.submit(() ->
+        backfills.parallel().map(backfill ->
+            BackfillPayload.create(backfill,
+                includeStatuses
+                ? Optional.of(RunStateDataPayload.create(retrieveBackfillStatuses(backfill)))
+                : Optional.empty()))
+            .collect(toList()))
+        .join();
 
     return BackfillsPayload.create(backfillPayloads);
   }
@@ -453,13 +450,11 @@ public final class BackfillResource implements Closeable {
     } else {
       processedInstants = instantsInRange(backfill.start(), backfill.nextTrigger(), backfill.schedule());
     }
-    processedStates = processedInstants.stream()
-        .map(instant -> forkJoinPool.submit(() ->
-            getRunStateData(backfill, activeWorkflowInstances, instant)))
-        .collect(toList())
-        .stream()
-        .map(ForkJoinTask::join)
-        .collect(toList());
+    processedStates = forkJoinPool.submit(() ->
+        processedInstants.parallelStream()
+            .map(instant -> getRunStateData(backfill, activeWorkflowInstances, instant))
+            .collect(toList()))
+        .join();
 
     final List<Instant> waitingInstants;
     if (backfill.reverse()) {

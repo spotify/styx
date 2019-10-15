@@ -39,6 +39,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -237,6 +238,17 @@ public class KubernetesDockerRunnerTest {
   @After
   public void tearDown() throws Exception {
     kdr.close();
+  }
+
+  @Test
+  public void shouldFailToInitialize() {
+    var spiedExecutor = spy(executor);
+    when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
+    kdr = new KubernetesDockerRunner(k8sClient, stateManager, stats, serviceAccountSecretManager,
+        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
+        spiedExecutor);
+    kdr.init();
+    verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
   }
 
   @Test
