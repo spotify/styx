@@ -246,13 +246,7 @@ public class BigtableStorage implements Closeable {
   private List<WorkflowInstanceExecutionData> executionData(
       Set<WorkflowInstance> workflowInstancesSet) {
     return workflowInstancesSet.stream()
-        .map(workflowInstance -> asyncIO(() -> {
-          try {
-            return executionData(workflowInstance);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }))
+        .map(workflowInstance -> asyncIO(() -> executionData(workflowInstance)))
         .collect(toList())
         .stream()
         .map(CompletableFuture::join)

@@ -73,6 +73,12 @@ public class AggregateStorageTest {
   }
 
   @Test
+  public void shouldCloseBigTable() throws IOException {
+    sut.close();
+    verify(bigtable).close();
+  }
+
+  @Test
   public void readActiveWorkflowInstances() throws Exception {
     final Map<WorkflowInstance, RunState> activeStates =
         Map.of(workflowInstance, runState);
