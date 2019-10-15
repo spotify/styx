@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.WorkflowInstanceEventFactory.TEST_RUNNER_ID;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -91,6 +92,7 @@ public class WFIExecutionBuilderTest {
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
+                            Optional.empty(),
                             List.of(
                                 ExecStatus.create(time("07:56"), "HALTED", Optional.empty())
                             )
@@ -124,6 +126,7 @@ public class WFIExecutionBuilderTest {
                     false,
                     List.of(
                         Execution.create(
+                            Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty(),
@@ -194,6 +197,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
@@ -204,6 +208,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.empty(),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
@@ -222,6 +227,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-10"),
                             Optional.of("img3"),
                             Optional.of("sha3"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
@@ -232,6 +238,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-11"),
                             Optional.of("img4"),
                             Optional.of("sha4"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
@@ -274,6 +281,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
@@ -323,6 +331,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
@@ -333,6 +342,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
@@ -373,6 +383,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty())
@@ -420,6 +431,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.empty(),
                             List.of(
                                 ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
                             )
@@ -428,6 +440,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
@@ -476,6 +489,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "HALTED", Optional.empty())
@@ -493,6 +507,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-10"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty())
@@ -541,6 +556,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-00"),
                             Optional.of("img1"),
                             Optional.of("sha1"),
+                            Optional.empty(),
                             List.of(
                                 ExecStatus.create(time("07:58"), "FAILED", Optional.of("First failure"))
                             )
@@ -549,6 +565,7 @@ public class WFIExecutionBuilderTest {
                             Optional.of("exec-id-01"),
                             Optional.of("img2"),
                             Optional.of("sha2"),
+                            Optional.of(TEST_RUNNER_ID),
                             List.of(
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),

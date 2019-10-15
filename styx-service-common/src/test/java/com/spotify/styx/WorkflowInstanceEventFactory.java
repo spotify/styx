@@ -31,6 +31,8 @@ import java.util.Set;
 
 public class WorkflowInstanceEventFactory {
 
+  public static final String TEST_RUNNER_ID = "test";
+
   private final WorkflowInstance workflowInstance;
 
   public WorkflowInstanceEventFactory(WorkflowInstance workflowInstance) {
@@ -66,7 +68,7 @@ public class WorkflowInstanceEventFactory {
   }
 
   public Event submitted(String executionId) {
-    return Event.submitted(workflowInstance, executionId, "test");
+    return Event.submitted(workflowInstance, executionId, TEST_RUNNER_ID);
   }
 
   public Event started() {

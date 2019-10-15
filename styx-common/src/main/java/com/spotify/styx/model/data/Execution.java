@@ -42,6 +42,9 @@ public abstract class Execution {
   public abstract Optional<String> commitSha();
 
   @JsonProperty
+  public abstract Optional<String> runnerId();
+
+  @JsonProperty
   public abstract List<ExecStatus> statuses();
 
   @JsonCreator
@@ -49,7 +52,8 @@ public abstract class Execution {
       @JsonProperty("execution_id") Optional<String> executionId,
       @JsonProperty("docker_image") Optional<String> dockerImage,
       @JsonProperty("commit_sha") Optional<String> commitSha,
+      @JsonProperty("runner_id") Optional<String> runnerId,
       @JsonProperty("statuses") List<ExecStatus> statuses) {
-    return new AutoValue_Execution(executionId, dockerImage, commitSha, statuses);
+    return new AutoValue_Execution(executionId, dockerImage, commitSha, runnerId, statuses);
   }
 }
