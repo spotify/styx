@@ -51,6 +51,7 @@ class WFIExecutionBuilder {
   private TriggerParameters currTriggerParameters = TriggerParameters.zero();
   @Nullable private String currDockerImg;
   @Nullable private String currCommitSha;
+  @Nullable private String currRunnerId;
 
   private boolean completed;
 
@@ -74,6 +75,7 @@ class WFIExecutionBuilder {
         Optional.ofNullable(currExecutionId),
         Optional.ofNullable(currDockerImg),
         Optional.ofNullable(currCommitSha),
+        Optional.ofNullable(currRunnerId),
         executionStatusList);
     executionList.add(execution);
 
@@ -159,6 +161,7 @@ class WFIExecutionBuilder {
     public Void submitted(WorkflowInstance workflowInstance, String executionId, String runnerId) {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
+      currRunnerId = runnerId;
 
       executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
           Optional.empty()));
