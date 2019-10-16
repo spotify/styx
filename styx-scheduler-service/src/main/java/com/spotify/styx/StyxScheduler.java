@@ -57,6 +57,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
+import com.spotify.styx.docker.DockerRunnerId;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.StyxConfig;
@@ -371,7 +372,7 @@ public class StyxScheduler implements AppInit {
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
-    final Function<RunState, String> runnerId = (runState) -> getRunnerId(runState, styxConfig);
+    final Function<RunState, String> runnerId = new DockerRunnerId(styxConfig);
     final Debug debug = () -> styxConfig.get().debugEnabled();
     var secretWhitelist =
         get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
@@ -449,11 +450,6 @@ public class StyxScheduler implements AppInit {
     this.scheduler = scheduler;
     this.triggerManager = triggerManager;
     this.backfillTriggerManager = backfillTriggerManager;
-  }
-
-  @VisibleForTesting
-  static String getRunnerId(RunState runState, Supplier<StyxConfig> styxConfig) {
-    return runState.data().runnerId().orElseGet(() -> styxConfig.get().globalDockerRunnerId());
   }
 
   @VisibleForTesting
