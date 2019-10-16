@@ -30,7 +30,6 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -82,7 +81,6 @@ import org.mockito.MockitoAnnotations;
 public class StyxSchedulerTest {
 
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
-  private static final String TEST_RUNNER_ID = "test";
 
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
   @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
@@ -229,29 +227,5 @@ public class StyxSchedulerTest {
 
     verifyNoMoreInteractions(storage);
     verifyNoMoreInteractions(stateManager);
-  }
-
-  @Test
-  public void testGetRunnerIdFromConfigSupplierWhenSubmitting() {
-    when(configSupplier.get()).thenReturn(StyxConfig.newBuilder().globalDockerRunnerId("default").build());
-    var runState = RunState.create(mock(WorkflowInstance.class), State.SUBMITTING, StateData.newBuilder()
-        .runnerId(TEST_RUNNER_ID)
-        .build());
-    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is("default"));
-  }
-
-  @Test
-  public void testGetRunnerIdFromRunState() {
-    var runState = RunState.create(mock(WorkflowInstance.class), State.SUBMITTED, StateData.newBuilder()
-        .runnerId(TEST_RUNNER_ID)
-        .build());
-    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is(TEST_RUNNER_ID));
-  }
-
-  @Test
-  public void testGetRunnerIdFromConfigSupplier() {
-    when(configSupplier.get()).thenReturn(StyxConfig.newBuilder().globalDockerRunnerId("default").build());
-    var runState = RunState.create(mock(WorkflowInstance.class), State.QUEUED, StateData.zero());
-    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is("default"));
   }
 }
