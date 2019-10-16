@@ -232,6 +232,15 @@ public class StyxSchedulerTest {
   }
 
   @Test
+  public void testGetRunnerIdFromConfigSupplierWhenSubmitting() {
+    when(configSupplier.get()).thenReturn(StyxConfig.newBuilder().globalDockerRunnerId("default").build());
+    var runState = RunState.create(mock(WorkflowInstance.class), State.SUBMITTING, StateData.newBuilder()
+        .runnerId(TEST_RUNNER_ID)
+        .build());
+    assertThat(StyxScheduler.getRunnerId(runState, configSupplier), is("default"));
+  }
+
+  @Test
   public void testGetRunnerIdFromRunState() {
     var runState = RunState.create(mock(WorkflowInstance.class), State.SUBMITTED, StateData.newBuilder()
         .runnerId(TEST_RUNNER_ID)

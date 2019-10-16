@@ -453,6 +453,9 @@ public class StyxScheduler implements AppInit {
 
   @VisibleForTesting
   static String getRunnerId(RunState runState, Supplier<StyxConfig> styxConfig) {
+    if (runState.state() == State.SUBMITTING) {
+      return styxConfig.get().globalDockerRunnerId();
+    }
     return runState.data().runnerId().orElseGet(() -> styxConfig.get().globalDockerRunnerId());
   }
 
