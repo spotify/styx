@@ -23,6 +23,7 @@ package com.spotify.styx.client;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -81,6 +82,15 @@ public interface StyxWorkflowClient extends AutoCloseable {
    * @return the {@link WorkflowState}
    */
   CompletionStage<WorkflowState> workflowState(String componentId, String workflowId);
+
+  /**
+   * Get a {@link WorkflowWithState}
+   *
+   * @param componentId component id
+   * @param workflowId  workflow id
+   * @return the {@link WorkflowWithState}
+   */
+  CompletionStage<WorkflowWithState> workflowWithState(String componentId, String workflowId);
 
   /**
    * Get execution data of an instance of a {@link Workflow}

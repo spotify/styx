@@ -28,9 +28,7 @@ import static org.junit.Assert.assertThat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
-import com.spotify.styx.api.RunStateDataPayload.RunStateData;
-import com.spotify.styx.cli.JsonCliOutput.WorkflowWithState;
-import com.spotify.styx.model.Backfill;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -38,6 +36,7 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.state.StateData;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -183,7 +182,6 @@ public class JsonCliOutputTest {
         .build();
     cliOutput.printWorkflow(workflow, state);
     assertThat(OBJECT_MAPPER.readValue(outContent.toString(), WorkflowWithState.class),
-        is(WorkflowWithState.of(workflow, state)));
+        is(WorkflowWithState.create(workflow, state)));
   }
-
 }
