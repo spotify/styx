@@ -122,7 +122,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       }
     }
 
-    final Collection<String> errors = validator.validateWorkflow(workflowWithState.workflow());
+    final Collection<String> errors = validator.validateWorkflow(workflow);
     if (!errors.isEmpty()) {
       throw new MissingRequiredPropertyException(format(
           "%s configuration is invalid, halting %s. Errors: %s",
