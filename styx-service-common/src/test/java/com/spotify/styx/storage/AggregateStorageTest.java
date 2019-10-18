@@ -113,4 +113,10 @@ public class AggregateStorageTest {
     exception.expectCause(is(rootCause));
     sut.runInTransactionWithRetries(tx -> "foobar");
   }
+
+  @Test
+  public void shouldReturnWorkflowWithState() throws IOException {
+    sut.workflowWithState(workflowInstance.workflowId());
+    verify(datastore).workflowWithState(workflowInstance.workflowId());
+  }
 }

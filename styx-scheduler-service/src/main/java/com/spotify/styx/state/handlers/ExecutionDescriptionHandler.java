@@ -27,13 +27,12 @@ import static java.util.Objects.requireNonNull;
 import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ResourceNotFoundException;
@@ -104,19 +103,26 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
   private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data)
       throws IOException, MissingRequiredPropertyException {
-    final WorkflowId workflowId = workflowInstance.workflowId();
+    var workflowId = workflowInstance.workflowId();
 
-    final Workflow workflow = storage.workflow(workflowId).orElseThrow(
-        () -> new ResourceNotFoundException(format("Missing %s, halting %s",
-                                                   workflowId, workflowInstance)));
+    var workflowWithState = storage.workflowWithState(workflowId).orElseThrow(
+        () -> new ResourceNotFoundException(format("Missing %s, halting %s", workflowId, workflowInstance)));
 
-    final String dockerImage = workflow.configuration().dockerImage().orElseThrow(
-        () -> new MissingRequiredPropertyException(format("%s has no docker image, halting %s",
-                                                          workflowId,
-                                                          workflowInstance))
+    var workflow = workflowWithState.workflow();
+
+    var dockerImage = workflow.configuration().dockerImage().orElseThrow(
+        () -> new MissingRequiredPropertyException(
+            format("%s has no docker image, halting %s", workflowId, workflowInstance))
     );
 
-    final Collection<String> errors = validator.validateWorkflow(workflow);
+    if (data.trigger().isPresent()) {
+      if (data.trigger().orElseThrow().equals(Trigger.natural()) &&
+          !workflowWithState.workflowState().enabled().orElse(false)) {
+        throw new MissingRequiredPropertyException(format("%s is disabled, halting %s", workflowId, workflowInstance));
+      }
+    }
+
+    final Collection<String> errors = validator.validateWorkflow(workflowWithState.workflow());
     if (!errors.isEmpty()) {
       throw new MissingRequiredPropertyException(format(
           "%s configuration is invalid, halting %s. Errors: %s",

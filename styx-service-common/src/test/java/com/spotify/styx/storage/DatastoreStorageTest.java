@@ -543,6 +543,32 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void shouldReturnWorkflowWithState() throws Exception {
+    storage.store(WORKFLOW);
+    var instant = Instant.parse("2016-03-14T14:00:00Z");
+    var offset = instant.plus(1, ChronoUnit.DAYS);
+    var spec = TriggerInstantSpec.create(instant, offset);
+    storage.updateNextNaturalTrigger(WORKFLOW.id(), spec);
+    var state = WorkflowState.builder()
+        .enabled(true)
+        .nextNaturalTrigger(instant)
+        .nextNaturalOffsetTrigger(offset)
+        .build();
+    storage.patchState(WORKFLOW.id(), state);
+
+    var retrieved = storage.workflowWithState(WORKFLOW.id());
+
+    assertThat(retrieved.orElseThrow().workflow(), is(WORKFLOW));
+    assertThat(retrieved.orElseThrow().workflowState(), is(state));
+  }
+
+  @Test
+  public void shouldReturnEmptyWorkflowWithState() throws Exception {
+    var retrieved = storage.workflowWithState(WORKFLOW.id());
+    assertThat(retrieved.isEmpty(), is(true));
+  }
+
+  @Test
   public void getsGlobalDockerRunnerId() throws Exception {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_DOCKER_RUNNER_ID, "foobar")
