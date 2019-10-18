@@ -115,11 +115,11 @@ public class ExecutionDescriptionHandler implements OutputHandler {
             format("%s has no docker image, halting %s", workflowId, workflowInstance))
     );
 
-    if (data.trigger().isPresent()) {
-      if (data.trigger().orElseThrow().equals(Trigger.natural()) &&
-          !workflowWithState.state().enabled().orElse(false)) {
-        throw new MissingRequiredPropertyException(format("%s is disabled, halting %s", workflowId, workflowInstance));
-      }
+    var isWorkflowEnabled = workflowWithState.state().enabled().orElse(false);
+    var isNaturalTrigger = data.trigger().map(t -> t.equals(Trigger.natural()).orElse(false);
+
+    if (!isWorkflowEnabled && isNaturalTrigger) {
+      throw new MissingRequiredPropertyException(format("%s is disabled, halting %s", workflowId, workflowInstance));
     }
 
     final Collection<String> errors = validator.validateWorkflow(workflow);
