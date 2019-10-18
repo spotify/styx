@@ -227,12 +227,12 @@ public final class BackfillResource implements Closeable {
 
   private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc,
                                                              RequestAuthenticator authenticator) {
-    final AuthContext authContext = authenticator.authenticate(rc.request());
+    var authContext = authenticator.authenticate(rc.request());
     try {
       // TODO: run in transction
-      final Optional<Backfill> backfillOptional = storage.backfill(id);
+      var backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
-        final Backfill backfill = backfillOptional.get();
+        var backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
         storage.storeBackfill(backfill.builder().halted(true).lastModified(time.get()).build());
         var graceful = rc.request().parameter("graceful").orElse("false").equalsIgnoreCase("true");
@@ -274,7 +274,7 @@ public final class BackfillResource implements Closeable {
   private CompletionStage<Boolean> haltActiveBackfillInstance(WorkflowInstance workflowInstance,
                                                               Client client) {
     try {
-      final Request request = Request.forUri(schedulerApiUrl("halt"), "POST")
+      var request = Request.forUri(schedulerApiUrl("halt"), "POST")
           .withPayload(serialize(workflowInstance));
       return client.send(request)
           .thenApply(response -> response.status().family().equals(SUCCESSFUL));
