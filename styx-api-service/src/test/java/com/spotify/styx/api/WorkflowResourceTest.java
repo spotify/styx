@@ -848,6 +848,18 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
   }
 
+  @Test
+  public void shouldFailToReturnWorkflowWithState() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflowWithState(WorkflowId.create("foo", "bar"))).thenThrow(new IOException());
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("/foo/bar/full")));
+
+    assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
+  }
+
   private long ms(String time) {
     return Instant.parse("2016-08-10T" + time + "Z").toEpochMilli();
   }
