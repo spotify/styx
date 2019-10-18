@@ -117,7 +117,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     if (data.trigger().isPresent()) {
       if (data.trigger().orElseThrow().equals(Trigger.natural()) &&
-          !workflowWithState.workflowState().enabled().orElse(false)) {
+          !workflowWithState.state().enabled().orElse(false)) {
         throw new MissingRequiredPropertyException(format("%s is disabled, halting %s", workflowId, workflowInstance));
       }
     }

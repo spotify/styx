@@ -29,12 +29,12 @@ public abstract class WorkflowWithState {
   public abstract Workflow workflow();
 
   @JsonProperty
-  public abstract WorkflowState workflowState();
+  public abstract WorkflowState state();
 
   @JsonCreator
   public static WorkflowWithState create(
       @JsonProperty("workflow") Workflow workflow,
-      @JsonProperty("workflow_state") WorkflowState workflowState) {
-    return new AutoValue_WorkflowWithState(workflow, workflowState);
+      @JsonProperty("state") WorkflowState state) {
+    return new AutoValue_WorkflowWithState(workflow, state);
   }
 }

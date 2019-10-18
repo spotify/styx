@@ -559,7 +559,7 @@ public class DatastoreStorageTest {
     var retrieved = storage.workflowWithState(WORKFLOW.id());
 
     assertThat(retrieved.orElseThrow().workflow(), is(WORKFLOW));
-    assertThat(retrieved.orElseThrow().workflowState(), is(state));
+    assertThat(retrieved.orElseThrow().state(), is(state));
   }
 
   @Test
