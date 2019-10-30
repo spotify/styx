@@ -58,7 +58,6 @@ import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
-import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import java.io.IOException;
@@ -70,7 +69,9 @@ import junitparams.Parameters;
 import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -81,6 +82,8 @@ import org.mockito.MockitoAnnotations;
 public class StyxSchedulerTest {
 
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
+
+  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Captor private ArgumentCaptor<io.fabric8.kubernetes.client.Config> k8sClientConfigCaptor;
   @Captor private ArgumentCaptor<OkHttpClient> httpClientCaptor;
@@ -112,40 +115,92 @@ public class StyxSchedulerTest {
   }
 
   @Test
-  @Parameters({"4711", ""})
+  @Parameters({ "4711", "" })
   public void testGetKubernetesClient(String k8sRequestTimeoutConfig) throws Exception {
-
-    final String project = "test-project";
-    final String zone = "test-zone";
-    final String cluster = "test-cluster";
-    final String namespace = "test-namespace";
-
-    final ImmutableMap.Builder<String, String> configMap = ImmutableMap.<String, String>builder()
-        .put("styx.gke.foo.project-id", project)
-        .put("styx.gke.foo.cluster-zone", zone)
-        .put("styx.gke.foo.cluster-id", cluster)
-        .put("styx.gke.foo.namespace", namespace);
+    var clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    var clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+    var clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
 
     final int expectedK8sRequestTimeout;
     if (!k8sRequestTimeoutConfig.isEmpty()) {
-      configMap.put("styx.k8s.request-timeout", k8sRequestTimeoutConfig);
       expectedK8sRequestTimeout = Integer.parseInt(k8sRequestTimeoutConfig);
     } else {
       expectedK8sRequestTimeout = DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS;
     }
 
-    final Config config = ConfigFactory.parseMap(configMap.build());
+    var client = getKubernetesClient(
+        k8sRequestTimeoutConfig,
+        clusterCaCertificate,
+        clientCertificate, clientKey);
 
+    assertThat(client, is(theInstance(kubernetesClient)));
 
-    final String endpoint = "k8s.example.com:4711";
-    final String clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
-    final String clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
-    final String clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
+    verify(kubernetesClientFactory).apply(httpClientCaptor.capture(), k8sClientConfigCaptor.capture());
 
-    final Cluster gkeCluster = new Cluster();
-    gkeCluster.setEndpoint(endpoint);
+    var k8sConfig = k8sClientConfigCaptor.getValue();
+    var httpClient = httpClientCaptor.getValue();
 
-    final MasterAuth masterAuth = new MasterAuth();
+    assertThat(k8sConfig.getMasterUrl(), is("https://k8s.example.com:4711/"));
+    assertThat(k8sConfig.getCaCertData(), is(clusterCaCertificate));
+    assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
+    assertThat(k8sConfig.getClientKeyData(), is(clientKey));
+    assertThat(k8sConfig.getNamespace(), is("test-namespace"));
+    assertThat(k8sConfig.getRequestTimeout(), is(expectedK8sRequestTimeout));
+
+    assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
+  }
+
+  @Test
+  public void testGetKubernetesClientNullClusterCaCertificate() throws Exception {
+    var clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+    var clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
+
+    exception.expect(NullPointerException.class);
+    getKubernetesClient("", null, clientCertificate, clientKey);
+  }
+
+  @Test
+  public void testGetKubernetesClientNullClientCertificate() throws Exception {
+    var clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    var clientKey = Resources.toString(Resources.getResource("client.key"), UTF_8);
+
+    exception.expect(NullPointerException.class);
+    getKubernetesClient("", clusterCaCertificate, null, clientKey);
+  }
+
+  @Test
+  public void testGetKubernetesClientNullClientKey() throws Exception {
+    var clusterCaCertificate = Resources.toString(Resources.getResource("ca.crt"), UTF_8);
+    var clientCertificate = Resources.toString(Resources.getResource("client.crt"), UTF_8);
+
+    exception.expect(NullPointerException.class);
+    getKubernetesClient("", clusterCaCertificate, clientCertificate, null);
+  }
+
+  private NamespacedKubernetesClient getKubernetesClient(String k8sRequestTimeoutConfig,
+                                                         String clusterCaCertificate,
+                                                         String clientCertificate,
+                                                         String clientKey) throws Exception {
+    var project = "test-project";
+    var zone = "test-zone";
+    var cluster = "test-cluster";
+
+    var configMap = ImmutableMap.<String, String>builder()
+        .put("styx.gke.foo.project-id", project)
+        .put("styx.gke.foo.cluster-zone", zone)
+        .put("styx.gke.foo.cluster-id", cluster)
+        .put("styx.gke.foo.namespace", "test-namespace");
+
+    if (!k8sRequestTimeoutConfig.isEmpty()) {
+      configMap.put("styx.k8s.request-timeout", k8sRequestTimeoutConfig);
+    }
+
+    var config = ConfigFactory.parseMap(configMap.build());
+
+    var gkeCluster = new Cluster();
+    gkeCluster.setEndpoint("k8s.example.com:4711");
+
+    var masterAuth = new MasterAuth();
     masterAuth.setClusterCaCertificate(clusterCaCertificate);
     masterAuth.setClientCertificate(clientCertificate);
     masterAuth.setClientKey(clientKey);
@@ -153,23 +208,7 @@ public class StyxSchedulerTest {
 
     when(gkeClusterGet.execute()).thenReturn(gkeCluster);
 
-    final NamespacedKubernetesClient client =
-        StyxScheduler.getKubernetesClient(config, "foo", gkeClient, kubernetesClientFactory);
-    assertThat(client, is(theInstance(kubernetesClient)));
-
-    verify(kubernetesClientFactory).apply(httpClientCaptor.capture(), k8sClientConfigCaptor.capture());
-
-    final io.fabric8.kubernetes.client.Config k8sConfig = k8sClientConfigCaptor.getValue();
-    final OkHttpClient httpClient = httpClientCaptor.getValue();
-
-    assertThat(k8sConfig.getMasterUrl(), is("https://" + endpoint + "/"));
-    assertThat(k8sConfig.getCaCertData(), is(clusterCaCertificate));
-    assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
-    assertThat(k8sConfig.getClientKeyData(), is(clientKey));
-    assertThat(k8sConfig.getNamespace(), is(namespace));
-    assertThat(k8sConfig.getRequestTimeout(), is(expectedK8sRequestTimeout));
-
-    assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
+    return StyxScheduler.getKubernetesClient(config, "foo", gkeClient, kubernetesClientFactory);
   }
 
   @Test
