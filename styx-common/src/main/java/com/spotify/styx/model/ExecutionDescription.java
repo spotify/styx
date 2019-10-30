@@ -21,6 +21,7 @@
 package com.spotify.styx.model;
 
 import io.norberg.automatter.AutoMatter;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +36,7 @@ public interface ExecutionDescription {
   Optional<String> serviceAccount();
   Optional<String> commitSha();
   Map<String, String> env();
+  Optional<Duration> runningTimeout();
 
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();
