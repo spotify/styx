@@ -114,6 +114,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -657,9 +658,14 @@ public class StyxScheduler implements AppInit {
 
       final io.fabric8.kubernetes.client.Config kubeConfig = new ConfigBuilder()
           .withMasterUrl("https://" + cluster.getEndpoint())
-          .withCaCertData(cluster.getMasterAuth().getClusterCaCertificate())
-          .withClientCertData(cluster.getMasterAuth().getClientCertificate())
-          .withClientKeyData(cluster.getMasterAuth().getClientKey())
+          // missing container.clusters.getCredentials permission in GCP will result null cert and key
+          // and we want it to fail loudly
+          .withCaCertData(Objects.requireNonNull(cluster.getMasterAuth().getClusterCaCertificate(),
+              "clusterCaCertificate"))
+          .withClientCertData(Objects.requireNonNull(cluster.getMasterAuth().getClientCertificate(),
+              "clientCertificate"))
+          .withClientKeyData(Objects.requireNonNull(cluster.getMasterAuth().getClientKey(),
+              "clientKey"))
           .withNamespace(config.getString(GKE_CLUSTER_NAMESPACE))
           .withRequestTimeout(get(rootConfig, rootConfig::getInt, KUBERNETES_REQUEST_TIMEOUT)
               .orElse(DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS))
