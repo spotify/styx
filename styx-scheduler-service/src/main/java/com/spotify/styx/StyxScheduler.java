@@ -643,6 +643,7 @@ public class StyxScheduler implements AppInit {
     }
   }
 
+  @VisibleForTesting
   static NamespacedKubernetesClient getKubernetesClient(Config rootConfig, String id,
                                                         Container gke, KubernetesClientFactory clientFactory) {
     try {
