@@ -44,7 +44,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
-import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -82,6 +81,8 @@ import org.mockito.MockitoAnnotations;
 public class StyxSchedulerTest {
 
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
+  private static final String ENDPOINT = "k8s.example.com:4711";
+  private static final String TEST_NAMESPACE = "test-namespace";
 
   @Rule public ExpectedException exception = ExpectedException.none();
 
@@ -100,7 +101,6 @@ public class StyxSchedulerTest {
   @Mock private RateLimiter submissionRateLimiter;
   @Mock private Stats stats;
   @Mock private Time time;
-  @Mock private Supplier<StyxConfig> configSupplier;
 
   @Before
   public void setUp() throws Exception {
@@ -140,11 +140,11 @@ public class StyxSchedulerTest {
     var k8sConfig = k8sClientConfigCaptor.getValue();
     var httpClient = httpClientCaptor.getValue();
 
-    assertThat(k8sConfig.getMasterUrl(), is("https://k8s.example.com:4711/"));
+    assertThat(k8sConfig.getMasterUrl(), is("https://" + ENDPOINT + "/"));
     assertThat(k8sConfig.getCaCertData(), is(clusterCaCertificate));
     assertThat(k8sConfig.getClientCertData(), is(clientCertificate));
     assertThat(k8sConfig.getClientKeyData(), is(clientKey));
-    assertThat(k8sConfig.getNamespace(), is("test-namespace"));
+    assertThat(k8sConfig.getNamespace(), is(TEST_NAMESPACE));
     assertThat(k8sConfig.getRequestTimeout(), is(expectedK8sRequestTimeout));
 
     assertThat(httpClient.protocols(), contains(Protocol.HTTP_1_1));
@@ -189,7 +189,7 @@ public class StyxSchedulerTest {
         .put("styx.gke.foo.project-id", project)
         .put("styx.gke.foo.cluster-zone", zone)
         .put("styx.gke.foo.cluster-id", cluster)
-        .put("styx.gke.foo.namespace", "test-namespace");
+        .put("styx.gke.foo.namespace", TEST_NAMESPACE);
 
     if (!k8sRequestTimeoutConfig.isEmpty()) {
       configMap.put("styx.k8s.request-timeout", k8sRequestTimeoutConfig);
@@ -198,7 +198,7 @@ public class StyxSchedulerTest {
     var config = ConfigFactory.parseMap(configMap.build());
 
     var gkeCluster = new Cluster();
-    gkeCluster.setEndpoint("k8s.example.com:4711");
+    gkeCluster.setEndpoint(ENDPOINT);
 
     var masterAuth = new MasterAuth();
     masterAuth.setClusterCaCertificate(clusterCaCertificate);
