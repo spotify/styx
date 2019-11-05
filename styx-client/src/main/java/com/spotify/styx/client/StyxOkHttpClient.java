@@ -177,6 +177,12 @@ class StyxOkHttpClient implements StyxClient {
   }
 
   @Override
+  public CompletionStage<List<Workflow>> workflows(String componentId) {
+    return execute(forUri(urlBuilder("workflows", componentId)), Workflow[].class)
+        .thenApply(Arrays::asList);
+  }
+
+  @Override
   public CompletionStage<List<Workflow>> workflows() {
     return execute(forUri(urlBuilder("workflows")), Workflow[].class)
         .thenApply(Arrays::asList);

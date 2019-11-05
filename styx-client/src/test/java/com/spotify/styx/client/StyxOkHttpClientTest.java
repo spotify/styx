@@ -195,6 +195,23 @@ public class StyxOkHttpClientTest {
   }
 
   @Test
+  public void shouldGetAllWorkflowsOfAComponent() throws Exception {
+    final List<Workflow> workflows = Arrays.asList(WORKFLOW_1, WORKFLOW_2);
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, workflows)));
+    final String componentId = WORKFLOW_1.componentId();
+    final CompletableFuture<List<Workflow>> r = styx.workflows(componentId).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final HttpUrl url = API_URL.newBuilder().addPathSegment("workflows")
+        .addPathSegment(componentId).build();
+    assertThat(request.url().toString(), is(url.uri().toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(workflows));
+  }
+
+  @Test
   public void shouldGetBackfill() throws Exception {
     final BackfillPayload payload = BackfillPayload.create(BACKFILL, Optional.empty());
     when(client.send(any(Request.class)))
