@@ -42,6 +42,13 @@ public interface StyxWorkflowClient extends AutoCloseable {
   CompletionStage<Workflow> workflow(String componentId, String workflowId);
 
   /**
+   * Get all {@link Workflow}s of a component
+   *
+   * @return all {@link Workflow}s of the given component
+   */
+  CompletionStage<List<Workflow>> workflows(String componentId);
+
+  /**
    * Get all {@link Workflow}s
    *
    * @return all {@link Workflow}s
