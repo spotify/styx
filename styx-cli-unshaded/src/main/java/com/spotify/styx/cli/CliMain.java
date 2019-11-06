@@ -546,9 +546,10 @@ public final class CliMain {
   }
 
   private void backfillHalt() throws ExecutionException, InterruptedException {
-    final String id = namespace.getString(parser.backfillHaltId.getDest());
+    var id = namespace.getString(parser.backfillHaltId.getDest());
+    var graceful = namespace.getBoolean(parser.backfillHaltGraceful.getDest());
 
-    styxClient.backfillHalt(id).toCompletableFuture().get();
+    styxClient.backfillHalt(id, graceful).toCompletableFuture().get();
     cliOutput.printMessage("Backfill halted! Use `styx backfill show " + id
                            + "` to check the backfill status.");
   }
@@ -738,6 +739,11 @@ public final class CliMain {
     final Subparser backfillHalt = BackfillCommand.HALT.parser(backfillParser, cliContext);
     final Argument backfillHaltId =
         backfillHalt.addArgument("backfill").help("Backfill ID");
+    final Argument backfillHaltGraceful = backfillHalt
+        .addArgument("--graceful")
+        .setDefault(false)
+        .action(Arguments.storeTrue())
+        .help("halt the backfill while leaving already triggered instances untouched");
 
     final Subparser backfillList = BackfillCommand.LIST.parser(backfillParser, cliContext);
     final Argument backfillListWorkflow =

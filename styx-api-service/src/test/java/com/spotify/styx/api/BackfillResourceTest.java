@@ -46,6 +46,7 @@ import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.spotify.apollo.Environment;
+import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
 import com.spotify.apollo.StatusType;
@@ -857,8 +858,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T05");
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_5.workflowId(), "2017-01-01T04");
@@ -883,8 +884,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T02:00:00Z")).build());
@@ -924,8 +925,8 @@ public class BackfillResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     serviceHelper.stubClient()
-        .respond(Response.forStatus(Status.ACCEPTED))
-        .to(SCHEDULER_BASE + "/api/v0/events");
+        .respond(Response.forStatus(Status.OK))
+        .to(SCHEDULER_BASE + "/api/v0/halt");
 
     WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
     WorkflowInstance wfi2 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T02");
@@ -946,8 +947,34 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
+    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    verify(serviceHelper.stubClient(), times(1)).send(Request.forUri(SCHEDULER_BASE + "/api/v0/halt", "POST")
+        .withPayload(Json.serialize(wfi1))
+        .withService("backfill-test"));
+  }
+
+  @Test
+  public void shouldNotHaltInstanceInBackfillIfGraceful() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    WorkflowInstance wfi1 = WorkflowInstance.create(BACKFILL_1.workflowId(), "2017-01-01T01");
+    storage.storeBackfill(BACKFILL_1.builder().nextTrigger(Instant.parse("2017-01-01T03:00:00Z")).build());
+    storage.writeEvent(SequenceEvent.create(
+        Event.triggerExecution(wfi1, Trigger.backfill("backfill-1"), TRIGGER_PARAMETERS),        1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(wfi1, RESOURCE_IDS),                   2L, 2L));
+    storage.writeEvent(SequenceEvent.create(Event.submit(wfi1, EXECUTION_DESCRIPTION, "exec-1"), 3L, 3L));
+    storage.writeEvent(SequenceEvent.create(Event.submitted(wfi1, "exec-1"),                     4L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.started(wfi1),                                 5L, 5L));
+    storage.writeActiveState(wfi1, RunState.create(wfi1, State.RUNNING,
+        StateData.zero(), Instant.now(), 5L));
+
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("DELETE", path("/" + BACKFILL_1.id() + "?graceful=true")));
+    assertThat(response.status().reasonPhrase(),
+        response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+
     assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().halted(), equalTo(true));
-    verify(serviceHelper.stubClient(), times(1)).send(any());
+    verify(serviceHelper.stubClient(), never()).send(any());
   }
 
   @Test

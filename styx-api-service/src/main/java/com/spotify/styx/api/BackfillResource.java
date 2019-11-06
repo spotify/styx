@@ -51,7 +51,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
-import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
@@ -225,15 +224,20 @@ public final class BackfillResource implements Closeable {
 
   private CompletionStage<Response<ByteString>> haltBackfill(String id, RequestContext rc,
                                                              RequestAuthenticator authenticator) {
-    final AuthContext authContext = authenticator.authenticate(rc.request());
+    var authContext = authenticator.authenticate(rc.request());
     try {
       // TODO: run in transction
-      final Optional<Backfill> backfillOptional = storage.backfill(id);
+      var backfillOptional = storage.backfill(id);
       if (backfillOptional.isPresent()) {
-        final Backfill backfill = backfillOptional.get();
+        var backfill = backfillOptional.get();
         workflowActionAuthorizer.authorizeWorkflowAction(authContext, backfill.workflowId());
         storage.storeBackfill(backfill.builder().halted(true).lastModified(time.get()).build());
-        return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
+        var graceful = rc.request().parameter("graceful").orElse("false").equalsIgnoreCase("true");
+        if (!graceful) {
+          return haltActiveBackfillInstances(backfill, rc.requestScopedClient());
+        } else {
+          return CompletableFuture.completedFuture(Response.ok());
+        }
       } else {
         return CompletableFuture.completedFuture(
             Response.forStatus(Status.NOT_FOUND.withReasonPhrase("backfill not found")));
@@ -267,9 +271,8 @@ public final class BackfillResource implements Closeable {
   private CompletionStage<Boolean> haltActiveBackfillInstance(WorkflowInstance workflowInstance,
                                                               Client client) {
     try {
-      final ByteString payload = serialize(Event.halt(workflowInstance));
-      final Request request = Request.forUri(schedulerApiUrl("events"), "POST")
-          .withPayload(payload);
+      var request = Request.forUri(schedulerApiUrl("halt"), "POST")
+          .withPayload(serialize(workflowInstance));
       return client.send(request)
           .thenApply(response -> response.status().family().equals(SUCCESSFUL));
     } catch (JsonProcessingException e) {
