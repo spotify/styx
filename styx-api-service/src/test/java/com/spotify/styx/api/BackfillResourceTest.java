@@ -947,7 +947,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     assertThat(response.status().reasonPhrase(),
                response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 
-    assertThat(storage.backfill(BACKFILL_1.id()).get().halted(), equalTo(true));
+    assertThat(storage.backfill(BACKFILL_1.id()).orElseThrow().halted(), equalTo(true));
     verify(serviceHelper.stubClient(), times(1)).send(Request.forUri(SCHEDULER_BASE + "/api/v0/halt", "POST")
         .withPayload(Json.serialize(wfi1))
         .withService("backfill-test"));
