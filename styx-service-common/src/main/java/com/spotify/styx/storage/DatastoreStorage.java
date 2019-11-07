@@ -73,6 +73,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
@@ -620,13 +621,28 @@ public class DatastoreStorage implements Closeable {
   }
 
   WorkflowState workflowState(WorkflowId workflowId) throws IOException {
-    final WorkflowState.Builder builder = WorkflowState.builder();
-
     var workflowEntity = getWorkflowOpt(datastore, datastore::newKeyFactory, workflowId);
+    return workflowState(workflowEntity);
+  }
+
+  Optional<WorkflowWithState> workflowWithState(WorkflowId workflowId) throws IOException {
+    final Optional<Entity> workflowEntity = getWorkflowOpt(datastore, datastore::newKeyFactory, workflowId);
+
+    if (workflowEntity.isEmpty()) {
+      return Optional.empty();
+    }
+
+    var workflow = parseWorkflowJson(workflowEntity.orElseThrow(), workflowId);
+    var workflowState = workflowState(workflowEntity);
+    return Optional.of(WorkflowWithState.create(workflow, workflowState));
+  }
+
+  private WorkflowState workflowState(Optional<Entity> workflowEntity) {
+    var builder = WorkflowState.builder();
 
     builder.enabled(workflowEntity.filter(w -> w.contains(PROPERTY_WORKFLOW_ENABLED))
-                        .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
-                        .orElse(DEFAULT_WORKFLOW_ENABLED));
+        .map(workflow -> workflow.getBoolean(PROPERTY_WORKFLOW_ENABLED))
+        .orElse(DEFAULT_WORKFLOW_ENABLED));
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_TRIGGER)
         .ifPresent(builder::nextNaturalTrigger);
     getOptInstantProperty(workflowEntity, PROPERTY_NEXT_NATURAL_OFFSET_TRIGGER)

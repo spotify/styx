@@ -28,6 +28,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
@@ -276,10 +277,18 @@ public interface Storage extends Closeable {
   /**
    * Get the persisted workflow state for a workflow.
    *
-   * @param workflowId The workflow to get the repository for
+   * @param workflowId The workflow to get the state for
    * @return workflow state.
    */
   WorkflowState workflowState(WorkflowId workflowId) throws IOException;
+
+  /**
+   * Get workflow definition and the persisted workflow state.
+   *
+   * @param workflowId The workflow to get the definition and state for
+   * @return workflow and workflow state.
+   */
+  Optional<WorkflowWithState> workflowWithState(WorkflowId workflowId) throws IOException;
 
   Optional<Resource> resource(String id) throws IOException;
 

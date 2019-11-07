@@ -42,8 +42,12 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -92,17 +96,19 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmittingIfMissingDockerArgs() throws Exception {
-    Workflow workflow = Workflow.create("id", workflowConfiguration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
-    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+    var workflow = Workflow.create("id", workflowConfiguration());
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    var runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
     toTest.transitionInto(runState);
 
     verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
 
-    final Event event = eventCaptor.getValue();
+    var event = eventCaptor.getValue();
     event.accept(eventVisitor);
     verify(eventVisitor)
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
@@ -115,17 +121,23 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitting() throws Exception {
-    Workflow workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
-    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+    var workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    var runState = RunState.create(workflowInstance,
+        PREPARE,
+        StateData.newBuilder().trigger(Trigger.natural()).build(),
+        NOW,
+        COUNTER);
 
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
     toTest.transitionInto(runState);
 
     verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
 
-    final Event event = eventCaptor.getValue();
+    var event = eventCaptor.getValue();
     event.accept(eventVisitor);
 
     verify(eventVisitor)
@@ -141,12 +153,11 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldTransitionIntoFailedIfStorageError() throws Exception {
-    Workflow workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    var workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    IOException exception = new IOException("TEST");
-    when(storage.workflow(workflow.id()))
-        .thenThrow(exception);
+    var exception = new IOException("TEST");
+    when(storage.workflowWithState(workflow.id())).thenThrow(exception);
 
     RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
@@ -157,10 +168,10 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingWorkflow() throws Exception {
-    WorkflowInstance workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+    var workflowInstance = WorkflowInstance.create(WorkflowId.create("c", "e"), "2016-03-14T15");
+    var runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
-    when(storage.workflow(any())).thenReturn(Optional.empty());
+    when(storage.workflowWithState(any())).thenReturn(Optional.empty());
 
     toTest.transitionInto(runState);
 
@@ -169,15 +180,36 @@ public class ExecutionDescriptionHandlerTest {
 
   @Test
   public void shouldHaltIfMissingDockerImage() throws Exception {
-    WorkflowConfiguration workflowConfiguration =
+    var workflowConfiguration =
         WorkflowConfigurationBuilder.from(workflowConfiguration("foo", "bar"))
             .dockerImage(Optional.empty())
             .build();
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+    var workflow = Workflow.create("id", workflowConfiguration);
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    var runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
+
+    toTest.transitionInto(runState);
+
+    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+  }
+
+  @Test
+  public void shouldHaltIfDisabledAndNaturallyTriggered() throws Exception {
+    var workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
+    var workflowState = WorkflowState.builder().enabled(false).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    var runState = RunState.create(workflowInstance,
+        PREPARE,
+        StateData.newBuilder().trigger(Trigger.natural()).build(),
+        NOW,
+        COUNTER);
+
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
     toTest.transitionInto(runState);
 
@@ -188,11 +220,13 @@ public class ExecutionDescriptionHandlerTest {
   public void shouldHaltIfInvalidConfiguration() throws Exception {
     when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("foo", "bar"));
 
-    Workflow workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+    var workflow = Workflow.create("id", FULL_WORKFLOW_CONFIGURATION);
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
+    var runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
-    when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
     toTest.transitionInto(runState);
 
