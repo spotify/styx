@@ -63,6 +63,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
@@ -368,6 +369,21 @@ public class StyxOkHttpClientTest {
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
     assertThat(r.join(), is(WorkflowState.empty()));
+  }
+
+  @Test
+  public void shouldGetWorkflowWithState() throws Exception {
+    var workflowWithState = WorkflowWithState.create(WORKFLOW_1, WorkflowState.empty());
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, workflowWithState)));
+    var r = styx.workflowWithState("component", "workflow").toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    var request = requestCaptor.getValue();
+    var uri = URI.create(API_URL + "/workflows/component/workflow/full");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(workflowWithState));
   }
 
   @Test

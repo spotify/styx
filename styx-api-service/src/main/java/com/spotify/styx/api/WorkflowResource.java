@@ -39,6 +39,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
@@ -89,6 +90,9 @@ public final class WorkflowResource {
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
             rc -> workflow(arg("cid", rc), arg("wfid", rc))),
+        Route.with(
+            json(), "GET", BASE + "/<cid>/<wfid>/full",
+            rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
             json(), "GET", BASE,
             rc -> workflows()),
@@ -247,6 +251,17 @@ public final class WorkflowResource {
       return Response.forPayload(storage.workflowState(workflowId));
     } catch (IOException e) {
       throw new RuntimeException("Failed to get the state of workflow " + workflowId.toKey(), e);
+    }
+  }
+
+  private Response<WorkflowWithState> workflowWithState(String componentId, String id) {
+    var workflowId = WorkflowId.create(componentId, id);
+    try {
+      return storage.workflowWithState(workflowId)
+          .map(Response::forPayload)
+          .orElse(Response.forStatus(Status.NOT_FOUND));
+    } catch (IOException e) {
+      throw new RuntimeException("Failed get workflow " + workflowId.toKey(), e);
     }
   }
 

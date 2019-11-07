@@ -72,7 +72,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import javaslang.Tuple;
@@ -609,17 +608,12 @@ public final class CliMain {
   }
 
   private void workflowShow() throws ExecutionException, InterruptedException {
-    final String component = namespace.getString(parser.workflowShowComponentId.getDest());
-    final String workflow = namespace.getString(parser.workflowShowWorkflowId.getDest());
+    var component = namespace.getString(parser.workflowShowComponentId.getDest());
+    var workflow = namespace.getString(parser.workflowShowWorkflowId.getDest());
 
-    final CompletableFuture<Workflow> workflowFuture =
-        styxClient.workflow(component, workflow).toCompletableFuture();
-    final CompletableFuture<WorkflowState> workflowStateFuture =
-        styxClient.workflowState(component, workflow).toCompletableFuture();
-
-    final Tuple2<Workflow, WorkflowState> tuple =
-        workflowFuture.thenCombine(workflowStateFuture, Tuple::of).toCompletableFuture().get();
-    cliOutput.printWorkflow(tuple._1, tuple._2);
+    var workflowWithStateFuture =
+        styxClient.workflowWithState(component, workflow).toCompletableFuture().get();
+    cliOutput.printWorkflow(workflowWithStateFuture.workflow(), workflowWithStateFuture.state());
   }
 
   private void workflowList() throws ExecutionException, InterruptedException {

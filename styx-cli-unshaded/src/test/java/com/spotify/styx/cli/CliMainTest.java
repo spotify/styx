@@ -54,6 +54,7 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.File;
@@ -128,6 +129,16 @@ public class CliMainTest {
   }
 
   @Test
+  public void testWorkflowShow() {
+    var payload = mock(WorkflowWithState.class);
+    when(client.workflowWithState("foo", "bar"))
+        .thenReturn(CompletableFuture.completedFuture(payload));
+    CliMain.run(cliContext, "workflow", "show", "foo", "bar");
+    verify(client).workflowWithState("foo", "bar");
+    verify(cliOutput).printWorkflow(payload.workflow(), payload.state());
+  }
+
+  @Test
   public void testWorkflowCreate() throws Exception {
     final String component = "quux";
 
@@ -186,7 +197,6 @@ public class CliMainTest {
     verify(cliOutput).printError(contains(
         "Workflow configuration doesn't conform to the expected structure, "));
   }
-
 
   @Test
   public void testWorkflowCreateInvalid() throws Exception {

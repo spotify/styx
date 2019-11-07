@@ -45,6 +45,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
@@ -204,6 +205,11 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<WorkflowState> workflowState(String componentId, String workflowId) {
     return execute(forUri(urlBuilder("workflows", componentId, workflowId, "state")),
                    WorkflowState.class);
+  }
+
+  @Override
+  public CompletionStage<WorkflowWithState> workflowWithState(String componentId, String workflowId) {
+    return execute(forUri(urlBuilder("workflows", componentId, workflowId, "full")), WorkflowWithState.class);
   }
 
   @Override

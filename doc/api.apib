@@ -203,6 +203,49 @@ Returns 204 No Content if the Workflow was found and deleted, 404 Not Found othe
 + Response 204
 + Response 404
 
+## Workflow with state [/{version}/workflows/{component_id}/{workflow_id}/full]
+
++ Parameters
+    + version: `v3` (enum[string]) - API version
+        + Members
+            + `v3`
+    + component_id: `styx-canary` (string) - Workflow Component
+    + workflow_id: `StyxCanary` (string) - Workflow ID
+
+### Get Workflow with State [GET]
+
++ Response 200 (application/json)
+
+        {
+            "workflow": {
+                "component_id": "styx-canary",
+                "workflow_id": "StyxCanary",
+                "component_uri": "file:///etc/styx/schedule.yaml",
+                "configuration": {
+                    "id": "StyxCanary",
+                    "schedule": "hours",
+                    "offset": null,
+                    "docker_image": null,
+                    "docker_args": [
+                      "luigi",
+                      "--module",
+                      "canary_job",
+                      "CanaryJob"
+                    ],
+                    "docker_termination_logging": false,
+                    "env": {"FOO": "bar"},
+                    "secret": null,
+                    "resources": [],
+                    "running_timeout": "PT2H"
+                  }
+            },
+            "state": {
+                "enabled": "true",
+                "next_natural_trigger": "2017-01-01T01:00:00Z",
+                "next_natural_offset_trigger": "2017-01-01T02:00:00Z"
+            }
+        }
+
 ## Workflow Instances [/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,tail,start,stop}]
 
 Query can be done in three different styles: `offset+limit`, `start+stop` or `tail+limit`.
@@ -331,8 +374,6 @@ returned is specified by `limit` but fewer instances may be returned even though
 
         {
             "enabled": "true",
-            "docker_image": "styx-canary-dummy:dummy",
-            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
             "next_natural_trigger": "2017-01-01T01:00:00Z",
             "next_natural_offset_trigger": "2017-01-01T02:00:00Z"
         }
@@ -352,8 +393,6 @@ returned is specified by `limit` but fewer instances may be returned even though
 
         {
             "enabled": "false",
-            "docker_image": "styx-canary-dummy:dummy",
-            "commit_sha": "f043333085fa87738ac24f04d64fb58ecc845111",
             "next_natural_trigger": "2017-01-01T01:00:00Z",
             "next_natural_offset_trigger": "2017-01-01T02:00:00Z"
         }
