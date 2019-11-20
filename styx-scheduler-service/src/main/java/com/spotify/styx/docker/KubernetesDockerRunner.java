@@ -157,6 +157,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Duration podDeletionDelay;
   private final Time time;
   private final ExecutorService executor;
+  private Watch watch;
 
   @VisibleForTesting
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
@@ -528,6 +529,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void close() throws IOException {
+    closeWatch();
     closer.close();
   }
 
@@ -535,15 +537,12 @@ class KubernetesDockerRunner implements DockerRunner {
     scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
-    final Watch watch;
     try {
       watch = client.watchPods(watcher);
     } catch (Throwable t) {
       LOG.warn("Failed to watch pods and will rely on polling.", t);
       return;
     }
-
-    closer.register(watch);
 
     scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
   }
@@ -689,6 +688,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   public class PodWatcher implements Watcher<Pod> {
 
+    private static final int RECONNECT_DELAY_SECONDS = 1;
+
     private final ConcurrentMap<String, WorkflowInstance> podUpdates = new ConcurrentHashMap<>();
 
     /**
@@ -755,11 +756,12 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     private void reconnect() {
-      LOG.warn("Re-establishing pod watcher");
+      LOG.info("Re-establishing pod watcher");
+
+      closeWatch();
 
       try {
-        watch = client.pods()
-            .watch(this);
+        watch = client.watchPods(this);
       } catch (Throwable e) {
         LOG.warn("Retry threw", e);
         scheduleReconnect();
@@ -774,6 +776,12 @@ class KubernetesDockerRunner implements DockerRunner {
     public void onClose(KubernetesClientException e) {
       LOG.warn("Watch closed", e);
       scheduleReconnect();
+    }
+  }
+
+  private void closeWatch() {
+    if (watch != null) {
+      watch.close();
     }
   }
 
