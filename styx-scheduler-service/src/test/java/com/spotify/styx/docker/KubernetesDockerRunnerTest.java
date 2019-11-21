@@ -238,17 +238,32 @@ public class KubernetesDockerRunnerTest {
   @After
   public void tearDown() throws Exception {
     kdr.close();
+    verify(podWatch, atLeastOnce()).close();
   }
 
   @Test
-  public void shouldFailToInitialize() {
+  public void shouldReconnectUponWatcherClose() {
+    Mockito.reset(k8sClient);
+    when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure")).thenReturn(podWatch);
+
+    podWatcher.onClose(new KubernetesClientException("Forced failure"));
+
+    executor.tick(2, TimeUnit.SECONDS);
+    verify(podWatch, times(2)).close();
+    verify(k8sClient, times(2)).watchPods(any());
+  }
+
+  @Test
+  public void shouldFailToInitialize() throws IOException {
     var spiedExecutor = spy(executor);
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
-    kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
+    var kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
         spiedExecutor);
     kdr.init();
     verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
+    kdr.close();
+    verify(podWatch, never()).close();
   }
 
   @Test

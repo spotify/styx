@@ -99,6 +99,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -156,6 +157,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Duration podDeletionDelay;
   private final Time time;
   private final ExecutorService executor;
+  private Watch watch;
 
   @VisibleForTesting
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
@@ -527,6 +529,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @Override
   public void close() throws IOException {
+    closeWatch();
     closer.close();
   }
 
@@ -534,15 +537,12 @@ class KubernetesDockerRunner implements DockerRunner {
     scheduleWithJitter(this::cleanupPods, scheduledExecutor, cleanupPodsInterval);
 
     final PodWatcher watcher = new PodWatcher();
-    final Watch watch;
     try {
       watch = client.watchPods(watcher);
     } catch (Throwable t) {
       LOG.warn("Failed to watch pods and will rely on polling.", t);
       return;
     }
-
-    closer.register(watch);
 
     scheduleWithJitter(watcher::processPodUpdates, scheduledExecutor, PROCESS_POD_UPDATE_INTERVAL);
   }
@@ -688,6 +688,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   public class PodWatcher implements Watcher<Pod> {
 
+    private static final int RECONNECT_DELAY_SECONDS = 1;
+
     private final ConcurrentMap<String, WorkflowInstance> podUpdates = new ConcurrentHashMap<>();
 
     /**
@@ -753,9 +755,33 @@ class KubernetesDockerRunner implements DockerRunner {
       emitPodEvents(pod, runState.get());
     }
 
+    private void reconnect() {
+      LOG.info("Re-establishing pod watcher");
+
+      closeWatch();
+
+      try {
+        watch = client.watchPods(this);
+      } catch (Throwable e) {
+        LOG.warn("Retry threw", e);
+        scheduleReconnect();
+      }
+    }
+
+    private void scheduleReconnect() {
+      scheduledExecutor.schedule(this::reconnect, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
     @Override
     public void onClose(KubernetesClientException e) {
       LOG.warn("Watch closed", e);
+      scheduleReconnect();
+    }
+  }
+
+  private void closeWatch() {
+    if (watch != null) {
+      watch.close();
     }
   }
 
