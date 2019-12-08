@@ -297,6 +297,9 @@ class KubernetesGCPServiceAccountSecretManager {
            + Hashing.sha256().hashString(serviceAccount, UTF_8);
   }
 
+  /**
+   * This returns either the n-th or (n+1)-th DEFAULT_SECRET_EPOCH_PERIOD.
+   */
   @VisibleForTesting
   static long smearedEpoch(long nowMillis, String serviceAccount) {
     final long offset = Math.abs(serviceAccount.hashCode()) % DEFAULT_SECRET_EPOCH_PERIOD.toMillis();

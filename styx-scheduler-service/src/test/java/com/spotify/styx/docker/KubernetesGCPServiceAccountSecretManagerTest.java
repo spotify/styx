@@ -502,20 +502,23 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", newP12Key.getPrivateKeyData()));
   }
 
+  /**
+   * During a week, the number of rotations happening each hour should meet
+   * certain statistically criteria.
+   */
   @Test
   public void shouldSmearRotationWeekly() {
     final long hours = Duration.ofDays(7).toHours();
     final int[] rotationsPerHour = new int[(int) hours];
     final int n = 10000;
     for (int i = 0; i < n; i++) {
-      long prevEpoch = 0;
       for (int hour = 0; hour < hours; hour++) {
         final long nowMillis = TimeUnit.HOURS.toMillis(hour);
         final long epoch = KubernetesGCPServiceAccountSecretManager.smearedEpoch(
             nowMillis, "sa" + i + "@example.com");
-        if (prevEpoch != epoch) {
-          prevEpoch = epoch;
+        if (epoch != 0) {
           rotationsPerHour[hour]++;
+          break;
         }
       }
     }
