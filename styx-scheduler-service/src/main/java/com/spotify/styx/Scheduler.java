@@ -29,6 +29,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
@@ -59,6 +60,7 @@ import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -72,6 +74,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,10 +94,13 @@ import org.slf4j.LoggerFactory;
  */
 public class Scheduler {
 
+  private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
+
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
 
   private static final Tracer tracer = Tracing.getTracer();
+  private static final long RANDOMIZED_DELAY_BASE = Duration.ofMinutes(5).toMillis();
 
   private final Time time;
   private final StateManager stateManager;
@@ -143,11 +149,11 @@ public class Scheduler {
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
     try {
-      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
       config = storage.config();
       globalConcurrency = config.globalConcurrency();
+      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
     } catch (IOException e) {
-      log.warn("Failed to get resource limits", e);
+      log.warn("Failed to read from storage", e);
       return;
     }
 
@@ -190,6 +196,10 @@ public class Scheduler {
                                 Set<WorkflowInstance> activeInstances,
                                 AtomicLongMap<String> currentResourceUsage,
                                 AtomicLongMap<String> currentResourceDemand) {
+
+    if (!config.globalEnabled()) {
+      LOG.info("Scheduling has been disabled globally.");
+    }
 
     var resourceExhaustedCache = new ConcurrentHashMap<String, Boolean>();
 
@@ -247,6 +257,12 @@ public class Scheduler {
 
     log.debug("Evaluating instance for dequeue: {}", instance);
 
+    if (!config.globalEnabled()) {
+      LOG.debug("Scheduling disabled, sending instance back to queue: {}", instance);
+      stateManager.receiveIgnoreClosed(Event.retryAfter(instance, randomizedDelay()), runState.counter());
+      return;
+    }
+
     // Get the workflow configuration
     var workflowOpt = workflows.computeIfAbsent(instance.workflowId(), this::readWorkflow);
     var workflowConfig = workflowOpt
@@ -291,6 +307,11 @@ public class Scheduler {
     // Racy: some resources may have been removed (become unknown) by now; in that case the
     // counters code during dequeue will treat them as unlimited...
     sendDequeue(instance, runState, instanceResourceRefs);
+  }
+
+  @VisibleForTesting
+  static long randomizedDelay() {
+    return ThreadLocalRandom.current().nextLong(RANDOMIZED_DELAY_BASE / 2, (long) (RANDOMIZED_DELAY_BASE * 1.5));
   }
 
   private Optional<Workflow> readWorkflow(WorkflowId workflowId) {

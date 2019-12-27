@@ -20,12 +20,16 @@
 
 package com.spotify.styx;
 
+import static org.hamcrest.Matchers.both;
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.either;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.Assert.assertThat;
-import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -62,6 +66,8 @@ import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
+import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -73,6 +79,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.LongStream;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -96,6 +103,8 @@ public class SchedulerTest {
       WorkflowInstance.create(WORKFLOW_ID1, "2016-12-02T01");
   private static final WorkflowInstance INSTANCE_2 =
       WorkflowInstance.create(WORKFLOW_ID2, "2016-12-02T01");
+
+  private static final long RANDOMIZED_DELAY_BASE = Duration.ofMinutes(5).toMillis();
 
   private Scheduler scheduler;
 
@@ -128,6 +137,7 @@ public class SchedulerTest {
 
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
+    when(config.globalEnabled()).thenReturn(true);
     when(storage.config()).thenReturn(config);
 
     when(resourceDecorator.decorateResources(
@@ -172,6 +182,13 @@ public class SchedulerTest {
             .schedule(Schedule.HOURS)
             .resources(resources)
             .build());
+  }
+
+  @Test
+  public void shouldNotScheduleExecutionWhenFailedToReadConfig() throws IOException {
+    when(storage.config()).thenThrow(new IOException());
+    scheduler.tick();
+    verify(storage, never()).listActiveInstances();
   }
 
   @Test
@@ -611,6 +628,36 @@ public class SchedulerTest {
     verify(stats).recordTickDuration(any(), anyLong());
 
     verify(log).debug("Counter capacity exhausted when scheduling instance: {}", INSTANCE_1, cause);
+  }
+
+  @Test
+  public void shouldSendBackToQueueOnDisabledGlobally() {
+    when(config.globalEnabled()).thenReturn(false);
+
+    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+    var stateData = StateData.newBuilder().tries(0).build();
+    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
+
+    scheduler.tick();
+
+    var event = eventCaptor.getValue();
+    assertThat(event.workflowInstance(), is(INSTANCE_1));
+    assertThat(EventUtil.name(event).equals("retryAfter"), is(true));
+  }
+
+  @Test
+  public void shouldGiveRandomizedDelay() {
+    var statistics = LongStream.range(0, 10000)
+        .map(i -> Scheduler.randomizedDelay())
+        .summaryStatistics();
+
+    assertThat(statistics.getAverage(), is(closeTo(RANDOMIZED_DELAY_BASE, RANDOMIZED_DELAY_BASE / 2.0)));
+    assertThat(statistics.getMin(), is(
+        both(greaterThanOrEqualTo(RANDOMIZED_DELAY_BASE / 2))
+            .and(lessThanOrEqualTo((long) (RANDOMIZED_DELAY_BASE * 1.5)))));
+    assertThat(statistics.getMax(), is(
+        both(greaterThanOrEqualTo(RANDOMIZED_DELAY_BASE))
+            .and(lessThanOrEqualTo((long) (RANDOMIZED_DELAY_BASE * 1.5)))));
   }
 
   private WorkflowInstance instance(WorkflowId id, String instanceId) {
