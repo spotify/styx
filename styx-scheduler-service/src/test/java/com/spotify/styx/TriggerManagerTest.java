@@ -79,6 +79,7 @@ public class TriggerManagerTest {
 
   @Before
   public void setUp() throws IOException {
+    when(config.globalEnabled()).thenReturn(true);
     when(storage.config()).thenReturn(config);
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
   }
@@ -185,7 +186,6 @@ public class TriggerManagerTest {
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
-    when(config.globalEnabled()).thenReturn(true);
     if (enabled) {
       when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
     } else {
