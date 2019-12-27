@@ -145,13 +145,13 @@ public class Scheduler {
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
     try {
-      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
       config = storage.config();
       if (!config.globalEnabled()) {
         LOG.info("Scheduling has been disabled globally.");
         return;
       }
       globalConcurrency = config.globalConcurrency();
+      resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
     } catch (IOException e) {
       log.warn("Failed to read from storage", e);
       return;
