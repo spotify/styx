@@ -147,7 +147,7 @@ public class Scheduler {
     try {
       resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
       config = storage.config();
-      if (!storage.config().globalEnabled()) {
+      if (!config.globalEnabled()) {
         LOG.info("Scheduling has been disabled globally.");
         return;
       }
