@@ -91,6 +91,8 @@ import org.slf4j.LoggerFactory;
  */
 public class Scheduler {
 
+  private static final Logger LOG = LoggerFactory.getLogger(Scheduler.class);
+
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
       Scheduler.class.getSimpleName());
 
@@ -138,6 +140,16 @@ public class Scheduler {
 
   private void tick0() {
     final Instant t0 = time.get();
+
+    try {
+      if (!storage.config().globalEnabled()) {
+        LOG.info("Scheduling has been disabled globally.");
+        return;
+      }
+    } catch (IOException e) {
+      LOG.warn("Couldn't fetch global enabled status, skipping this run", e);
+      return;
+    }
 
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;

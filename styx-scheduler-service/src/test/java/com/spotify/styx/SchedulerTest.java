@@ -23,9 +23,10 @@ package com.spotify.styx;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
-import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -62,6 +63,7 @@ import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.EventUtil;
 import com.spotify.styx.util.ShardedCounter;
 import com.spotify.styx.util.Time;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -128,6 +130,7 @@ public class SchedulerTest {
 
     when(storage.resources()).thenReturn(resourceLimits);
     when(config.globalConcurrency()).thenReturn(Optional.empty());
+    when(config.globalEnabled()).thenReturn(true);
     when(storage.config()).thenReturn(config);
 
     when(resourceDecorator.decorateResources(
@@ -172,6 +175,13 @@ public class SchedulerTest {
             .schedule(Schedule.HOURS)
             .resources(resources)
             .build());
+  }
+
+  @Test
+  public void shouldNotScheduleExecutionOnDisabledGlobally() throws IOException {
+    when(config.globalEnabled()).thenReturn(false);
+    scheduler.tick();
+    verify(storage, never()).backfills(anyBoolean());
   }
 
   @Test
