@@ -185,6 +185,13 @@ public class SchedulerTest {
   }
 
   @Test
+  public void shouldNotScheduleExecutionWhenFailedToReadConfig() throws IOException {
+    when(storage.config()).thenThrow(new IOException());
+    scheduler.tick();
+    verify(storage, never()).backfills(anyBoolean());
+  }
+
+  @Test
   public void shouldBeRateLimiting() {
     when(rateLimiter.acquire()).thenReturn(1.0);
 

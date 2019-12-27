@@ -153,6 +153,14 @@ public class TriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerExecutionWhenFailedToReadConfig() throws IOException {
+    when(storage.config()).thenThrow(new IOException());
+    triggerManager.tick();
+    verify(triggerListener, never()).event(any(), any(), any(), any());
+    verify(storage, never()).updateNextNaturalTrigger(any(), any());
+  }
+
+  @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any(), any());

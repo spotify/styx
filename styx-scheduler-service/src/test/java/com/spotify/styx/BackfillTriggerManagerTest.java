@@ -210,6 +210,13 @@ public class BackfillTriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerExecutionWhenFailedToReadConfig() throws IOException {
+    when(storage.config()).thenThrow(new IOException());
+    backfillTriggerManager.tick();
+    verify(storage, never()).backfills(anyBoolean());
+  }
+
+  @Test
   public void shouldTriggerBackfillsNew() throws IOException {
     final Workflow workflow = createWorkflow(WORKFLOW_ID1);
     initWorkflow(workflow);
