@@ -45,6 +45,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Lists;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
+import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -145,6 +146,7 @@ public class BackfillTriggerManagerTest {
   @Mock Storage storage;
   @Mock StorageTransaction transaction;
   @Mock StateManager stateManager;
+  @Mock StyxConfig config;
 
   private BackfillTriggerManager backfillTriggerManager;
 
@@ -187,6 +189,9 @@ public class BackfillTriggerManagerTest {
     when(storage.runInTransactionWithRetries(any())).then(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
 
+    when(config.globalEnabled()).thenReturn(true);
+    when(storage.config()).thenReturn(config);
+
     backfillTriggerManager = new BackfillTriggerManager(stateManager, storage,
                                                         triggerListener, Stats.NOOP, TIME,
                                                         (x) -> {});
@@ -195,6 +200,13 @@ public class BackfillTriggerManagerTest {
   @After
   public void tearDown() {
     executor.shutdownNow();
+  }
+
+  @Test
+  public void shouldNotTriggerExecutionOnDisabledGlobally() throws IOException {
+    when(config.globalEnabled()).thenReturn(false);
+    backfillTriggerManager.tick();
+    verify(storage, never()).backfills(anyBoolean());
   }
 
   @Test
