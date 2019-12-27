@@ -181,14 +181,14 @@ public class SchedulerTest {
   public void shouldNotScheduleExecutionOnDisabledGlobally() throws IOException {
     when(config.globalEnabled()).thenReturn(false);
     scheduler.tick();
-    verify(storage, never()).backfills(anyBoolean());
+    verify(storage, never()).listActiveInstances();
   }
 
   @Test
   public void shouldNotScheduleExecutionWhenFailedToReadConfig() throws IOException {
     when(storage.config()).thenThrow(new IOException());
     scheduler.tick();
-    verify(storage, never()).backfills(anyBoolean());
+    verify(storage, never()).listActiveInstances();
   }
 
   @Test
