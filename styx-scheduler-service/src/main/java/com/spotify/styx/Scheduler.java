@@ -141,25 +141,19 @@ public class Scheduler {
   private void tick0() {
     final Instant t0 = time.get();
 
-    try {
-      if (!storage.config().globalEnabled()) {
-        LOG.info("Scheduling has been disabled globally.");
-        return;
-      }
-    } catch (IOException e) {
-      LOG.warn("Couldn't fetch global enabled status, skipping this run", e);
-      return;
-    }
-
     final Map<String, Resource> resources;
     final Optional<Long> globalConcurrency;
     final StyxConfig config;
     try {
       resources = storage.resources().stream().collect(toMap(Resource::id, identity()));
       config = storage.config();
+      if (!storage.config().globalEnabled()) {
+        LOG.info("Scheduling has been disabled globally.");
+        return;
+      }
       globalConcurrency = config.globalConcurrency();
     } catch (IOException e) {
-      log.warn("Failed to get resource limits", e);
+      log.warn("Failed to read from storage", e);
       return;
     }
 
