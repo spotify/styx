@@ -711,7 +711,8 @@ public class KubernetesDockerRunnerTest {
     receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image: ErrImagePull: foobar"),
+        Event.runError(WORKFLOW_INSTANCE,
+            "Failed to pull image busybox:latest of container styx-run, reason: ErrImagePull, message: foobar"),
         -1);
   }
 
@@ -720,9 +721,10 @@ public class KubernetesDockerRunnerTest {
     setWaiting(createdPod, "Pending", "ErrImagePull", "foobar");
     receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
 
-    verify(stats, times(1)).recordPullImageError();
+    verify(stats).recordPullImageError();
     verify(stateManager).receive(
-        Event.runError(WORKFLOW_INSTANCE, "One or more containers failed to pull their image: ErrImagePull: foobar"),
+        Event.runError(WORKFLOW_INSTANCE,
+            "Failed to pull image busybox:latest of container styx-run, reason: ErrImagePull, message: foobar"),
         -1);
   }
 
