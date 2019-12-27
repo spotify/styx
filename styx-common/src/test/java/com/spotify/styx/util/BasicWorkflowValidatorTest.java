@@ -64,6 +64,7 @@ public class BasicWorkflowValidatorTest {
   private static final int MAX_SECRET_NAME_LENGTH = 253;
   private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  private static final int MAX_RETRY_CONDITION_LENGTH = 256;
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
@@ -135,6 +136,7 @@ public class BasicWorkflowValidatorTest {
         .collect(toMap(i -> "env-var-" + i, i -> "env-val-" + i));
     final long envSize = env.entrySet().stream().mapToLong(e -> e.getKey().length() + e.getValue().length()).sum();
     final Duration runningTimeout = Duration.ofSeconds(59L);
+    var retryCondition = Strings.repeat("foo -> bar", 1024);
 
     final WorkflowConfiguration invalidConfiguration = WorkflowConfiguration.builder()
         .id(id)
@@ -148,6 +150,7 @@ public class BasicWorkflowValidatorTest {
         .serviceAccount(serviceAccount)
         .env(env)
         .runningTimeout(runningTimeout)
+        .retryCondition(retryCondition)
         .build();
 
     final List<String> errors = sut.validateWorkflow(Workflow.create("test", invalidConfiguration));
@@ -167,6 +170,8 @@ public class BasicWorkflowValidatorTest {
         .add(limit("env too big", envSize, MAX_ENV_SIZE))
         .add(limit("running timeout is too small", runningTimeout, MIN_RUNNING_TIMEOUT))
         .add("service account is not a valid email address: " + serviceAccount)
+        .add(limit("retry condition too long", retryCondition.length(), MAX_RETRY_CONDITION_LENGTH))
+        .add("invalid retry condition: Expression [" + retryCondition + "] @4: EL1042E: Problem parsing right operand")
         .build();
 
     assertThat(errors, containsInAnyOrder(expectedErrors.toArray()));

@@ -20,15 +20,35 @@
 
 package com.spotify.styx.state.handlers;
 
+import static java.lang.Boolean.TRUE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.RetryUtil;
+import com.spotify.styx.util.TriggerUtil;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.expression.EvaluationException;
+import org.springframework.expression.Expression;
+import org.springframework.expression.spel.SpelCompilerMode;
+import org.springframework.expression.spel.SpelParserConfiguration;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 
 /**
  * A {@link OutputHandler} that manages scheduling generation of {@link Event}s
@@ -36,17 +56,32 @@ import java.util.Optional;
  */
 public class TerminationHandler implements OutputHandler {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TerminationHandler.class);
+
   // Retry cost is vaguely related to a max time period we're going to keep retrying a state.
   // See the different costs for failures and missing dependencies in RunState
   static final double MAX_RETRY_COST = 50.0;
   private static final int MISSING_DEPS_EXIT_CODE = 20;
   private static final int FAIL_FAST_EXIT_CODE = 50;
   public static final int MISSING_DEPS_RETRY_DELAY_MINUTES = 10;
+  private static final long RETRY_CONDITION_EXPRESSION_CACHE_SIZE = 1000;
 
   private final RetryUtil retryUtil;
 
-  public TerminationHandler(RetryUtil retryUtil) {
-    this.retryUtil = Objects.requireNonNull(retryUtil);
+  private final Supplier<Map<WorkflowId, Workflow>> workflows;
+
+  private final SpelExpressionParser expressionParser;
+  private final Cache<String, Expression> retryConditionExpressionCache;
+
+  public TerminationHandler(RetryUtil retryUtil, Supplier<Map<WorkflowId, Workflow>> workflows) {
+    this.retryUtil = Objects.requireNonNull(retryUtil, "retryUtil");
+    this.workflows = Objects.requireNonNull(workflows, "workflows");
+
+    var config = new SpelParserConfiguration(SpelCompilerMode.IMMEDIATE, this.getClass().getClassLoader());
+    expressionParser = new SpelExpressionParser(config);
+    retryConditionExpressionCache = CacheBuilder.newBuilder()
+        .maximumSize(RETRY_CONDITION_EXPRESSION_CACHE_SIZE)
+        .build();
   }
 
   @Override
@@ -74,7 +109,7 @@ public class TerminationHandler implements OutputHandler {
 
     if (state.data().retryCost() < MAX_RETRY_COST) {
       final Optional<Integer> exitCode = state.data().lastExit();
-      if (shouldFailFast(exitCode)) {
+      if (shouldFailFast(state, exitCode)) {
         eventRouter.receiveIgnoreClosed(Event.stop(workflowInstance), state.counter());
       } else {
         final long delayMillis;
@@ -94,7 +129,46 @@ public class TerminationHandler implements OutputHandler {
     return exitCode.map(c -> c == MISSING_DEPS_EXIT_CODE).orElse(false);
   }
 
-  private static boolean shouldFailFast(Optional<Integer> exitCode) {
-    return exitCode.map(c -> c == FAIL_FAST_EXIT_CODE).orElse(false);
+  private boolean shouldFailFast(RunState state, Optional<Integer> exitCode) {
+    if (exitCode.isPresent() && exitCode.orElseThrow() == FAIL_FAST_EXIT_CODE) {
+      return true;
+    }
+
+    var workflow = workflows.get().get(state.workflowInstance().workflowId());
+    if (workflow == null) {
+      LOG.info("Workflow {} does not exist", state.workflowInstance().workflowId().toKey());
+      return true;
+    }
+
+    return workflow.configuration().retryCondition()
+        .map(s -> !retryConditionMet(state, exitCode, s))
+        .orElse(false);
+  }
+
+  @VisibleForTesting
+  boolean retryConditionMet(RunState state,
+                            Optional<Integer> exitCode,
+                            String retryCondition) {
+    var context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+    context.setVariable("exitCode", exitCode.orElse(null));
+    context.setVariable("tries", state.data().tries());
+    context.setVariable("triggerType", state.data().trigger().map(TriggerUtil::triggerType).orElse(null));
+    context.setVariable("consecutiveFailures", state.data().consecutiveFailures());
+
+    final Expression expression;
+    try {
+      expression = retryConditionExpressionCache.get(retryCondition,
+          () -> expressionParser.parseRaw(retryCondition));
+    } catch (ExecutionException | UncheckedExecutionException e) {
+      LOG.debug("Failed to parse retry condition `{}`", retryCondition, e.getCause());
+      return false;
+    }
+
+    try {
+      return TRUE.equals(expression.getValue(context, Boolean.class));
+    } catch (EvaluationException e) {
+      LOG.debug("Failed to evaluate retry condition `{}`", retryCondition, e);
+      return false;
+    }
   }
 }

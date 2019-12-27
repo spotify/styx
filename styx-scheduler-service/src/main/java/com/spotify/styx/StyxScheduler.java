@@ -374,7 +374,7 @@ public class StyxScheduler implements AppInit {
     // These output handlers will be invoked in order.
     var outputHandlers = OutputHandler.tracing(List.of(
         new DockerRunnerHandler(dockerRunner),
-        new TerminationHandler(retryUtil),
+        new TerminationHandler(retryUtil, workflowCache),
         new MonitoringHandler(stats),
         new ExecutionDescriptionHandler(storage, workflowValidator),
         // Emit timeouts last in order to not over-eagerly time out an instance that
