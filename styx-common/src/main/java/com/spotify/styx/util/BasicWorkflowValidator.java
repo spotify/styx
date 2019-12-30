@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.springframework.expression.ParseException;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 public class BasicWorkflowValidator implements WorkflowValidator {
 
@@ -43,6 +45,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   private static final int MAX_SECRET_NAME_LENGTH = 253;
   private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
+  private static final int MAX_RETRY_CONDITION_LENGTH = 256;
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
@@ -95,6 +98,8 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     upperLimit(e, cfg.env().entrySet().stream()
             .mapToInt(entry -> entry.getKey().length() + entry.getValue().length()).sum(),
         MAX_ENV_SIZE, "env too big");
+    upperLimit(e, cfg.retryCondition().map(String::length).orElse(0),
+        MAX_RETRY_CONDITION_LENGTH, "retry condition too long");
 
     cfg.dockerImage().ifPresent(image ->
         dockerImageValidator.validateImageReference(image).stream()
@@ -132,11 +137,19 @@ public class BasicWorkflowValidator implements WorkflowValidator {
       }
     });
 
+    cfg.retryCondition().ifPresent(retryCondition -> {
+      try {
+        new SpelExpressionParser().parseRaw(retryCondition);
+      } catch (ParseException ex) {
+        e.add(format("invalid retry condition: %s", ex.getMessage()));
+      }
+    });
+
     return e;
   }
 
   private static boolean validateServiceAccount(String serviceAccount) {
-    var matcher = VALID_EMAIL_ADDRESS_REGEX .matcher(serviceAccount);
+    var matcher = VALID_EMAIL_ADDRESS_REGEX.matcher(serviceAccount);
     return matcher.matches();
   }
 }

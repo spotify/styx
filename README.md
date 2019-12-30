@@ -107,6 +107,8 @@ secret:
   name: my-secret
   mount_path: /etc/my-keys
 service_account: my-service-account@my-project.iam.gserviceaccount.com
+running_timeout: PT2H
+retry_condition: #exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == "natural"
 ```
 
 #### `id` **[string]**
@@ -214,6 +216,19 @@ Custom environment variables to be injected into running container.
 #### `running_timeout` **[string]**
 An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
 serves as the upper boundary.
+
+#### `retry_condition` **[string]**
+A [SpEL](https://docs.spring.io/spring/docs/current/spring-framework-reference/core.html#expressions) boolean expression.
+If the expression evaluates to `false`, Styx will stop retrying and halt the workflow instance immediately. This
+configuration has no impact on possible max number of tries, meaning it can only be used to halt workflow instance
+earlier.
+
+The following variables will be injected by Styx so that they can be used in the expression:
+* \#exitCode: the exit code from the last execution
+* \#tries: total number of tries, which equals to `1` when the first time a workflow instance gets executed and `2` when
+  the first retry is issued
+* \#consecutiveFailures: total number of consecutive failures that is not `missing dependency`
+* \#triggerType: `natural`, `backfill` or `ad-hoc`
 
 ### Triggering and executions
 

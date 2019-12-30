@@ -83,6 +83,10 @@
       <artifactId>google-api-client</artifactId>
       <version>1.28.0</version>
     </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-expression</artifactId>
+    </dependency>
 
     <!-- test deps -->
     <dependency>
