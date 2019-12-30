@@ -37,6 +37,7 @@ public interface ExecutionDescription {
   Optional<String> commitSha();
   Map<String, String> env();
   Optional<Duration> runningTimeout();
+  Optional<String> retryCondition();
 
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();

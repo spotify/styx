@@ -273,6 +273,7 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("Environment:           " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));
     System.out.println("Timeout:               " + wf.configuration().runningTimeout().map(Duration::toString).orElse(""));
     System.out.println("Commit:                " + wf.configuration().commitSha().orElse(""));
+    System.out.println("Retry Condition:       " + wf.configuration().retryCondition().orElse(""));
     System.out.println("Enabled:               " + state.enabled().map(Object::toString).orElse(""));
     System.out.println("Next Trigger:          " + state.nextNaturalTrigger().map(Object::toString).orElse(""));
     System.out.println("Next Trigger (offset): " + state.nextNaturalOffsetTrigger().map(Object::toString).orElse(""));

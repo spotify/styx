@@ -142,6 +142,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .commitSha(workflow.configuration().commitSha())
         .env(env)
         .runningTimeout(workflow.configuration().runningTimeout())
+        .retryCondition(workflow.configuration().retryCondition())
         .build();
   }
 

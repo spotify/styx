@@ -190,7 +190,7 @@ public class TerminationHandlerTest {
     verify(eventRouter).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
   }
 
-  @Test(timeout = 1000)
+  @Test(timeout = 2000)
   public void shouldEvaluateToTrueUnderMultiThreadEnv() {
     var forkJoinPool = new ForkJoinPool(32);
     var results = forkJoinPool.submit(() -> IntStream.range(0, 10000)
