@@ -21,8 +21,8 @@
 package com.spotify.styx.model;
 
 import io.norberg.automatter.AutoMatter;
-import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @AutoMatter
 public interface StyxConfig {
@@ -55,7 +55,7 @@ public interface StyxConfig {
   /**
    * Get client blacklist.
    */
-  List<String> clientBlacklist();
+  Set<String> clientBlacklist();
 
   static StyxConfigBuilder newBuilder() {
     return new StyxConfigBuilder();

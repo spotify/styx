@@ -45,7 +45,6 @@ import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -105,11 +104,10 @@ public final class Middlewares {
     });
   }
 
-  static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> clientValidator(
-      Supplier<List<String>> supplier) {
+  public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> clientValidator(
+      Supplier<Set<String>> supplier) {
     return innerHandler -> requestContext -> {
       if (requestContext.request().header("User-Agent")
-          // TODO: should the blacklist be a set so this lookup is O(1) instead of O(n) ?
           .map(header -> supplier.get().contains(header))
           .orElse(false)) {
         // TODO: fire some stats

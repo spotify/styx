@@ -228,7 +228,7 @@ public class DatastoreStorage implements Closeable {
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
         .clientBlacklist(this.<String>readStream(entity, PROPERTY_CONFIG_CLIENT_BLACKLIST)
-            .collect(toList()))
+            .collect(toSet()))
         .build();
   }
 

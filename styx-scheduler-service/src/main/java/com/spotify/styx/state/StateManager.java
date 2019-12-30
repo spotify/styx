@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Interface for driving active {@link RunState} instances by sending them {@link Event}s.
  */
-public interface StateManager extends Closeable {
+public interface StateManager extends EventRouter, Closeable {
 
   Logger LOG = LoggerFactory.getLogger(StateManager.class);
 
@@ -53,55 +53,9 @@ public interface StateManager extends Closeable {
       TriggerParameters parameters) throws IsClosedException;
 
   /**
-   * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
-   * the {@link Event#workflowInstance()} key of the event.
-   *
-   * @param event The event to receive
-   * @throws IsClosedException if the state receiver is closed and can not handle events
-   */
-  void receive(Event event) throws IsClosedException;
-
-  /**
-   * Receive an {@link Event} and route it to the corresponding active {@link RunState} based on
-   * the {@link Event#workflowInstance()} key of the event.
-   *
-   * @param event   The event to receive
-   * @param counter The state counter upon which the event must act upon
-   * @throws IsClosedException if the state receiver is closed and can not handle events
-   */
-  void receive(Event event, long counter) throws IsClosedException;
-
-  /**
    * Get a map of all active {@link WorkflowInstance} states filtered by triggerId.
    */
   Map<WorkflowInstance, RunState> getActiveStatesByTriggerId(String triggerId);
-
-  /**
-   * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.
-   *
-   * @param event The event to receive
-   */
-  default void receiveIgnoreClosed(Event event) {
-    try {
-      receive(event);
-    } catch (IsClosedException isClosedException) {
-      LOG.info("Ignored event, state receiver closed", isClosedException);
-    }
-  }
-
-  /**
-   * Like {@link #receive(Event)} but ignoring the {@link IsClosedException} exception.
-   *
-   * @param event The event to receive
-   * @param counter The state counter upon which the event must act upon
-   */
-  default void receiveIgnoreClosed(Event event, long counter) {
-    try {
-      receive(event, counter);
-    } catch (IsClosedException isClosedException) {
-      LOG.info("Ignored event, state receiver closed", isClosedException);
-    }
-  }
 
   /**
    * Get a list of all active {@link WorkflowInstance}s.

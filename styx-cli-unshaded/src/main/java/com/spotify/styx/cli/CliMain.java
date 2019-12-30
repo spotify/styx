@@ -361,8 +361,6 @@ public final class CliMain {
     final List<String> workflows = namespace.getList(parser.workflowDeleteWorkflowId.getDest());
     final boolean force = namespace.getBoolean(parser.workflowDeleteForce.getDest());
 
-    // TODO: allow reading workflow ID's from file?
-
     if (cliContext.hasConsole() && !force) {
       final String reply = cliContext.consoleReadLine(
           "Sure you want to delete the workflow" + (workflows.size() > 1 ? "s" : "") + " "

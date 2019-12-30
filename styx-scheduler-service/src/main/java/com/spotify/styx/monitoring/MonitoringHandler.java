@@ -20,6 +20,7 @@
 
 package com.spotify.styx.monitoring;
 
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import java.util.Objects;
@@ -36,7 +37,7 @@ public class MonitoringHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public void transitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case TERMINATED:
         if (state.data().lastExit().isPresent()) {

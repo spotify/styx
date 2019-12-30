@@ -40,10 +40,10 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
 import java.time.Instant;
@@ -74,7 +74,7 @@ public class DockerRunnerHandlerTest {
       .build();
 
   @Mock DockerRunner dockerRunner;
-  @Mock StateManager stateManager;
+  @Mock EventRouter eventRouter;
 
   @Captor ArgumentCaptor<RunState> runStateCaptor;
   @Captor ArgumentCaptor<RunSpec> runSpecCaptor;
@@ -83,7 +83,7 @@ public class DockerRunnerHandlerTest {
   public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
     when(dockerRunner.start(any(RunState.class), any(RunSpec.class))).thenReturn(TEST_RUNNER_ID);
-    dockerRunnerHandler = new DockerRunnerHandler(dockerRunner, stateManager);
+    dockerRunnerHandler = new DockerRunnerHandler(dockerRunner);
   }
 
   @Test
@@ -97,7 +97,7 @@ public class DockerRunnerHandlerTest {
             .executionId(TEST_EXECUTION_ID)
             .build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(dockerRunner, timeout(60_000)).start(runStateCaptor.capture(), runSpecCaptor.capture());
 
@@ -116,7 +116,7 @@ public class DockerRunnerHandlerTest {
             .executionDescription(EXECUTION_DESCRIPTION)
             .build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(dockerRunner, timeout(60_000)).start(runStateCaptor.capture(), runSpecCaptor.capture());
 
@@ -133,9 +133,9 @@ public class DockerRunnerHandlerTest {
         .executionDescription(EXECUTION_DESCRIPTION)
         .build());
 
-    dockerRunnerHandler.transitionInto(runState);
-
-    verify(stateManager, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID, TEST_RUNNER_ID),
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
+    
+    verify(eventRouter, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID, TEST_RUNNER_ID),
         runState.counter());
   }
 
@@ -162,10 +162,10 @@ public class DockerRunnerHandlerTest {
             .executionDescription(EXECUTION_DESCRIPTION)
             .build(), NOW, COUNTER);
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receive(Event.runError(workflowInstance, throwable.getMessage()), COUNTER);
-    verifyNoMoreInteractions(stateManager);
+    verify(eventRouter).receive(Event.runError(workflowInstance, throwable.getMessage()), COUNTER);
+    verifyNoMoreInteractions(eventRouter);
   }
 
   @Test
@@ -176,10 +176,10 @@ public class DockerRunnerHandlerTest {
         .executionId(TEST_EXECUTION_ID)
         .build(), NOW, COUNTER);
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
-    verifyNoMoreInteractions(stateManager);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verifyNoMoreInteractions(eventRouter);
   }
 
   @Test
@@ -190,10 +190,10 @@ public class DockerRunnerHandlerTest {
         .executionDescription(EXECUTION_DESCRIPTION)
         .build(), NOW, COUNTER);
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
-    verifyNoMoreInteractions(stateManager);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verifyNoMoreInteractions(eventRouter);
   }
 
   @Parameters({"SUBMITTED", "RUNNING"})
@@ -205,11 +205,10 @@ public class DockerRunnerHandlerTest {
     RunState runState = RunState.create(workflowInstance, state,
         StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
 
-    dockerRunnerHandler.transitionInto(runState);
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(dockerRunner).poll(runState);
   }
-
 
   private WorkflowConfiguration configuration(String... args) {
     return WorkflowConfiguration.builder()

@@ -28,10 +28,10 @@ import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.IsClosedException;
@@ -54,20 +54,17 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   private static final String STYX_RUN = "styx-run";
 
   private final Storage storage;
-  private final StateManager stateManager;
   private final WorkflowValidator validator;
 
   public ExecutionDescriptionHandler(
       Storage storage,
-      StateManager stateManager,
       WorkflowValidator validator) {
     this.storage = requireNonNull(storage);
-    this.stateManager = requireNonNull(stateManager);
     this.validator = requireNonNull(validator);
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public void transitionInto(RunState state, EventRouter eventRouter) {
     final WorkflowInstance workflowInstance = state.workflowInstance();
 
     switch (state.state()) {
@@ -76,20 +73,20 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           final Event submitEvent = Event.submit(
               state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId());
           try {
-            stateManager.receive(submitEvent, state.counter());
+            eventRouter.receive(submitEvent, state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Could not send 'submit' event", isClosedException);
           }
         } catch (ResourceNotFoundException e) {
           LOG.info("Halting {}: {}", workflowInstance, e.getMessage());
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
+          eventRouter.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
         } catch (MissingRequiredPropertyException e) {
           LOG.warn("Failed to prepare execution description for " + state.workflowInstance(), e);
-          stateManager.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
+          eventRouter.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
         } catch (IOException e) {
           try {
             LOG.error("Failed to retrieve execution description for " + state.workflowInstance(), e);
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
+            eventRouter.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }

@@ -69,7 +69,6 @@ class KubernetesGCPServiceAccountSecretManager {
   private static final Clock DEFAULT_CLOCK = Clock.systemUTC();
 
   // epoch period + timeout of "running" state
-  // todo: use config value instead of hardcoded 24 hour timeout
   private static final Duration SECRET_GC_GRACE_PERIOD = DEFAULT_SECRET_EPOCH_PERIOD.plusHours(24);
 
   private final Fabric8KubernetesClient client;

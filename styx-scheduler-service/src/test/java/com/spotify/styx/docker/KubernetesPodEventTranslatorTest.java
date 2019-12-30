@@ -101,22 +101,33 @@ public class KubernetesPodEventTranslatorTest {
         Event.started(WFI));
   }
 
-  @Parameters({ "ImageInspectError  , One or more containers failed to pull their image",
-                "PullImageError     , One or more containers failed to pull their image",
-                "ErrImagePull       , One or more containers failed to pull their image",
-                "ErrImageNeverPull  , One or more containers failed to pull their image",
-                "ImagePullBackOff   , One or more containers failed to pull their image",
-                "RegistryUnavailable, One or more containers failed to pull their image",
-                "InvalidImageName   , One or more container image names were invalid",
+  @Parameters({ "ImageInspectError",
+                "PullImageError",
+                "ErrImagePull",
+                "ErrImageNeverPull",
+                "ImagePullBackOff",
+                "RegistryUnavailable"
   })
   @Test
-  public void runErrorOnImageError(String reason, String errorMessage) {
+  public void runErrorOnImageError(String reason) {
     var message = "foobar!";
     setWaiting(pod, "Pending", reason, message);
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
-        Event.runError(WFI, errorMessage + ": " + reason + ": " + message));
+        Event.runError(WFI,
+            String.format("Failed to pull image busybox:latest of container styx-run, reason: %s, message: %s",
+                reason, message)));
+  }
+
+  @Test
+  public void runErrorOnInvalidImage() {
+    var message = "foobar!";
+    setWaiting(pod, "Pending", "InvalidImageName", message);
+
+    assertGeneratesEventsAndTransitions(
+        RunState.State.SUBMITTED, pod,
+        Event.runError(WFI, "Container styx-run has invalid image name busybox:latest, message: " + message));
   }
 
   @Test
@@ -392,7 +403,7 @@ public class KubernetesPodEventTranslatorTest {
   static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
-        .add(new ContainerStatus("foo", "", "", containerState,
+        .add(new ContainerStatus("foo", "busybox:latest", "foobar", containerState,
                                  MAIN_CONTAINER_NAME, ready, 0, containerState));
     podStatus.getContainerStatuses()
         .add(new ContainerStatusBuilder().withName(KEEPALIVE_CONTAINER_NAME)

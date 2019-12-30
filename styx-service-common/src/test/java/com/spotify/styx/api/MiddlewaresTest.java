@@ -62,9 +62,9 @@ import io.opencensus.trace.Tracer;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -218,7 +218,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientNoBlacklist() throws Exception {
-    Supplier<List<String>> supplier = Collections::emptyList;
+    final Supplier<Set<String>> supplier = Set::of;
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -228,7 +228,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientEmptyBlacklist() throws Exception {
-    Supplier<List<String>> supplier = Collections::emptyList;
+    final Supplier<Set<String>> supplier = Set::of;
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -238,7 +238,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClient() throws Exception {
-    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.0");
+    final Supplier<Set<String>> supplier = () -> Set.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(true);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -248,7 +248,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testValidClientNoHeader() throws Exception {
-    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.0");
+    final Supplier<Set<String>> supplier = () -> Set.of("Styx CLI 0.1.0");
     RequestContext requestContext = mockRequestContext(false);
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)
         .apply(mockInnerHandler(requestContext))
@@ -258,7 +258,7 @@ public class MiddlewaresTest {
 
   @Test
   public void testInvalidClient() throws Exception {
-    Supplier<List<String>> supplier = () -> List.of("Styx CLI 0.1.1");
+    final Supplier<Set<String>> supplier = () -> Set.of("Styx CLI 0.1.1");
     RequestContext requestContext = mockRequestContext(true);
 
     Response<Object> response = awaitResponse(Middlewares.clientValidator(supplier)

@@ -33,8 +33,6 @@ import java.util.Optional;
 @AutoMatter
 public interface RunStateDataPayload {
 
-  // todo change the name of this variable, remove 'active'
-  // however this will be a breaking change
   List<RunStateData> activeStates();
 
   @AutoMatter

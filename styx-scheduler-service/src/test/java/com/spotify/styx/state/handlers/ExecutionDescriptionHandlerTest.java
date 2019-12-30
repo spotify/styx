@@ -44,9 +44,9 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.model.WorkflowWithState;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.WorkflowValidator;
@@ -77,7 +77,7 @@ public class ExecutionDescriptionHandlerTest {
   private ExecutionDescriptionHandler toTest;
 
   @Mock Storage storage;
-  @Mock StateManager stateManager;
+  @Mock EventRouter eventRouter;
   @Mock EventVisitor<Void> eventVisitor;
 
   @Captor ArgumentCaptor<WorkflowInstance> workflowInstanceCaptor;
@@ -91,7 +91,7 @@ public class ExecutionDescriptionHandlerTest {
   public void setUp() {
     when(workflowValidator.validateWorkflow(any())).thenReturn(Collections.emptyList());
 
-    toTest = new ExecutionDescriptionHandler(storage, stateManager, workflowValidator);
+    toTest = new ExecutionDescriptionHandler(storage, workflowValidator);
   }
 
   @Test
@@ -104,9 +104,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
+    verify(eventRouter).receive(eventCaptor.capture(), eq(COUNTER));
 
     var event = eventCaptor.getValue();
     event.accept(eventVisitor);
@@ -133,9 +133,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receive(eventCaptor.capture(), eq(COUNTER));
+    verify(eventRouter).receive(eventCaptor.capture(), eq(COUNTER));
 
     var event = eventCaptor.getValue();
     event.accept(eventVisitor);
@@ -161,9 +161,9 @@ public class ExecutionDescriptionHandlerTest {
 
     RunState runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receive(Event.runError(workflowInstance, exception.getMessage()), COUNTER);
+    verify(eventRouter).receive(Event.runError(workflowInstance, exception.getMessage()), COUNTER);
   }
 
   @Test
@@ -173,9 +173,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(any())).thenReturn(Optional.empty());
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -192,9 +192,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -211,9 +211,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   @Test
@@ -228,9 +228,9 @@ public class ExecutionDescriptionHandlerTest {
 
     when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
 
-    toTest.transitionInto(runState);
+    toTest.transitionInto(runState, eventRouter);
 
-    verify(stateManager).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
+    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
 
   private WorkflowConfiguration workflowConfiguration(String... args) {

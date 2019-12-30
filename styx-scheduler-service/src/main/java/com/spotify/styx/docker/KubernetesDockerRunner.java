@@ -837,7 +837,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean runError(WorkflowInstance workflowInstance, String message) {
-      return message.contains("failed to pull");
+      return message.contains("Failed to pull image");
     }
 
     @Override

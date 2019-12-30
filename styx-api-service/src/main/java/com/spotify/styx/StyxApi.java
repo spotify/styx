@@ -63,7 +63,6 @@ import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -215,7 +214,7 @@ public class StyxApi implements AppInit {
 
     final Supplier<StyxConfig> configSupplier =
         new CachedSupplier<>(storage::config, Instant::now);
-    final Supplier<List<String>> clientBlacklistSupplier =
+    final Supplier<Set<String>> clientBlacklistSupplier =
         () -> configSupplier.get().clientBlacklist();
 
     final RequestAuthenticator requestAuthenticator = new RequestAuthenticator(authenticatorFactory.apply(

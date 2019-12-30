@@ -596,11 +596,11 @@ public class DatastoreStorageTest {
             List.of(StringValue.of("v1"), StringValue.of("v2"), StringValue.of("v3")))
         .build();
     datastoreClient.put(config);
-    List<String> blacklist = storage.config().clientBlacklist();
+    var blacklist = storage.config().clientBlacklist();
     assertThat(blacklist.size(), is(3));
-    assertThat(blacklist.get(0), is("v1"));
-    assertThat(blacklist.get(1), is("v2"));
-    assertThat(blacklist.get(2), is("v3"));
+    assertThat(blacklist.contains("v1"), is(true));
+    assertThat(blacklist.contains("v2"), is(true));
+    assertThat(blacklist.contains("v3"), is(true));
   }
 
   @Test

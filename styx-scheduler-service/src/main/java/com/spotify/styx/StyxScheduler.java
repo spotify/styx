@@ -110,7 +110,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -358,9 +357,32 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
-    // TODO: hack to get around circular reference. Change OutputHandler.transitionInto() to
-    //       take StateManager as argument instead?
-    final List<OutputHandler> outputHandlers = new ArrayList<>();
+    final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
+    final Function<RunState, String> runnerId = new DockerRunnerId(styxConfig);
+    final Debug debug = () -> styxConfig.get().debugEnabled();
+    var secretWhitelist =
+        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
+    var workflowValidator = new ExtendedWorkflowValidator(
+        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
+
+    final DockerRunner routingDockerRunner = DockerRunner.routing(
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
+        runnerId);
+    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
+        TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
+
+    // These output handlers will be invoked in order.
+    var outputHandlers = OutputHandler.tracing(List.of(
+        new DockerRunnerHandler(dockerRunner),
+        new TerminationHandler(retryUtil),
+        new MonitoringHandler(stats),
+        new ExecutionDescriptionHandler(storage, workflowValidator),
+        // Emit timeouts last in order to not over-eagerly time out an instance that
+        // will be transitioned by another handler. In situations where the styx scheduler comes back up after
+        // an extended downtime, many k8s pods will be completed and would transition the instance into done.
+        // However, many of those instances would _also_ technically have timed out according to wall clock and
+        // the TimeoutHandler would fail them if allowed to run first.
+        new TimeoutHandler(timeoutConfig, time, workflowCache)));
     var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
 
     var eventConsumer = fanEvent(EventConsumer.tracing(List.of(
@@ -372,35 +394,7 @@ public class StyxScheduler implements AppInit {
         storage, eventConsumer, eventConsumerExecutor, outputHandler, shardedCounter));
     final StateManager stateManager = TracingProxy.instrument(StateManager.class, queuedStateManager);
 
-    final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
-    final Function<RunState, String> runnerId = new DockerRunnerId(styxConfig);
-    final Debug debug = () -> styxConfig.get().debugEnabled();
-    var secretWhitelist =
-        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
-    final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
-        runnerId);
-    final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
-        TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
-
     final RateLimiter dequeueRateLimiter = RateLimiter.create(DEFAULT_SUBMISSION_RATE_PER_SEC);
-
-    var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
-
-    // These output handlers will be invoked in order.
-    outputHandlers.addAll(OutputHandler.tracing(List.of(
-        new DockerRunnerHandler(dockerRunner, stateManager),
-        new TerminationHandler(retryUtil, stateManager),
-        new MonitoringHandler(stats),
-        new ExecutionDescriptionHandler(storage, stateManager, workflowValidator),
-
-        // Emit timeouts last in order to not over-eagerly time out an instance that
-        // will be transitioned by another handler. In situations where the styx scheduler comes back up after
-        // an extended downtime, many k8s pods will be completed and would transition the instance into done.
-        // However, many of those instances would _also_ technically have timed out according to wall clock and
-        // the TimeoutHandler would fail them if allowed to run first.
-        new TimeoutHandler(timeoutConfig, time, stateManager, workflowCache))));
 
     final TriggerListener trigger =
         new StateInitializingTrigger(stateManager);

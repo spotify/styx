@@ -77,7 +77,6 @@ final class KubernetesPodEventTranslator {
         stats.recordTerminationLogMissing();
       } else {
         try {
-          // TODO: handle multiple termination log messages
           final TerminationLogMessage message = Json.deserialize(
               ByteString.encodeUtf8(terminated.getMessage()), TerminationLogMessage.class);
 
@@ -284,10 +283,11 @@ final class KubernetesPodEventTranslator {
             case "ErrImageNeverPull":
             case "ImagePullBackOff":
             case "RegistryUnavailable":
-              // TODO: Provide more descriptive error messages here
-              return Optional.of("One or more containers failed to pull their image: " + reason + ": " + message);
+              return Optional.of(String.format("Failed to pull image %s of container %s, reason: %s, message: %s",
+                  cs.getImage(), cs.getName(), reason, message));
             case "InvalidImageName":
-              return Optional.of("One or more container image names were invalid: " + reason + ": " + message);
+              return Optional.of(String.format("Container %s has invalid image name %s, message: %s",
+                  cs.getName(), cs.getImage(), message));
             default:
               return Optional.empty();
           }

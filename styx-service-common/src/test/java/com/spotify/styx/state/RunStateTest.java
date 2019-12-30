@@ -85,16 +85,19 @@ public class RunStateTest {
   private List<RunState.State> outputs;
   private StateTransitioner transitioner;
   @Mock private Time time;
+  @Mock private EventRouter eventRouter;
 
   static class StateTransitioner {
 
     private final Time time;
     private final OutputHandler outputHandler;
     private final Map<WorkflowInstance, RunState> states = Maps.newHashMap();
+    private final EventRouter eventRouter;
 
-    StateTransitioner(Time time, OutputHandler outputHandler) {
+    StateTransitioner(Time time, OutputHandler outputHandler, EventRouter eventRouter) {
       this.time = Objects.requireNonNull(time);
       this.outputHandler = Objects.requireNonNull(outputHandler);
+      this.eventRouter = Objects.requireNonNull(eventRouter);
     }
 
     void initialize(RunState runState) {
@@ -108,7 +111,7 @@ public class RunStateTest {
       RunState nextState = currentState.transition(event, time);
       states.put(key, nextState);
 
-      outputHandler.transitionInto(nextState);
+      outputHandler.transitionInto(nextState, eventRouter);
     }
 
     public RunState get(WorkflowInstance workflowInstance) {
@@ -119,11 +122,11 @@ public class RunStateTest {
   @Before
   public void setUp() {
     outputs = new ArrayList<>();
-    transitioner = new StateTransitioner(time, this::record);
+    transitioner = new StateTransitioner(time, this::record, eventRouter);
     when(time.get()).thenReturn(Instant.now());
   }
 
-  private void record(RunState state) {
+  private void record(RunState state, EventRouter eventRouter) {
     outputs.add(state.state());
   }
 

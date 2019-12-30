@@ -29,9 +29,9 @@ import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.RetryUtil;
 import java.time.Duration;
@@ -49,7 +49,7 @@ public class TerminationHandlerTest {
   private static final Instant NOW = Instant.now();
   private static final long COUNTER = 17;
 
-  @Mock StateManager stateManager;
+  @Mock EventRouter eventRouter;
   @Mock RetryUtil retryUtil;
 
   private TerminationHandler terminationHandler;
@@ -59,15 +59,15 @@ public class TerminationHandlerTest {
 
   @Before
   public void setUp() {
-    terminationHandler = new TerminationHandler(retryUtil, stateManager);
+    terminationHandler = new TerminationHandler(retryUtil);
   }
 
   @Test
   public void shouldCompleteOnZeroExitCode() {
     StateData data = data(1, 1.0, Optional.of(0));
     RunState zeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(zeroTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.success(WORKFLOW_INSTANCE), COUNTER);
+    terminationHandler.transitionInto(zeroTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.success(WORKFLOW_INSTANCE), COUNTER);
   }
 
   @Test
@@ -76,8 +76,8 @@ public class TerminationHandlerTest {
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
     when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
-    terminationHandler.transitionInto(nonZeroTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
+    terminationHandler.transitionInto(nonZeroTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
   }
 
   @Test
@@ -86,8 +86,8 @@ public class TerminationHandlerTest {
     RunState nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
     when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
-    terminationHandler.transitionInto(nonZeroTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
+    terminationHandler.transitionInto(nonZeroTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
   }
 
   @Test
@@ -96,32 +96,32 @@ public class TerminationHandlerTest {
     RunState failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
     Duration expectedDelay = Duration.ofMillis(4711);
     when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
-    terminationHandler.transitionInto(failed);
-    verify(stateManager).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
+    terminationHandler.transitionInto(failed, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
   }
 
   @Test
   public void shouldStopOnNonZeroMaxRetriesReached() {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(maxedTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+    terminationHandler.transitionInto(maxedTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
   }
 
   @Test
   public void shouldStopOnFailMaxRetriesReached() {
     StateData data = data(400, MAX_RETRY_COST, Optional.of(1));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(maxedTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+    terminationHandler.transitionInto(maxedTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
   }
 
   @Test
   public void shouldScheduleRetryOf10MinutesOnMissingDependencies() {
     StateData data = data(1, 1.0, Optional.of(20));
     RunState missingDeps = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(missingDeps);
-    verify(stateManager).receiveIgnoreClosed(
+    terminationHandler.transitionInto(missingDeps, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(
         Event.retryAfter(WORKFLOW_INSTANCE, Duration.ofMinutes(10).toMillis()), COUNTER);
   }
 
@@ -129,8 +129,8 @@ public class TerminationHandlerTest {
   public void shouldFailOnFailFastExitCodeReceived() {
     StateData data = data(1, 1.0, Optional.of(50));
     RunState maxedTerm = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
-    terminationHandler.transitionInto(maxedTerm);
-    verify(stateManager).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+    terminationHandler.transitionInto(maxedTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
   }
 
   private StateData data(int tries, double cost, Optional<Integer> lastExit) {

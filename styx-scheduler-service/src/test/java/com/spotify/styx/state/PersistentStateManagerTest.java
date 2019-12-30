@@ -132,7 +132,7 @@ public class PersistentStateManagerTest {
     when(time.get()).thenReturn(NOW);
     when(storage.runInTransactionWithRetries(any())).thenAnswer(
         a -> a.<TransactionFunction>getArgument(0).apply(transaction));
-    doNothing().when(outputHandler).transitionInto(runStateCaptor.capture());
+    doNothing().when(outputHandler).transitionInto(runStateCaptor.capture(), any());
     stateManager = new PersistentStateManager(
         time, executor, storage, eventConsumer,
         eventConsumerExecutor, OutputHandler.fanOutput(List.of(outputHandler)), shardedCounter, logger);
@@ -157,8 +157,8 @@ public class PersistentStateManagerTest {
 
     stateManager.tick();
 
-    verify(outputHandler).transitionInto(runState1);
-    verify(outputHandler).transitionInto(runState2);
+    verify(outputHandler).transitionInto(runState1, stateManager);
+    verify(outputHandler).transitionInto(runState2, stateManager);
   }
 
   @Test
@@ -173,12 +173,12 @@ public class PersistentStateManagerTest {
     when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
     var cause = new RuntimeException("fail!");
-    doThrow(cause).when(outputHandler).transitionInto(runState1);
+    doThrow(cause).when(outputHandler).transitionInto(runState1, stateManager);
 
     stateManager.tick();
 
-    verify(outputHandler).transitionInto(runState1);
-    verify(outputHandler).transitionInto(runState2);
+    verify(outputHandler).transitionInto(runState1, stateManager);
+    verify(outputHandler).transitionInto(runState2, stateManager);
 
     verify(logger).error("Error ticking instance: {}", instance1, cause );
   }
@@ -195,12 +195,12 @@ public class PersistentStateManagerTest {
     when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
     var cause = new StateTransitionConflictException("conflict!");
-    doThrow(cause).when(outputHandler).transitionInto(runState1);
+    doThrow(cause).when(outputHandler).transitionInto(runState1, stateManager);
 
     stateManager.tick();
 
-    verify(outputHandler).transitionInto(runState1);
-    verify(outputHandler).transitionInto(runState2);
+    verify(outputHandler).transitionInto(runState1, stateManager);
+    verify(outputHandler).transitionInto(runState2, stateManager);
 
     verify(logger).debug("State transition conflict when ticking instance: {}", instance1, cause);
   }
@@ -217,12 +217,12 @@ public class PersistentStateManagerTest {
     when(storage.readActiveState(instance2)).thenReturn(Optional.of(runState2));
 
     var cause = new CounterCapacityException("no capacity");
-    doThrow(cause).when(outputHandler).transitionInto(runState1);
+    doThrow(cause).when(outputHandler).transitionInto(runState1, stateManager);
 
     stateManager.tick();
 
-    verify(outputHandler).transitionInto(runState1);
-    verify(outputHandler).transitionInto(runState2);
+    verify(outputHandler).transitionInto(runState1, stateManager);
+    verify(outputHandler).transitionInto(runState2, stateManager);
 
     verify(logger).debug("Counter capacity exhausted when ticking instance: {}", instance1, cause);
   }
@@ -489,7 +489,7 @@ public class PersistentStateManagerTest {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.of(-1L));
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final RuntimeException rootCause = new RuntimeException("foo!");
-    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
     try {
       stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
       fail();
@@ -505,7 +505,7 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     final RuntimeException rootCause = new RuntimeException("foo!");
-    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
     try {
       stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
       fail();
@@ -521,7 +521,7 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
     final StateTransitionConflictException rootCause = new StateTransitionConflictException("conflict!");
-    doThrow(rootCause).when(outputHandler).transitionInto(any());
+    doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
     stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
     verify(logger).debug("State transition conflict when invoking output handler: {}", INSTANCE, rootCause);
   }

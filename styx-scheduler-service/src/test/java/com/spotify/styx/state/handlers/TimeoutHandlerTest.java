@@ -35,9 +35,9 @@ import static org.mockito.Mockito.when;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.util.Time;
 import java.time.Instant;
@@ -59,7 +59,7 @@ public class TimeoutHandlerTest {
   private Time time = () -> now;
   private long counter = 17;
 
-  @Mock private StateManager stateManager;
+  @Mock private EventRouter eventRouter;
   @Mock private Supplier<Map<WorkflowId, Workflow>> workflows;
 
   private TimeoutHandler timeoutHandler;
@@ -72,7 +72,7 @@ public class TimeoutHandlerTest {
 
   private void setUpWithTimeoutSeconds(int timeoutSeconds) {
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
-    timeoutHandler = new TimeoutHandler(timeoutConfig, time, stateManager, workflows);
+    timeoutHandler = new TimeoutHandler(timeoutConfig, time, workflows);
   }
 
   @Parameters(source = State.class)
@@ -82,8 +82,8 @@ public class TimeoutHandlerTest {
     setUpWithTimeoutSeconds(5);
     var runState = RunState.create(WORKFLOW_INSTANCE, state, now, counter);
     now = now.plus(5, ChronoUnit.SECONDS);
-    timeoutHandler.transitionInto(runState);
-    verify(stateManager).receiveIgnoreClosed(Event.timeout(WORKFLOW_INSTANCE), counter);
+    timeoutHandler.transitionInto(runState, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.timeout(WORKFLOW_INSTANCE), counter);
   }
 
   @Parameters(source = State.class)
@@ -93,8 +93,8 @@ public class TimeoutHandlerTest {
     setUpWithTimeoutSeconds(0);
     now = now.plus(5, ChronoUnit.SECONDS);
     var runState = RunState.create(WORKFLOW_INSTANCE, state, now, counter);
-    timeoutHandler.transitionInto(runState);
-    verify(stateManager, never()).receiveIgnoreClosed(any());
+    timeoutHandler.transitionInto(runState, eventRouter);
+    verify(eventRouter, never()).receiveIgnoreClosed(any());
   }
 
   @Parameters(source = State.class)
@@ -102,7 +102,7 @@ public class TimeoutHandlerTest {
   public void shouldNotTransitionIfNotTimedOut(State state) {
     setUpWithTimeoutSeconds(20);
     var runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, now, counter);
-    timeoutHandler.transitionInto(runState);
-    verify(stateManager, never()).receiveIgnoreClosed(any());
+    timeoutHandler.transitionInto(runState, eventRouter);
+    verify(eventRouter, never()).receiveIgnoreClosed(any());
   }
 }

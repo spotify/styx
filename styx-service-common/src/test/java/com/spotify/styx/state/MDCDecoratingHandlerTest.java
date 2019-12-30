@@ -50,6 +50,7 @@ public class MDCDecoratingHandlerTest {
 
   @Mock private OutputHandler delegate;
   @Mock private RunState runState;
+  @Mock private EventRouter eventRouter;
 
   private MDCDecoratingHandler sut;
 
@@ -75,9 +76,9 @@ public class MDCDecoratingHandlerTest {
       stateCounter.set(MDC.get("wfi-state-counter"));
       stateName.set(MDC.get("wfi-state-name"));
       return null;
-    }).when(delegate).transitionInto(any());
+    }).when(delegate).transitionInto(any(), any());
 
-    sut.transitionInto(runState);
+    sut.transitionInto(runState, eventRouter);
 
     assertThat(id.get(), is(WORKFLOW_INSTANCE.toString()));
     assertThat(stateCounter.get(), is(String.valueOf(COUNTER)));
@@ -91,11 +92,11 @@ public class MDCDecoratingHandlerTest {
 
     var cause = new IOException("foo!");
 
-    doAnswer(a -> sneakyThrow(cause)).when(delegate).transitionInto(any());
+    doAnswer(a -> sneakyThrow(cause)).when(delegate).transitionInto(any(), any());
 
     exception.expect(RuntimeException.class);
     exception.expectCause(is(cause));
-    sut.transitionInto(runState);
+    sut.transitionInto(runState, eventRouter);
   }
 
   @SuppressWarnings("unchecked")

@@ -32,8 +32,7 @@ import com.spotify.apollo.route.Route;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import okio.ByteString;
@@ -66,12 +65,12 @@ public final class Api {
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
       RequestAuthenticator authenticator,
       String service) {
-    return withCommonMiddleware(routes, Collections::emptyList, authenticator, service);
+    return withCommonMiddleware(routes, Set::of, authenticator, service);
   }
 
   public static Stream<Route<AsyncHandler<Response<ByteString>>>> withCommonMiddleware(
       Stream<Route<AsyncHandler<Response<ByteString>>>> routes,
-      Supplier<List<String>> clientBlacklistSupplier,
+      Supplier<Set<String>> clientBlacklistSupplier,
       RequestAuthenticator authenticator,
       String service) {
     return routes.map(r -> r

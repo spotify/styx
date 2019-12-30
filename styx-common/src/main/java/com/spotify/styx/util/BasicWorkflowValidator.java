@@ -78,8 +78,6 @@ public class BasicWorkflowValidator implements WorkflowValidator {
       e.add("workflow id mismatch");
     }
 
-    // TODO: validate more of the contents
-
     upperLimit(e, cfg.id().length(),
         MAX_ID_LENGTH, "id too long");
     upperLimit(e, cfg.commitSha().map(String::length).orElse(0),

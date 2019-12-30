@@ -28,9 +28,9 @@ import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.state.StateManager;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ResourceNotFoundException;
 import java.util.List;
@@ -46,13 +46,10 @@ public class DockerRunnerHandler implements OutputHandler {
   private static final Logger LOG = LoggerFactory.getLogger(DockerRunnerHandler.class);
 
   private final DockerRunner dockerRunner;
-  private final StateManager stateManager;
 
   public DockerRunnerHandler(
-      DockerRunner dockerRunner,
-      StateManager stateManager) {
+      DockerRunner dockerRunner) {
     this.dockerRunner = requireNonNull(dockerRunner);
-    this.stateManager = requireNonNull(stateManager);
   }
 
   private boolean isUserError(Throwable e) {
@@ -60,7 +57,7 @@ public class DockerRunnerHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state) {
+  public void transitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
         final RunSpec runSpec;
@@ -68,7 +65,7 @@ public class DockerRunnerHandler implements OutputHandler {
           runSpec = createRunSpec(state);
         } catch (ResourceNotFoundException e) {
           LOG.error("Unable to start docker procedure.", e);
-          stateManager.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
+          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
           return;
         }
 
@@ -84,7 +81,7 @@ public class DockerRunnerHandler implements OutputHandler {
             } else {
               LOG.error(msg, e);
             }
-            stateManager.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
+            eventRouter.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);
           }
@@ -94,7 +91,7 @@ public class DockerRunnerHandler implements OutputHandler {
         // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
         final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId(), runnerId);
         try {
-          stateManager.receive(submitted, state.counter());
+          eventRouter.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {
           LOG.warn("Could not emit 'submitted' event", isClosedException);
         }
