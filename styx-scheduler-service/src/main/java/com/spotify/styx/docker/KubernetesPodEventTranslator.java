@@ -286,7 +286,7 @@ final class KubernetesPodEventTranslator {
               return Optional.of(String.format("Failed to pull image %s of container %s, reason: %s, message: %s",
                   cs.getImage(), cs.getName(), reason, message));
             case "InvalidImageName":
-              return Optional.of(String.format("Container %s has invalid name %s, message: %s",
+              return Optional.of(String.format("Container %s has invalid image name %s, message: %s",
                   cs.getName(), cs.getImage(), message));
             default:
               return Optional.empty();

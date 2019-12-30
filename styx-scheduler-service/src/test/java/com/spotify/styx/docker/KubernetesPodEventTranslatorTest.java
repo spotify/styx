@@ -127,7 +127,7 @@ public class KubernetesPodEventTranslatorTest {
 
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED, pod,
-        Event.runError(WFI, "Container styx-run has invalid name busybox:latest, message: " + message));
+        Event.runError(WFI, "Container styx-run has invalid image name busybox:latest, message: " + message));
   }
 
   @Test
