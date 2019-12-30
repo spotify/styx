@@ -119,7 +119,7 @@ class BackfillTriggerManager {
 
     try {
       if (!storage.config().globalEnabled()) {
-        LOG.info("Triggering has been disabled globally.");
+        LOG.info("Backfill triggering has been disabled globally.");
         return;
       }
     } catch (IOException e) {
