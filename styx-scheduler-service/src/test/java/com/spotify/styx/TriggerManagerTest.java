@@ -79,6 +79,7 @@ public class TriggerManagerTest {
 
   @Before
   public void setUp() throws IOException {
+    when(config.globalEnabled()).thenReturn(true);
     when(storage.config()).thenReturn(config);
     triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
   }
@@ -152,6 +153,14 @@ public class TriggerManagerTest {
   }
 
   @Test
+  public void shouldNotTriggerExecutionWhenFailedToReadConfig() throws IOException {
+    when(storage.config()).thenThrow(new IOException());
+    triggerManager.tick();
+    verify(triggerListener, never()).event(any(), any(), any(), any());
+    verify(storage, never()).updateNextNaturalTrigger(any(), any());
+  }
+
+  @Test
   public void shouldNotUpdateNextNaturalTriggerIfTriggerListenerThrows() throws Exception {
     setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"));
     doThrow(new RuntimeException()).when(triggerListener).event(any(), any(), any(), any());
@@ -185,7 +194,6 @@ public class TriggerManagerTest {
   }
 
   private void setupWithNextNaturalTrigger(boolean enabled, Instant nextNaturalTrigger) throws IOException {
-    when(config.globalEnabled()).thenReturn(true);
     if (enabled) {
       when(storage.enabled()).thenReturn(ImmutableSet.of(WORKFLOW_DAILY.id()));
     } else {

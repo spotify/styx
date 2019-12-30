@@ -117,6 +117,16 @@ class BackfillTriggerManager {
   private void tick0() {
     final Instant t0 = time.get();
 
+    try {
+      if (!storage.config().globalEnabled()) {
+        LOG.info("Triggering has been disabled globally.");
+        return;
+      }
+    } catch (IOException e) {
+      LOG.warn("Couldn't fetch global enabled status, skipping this run", e);
+      return;
+    }
+
     final List<Backfill> backfills;
     try {
       backfills = storage.backfills(false);
