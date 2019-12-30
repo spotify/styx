@@ -136,7 +136,7 @@ public class TerminationHandler implements OutputHandler {
 
     var workflow = workflows.get().get(state.workflowInstance().workflowId());
     if (workflow == null) {
-      LOG.debug("Workflow {} does not exist possibly due to stale caching",
+      LOG.debug("Workflow {} does not exist possibly due to stale workflow cache",
           state.workflowInstance().workflowId().toKey());
       return false;
     }
