@@ -160,12 +160,14 @@ public class TerminationHandlerTest {
   }
 
   @Test
-  public void shouldStopOnWorkflowNotFound() {
-    var data = data(1, 1.0, Optional.empty());
-    var failed = RunState.create(WORKFLOW_INSTANCE, FAILED, data, NOW, COUNTER);
+  public void shouldNotStopOnWorkflowNotFound() {
     when(workflows.get()).thenReturn(Map.of());
-    terminationHandler.transitionInto(failed, eventRouter);
-    verify(eventRouter).receiveIgnoreClosed(Event.stop(WORKFLOW_INSTANCE), COUNTER);
+    var data = data(1, 1.0, Optional.of(1));
+    var nonZeroTerm = RunState.create(WORKFLOW_INSTANCE, TERMINATED, data, NOW, COUNTER);
+    var expectedDelay = Duration.ofMillis(4711);
+    when(retryUtil.calculateDelay(anyInt())).thenReturn(expectedDelay);
+    terminationHandler.transitionInto(nonZeroTerm, eventRouter);
+    verify(eventRouter).receiveIgnoreClosed(Event.retryAfter(WORKFLOW_INSTANCE, expectedDelay.toMillis()), COUNTER);
   }
 
   @Test
