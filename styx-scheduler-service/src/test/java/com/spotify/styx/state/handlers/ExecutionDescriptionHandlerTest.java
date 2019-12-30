@@ -149,6 +149,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
     assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));
     assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(Optional.of(Duration.ZERO)));
+    assertThat(executionDescriptionCaptor.getValue().retryCondition(), is(Optional.of("#tries<2")));
   }
 
   @Test
@@ -242,6 +243,7 @@ public class ExecutionDescriptionHandlerTest {
         .dockerArgs(Arrays.asList(args))
         .env("foo", "bar")
         .runningTimeout(Duration.ZERO)
+        .retryCondition("#tries<2")
         .build();
   }
 }

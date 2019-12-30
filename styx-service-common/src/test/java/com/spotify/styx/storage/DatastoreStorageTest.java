@@ -209,6 +209,7 @@ public class DatastoreStorageTest {
               .commitSha("2d2bfa926b94508de5aab47b5f305659ead2274a")
               .env("foo", "bar")
               .runningTimeout(java.time.Duration.ZERO)
+              .retryCondition("#tries<2")
               .build())
           .resourceIds(ImmutableSet.of("GLOBAL_STYX_CLUSTER", "foo-resource", "bar-resource"))
           .addMessage(Message.info("foo"))
