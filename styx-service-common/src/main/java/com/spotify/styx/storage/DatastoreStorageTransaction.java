@@ -86,9 +86,9 @@ public class DatastoreStorageTransaction implements StorageTransaction {
 
   @Override
   public Optional<Shard> shard(String counterId, int shardIndex) throws IOException {
-    final Key shardKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
+    var shardKey = tx.getDatastore().newKeyFactory().setKind(KIND_COUNTER_SHARD)
         .newKey(counterId + "-" + shardIndex);
-    var shardEntity = tx.getDatastore().get(shardKey);
+    var shardEntity = tx.get(shardKey);
     if (shardEntity == null) {
       return Optional.empty();
     }
