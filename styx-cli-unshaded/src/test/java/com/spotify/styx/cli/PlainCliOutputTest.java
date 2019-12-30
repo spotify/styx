@@ -157,6 +157,7 @@ public class PlainCliOutputTest {
         .env("FOO", "foo", "BAR", "bar")
         .runningTimeout(Duration.parse("PT20H"))
         .commitSha("deadbeef")
+        .retryCondition("#tries<2")
         .build());
     final WorkflowState state = WorkflowState.builder()
         .enabled(true)
@@ -166,7 +167,7 @@ public class PlainCliOutputTest {
     cliOutput.printWorkflow(workflow, state);
     assertThat(outContent.toString(), is(
         "foo1 bar1 DAYS 6h foo/bar:baz [foo, the, bar] true secret-foo:/foo-secret foo@bar.baz [r1, r2] {BAR=bar, "
-        + "FOO=foo} PT20H deadbeef true 2018-01-02T03:04:05.000000006Z 2018-01-02T09:04:05.000000006Z\n"));
+        + "FOO=foo} PT20H deadbeef #tries<2 true 2018-01-02T03:04:05.000000006Z 2018-01-02T09:04:05.000000006Z\n"));
 
   }
 }

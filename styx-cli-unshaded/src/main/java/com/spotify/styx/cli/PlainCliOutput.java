@@ -139,6 +139,7 @@ class PlainCliOutput implements CliOutput {
         wf.configuration().env(),
         wf.configuration().runningTimeout().map(Duration::toString).orElse(""),
         wf.configuration().commitSha().orElse(""),
+        wf.configuration().retryCondition().orElse(""),
         state.enabled().map(Object::toString).orElse(""),
         state.nextNaturalTrigger().map(Object::toString).orElse(""),
         state.nextNaturalOffsetTrigger().map(Object::toString).orElse("")));

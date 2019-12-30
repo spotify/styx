@@ -308,6 +308,7 @@ public class PrettyCliOutputTest {
         .env("FOO", "foo", "BAR", "bar")
         .runningTimeout(Duration.parse("PT23H"))
         .commitSha("deadbeef")
+        .retryCondition("#tries<2")
         .build());
     final WorkflowState state = WorkflowState.builder()
         .enabled(true)
@@ -329,6 +330,7 @@ public class PrettyCliOutputTest {
             + "Environment:           BAR=bar FOO=foo\n"
             + "Timeout:               PT23H\n"
             + "Commit:                deadbeef\n"
+            + "Retry Condition:       #tries<2\n"
             + "Enabled:               true\n"
             + "Next Trigger:          2018-01-02T03:04:05.000000006Z\n"
             + "Next Trigger (offset): 2018-01-02T09:04:05.000000006Z\n"));
