@@ -46,6 +46,7 @@ import com.spotify.styx.ServiceAccountKeyManager;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
@@ -124,6 +125,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   @Mock PodList podList;
   @Captor ArgumentCaptor<Secret> secretCaptor;
 
+  @Mock Stats stats;
+
   private KubernetesGCPServiceAccountSecretManager sut;
 
   @Before
@@ -140,7 +143,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     when(secretList.getItems()).thenReturn(List.of());
 
     sut = new KubernetesGCPServiceAccountSecretManager(
-        k8sClient, serviceAccountKeyManager, (now, sa) -> SECRET_EPOCH, CLOCK);
+        k8sClient, serviceAccountKeyManager, stats, (now, sa) -> SECRET_EPOCH, CLOCK);
   }
 
   @After
@@ -279,6 +282,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(k8sClient).deleteSecret(secret.getMetadata().getName());
+    verify(stats).recordServiceAccountCleanup();
   }
 
   @Test
@@ -301,6 +305,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "p12-key"));
     verify(k8sClient).deleteSecret(secret.getMetadata().getName());
+    verify(stats).recordServiceAccountCleanup();
   }
 
   @Test
@@ -334,6 +339,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT_3, "json-key-3"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT_3, "p12-key-3"));
     verify(k8sClient, never()).deleteSecret(secret3.getMetadata().getName());
+
+    verify(stats, never()).recordServiceAccountCleanup();
   }
 
   @Test
@@ -352,6 +359,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     sut.cleanup();
     verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(k8sClient, never()).deleteSecret(any());
+    verify(stats, never()).recordServiceAccountCleanup();
   }
 
   @Test
@@ -366,6 +374,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-json-key"));
     verify(serviceAccountKeyManager).deleteKey(keyName(SERVICE_ACCOUNT, "old-p12-key"));
     verify(k8sClient).deleteSecret(secret.getMetadata().getName());
+    verify(stats).recordServiceAccountCleanup();
   }
 
   @Test
@@ -382,6 +391,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
     verify(serviceAccountKeyManager, never()).deleteKey(anyString());
     verify(k8sClient, never()).deleteSecret(any());
+    verify(stats, never()).recordServiceAccountCleanup();
   }
 
   @Test

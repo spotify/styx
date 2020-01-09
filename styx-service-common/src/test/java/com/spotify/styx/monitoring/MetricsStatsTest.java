@@ -41,6 +41,7 @@ import static com.spotify.styx.monitoring.MetricsStats.PULL_IMAGE_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_CONFIGURED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_DEMANDED;
 import static com.spotify.styx.monitoring.MetricsStats.RESOURCE_USED;
+import static com.spotify.styx.monitoring.MetricsStats.SERVICE_ACCOUNT_CLEANUP_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.STORAGE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.SUBMISSION_RATE_LIMIT;
@@ -108,6 +109,7 @@ public class MetricsStatsTest {
     when(registry.meter(WORKFLOW_CONSUMER_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "miss"))).thenReturn(meter);
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "hit"))).thenReturn(meter);
+    when(registry.meter(SERVICE_ACCOUNT_CLEANUP_RATE)).thenReturn(meter);
     stats = new MetricsStats(registry, time);
   }
 
@@ -348,6 +350,12 @@ public class MetricsStatsTest {
   @Test
   public void shouldRecordCounterCacheMiss() {
     stats.recordCounterCacheMiss();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordServiceAccountCleanup() {
+    stats.recordServiceAccountCleanup();
     verify(meter).mark();
   }
 
