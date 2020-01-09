@@ -29,6 +29,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.spotify.styx.ServiceAccountKeyManager;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.util.GcpUtil;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
@@ -73,6 +74,7 @@ class KubernetesGCPServiceAccountSecretManager {
 
   private final Fabric8KubernetesClient client;
   private final ServiceAccountKeyManager keyManager;
+  private final Stats stats;
   private final EpochProvider epochProvider;
   private final Clock clock;
 
@@ -83,18 +85,21 @@ class KubernetesGCPServiceAccountSecretManager {
   KubernetesGCPServiceAccountSecretManager(
       Fabric8KubernetesClient client,
       ServiceAccountKeyManager keyManager,
+      Stats stats,
       EpochProvider epochProvider,
       Clock clock) {
-    this.client = Objects.requireNonNull(client);
-    this.keyManager = Objects.requireNonNull(keyManager);
-    this.epochProvider = Objects.requireNonNull(epochProvider);
-    this.clock = Objects.requireNonNull(clock);
+    this.client = Objects.requireNonNull(client, "client");
+    this.keyManager = Objects.requireNonNull(keyManager, "keyManager");
+    this.stats = Objects.requireNonNull(stats, "stats");
+    this.epochProvider = Objects.requireNonNull(epochProvider, "epochProvider");
+    this.clock = Objects.requireNonNull(clock, "clock");
   }
 
   KubernetesGCPServiceAccountSecretManager(
       Fabric8KubernetesClient client,
-      ServiceAccountKeyManager keyManager) {
-    this(client, keyManager, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
+      ServiceAccountKeyManager keyManager,
+      Stats stats) {
+    this(client, keyManager, stats, DEFAULT_SECRET_EPOCH_PROVIDER, DEFAULT_CLOCK);
   }
 
   String ensureServiceAccountKeySecret(String workflowId, String serviceAccount) {
@@ -252,6 +257,7 @@ class KubernetesGCPServiceAccountSecretManager {
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION));
         keyManager.deleteKey(annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION));
         deleteSecret(secret);
+        stats.recordServiceAccountCleanup();
       } catch (KubernetesClientException | IOException e) {
         LOG.warn("Failed to cleanup secret or keys for service account {}",
             annotations.get(STYX_WORKFLOW_SA_ID_ANNOTATION), e);

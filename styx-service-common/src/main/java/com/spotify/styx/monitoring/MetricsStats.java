@@ -174,6 +174,9 @@ public final class MetricsStats implements Stats {
   static final MetricId COUNTER_CACHE_RATE = BASE
       .tagged("what", "counter-cache-rate");
 
+  static final MetricId SERVICE_ACCOUNT_CLEANUP_RATE = BASE
+      .tagged("what", "service-account-cleanup-rate");
+
   private static final String STATUS = "status";
   private static final String COUNTER_CACHE_RESULT = "result";
   private static final String COUNTER_CACHE_HIT = "hit";
@@ -191,6 +194,7 @@ public final class MetricsStats implements Stats {
   private final Meter workflowConsumerErrorMeter;
   private final Meter counterCacheHitMeter;
   private final Meter counterCacheMissMeter;
+  private final Meter serviceAccountCleanupMeter;
   private final ConcurrentMap<String, Histogram> storageOperationHistograms;
   private final ConcurrentMap<String, Meter> storageOperationMeters;
   private final ConcurrentMap<String, Histogram> dockerOperationHistograms;
@@ -231,6 +235,7 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerErrorMeter = registry.meter(WORKFLOW_CONSUMER_ERROR_RATE);
     this.counterCacheHitMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_HIT));
     this.counterCacheMissMeter = registry.meter(COUNTER_CACHE_RATE.tagged(COUNTER_CACHE_RESULT, COUNTER_CACHE_MISS));
+    this.serviceAccountCleanupMeter = registry.meter(SERVICE_ACCOUNT_CLEANUP_RATE);
     this.storageOperationHistograms = new ConcurrentHashMap<>();
     this.storageOperationMeters = new ConcurrentHashMap<>();
     this.dockerOperationHistograms = new ConcurrentHashMap<>();
@@ -409,6 +414,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordCounterCacheMiss() {
     counterCacheMissMeter.mark();
+  }
+
+  @Override
+  public void recordServiceAccountCleanup() {
+    serviceAccountCleanupMeter.mark();
   }
 
   @Override

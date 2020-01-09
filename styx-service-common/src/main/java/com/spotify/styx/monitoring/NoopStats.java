@@ -178,6 +178,11 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordServiceAccountCleanup() {
+    // nop
+  }
+
+  @Override
   public void recordKubernetesOperation(String operation, long durationMillis, String status) {
     // nop
   }

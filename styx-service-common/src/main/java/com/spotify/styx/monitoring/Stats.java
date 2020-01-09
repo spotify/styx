@@ -91,6 +91,8 @@ public interface Stats {
 
   void recordCounterCacheMiss();
 
+  void recordServiceAccountCleanup();
+
   void recordKubernetesOperation(String operation, long durationMillis, String status);
 
   void recordKubernetesOperationError(String operation, String type, int code);
