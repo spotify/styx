@@ -41,6 +41,7 @@ import static java.util.stream.Collectors.toSet;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.api.client.util.ExponentialBackOff;
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreReader;
@@ -78,6 +79,7 @@ import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.MDCUtil;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.TriggerInstantSpec;
@@ -955,18 +957,28 @@ public class DatastoreStorage implements Closeable {
         if (!isRetryableTransactionException(e.getCause())) {
           throw e;
         }
-        if (retrySettings.getMaxAttempts() > 0 && attempt >= retrySettings.getMaxAttempts()) {
+        checkAttemptsAndSleep(retrySettings, backoff, attempt, e);
+      } catch (CounterCapacityException e) {
+        if (!e.getMessage().endsWith("has capacity for delta -1")) {
           throw e;
         }
-        // Back-off sleep before retrying
-        var sleepMillis = backoff.nextBackOffMillis();
-        if (sleepMillis == STOP) {
-          throw e;
-        }
-        log.debug("datastore transaction exception, attempt #{}, retrying in {}ms", attempt, sleepMillis, e);
-        sleepMillis(sleepMillis);
+        checkAttemptsAndSleep(retrySettings, backoff, attempt, e);
       }
     }
+  }
+
+  private <E extends Exception> void checkAttemptsAndSleep(RetrySettings retrySettings, ExponentialBackOff backoff, int attempt,
+                                     E e) throws IOException, E {
+    if (retrySettings.getMaxAttempts() > 0 && attempt >= retrySettings.getMaxAttempts()) {
+      throw e;
+    }
+    // Back-off sleep before retrying
+    var sleepMillis = backoff.nextBackOffMillis();
+    if (sleepMillis == STOP) {
+      throw e;
+    }
+    log.debug("datastore transaction exception, attempt #{}, retrying in {}ms", attempt, sleepMillis, e);
+    sleepMillis(sleepMillis);
   }
 
   private <T, E extends Exception> T runInTransaction(TransactionFunction<T, E> f) throws IOException, E {

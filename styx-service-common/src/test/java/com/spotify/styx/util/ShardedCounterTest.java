@@ -60,6 +60,7 @@ import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -341,9 +342,24 @@ public class ShardedCounterTest {
   }
 
   @Test(expected = CounterCapacityException.class)
-  public void shouldFailDecrementingEmptyCounter() {
-    //increment counter by 1
-    updateCounterInTransaction(COUNTER_ID1, -1L);
+  public void shouldFailDecrementingEmptyCounterAndRetries() throws IOException{
+    updateLimitInStorage(COUNTER_ID1, 1);
+    assertEquals(0, shardedCounter.getCounter(COUNTER_ID1));
+    final var numOfInvocation = new AtomicInteger();
+    shardedCounter = spy(shardedCounter);
+    //decrement counter by 1
+    doAnswer(invocation -> {
+      numOfInvocation.incrementAndGet();
+      invocation.callRealMethod();
+      return null;
+    }).when(shardedCounter).updateCounter(any(StorageTransaction.class), anyString(),
+        anyLong());
+    try{
+      updateCounterInTransaction(COUNTER_ID1, -1L);
+    } catch (CounterCapacityException e) {
+      assertTrue(numOfInvocation.get() > 1);
+      throw e;
+    }
   }
 
   @Test(expected = CounterCapacityException.class)
