@@ -390,7 +390,7 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-cloudresourcemanager</artifactId>
-        <version>v1-rev20190424-${google.client.lib.version}</version>
+        <version>v1-rev20191206-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
