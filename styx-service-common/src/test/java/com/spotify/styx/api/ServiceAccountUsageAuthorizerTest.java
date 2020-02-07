@@ -50,6 +50,8 @@ import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.admin.directory.model.MembersHasMember;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
+import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
+import com.google.api.services.cloudresourcemanager.model.GetPolicyOptions;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -117,12 +119,16 @@ public class ServiceAccountUsageAuthorizerTest {
       "group:" + BLACKLISTED_GROUP_EMAIL,
       "serviceAccount:" + BLACKLISTED_SA_EMAIL);
 
+  private static final GetIamPolicyRequest GET_IAM_POLICY_REQUEST =
+      new GetIamPolicyRequest().setOptions(new GetPolicyOptions().setRequestedPolicyVersion(3));
+
   @Mock private AuthorizationPolicy authorizationPolicy;
   @Mock private PrivateKey privateKey;
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
+  @Mock private CloudResourceManager.Projects.GetIamPolicy getIamPolicy;
   @Mock private Directory directory;
   @Mock private Directory.Members members;
   @Mock private Directory.Members.HasMember isMember;
@@ -159,7 +165,8 @@ public class ServiceAccountUsageAuthorizerTest {
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(true);
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(idTokenPayload.getEmail()).thenReturn(PRINCIPAL_EMAIL);
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(projectPolicy);
+    when((Object) getIamPolicy.execute()).thenReturn(projectPolicy);
+    when((Object) crm.projects().getIamPolicy(any(), eq(GET_IAM_POLICY_REQUEST))).thenReturn(getIamPolicy);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenReturn(saPolicy);
     doReturn(members).when(directory).members();
     doReturn(isNotMember).when(members).hasMember(any(), any());
@@ -207,7 +214,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void shouldDenyAccessIfNoPolicyBinding() throws IOException {
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenReturn(
+    when((Object) getIamPolicy.execute()).thenReturn(
         new com.google.api.services.cloudresourcemanager.model.Policy());
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenReturn(
         new com.google.api.services.iam.v1.model.Policy());
@@ -218,7 +225,7 @@ public class ServiceAccountUsageAuthorizerTest {
     assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
-    verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
+    verify(getIamPolicy).execute();
 
     verify(directory.members(), never()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     verify(directory.members(), never()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
@@ -246,7 +253,7 @@ public class ServiceAccountUsageAuthorizerTest {
     assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
     verify(iam.projects().serviceAccounts().getIamPolicy("projects/-/serviceAccounts/" + SERVICE_ACCOUNT)).execute();
-    verify(crm.projects().getIamPolicy(eq(SERVICE_ACCOUNT_PROJECT), any())).execute();
+    verify(getIamPolicy).execute();
     verify(directory.members()).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     verify(directory.members()).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
 
@@ -306,7 +313,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldAllowAccessOnFailureIfNotEnforcingAuthorizationPolicy(String serviceAccount) throws IOException {
     final Throwable cause = new AssertionError();
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
+    when((Object) getIamPolicy.execute()).thenThrow(cause);
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
     sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
   }
@@ -425,7 +432,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfProjectDoesNotExist(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(404);
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
+    when((Object) getIamPolicy.execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
@@ -447,10 +454,10 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfProjectRequestFailsWithGoogleException(String serviceAccount) throws IOException {
     final Throwable cause = googleJsonResponseException(500);
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
+    when((Object) getIamPolicy.execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
-    verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
+    verify(getIamPolicy, atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
@@ -467,10 +474,10 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfProjectRequestFailsWithIOException(String serviceAccount) throws IOException {
     final Throwable cause = new IOException();
-    when((Object) crm.projects().getIamPolicy(any(), any()).execute()).thenThrow(cause);
+    when((Object) getIamPolicy.execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
-    verify(crm.projects().getIamPolicy(any(), any()), atLeast(RETRY_ATTEMPTS)).execute();
+    verify(getIamPolicy, atLeast(RETRY_ATTEMPTS)).execute();
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})

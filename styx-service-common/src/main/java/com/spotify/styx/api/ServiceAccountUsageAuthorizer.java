@@ -48,6 +48,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.cloudresourcemanager.CloudResourceManager;
 import com.google.api.services.cloudresourcemanager.model.GetIamPolicyRequest;
+import com.google.api.services.cloudresourcemanager.model.GetPolicyOptions;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
@@ -403,7 +404,8 @@ public interface ServiceAccountUsageAuthorizer {
     private Optional<com.google.api.services.cloudresourcemanager.model.Policy> getProjectPolicy(String projectId) {
       try {
         return retry(() -> Optional.of(crm.projects()
-            .getIamPolicy(projectId, new GetIamPolicyRequest())
+            .getIamPolicy(projectId,
+                new GetIamPolicyRequest().setOptions(new GetPolicyOptions().setRequestedPolicyVersion(3)))
             .execute()));
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
