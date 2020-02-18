@@ -283,4 +283,9 @@ public class AggregateStorage implements Storage {
       throw new TransactionException(e.getCause());
     }
   }
+
+  @Override
+  public Map<WorkflowId, WorkflowWithState> workflowsWithStates() throws IOException{
+    return datastoreStorage.workflowsWithStates();
+  }
 }

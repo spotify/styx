@@ -92,6 +92,7 @@ import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Message.MessageLevel;
@@ -231,6 +232,8 @@ public class DatastoreStorageTest {
       WORKFLOW_CONFIGURATION);
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+
+  private static final WorkflowState EMPTY_STATE = WorkflowState.empty().toBuilder().enabled(false).build();
 
   private DatastoreStorage storage;
   private CheckedDatastore datastore;
@@ -621,6 +624,25 @@ public class DatastoreStorageTest {
     assertThat(workflows, hasEntry(WORKFLOW_ID1, workflow1));
     assertThat(workflows, hasEntry(WORKFLOW_ID2, workflow2));
     assertThat(workflows, hasEntry(WORKFLOW_ID3, workflow3));
+  }
+
+  @Test
+  public void shouldReturnAllWorkflowsWithStates() throws Exception {
+    assertThat(storage.workflowsWithStates().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storage.store(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    var workflows = storage.workflowsWithStates();
+    assertThat(workflows.size(), is(3));
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, WorkflowWithState.create(workflow1, EMPTY_STATE)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, WorkflowWithState.create(workflow2, EMPTY_STATE)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, WorkflowWithState.create(workflow3, EMPTY_STATE)));
   }
 
   @Test

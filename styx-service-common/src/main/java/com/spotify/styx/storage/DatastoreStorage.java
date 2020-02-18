@@ -340,6 +340,24 @@ public class DatastoreStorage implements Closeable {
     return workflows;
   }
 
+  public Map<WorkflowId, WorkflowWithState> workflowsWithStates()  throws IOException {
+    var workflows = new HashMap<WorkflowId, WorkflowWithState>();
+    var query = Query.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
+    datastore.query(query, entity -> {
+      Workflow workflow;
+      try {
+        workflow = OBJECT_MAPPER.readValue(entity.getString(PROPERTY_WORKFLOW_JSON), Workflow.class);
+      } catch (IOException e) {
+        log.warn("Failed to read workflow {}.", entity.getKey(), e);
+        return;
+      }
+      var workflowState = workflowState(Optional.of(entity));
+      workflows.put(workflow.id(),  WorkflowWithState.create(workflow, workflowState));
+    });
+
+    return workflows;
+  }
+
   public Map<WorkflowId, Workflow> workflows(Set<WorkflowId> workflowIds) {
     final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds,
         MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);

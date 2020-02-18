@@ -45,6 +45,7 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.StatusResource;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.api.WorkflowResource;
+import com.spotify.styx.api.WorkflowWithStateResource;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -201,6 +202,8 @@ public class StyxApi implements AppInit {
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
 
+    final WorkflowWithStateResource workflowWithStateResource = new WorkflowWithStateResource(storage);
+
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage,
         workflowValidator, time, workflowActionAuthorizer);
     final StatusResource statusResource = new StatusResource(storage, serviceAccountUsageAuthorizer);
@@ -223,6 +226,7 @@ public class StyxApi implements AppInit {
     final Stream<Route<AsyncHandler<Response<ByteString>>>> routes = Streams.concat(
         workflowResource.routes(requestAuthenticator),
         backfillResource.routes(requestAuthenticator),
+        workflowWithStateResource.routes(),
         resourceResource.routes(),
         statusResource.routes(),
         schedulerProxyResource.routes()

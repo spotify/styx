@@ -320,4 +320,6 @@ public interface Storage extends Closeable {
    */
   <T, E extends Exception> T runInTransactionWithRetries(TransactionFunction<T, E> f)
       throws IOException, E;
+
+  Map<WorkflowId, WorkflowWithState> workflowsWithStates() throws IOException;
 }
