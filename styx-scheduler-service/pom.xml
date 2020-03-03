@@ -27,6 +27,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>io.norberg</groupId>
       <artifactId>auto-matter</artifactId>
       <scope>provided</scope>
@@ -47,11 +52,6 @@
     <dependency>
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.spotify</groupId>
-      <artifactId>docker-client</artifactId>
     </dependency>
     <dependency>
       <groupId>io.fabric8</groupId>
@@ -83,7 +83,7 @@
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-all</artifactId>
+      <artifactId>hamcrest</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

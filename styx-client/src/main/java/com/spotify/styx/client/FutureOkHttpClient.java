@@ -50,6 +50,7 @@ class FutureOkHttpClient implements AutoCloseable {
   private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
   private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(90);
+  @SuppressWarnings("FieldMissingNullable")
   private static final MediaType APPLICATION_JSON =
       Objects.requireNonNull(MediaType.parse("application/json"));
 
