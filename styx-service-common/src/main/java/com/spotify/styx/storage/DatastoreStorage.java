@@ -919,7 +919,7 @@ public class DatastoreStorage implements Closeable {
         : Optional.empty();
   }
 
-  private static <T> Optional<T> readOptJson(Entity entity, String property, TypeReference valueTypeRef)
+  private static <T> Optional<T> readOptJson(Entity entity, String property, TypeReference<T> valueTypeRef)
       throws IOException {
     return entity.contains(property)
         ? Optional.of(OBJECT_MAPPER.readValue(entity.getString(property), valueTypeRef))
