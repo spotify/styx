@@ -70,15 +70,10 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Answers;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.mockito.junit.MockitoRule;
-import org.mockito.quality.Strictness;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AuthenticatorTest {
-
-  public MockitoRule rule = MockitoJUnit.rule().strictness(Strictness.LENIENT);
 
   private static final ResourceId ORGANIZATION_RESOURCE = resourceId("organization", "test-org");
   private static final ResourceId FOLDER_RESOURCE = resourceId("folder", "test-folder");
