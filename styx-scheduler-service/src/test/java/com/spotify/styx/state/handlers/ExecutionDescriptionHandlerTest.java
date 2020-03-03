@@ -20,7 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
@@ -116,7 +116,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().dockerArgs(), hasSize(0));
-    assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
+    assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
   }
 
   @Test
@@ -145,7 +145,7 @@ public class ExecutionDescriptionHandlerTest {
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
-    assertThat(executionDescriptionCaptor.getValue().commitSha(), hasValue(COMMIT_SHA));
+    assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
     assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
     assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));
     assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(Optional.of(Duration.ZERO)));

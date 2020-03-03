@@ -20,8 +20,8 @@
 
 package com.spotify.styx.api;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
@@ -167,7 +167,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo("resource2"));
     assertJson(response, "concurrency", equalTo(2));
 
-    assertThat(storage.resource(RESOURCE_2.id()), hasValue(RESOURCE_2));
+    assertThat(storage.resource(RESOURCE_2.id()), isPresentAndIs(RESOURCE_2));
     verify(storage).storeResource(RESOURCE_2);
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(RESOURCE_2.concurrency()));
   }
@@ -197,7 +197,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(response, "id", equalTo("resource1"));
     assertJson(response, "concurrency", equalTo(21));
 
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(Resource.create(RESOURCE_1.id(), 21)));
+    assertThat(storage.resource(RESOURCE_1.id()), isPresentAndIs(Resource.create(RESOURCE_1.id(), 21)));
     verify(storage).storeResource(Resource.create(RESOURCE_1.id(), 21L));
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(21L));
   }
@@ -272,8 +272,8 @@ public class ResourceResourceTest extends VersionedApiTest {
         Map.of("id", "resource1", "concurrency", 1),
         Map.of("id", "resource2", "concurrency", 3)
     ));
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
-    assertThat(storage.resource("resource2"), hasValue(Resource.create("resource2", 3)));
+    assertThat(storage.resource(RESOURCE_1.id()), isPresentAndIs(RESOURCE_1));
+    assertThat(storage.resource("resource2"), isPresentAndIs(Resource.create("resource2", 3)));
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
     assertThat(storage.getLimitForCounter(RESOURCE_2.id()), is(3L));
 
@@ -290,7 +290,7 @@ public class ResourceResourceTest extends VersionedApiTest {
     assertJson(listResponse3, "resources", containsInAnyOrder(
         Map.of("id", "resource1", "concurrency", 1)
     ));
-    assertThat(storage.resource(RESOURCE_1.id()), hasValue(RESOURCE_1));
+    assertThat(storage.resource(RESOURCE_1.id()), isPresentAndIs(RESOURCE_1));
     assertThat(storage.resource("resource2"), isEmpty());
     assertThat(storage.getLimitForCounter(RESOURCE_1.id()), is(RESOURCE_1.concurrency()));
 
