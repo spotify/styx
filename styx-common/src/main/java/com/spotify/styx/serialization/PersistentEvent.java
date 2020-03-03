@@ -59,7 +59,7 @@ import java.util.Set;
     @JsonSubTypes.Type(value = PersistentEvent.Submitted.class, name = "submitted")
     })
 @JsonInclude(Include.NON_ABSENT)
-class PersistentEvent {
+public class PersistentEvent {
 
   private static final SerializerVisitor SERIALIZER_VISITOR = new SerializerVisitor();
 

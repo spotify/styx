@@ -57,6 +57,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -99,7 +100,7 @@ public class MetricsStatsTest {
 
   @Before
   public void setUp() {
-    when(time.nanoTime()).then(a -> System.nanoTime());
+    lenient().when(time.nanoTime()).then(a -> System.nanoTime());
     when(registry.getOrAdd(TRANSITIONING_DURATION, HISTOGRAM)).thenReturn(histogram);
     when(registry.meter(PULL_IMAGE_ERROR_RATE)).thenReturn(meter);
     when(registry.meter(NATURAL_TRIGGER_RATE)).thenReturn(meter);
@@ -169,9 +170,8 @@ public class MetricsStatsTest {
 
   @Test
   public void shouldRecordSubmitToRunningTime() {
-    when(time.nanoTime()).thenReturn(SECONDS.toNanos(17L));
+    when(time.nanoTime()).thenReturn(SECONDS.toNanos(17L)).thenReturn(SECONDS.toNanos(4711L));
     stats.recordSubmission("foo");
-    when(time.nanoTime()).thenReturn(SECONDS.toNanos(4711L));
     stats.recordRunning("foo");
     verify(histogram).update(4711L - 17L);
   }

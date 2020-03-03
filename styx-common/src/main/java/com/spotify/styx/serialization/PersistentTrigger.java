@@ -38,7 +38,7 @@ import com.spotify.styx.state.TriggerVisitor;
     @JsonSubTypes.Type(value = PersistentTrigger.PersistentTriggerWithId.class, name = "unknown"),
     })
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
-class PersistentTrigger {
+public class PersistentTrigger {
 
   private static final TriggerSerializerVisitor SERIALIZER_VISITOR = new TriggerSerializerVisitor();
 

@@ -44,8 +44,10 @@ public class ServiceAccountKeyManagerTest {
   @Mock(answer = Answers.RETURNS_DEEP_STUBS)
   Iam iam;
 
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+  @Mock
   Iam.Projects.ServiceAccounts serviceAccounts;
+
+  @Mock Iam.Projects.ServiceAccounts.Keys keys;
 
   @Mock
   Iam.Projects.ServiceAccounts.Keys.Delete delete;
@@ -73,8 +75,9 @@ public class ServiceAccountKeyManagerTest {
   @Before
   public void setUp() throws Exception {
     when(iam.projects().serviceAccounts()).thenReturn(serviceAccounts);
-    when(serviceAccounts.keys().get(any())).thenReturn(get);
-    when(serviceAccounts.keys().delete(any())).thenReturn(delete);
+    when(serviceAccounts.keys()).thenReturn(keys);
+    when(keys.get(any())).thenReturn(get);
+    when(keys.delete(any())).thenReturn(delete);
 
     sakm = new ServiceAccountKeyManager(iam);
   }
