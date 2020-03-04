@@ -357,7 +357,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus running(boolean ready) {
-    return podStatus("Running", ready, runningContainerState());
+    return podStatus("Running", ready, runningContainerState(), true);
   }
 
   private static ContainerState runningContainerState() {
@@ -369,7 +369,7 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus terminated(String phase, Integer exitCode, String message) {
-    return podStatus(phase, true, terminatedContainerState(exitCode, message));
+    return podStatus(phase, true, terminatedContainerState(exitCode, message), false);
   }
 
   static ContainerState terminatedContainerState(Integer exitCode, String message) {
@@ -385,11 +385,11 @@ public class KubernetesPodEventTranslatorTest {
   }
 
   static PodStatus waiting(String phase, String reason) {
-    return podStatus(phase, true, waitingContainerState(reason));
+    return podStatus(phase, true, waitingContainerState(reason), false);
   }
 
   static PodStatus waiting(String phase, String reason, String message) {
-    return podStatus(phase, true, waitingContainerState(reason, message));
+    return podStatus(phase, true, waitingContainerState(reason, message), false);
   }
 
   private static ContainerState waitingContainerState(String reason) {
@@ -400,11 +400,11 @@ public class KubernetesPodEventTranslatorTest {
     return new ContainerState(null, null, new ContainerStateWaiting(message, reason));
   }
 
-  static PodStatus podStatus(String phase, boolean ready, ContainerState containerState) {
+  static PodStatus podStatus(String phase, boolean ready, ContainerState containerState, boolean started) {
     PodStatus podStatus = podStatusNoContainer(phase);
     podStatus.getContainerStatuses()
         .add(new ContainerStatus("foo", "busybox:latest", "foobar", containerState,
-                                 MAIN_CONTAINER_NAME, ready, 0, containerState));
+                                 MAIN_CONTAINER_NAME, ready, 0, started, containerState));
     podStatus.getContainerStatuses()
         .add(new ContainerStatusBuilder().withName(KEEPALIVE_CONTAINER_NAME)
             .withNewState().withNewRunning().endRunning().endState()

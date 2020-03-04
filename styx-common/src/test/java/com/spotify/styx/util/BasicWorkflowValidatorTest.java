@@ -184,6 +184,7 @@ public class BasicWorkflowValidatorTest {
         .id("foo")
         .schedule(Schedule.HOURS)
         .build();
+    @SuppressWarnings("ExtendsAutoValue")
     var workflow = new Workflow() {
       @Override
       public String componentId() {

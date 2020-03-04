@@ -22,7 +22,7 @@ package com.spotify.styx.util;
 
 import java.util.UUID;
 import org.hamcrest.Description;
-import org.hamcrest.Factory;
+
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
@@ -46,7 +46,6 @@ public class StringIsValidUuid extends TypeSafeMatcher<String> {
     description.appendText("a string that is a valid UUID");
   }
 
-  @Factory
   public static Matcher<String> isValidUuid() {
     return new StringIsValidUuid();
   }

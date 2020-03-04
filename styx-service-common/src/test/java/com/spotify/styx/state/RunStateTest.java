@@ -20,8 +20,9 @@
 
 package com.spotify.styx.state;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAnd;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static com.spotify.styx.state.RunState.State.DONE;
 import static com.spotify.styx.state.RunState.State.ERROR;
 import static com.spotify.styx.state.RunState.State.FAILED;
@@ -149,7 +150,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(777));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
 
     transitioner.receive(eventFactory.retry());
     transitioner.receive(eventFactory.started());
@@ -169,7 +170,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(777));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec2"));
@@ -188,7 +189,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(777));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
 
     transitioner.receive(eventFactory.retry());
@@ -196,7 +197,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(999));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(999L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(999L));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(2));
   }
 
@@ -207,10 +208,10 @@ public class RunStateTest {
 
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().triggerId(),
-        hasValue(TriggerUtil.NATURAL_TRIGGER_ID));
+        isPresentAndIs(TriggerUtil.NATURAL_TRIGGER_ID));
     assertThat(
         transitioner.get(WORKFLOW_INSTANCE).data().trigger(),
-        hasValue(NATURAL_TRIGGER1));
+        isPresentAndIs(NATURAL_TRIGGER1));
   }
 
   @Test
@@ -273,7 +274,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(777));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
 
     transitioner.receive(eventFactory.retry());
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE));
@@ -282,7 +283,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(999));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(999L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(999L));
     assertThat(outputs, contains(QUEUED, SUBMITTED, FAILED, QUEUED, PREPARE, SUBMITTED,
                                  RUNNING, TERMINATED, QUEUED));
   }
@@ -296,12 +297,12 @@ public class RunStateTest {
     transitioner.receive(eventFactory.retryAfter(777));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(777L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
 
     transitioner.receive(eventFactory.retryAfter(0));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), hasValue(0L));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(0L));
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
 
@@ -426,7 +427,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(DONE));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(0));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(0));
     assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, DONE));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(0));
   }
@@ -443,7 +444,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(1));
     assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
   }
@@ -464,7 +465,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(3));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(7));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(7));
     assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, PREPARE, SUBMITTED,
                                  RUNNING, TERMINATED, PREPARE, SUBMITTED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(2));
@@ -481,7 +482,7 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(ERROR));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), hasValue(1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(1));
     assertThat(outputs, contains(QUEUED, SUBMITTED, RUNNING, TERMINATED, ERROR));
   }
 
@@ -640,7 +641,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isPresentAnd(contains("r1")));
 
     transitioner.receive(eventFactory.retryAfter(12));
 
@@ -648,7 +649,7 @@ public class RunStateTest {
 
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of("r2")));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r2")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isPresentAnd(contains("r2")));
   }
 
   @Test
@@ -665,7 +666,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(TERMINATED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isPresentAnd(contains("r1")));
   }
 
   @Test
@@ -680,7 +681,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.timeout());
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), hasValue(contains("r1")));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isPresentAnd(contains("r1")));
   }
 
   @Test

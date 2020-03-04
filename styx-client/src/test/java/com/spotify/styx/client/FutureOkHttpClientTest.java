@@ -60,6 +60,7 @@ public class FutureOkHttpClientTest {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
+  @SuppressWarnings("FieldMissingNullable")
   private static final HttpUrl URI = Objects.requireNonNull(HttpUrl.parse("http://example.org/"));
 
   private static final Request REQUEST = FutureOkHttpClient.forUri(URI);

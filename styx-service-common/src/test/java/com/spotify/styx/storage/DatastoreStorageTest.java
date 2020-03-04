@@ -20,7 +20,7 @@
 
 package com.spotify.styx.storage;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.hasValue;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static com.spotify.styx.model.Schedule.DAYS;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
@@ -389,19 +389,19 @@ public class DatastoreStorageTest {
     storage.setEnabled(id, true);
     Optional<Workflow> workflow = storage.workflow(id);
     boolean enabled = storage.enabled(id);
-    assertThat(workflow, hasValue(WORKFLOW));
+    assertThat(workflow, isPresentAndIs(WORKFLOW));
     assertTrue(enabled);
 
     storage.setEnabled(id, false);
     workflow = storage.workflow(id);
     enabled = storage.enabled(id);
-    assertThat(workflow, hasValue(WORKFLOW));
+    assertThat(workflow, isPresentAndIs(WORKFLOW));
     assertFalse(enabled);
 
     storage.store(WORKFLOW);
     workflow = storage.workflow(id);
     enabled = storage.enabled(id);
-    assertThat(workflow, hasValue(WORKFLOW));
+    assertThat(workflow, isPresentAndIs(WORKFLOW));
     assertFalse(enabled);
   }
 

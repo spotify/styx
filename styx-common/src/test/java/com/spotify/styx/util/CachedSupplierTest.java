@@ -67,7 +67,7 @@ public class CachedSupplierTest {
 
   @Before
   public void setUp() throws Throwable {
-    when(delegate.get()).thenReturn(INITIAL_VALUE);
+    lenient().when(delegate.get()).thenReturn(INITIAL_VALUE);
     when(time.nanoTime()).then(a -> MILLISECONDS.toNanos(now.toEpochMilli()));
     sut = new CachedSupplier<>(delegate, time, TIMEOUT);
   }

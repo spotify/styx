@@ -42,16 +42,19 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ServiceAccountKeyManagerTest {
 
   @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  Iam iam;
-
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-  Iam.Projects.ServiceAccounts serviceAccounts;
+  private Iam iam;
 
   @Mock
-  Iam.Projects.ServiceAccounts.Keys.Delete delete;
+  private Iam.Projects.ServiceAccounts serviceAccounts;
 
   @Mock
-  Iam.Projects.ServiceAccounts.Keys.Get get;
+  private Iam.Projects.ServiceAccounts.Keys keys;
+
+  @Mock
+  private Iam.Projects.ServiceAccounts.Keys.Delete delete;
+
+  @Mock
+  private Iam.Projects.ServiceAccounts.Keys.Get get;
 
   private ServiceAccountKeyManager sakm;
 
@@ -73,8 +76,9 @@ public class ServiceAccountKeyManagerTest {
   @Before
   public void setUp() throws Exception {
     when(iam.projects().serviceAccounts()).thenReturn(serviceAccounts);
-    when(serviceAccounts.keys().get(any())).thenReturn(get);
-    when(serviceAccounts.keys().delete(any())).thenReturn(delete);
+    when(serviceAccounts.keys()).thenReturn(keys);
+    when(keys.get(any())).thenReturn(get);
+    when(keys.delete(any())).thenReturn(delete);
 
     sakm = new ServiceAccountKeyManager(iam);
   }

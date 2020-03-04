@@ -25,6 +25,7 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.belongsToFamily;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
+import static com.spotify.styx.api.JsonMatchers.assertJsonNullValue;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
@@ -516,7 +517,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
     assertJson(response, "backfill.id", equalTo(BACKFILL_1.id()));
-    assertNoJson(response, "statuses");
+    assertJsonNullValue(response, "statuses");
   }
 
   @Test

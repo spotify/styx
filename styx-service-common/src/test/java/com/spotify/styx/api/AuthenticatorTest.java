@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -134,8 +135,9 @@ public class AuthenticatorTest {
 
   @Mock private GoogleIdToken idToken;
   @Mock private GoogleIdTokenVerifier verifier;
-  @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager cloudResourceManager;
+  @Mock private CloudResourceManager cloudResourceManager;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
+  @Mock private CloudResourceManager.Projects projects;
   @Mock private CloudResourceManager.Projects.List projectsList;
   @Mock private CloudResourceManager.Projects.GetAncestry projectsGetAncestry;
   @Mock private Iam.Projects.ServiceAccounts.Get serviceAccountsGet;
@@ -148,7 +150,9 @@ public class AuthenticatorTest {
     when(idToken.getPayload()).thenReturn(idTokenPayload);
     when(verifier.verify(anyString())).thenReturn(idToken);
 
-    when(cloudResourceManager.projects().getAncestry(any(), any())).thenReturn(projectsGetAncestry);
+    lenient().when(cloudResourceManager.projects()).thenReturn(projects);
+
+    when(projects.getAncestry(any(), any())).thenReturn(projectsGetAncestry);
     when(iam.projects().serviceAccounts().get(any())).thenReturn(serviceAccountsGet);
     verify(iam).projects();
 
@@ -157,7 +161,7 @@ public class AuthenticatorTest {
     mockAncestryResponse(BAZ_PROJECT, resourceId(BAZ_PROJECT));
     mockAncestryResponse(EXTERNAL_PROJECT, resourceId(EXTERNAL_PROJECT));
 
-    when(cloudResourceManager.projects().list()).thenReturn(projectsList);
+    when(projects.list()).thenReturn(projectsList);
 
     final ListProjectsResponse listProjectsResponse1 = new ListProjectsResponse();
     listProjectsResponse1.setProjects(PROJECTS);

@@ -77,6 +77,7 @@ import java.util.concurrent.ExecutionException;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.helper.HelpScreenException;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.Argument;
 import net.sourceforge.argparse4j.inf.ArgumentAction;
@@ -87,7 +88,6 @@ import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
-import net.sourceforge.argparse4j.internal.HelpScreenException;
 
 public final class CliMain {
 

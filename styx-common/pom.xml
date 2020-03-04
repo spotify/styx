@@ -17,6 +17,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>io.norberg</groupId>
       <artifactId>auto-matter</artifactId>
       <scope>provided</scope>
@@ -81,7 +86,6 @@
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client</artifactId>
-      <version>1.28.0</version>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
@@ -106,7 +110,7 @@
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-all</artifactId>
+      <artifactId>hamcrest</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

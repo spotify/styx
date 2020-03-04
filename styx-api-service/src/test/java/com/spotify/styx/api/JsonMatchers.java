@@ -23,6 +23,7 @@ package com.spotify.styx.api;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasJsonPath;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasNoJsonPath;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.apollo.Response;
@@ -44,6 +45,10 @@ class JsonMatchers {
 
   static void assertNoJson(Response<ByteString> response, String jsonPath) {
     assertThat(response, hasPayload(asByteString(hasNoJsonPath(jsonPath))));
+  }
+
+  static void assertJsonNullValue(Response<ByteString> response, String jsonPath) {
+    assertThat(response, hasPayload(asByteString(hasJsonPath(jsonPath, nullValue()))));
   }
 
   private static Matcher<ByteString> asByteString(Matcher<? super String> strMatcher) {
