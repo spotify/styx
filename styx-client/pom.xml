@@ -42,6 +42,10 @@
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-oauth2</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
