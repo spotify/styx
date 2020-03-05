@@ -18,12 +18,12 @@
     <maven.compiler.release>11</maven.compiler.release>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
-    <apollo.version>1.3.2</apollo.version>
+    <apollo.version>1.15.1</apollo.version>
     <jackson.version>2.10.2</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
-    <semantic-metrics.version>0.11.5</semantic-metrics.version>
-    <metrics.version>3.2.6</metrics.version>
+    <semantic-metrics.version>1.0.2</semantic-metrics.version>
+    <metrics.version>4.0.2</metrics.version>
     <opencensus.version>0.25.0</opencensus.version>
     <google.client.lib.version>1.30.8</google.client.lib.version>
     <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
@@ -124,6 +124,13 @@
         <version>0.122.3-alpha</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-bom</artifactId>
+        <version>3.11.4</version>
+        <scope>import</scope>
+        <type>pom</type>
       </dependency>
 
       <!-- submodules-->
@@ -563,16 +570,6 @@
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client-jackson2</artifactId>
         <version>${google.http.client.lib.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>3.11.4</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java-util</artifactId>
-        <version>3.11.4</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
