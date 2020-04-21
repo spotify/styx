@@ -144,6 +144,8 @@ public class PersistentStateManager implements StateManager {
       log.debug("State transition conflict when ticking instance: {}", state.workflowInstance(), e);
     } catch (CounterCapacityException e) {
       log.debug("Counter capacity exhausted when ticking instance: {}", state.workflowInstance(), e);
+    } catch (IllegalArgumentException e) {
+      log.debug("Illegal argument when ticking instance: {}", state.workflowInstance(), e);
     }
   }
 
