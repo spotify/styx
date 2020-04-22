@@ -29,6 +29,7 @@ import static org.mockito.Mockito.mock;
 
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -100,7 +101,7 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForWorkflowInstance() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER, TRIGGER_PARAMETERS), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId", "img"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI1, ImmutableSet.of()), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     WorkflowInstanceExecutionData workflowInstanceExecutionData = storage.executionData(WFI1);
@@ -117,11 +118,11 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI1, ImmutableSet.of()), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI2, ImmutableSet.of()), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
@@ -177,11 +178,11 @@ public class BigTableStorageTest {
   public void shouldReturnRangeOfExecutionDataForWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI1, ImmutableSet.of()), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI2, ImmutableSet.of()), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =
@@ -209,11 +210,11 @@ public class BigTableStorageTest {
   public void shouldReturnExecutionDataForOneWorkflow() throws Exception {
     setUp(0);
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI1, TRIGGER1, TRIGGER_PARAMETERS), 0L, 0L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI1, "execId1", "img1"), 1L, 1L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI1, ImmutableSet.of()), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI1), 2L, 2L));
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI2, TRIGGER2, TRIGGER_PARAMETERS), 0L, 3L));
-    storage.writeEvent(SequenceEvent.create(Event.created(WFI2, "execId2", "img2"), 1L, 4L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI2, ImmutableSet.of()), 1L, 4L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI2), 2L, 5L));
 
     List<WorkflowInstanceExecutionData> workflowInstanceExecutionData =

@@ -125,17 +125,6 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      currWorkflowInstance = workflowInstance;
-      currExecutionId = executionId;
-      currDockerImg = dockerImage;
-
-      executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
-          Optional.empty()));
-      return null;
-    }
-
-    @Override
     public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       currWorkflowInstance = workflowInstance;

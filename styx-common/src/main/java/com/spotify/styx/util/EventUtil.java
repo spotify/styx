@@ -68,11 +68,6 @@ public final class EventUtil {
     }
 
     @Override
-    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
-    }
-
-    @Override
     public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return "";
     }
@@ -154,12 +149,6 @@ public final class EventUtil {
     @Override
     public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return "dequeue";
-    }
-
-    @Override
-    public String created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage) {
-      return "created";
     }
 
     @Override

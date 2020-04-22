@@ -51,10 +51,6 @@ public class WorkflowInstanceEventFactory {
     return Event.info(workflowInstance, message);
   }
 
-  public Event created(String executionId, String dockerImage) {
-    return Event.created(workflowInstance, executionId, dockerImage);
-  }
-
   public Event dequeue(Set<String> resourceIds) {
     return Event.dequeue(workflowInstance, resourceIds);
   }

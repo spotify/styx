@@ -805,11 +805,6 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return false;
-    }
-
-    @Override
     public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       return false;

@@ -53,7 +53,5 @@ public interface EventVisitor<R> {
 
   // Note: Do not make changes to these deprecated event method signatures
   @Deprecated
-  R created(@Getter WorkflowInstance workflowInstance, String executionId, String dockerImage);
-  @Deprecated
   R retry(@Getter WorkflowInstance workflowInstance);
 }

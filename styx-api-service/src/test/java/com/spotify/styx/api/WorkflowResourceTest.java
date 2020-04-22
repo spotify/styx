@@ -30,6 +30,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.cloud.datastore.Datastore;
+import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -342,7 +344,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.dequeue(wfi, ImmutableSet.of()), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
     Response<ByteString> response =
@@ -383,7 +385,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.dequeue(wfi, ImmutableSet.of()), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
     Response<ByteString> response =
@@ -412,8 +414,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
-    storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.dequeue(wfi, ImmutableSet.of()), 1L, ms("07:00:01")));
+    storage.writeEvent(create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec", "test"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
@@ -429,7 +433,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].complete", is(false));
     assertJson(response, "triggers.[0].executions", hasSize(1));
     assertJson(response, "triggers.[0].executions.[0].execution_id", is("exec"));
-    assertJson(response, "triggers.[0].executions.[0].docker_image", is("img"));
+    assertJson(response, "triggers.[0].executions.[0].docker_image", is("busybox:1.1"));
     assertJson(response, "triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));

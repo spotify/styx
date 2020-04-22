@@ -43,7 +43,6 @@ import java.util.Set;
 @JsonSubTypes({
     @JsonSubTypes.Type(value = PersistentEvent.TriggerExecution.class, name = "triggerExecution"),
     @JsonSubTypes.Type(value = PersistentEvent.Info.class, name = "info"),
-    @JsonSubTypes.Type(value = PersistentEvent.Created.class, name = "created"),
     @JsonSubTypes.Type(value = PersistentEvent.Dequeue.class, name = "dequeue"),
     @JsonSubTypes.Type(value = PersistentEvent.Started.class, name = "started"),
     @JsonSubTypes.Type(value = PersistentEvent.Terminate.class, name = "terminate"),
@@ -80,11 +79,6 @@ public class PersistentEvent {
     @Override
     public PersistentEvent info(WorkflowInstance workflowInstance, Message message) {
       return new Info(workflowInstance.toKey(), message);
-    }
-
-    @Override
-    public PersistentEvent created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return new Created(workflowInstance.toKey(), executionId, Optional.of(dockerImage));
     }
 
     @Override
@@ -229,28 +223,6 @@ public class PersistentEvent {
     @Override
     public Event toEvent() {
       return Event.info(WorkflowInstance.parseKey(workflowInstance), message);
-    }
-  }
-
-
-  public static class Created extends PersistentEvent {
-
-    public final String executionId;
-    public final String dockerImage;
-
-    @JsonCreator
-    public Created(
-        @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("execution_id") String executionId,
-        @JsonProperty("docker_image") Optional<String> dockerImage) {
-      super("created", workflowInstance);
-      this.executionId = executionId;
-      this.dockerImage = dockerImage.orElse("UNKNOWN");
-    }
-
-    @Override
-    public Event toEvent() {
-      return Event.created(WorkflowInstance.parseKey(workflowInstance), executionId, dockerImage);
     }
   }
 

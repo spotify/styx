@@ -141,26 +141,6 @@ public abstract class RunState {
       }
     }
 
-    @Deprecated
-    @Override
-    public RunState created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage) {
-      switch (state()) {
-        case PREPARE:
-        case QUEUED:
-          return state(
-              SUBMITTED, // for backwards compatibility
-              data().builder()
-                  .executionId(executionId)
-                  .executionDescription(ExecutionDescription.forImage(dockerImage))
-                  .tries(data().tries() + 1)
-                  .build());
-
-        default:
-          throw illegalTransition("created");
-      }
-    }
-
     @Override
     public RunState info(WorkflowInstance workflowInstance, Message message) {
       switch (state()) {

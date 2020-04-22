@@ -68,7 +68,6 @@ public class PersistentEventTest {
   public void testRoundtripAllEvents() throws Exception {
     assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
-    assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("some-resource")));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of()));
     assertRoundtrip(Event.started(INSTANCE1));
@@ -122,10 +121,6 @@ public class PersistentEventTest {
                                            + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME, RUNNER_ID)));
     assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
-            + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE)));
-    assertThat(
         deserializeEvent(json("runError", "\"message\":\"ErrorMessage\"")),
         is(Event.runError(INSTANCE1, "ErrorMessage")));
     assertThat(
@@ -166,9 +161,6 @@ public class PersistentEventTest {
     assertThat(
         deserializeEvent(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
         is(Event.started(INSTANCE1))); // for backwards compatibility
-    assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
         is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN, TriggerParameters.zero())));
