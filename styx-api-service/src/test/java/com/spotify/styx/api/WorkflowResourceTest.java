@@ -345,7 +345,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.dequeue(wfi, ImmutableSet.of()), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec", "test"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances")));
@@ -361,7 +363,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "[0].triggers.[0].complete", is(false));
     assertJson(response, "[0].triggers.[0].executions", hasSize(1));
     assertJson(response, "[0].triggers.[0].executions.[0].execution_id", is("exec"));
-    assertJson(response, "[0].triggers.[0].executions.[0].docker_image", is("img"));
+    assertJson(response, "[0].triggers.[0].executions.[0].docker_image", is("busybox:1.1"));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
@@ -386,7 +388,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
     storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.dequeue(wfi, ImmutableSet.of()), 1L, ms("07:00:01")));
-    storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submit(wfi, EXECUTION_DESCRIPTION, "exec"), 2L, ms("07:00:02")));
+    storage.writeEvent(create(Event.submitted(wfi, "exec", "test"), 3L, ms("07:00:03")));
+    storage.writeEvent(create(Event.started(wfi), 4L, ms("07:00:04")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances?start=2016-08-10")));
@@ -402,7 +406,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "[0].triggers.[0].complete", is(false));
     assertJson(response, "[0].triggers.[0].executions", hasSize(1));
     assertJson(response, "[0].triggers.[0].executions.[0].execution_id", is("exec"));
-    assertJson(response, "[0].triggers.[0].executions.[0].docker_image", is("img"));
+    assertJson(response, "[0].triggers.[0].executions.[0].docker_image", is("busybox:1.1"));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses", hasSize(2));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "[0].triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
@@ -438,9 +442,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
-               is("2016-08-10T07:00:01Z"));
+               is("2016-08-10T07:00:03Z"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
-               is("2016-08-10T07:00:02Z"));
+               is("2016-08-10T07:00:04Z"));
   }
 
   @Test

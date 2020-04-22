@@ -53,7 +53,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
-public class TimeoutHandlerTest {
+public class  TimeoutHandlerTest {
 
   private Instant now = Instant.parse("2016-12-02T22:00:00Z");
   private Time time = () -> now;

@@ -34,6 +34,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.Status;
@@ -132,6 +133,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     storage.writeEvent(SequenceEvent.create(Event.triggerExecution(WFI_1, TRIGGER, TriggerParameters.zero()), 0L, 0L));
+    storage.writeEvent(SequenceEvent.create(Event.dequeue(WFI_1, ImmutableSet.of()), 1L, 1L));
     storage.writeEvent(SequenceEvent.create(Event.started(WFI_1), 2L, 2L));
 
     Response<ByteString> response =
