@@ -363,7 +363,7 @@ public class PersistentStateManagerTest {
   public void shouldRejectEventIfClosed() throws Exception {
     stateManager.close();
     exception.expect(IsClosedException.class);
-    stateManager.receive(Event.timeTrigger(INSTANCE));
+    stateManager.receive(Event.triggerExecution(INSTANCE, Trigger.natural(), TriggerParameters.zero()));
   }
 
   @Test

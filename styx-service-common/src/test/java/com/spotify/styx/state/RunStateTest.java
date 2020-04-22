@@ -142,9 +142,12 @@ public class RunStateTest {
   }
 
   @Test // for backwards compatibility
-  public void testTimeTriggerAndRetry() {
+  public void testTriggerAndRetry() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
-    transitioner.receive(eventFactory.timeTrigger());
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(777));
@@ -159,7 +162,7 @@ public class RunStateTest {
   }
 
   @Test
-  public void testTimeTriggerAndRetry2() {
+  public void testTriggerAndRetryAfter() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
@@ -183,7 +186,10 @@ public class RunStateTest {
   @Test
   public void testRunErrorOnCreating() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
-    transitioner.receive(eventFactory.timeTrigger());
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
+    transitioner.receive(eventFactory.submitted("exec1"));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(777));

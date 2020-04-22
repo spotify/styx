@@ -123,23 +123,6 @@ public abstract class RunState {
 
   private class TransitionVisitor implements EventVisitor<RunState> {
 
-    @Deprecated
-    @Override
-    public RunState timeTrigger(WorkflowInstance workflowInstance) {
-      switch (state()) {
-        case NEW:
-          return state( // for backwards compatibility
-              SUBMITTED,
-              data().builder()
-                  .trigger(Trigger.unknown("UNKNOWN"))
-                  .triggerId("UNKNOWN") // for backwards compatibility
-                  .build());
-
-        default:
-          throw illegalTransition("timeTrigger");
-      }
-    }
-
     @Override
     public RunState triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {

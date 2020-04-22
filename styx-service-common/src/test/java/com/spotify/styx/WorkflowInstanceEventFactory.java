@@ -39,10 +39,6 @@ public class WorkflowInstanceEventFactory {
     this.workflowInstance = workflowInstance;
   }
 
-  public Event timeTrigger() {
-    return Event.timeTrigger(workflowInstance);
-  }
-
   public Event triggerExecution(Trigger trigger) {
     return triggerExecution(trigger, TriggerParameters.zero());
   }

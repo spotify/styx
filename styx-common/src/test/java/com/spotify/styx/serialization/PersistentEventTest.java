@@ -66,7 +66,6 @@ public class PersistentEventTest {
 
   @Test
   public void testRoundtripAllEvents() throws Exception {
-    assertRoundtrip(Event.timeTrigger(INSTANCE1));
     assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
     assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
@@ -87,7 +86,6 @@ public class PersistentEventTest {
 
   @Test
   public void testDeserializeFromJson() throws Exception {
-    assertThat(deserializeEvent(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
     assertThat(deserializeEvent(json("dequeue", "\"resource_ids\":[\"quux\"]")),
         is(Event.dequeue(INSTANCE1, ImmutableSet.of("quux"))));
     assertThat(deserializeEvent(json("dequeue")),
