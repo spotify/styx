@@ -41,7 +41,6 @@ import java.util.Set;
 
 @JsonTypeInfo(use = Id.NAME, visible = true)
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
     @JsonSubTypes.Type(value = PersistentEvent.TriggerExecution.class, name = "triggerExecution"),
     @JsonSubTypes.Type(value = PersistentEvent.Info.class, name = "info"),
     @JsonSubTypes.Type(value = PersistentEvent.Created.class, name = "created"),
@@ -71,10 +70,6 @@ class PersistentEvent {
 
   public static class SerializerVisitor implements EventVisitor<PersistentEvent> {
 
-    @Override
-    public PersistentEvent timeTrigger(WorkflowInstance workflowInstance) {
-      return new PersistentEvent("timeTrigger", workflowInstance.toKey());
-    }
 
     @Override
     public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
@@ -169,8 +164,6 @@ class PersistentEvent {
   public Event toEvent() {
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(this.workflowInstance);
     switch (type) {
-      case "timeTrigger":
-        return Event.timeTrigger(workflowInstance);
       case "success":
         return Event.success(workflowInstance);
       case "retry":

@@ -789,11 +789,6 @@ class KubernetesDockerRunner implements DockerRunner {
   private static class PullImageErrorMatcher implements EventVisitor<Boolean> {
 
     @Override
-    public Boolean timeTrigger(WorkflowInstance workflowInstance) {
-      return false;
-    }
-
-    @Override
     public Boolean triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return false;

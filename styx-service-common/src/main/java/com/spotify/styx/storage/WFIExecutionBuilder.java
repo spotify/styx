@@ -101,15 +101,6 @@ class WFIExecutionBuilder {
   private class Reducer implements EventVisitor<Void> {
 
     @Override
-    public Void timeTrigger(WorkflowInstance workflowInstance) {
-      currWorkflowInstance = workflowInstance;
-      completed = false;
-
-      triggerTs = eventTs;
-      return null;
-    }
-
-    @Override
     public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger,
         TriggerParameters parameters) {
       currWorkflowInstance = workflowInstance;

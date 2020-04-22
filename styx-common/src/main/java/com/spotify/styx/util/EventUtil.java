@@ -56,11 +56,6 @@ public final class EventUtil {
     INSTANCE;
 
     @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
     public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return String.format("Trigger id: %s, Parameters: %s", TriggerUtil.triggerId(trigger),
@@ -144,11 +139,6 @@ public final class EventUtil {
    */
   private enum EventNameVisitor implements EventVisitor<String> {
     INSTANCE;
-
-    @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "timeTrigger";
-    }
 
     @Override
     public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
