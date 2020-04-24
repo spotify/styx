@@ -179,8 +179,6 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
 
-    //transitioner.receive(eventFactory.retry()); TODO: This should pass without retry but does this test still make
-    // sense to have?
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
     transitioner.receive(eventFactory.retryAfter(999));
 
