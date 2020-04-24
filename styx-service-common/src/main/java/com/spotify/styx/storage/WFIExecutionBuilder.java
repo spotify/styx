@@ -213,12 +213,6 @@ class WFIExecutionBuilder {
     }
 
     @Override
-    public Void retry(WorkflowInstance workflowInstance) {
-      currWorkflowInstance = workflowInstance;
-      return null;
-    }
-
-    @Override
     public Void stop(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
       completed = true;

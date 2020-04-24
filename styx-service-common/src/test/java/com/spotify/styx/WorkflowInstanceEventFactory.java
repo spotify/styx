@@ -87,10 +87,6 @@ public class WorkflowInstanceEventFactory {
     return Event.retryAfter(workflowInstance, delayMillis);
   }
 
-  public Event retry() {
-    return Event.retry(workflowInstance);
-  }
-
   public Event stop() {
     return Event.stop(workflowInstance);
   }

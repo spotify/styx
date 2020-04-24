@@ -330,20 +330,6 @@ public abstract class RunState {
       }
     }
 
-    @Deprecated
-    @Override
-    public RunState retry(WorkflowInstance workflowInstance) {
-      switch (state()) {
-        case TERMINATED:
-        case FAILED:
-        case QUEUED:
-          return state(PREPARE);
-
-        default:
-          throw illegalTransition("retry");
-      }
-    }
-
     @Override
     public RunState stop(WorkflowInstance workflowInstance) {
       switch (state()) {

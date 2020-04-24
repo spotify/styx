@@ -98,11 +98,6 @@ public final class EventUtil {
     }
 
     @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
     public String stop(WorkflowInstance workflowInstance) {
       return "";
     }
@@ -174,11 +169,6 @@ public final class EventUtil {
     @Override
     public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
       return "retryAfter";
-    }
-
-    @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "retry";
     }
 
     @Override

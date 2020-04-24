@@ -159,7 +159,6 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.terminate(RunState.MISSING_DEPS_EXIT_CODE), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
-        SequenceEvent.create(E.retry(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
@@ -174,7 +173,6 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.terminate(1), c++, ts("09:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("09:59")),
 
-        SequenceEvent.create(E.retry(), c++, ts("10:56")),
         SequenceEvent.create(E.submit(desc("img4", "sha4"), "exec-id-11"), c++, ts("10:55")),
         SequenceEvent.create(E.submitted("exec-id-11"), c++, ts("10:56")),
         SequenceEvent.create(E.started(), c++, ts("10:57"))
@@ -308,7 +306,6 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.timeout(), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
-        SequenceEvent.create(E.retry(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
@@ -407,7 +404,6 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
-        SequenceEvent.create(E.retry(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
@@ -531,7 +527,6 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
-        SequenceEvent.create(E.retry(), c++, ts("08:56")),
         SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),

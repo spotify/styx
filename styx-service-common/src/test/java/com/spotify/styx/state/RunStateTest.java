@@ -142,26 +142,6 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).counter(), is(0L));
   }
 
-  @Test // for backwards compatibility
-  public void testTriggerAndRetry() {
-    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
-    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
-    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
-    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, "exec1"));
-    transitioner.receive(eventFactory.submitted("exec1"));
-    transitioner.receive(eventFactory.started());
-    transitioner.receive(eventFactory.terminate(1));
-    transitioner.receive(eventFactory.retryAfter(777));
-
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
-
-    transitioner.receive(eventFactory.retry());
-    transitioner.receive(eventFactory.started());
-
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(RUNNING));
-  }
-
   @Test
   public void testTriggerAndRetryAfter() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
@@ -199,7 +179,8 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
 
-    transitioner.receive(eventFactory.retry());
+    //transitioner.receive(eventFactory.retry()); TODO: This should pass without retry but does this test still make
+    // sense to have?
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
     transitioner.receive(eventFactory.retryAfter(999));
 
@@ -237,7 +218,6 @@ public class RunStateTest {
 
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(999));
-    transitioner.receive(eventFactory.retry());
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_2));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_2));
     transitioner.receive(eventFactory.started());
@@ -247,7 +227,7 @@ public class RunStateTest {
         transitioner.get(WORKFLOW_INSTANCE).data().executionId(),
         equalTo(Optional.of(TEST_EXECUTION_ID_2)));
     assertThat(outputs, contains(QUEUED, PREPARE, SUBMITTING, SUBMITTED, RUNNING, TERMINATED, QUEUED,
-                                 PREPARE, SUBMITTING, SUBMITTED, RUNNING));
+                                 SUBMITTING, SUBMITTED, RUNNING));
   }
 
   @Test
@@ -286,7 +266,7 @@ public class RunStateTest {
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().retryDelayMillis(), isPresentAndIs(777L));
 
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(999));
@@ -318,36 +298,37 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromRunError() {
+  public void testRetryAfterFromRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(PREPARE));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(QUEUED, PREPARE, SUBMITTING, SUBMITTED, FAILED, PREPARE));
+    assertThat(outputs, contains(QUEUED, PREPARE, SUBMITTING, SUBMITTED, FAILED, QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
   }
 
   @Test
-  public void testManyRetriesFromRunError() {
+  public void testManyRetriesAfterFromRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(PREPARE));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
-    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, FAILED, PREPARE, RUNNING, FAILED, PREPARE));
+    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, FAILED, QUEUED, PREPARE, RUNNING, FAILED, QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(2));
   }
 
@@ -359,7 +340,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
     transitioner.receive(eventFactory.retryAfter(0));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
 
@@ -377,7 +358,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
     transitioner.receive(eventFactory.retryAfter(0));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(RunState.MISSING_DEPS_EXIT_CODE));
 
@@ -396,7 +377,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
     transitioner.receive(eventFactory.retryAfter(0));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
 
@@ -437,38 +418,39 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromTerminated() {
+  public void testRetryAfterFromTerminated() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(PREPARE));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(1));
-    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, TERMINATED, PREPARE));
+    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, TERMINATED, QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
   }
 
   @Test
-  public void testManyRetriesFromTerminated() {
+  public void testManyRetriesAfterFromTerminated() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(7));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(PREPARE));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(2));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().lastExit(), isPresentAndIs(7));
-    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, TERMINATED, PREPARE,
-                                 RUNNING, TERMINATED, PREPARE));
+    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, TERMINATED, QUEUED, PREPARE,
+                                 RUNNING, TERMINATED, QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(2));
   }
 
@@ -487,17 +469,17 @@ public class RunStateTest {
   }
 
   @Test
-  public void testRetryFromStartedThenRunError() {
+  public void testRetryAfterFromStartedThenRunError() {
     transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
     transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
     transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.runError(TEST_ERROR_MESSAGE));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
 
-    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(PREPARE));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().tries(), equalTo(1));
-    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, FAILED, PREPARE));
+    assertThat(outputs, contains(QUEUED, PREPARE, RUNNING, FAILED, QUEUED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().consecutiveFailures(), equalTo(1));
   }
 
@@ -619,7 +601,8 @@ public class RunStateTest {
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
     transitioner.receive(eventFactory.started());
     transitioner.receive(eventFactory.terminate(1));
-    transitioner.receive(eventFactory.retry());
+    transitioner.receive(eventFactory.retryAfter(0));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
     transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION2, TEST_EXECUTION_ID_2));
     transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_2));
 

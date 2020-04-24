@@ -123,11 +123,6 @@ public class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent retry(WorkflowInstance workflowInstance) {
-      return new PersistentEvent("retry", workflowInstance.toKey());
-    }
-
-    @Override
     public PersistentEvent stop(WorkflowInstance workflowInstance) {
       return new PersistentEvent("stop", workflowInstance.toKey());
     }
@@ -160,8 +155,6 @@ public class PersistentEvent {
     switch (type) {
       case "success":
         return Event.success(workflowInstance);
-      case "retry":
-        return Event.retry(workflowInstance);
       case "stop":
         return Event.stop(workflowInstance);
       case "timeout":

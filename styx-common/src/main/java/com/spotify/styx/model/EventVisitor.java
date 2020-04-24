@@ -51,7 +51,4 @@ public interface EventVisitor<R> {
   R timeout(@Getter WorkflowInstance workflowInstance);
   R halt(@Getter WorkflowInstance workflowInstance);
 
-  // Note: Do not make changes to these deprecated event method signatures
-  @Deprecated
-  R retry(@Getter WorkflowInstance workflowInstance);
 }

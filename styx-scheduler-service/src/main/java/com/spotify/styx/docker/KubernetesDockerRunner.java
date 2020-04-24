@@ -841,11 +841,6 @@ class KubernetesDockerRunner implements DockerRunner {
     }
 
     @Override
-    public Boolean retry(WorkflowInstance workflowInstance) {
-      return false;
-    }
-
-    @Override
     public Boolean stop(WorkflowInstance workflowInstance) {
       return false;
     }

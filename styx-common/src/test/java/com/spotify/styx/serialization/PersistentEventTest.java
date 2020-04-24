@@ -75,7 +75,6 @@ public class PersistentEventTest {
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
     assertRoundtrip(Event.success(INSTANCE1));
     assertRoundtrip(Event.retryAfter(INSTANCE1, 12345));
-    assertRoundtrip(Event.retry(INSTANCE1));
     assertRoundtrip(Event.stop(INSTANCE1));
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
@@ -91,7 +90,6 @@ public class PersistentEventTest {
         is(Event.dequeue(INSTANCE1, ImmutableSet.of())));
     assertThat(deserializeEvent(json("started")), is(Event.started(INSTANCE1)));
     assertThat(deserializeEvent(json("success")), is(Event.success(INSTANCE1)));
-    assertThat(deserializeEvent(json("retry")), is(Event.retry(INSTANCE1)));
     assertThat(deserializeEvent(json("stop")), is(Event.stop(INSTANCE1)));
     assertThat(deserializeEvent(json("timeout")), is(Event.timeout(INSTANCE1)));
     assertThat(deserializeEvent(json("halt")), is(Event.halt(INSTANCE1)));
