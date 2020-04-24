@@ -176,7 +176,6 @@ public abstract class RunState {
     public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       switch (state()) {
-        case QUEUED: // for backwards compatibility
         case PREPARE:
           return state(
               SUBMITTING,
