@@ -212,10 +212,6 @@ public abstract class RunState {
       switch (state()) {
         case SUBMITTED:
           return state(RUNNING);
-        case PREPARE:
-          return state(RUNNING, data().builder()
-              .tries(data().tries() + 1)
-              .build());
 
         default:
           throw illegalTransition("started");
