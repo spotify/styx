@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import org.springframework.expression.ParseException;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 public class BasicWorkflowValidator implements WorkflowValidator {
@@ -140,7 +139,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     cfg.retryCondition().ifPresent(retryCondition -> {
       try {
         new SpelExpressionParser().parseRaw(retryCondition);
-      } catch (ParseException ex) {
+      } catch (Exception ex) {
         e.add(format("invalid retry condition: %s", ex.getMessage()));
       }
     });
