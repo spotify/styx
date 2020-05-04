@@ -66,10 +66,8 @@ public class PersistentEventTest {
 
   @Test
   public void testRoundtripAllEvents() throws Exception {
-    assertRoundtrip(Event.timeTrigger(INSTANCE1));
     assertRoundtrip(Event.triggerExecution(INSTANCE1, UNKNOWN_TRIGGER, TRIGGER_PARAMETERS));
     assertRoundtrip(Event.info(INSTANCE1, Message.info("InfoMessage")));
-    assertRoundtrip(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of("some-resource")));
     assertRoundtrip(Event.dequeue(INSTANCE1, ImmutableSet.of()));
     assertRoundtrip(Event.started(INSTANCE1));
@@ -77,7 +75,6 @@ public class PersistentEventTest {
     assertRoundtrip(Event.runError(INSTANCE1, "ErrorMessage"));
     assertRoundtrip(Event.success(INSTANCE1));
     assertRoundtrip(Event.retryAfter(INSTANCE1, 12345));
-    assertRoundtrip(Event.retry(INSTANCE1));
     assertRoundtrip(Event.stop(INSTANCE1));
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
@@ -87,14 +84,12 @@ public class PersistentEventTest {
 
   @Test
   public void testDeserializeFromJson() throws Exception {
-    assertThat(deserializeEvent(json("timeTrigger")), is(Event.timeTrigger(INSTANCE1)));
     assertThat(deserializeEvent(json("dequeue", "\"resource_ids\":[\"quux\"]")),
         is(Event.dequeue(INSTANCE1, ImmutableSet.of("quux"))));
     assertThat(deserializeEvent(json("dequeue")),
         is(Event.dequeue(INSTANCE1, ImmutableSet.of())));
     assertThat(deserializeEvent(json("started")), is(Event.started(INSTANCE1)));
     assertThat(deserializeEvent(json("success")), is(Event.success(INSTANCE1)));
-    assertThat(deserializeEvent(json("retry")), is(Event.retry(INSTANCE1)));
     assertThat(deserializeEvent(json("stop")), is(Event.stop(INSTANCE1)));
     assertThat(deserializeEvent(json("timeout")), is(Event.timeout(INSTANCE1)));
     assertThat(deserializeEvent(json("halt")), is(Event.halt(INSTANCE1)));
@@ -123,10 +118,6 @@ public class PersistentEventTest {
         deserializeEvent(json("submitted", "\"execution_id\":\"" + POD_NAME + "\",\"runner_id\":\"" + RUNNER_ID
                                            + "\"")),
         is(Event.submitted(INSTANCE1, POD_NAME, RUNNER_ID)));
-    assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\",\"docker_image\":\"" + DOCKER_IMAGE
-            + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, DOCKER_IMAGE)));
     assertThat(
         deserializeEvent(json("runError", "\"message\":\"ErrorMessage\"")),
         is(Event.runError(INSTANCE1, "ErrorMessage")));
@@ -168,9 +159,6 @@ public class PersistentEventTest {
     assertThat(
         deserializeEvent(json("started", "\"pod_name\":\"" + POD_NAME + "\"")),
         is(Event.started(INSTANCE1))); // for backwards compatibility
-    assertThat(
-        deserializeEvent(json("created", "\"execution_id\":\"" + POD_NAME + "\"")),
-        is(Event.created(INSTANCE1, POD_NAME, "UNKNOWN")));
     assertThat(
         deserializeEvent(json("triggerExecution")),
         is(Event.triggerExecution(INSTANCE1, TRIGGER_UNKNOWN, TriggerParameters.zero())));

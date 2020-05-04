@@ -41,10 +41,8 @@ import java.util.Set;
 
 @JsonTypeInfo(use = Id.NAME, visible = true)
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = PersistentEvent.class, name = "timeTrigger"),
     @JsonSubTypes.Type(value = PersistentEvent.TriggerExecution.class, name = "triggerExecution"),
     @JsonSubTypes.Type(value = PersistentEvent.Info.class, name = "info"),
-    @JsonSubTypes.Type(value = PersistentEvent.Created.class, name = "created"),
     @JsonSubTypes.Type(value = PersistentEvent.Dequeue.class, name = "dequeue"),
     @JsonSubTypes.Type(value = PersistentEvent.Started.class, name = "started"),
     @JsonSubTypes.Type(value = PersistentEvent.Terminate.class, name = "terminate"),
@@ -71,10 +69,6 @@ public class PersistentEvent {
 
   public static class SerializerVisitor implements EventVisitor<PersistentEvent> {
 
-    @Override
-    public PersistentEvent timeTrigger(WorkflowInstance workflowInstance) {
-      return new PersistentEvent("timeTrigger", workflowInstance.toKey());
-    }
 
     @Override
     public PersistentEvent triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
@@ -85,11 +79,6 @@ public class PersistentEvent {
     @Override
     public PersistentEvent info(WorkflowInstance workflowInstance, Message message) {
       return new Info(workflowInstance.toKey(), message);
-    }
-
-    @Override
-    public PersistentEvent created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return new Created(workflowInstance.toKey(), executionId, Optional.of(dockerImage));
     }
 
     @Override
@@ -134,11 +123,6 @@ public class PersistentEvent {
     }
 
     @Override
-    public PersistentEvent retry(WorkflowInstance workflowInstance) {
-      return new PersistentEvent("retry", workflowInstance.toKey());
-    }
-
-    @Override
     public PersistentEvent stop(WorkflowInstance workflowInstance) {
       return new PersistentEvent("stop", workflowInstance.toKey());
     }
@@ -169,12 +153,8 @@ public class PersistentEvent {
   public Event toEvent() {
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(this.workflowInstance);
     switch (type) {
-      case "timeTrigger":
-        return Event.timeTrigger(workflowInstance);
       case "success":
         return Event.success(workflowInstance);
-      case "retry":
-        return Event.retry(workflowInstance);
       case "stop":
         return Event.stop(workflowInstance);
       case "timeout":
@@ -236,28 +216,6 @@ public class PersistentEvent {
     @Override
     public Event toEvent() {
       return Event.info(WorkflowInstance.parseKey(workflowInstance), message);
-    }
-  }
-
-
-  public static class Created extends PersistentEvent {
-
-    public final String executionId;
-    public final String dockerImage;
-
-    @JsonCreator
-    public Created(
-        @JsonProperty("workflow_instance") String workflowInstance,
-        @JsonProperty("execution_id") String executionId,
-        @JsonProperty("docker_image") Optional<String> dockerImage) {
-      super("created", workflowInstance);
-      this.executionId = executionId;
-      this.dockerImage = dockerImage.orElse("UNKNOWN");
-    }
-
-    @Override
-    public Event toEvent() {
-      return Event.created(WorkflowInstance.parseKey(workflowInstance), executionId, dockerImage);
     }
   }
 

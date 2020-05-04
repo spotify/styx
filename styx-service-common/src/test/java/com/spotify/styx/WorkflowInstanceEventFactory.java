@@ -39,10 +39,6 @@ public class WorkflowInstanceEventFactory {
     this.workflowInstance = workflowInstance;
   }
 
-  public Event timeTrigger() {
-    return Event.timeTrigger(workflowInstance);
-  }
-
   public Event triggerExecution(Trigger trigger) {
     return triggerExecution(trigger, TriggerParameters.zero());
   }
@@ -53,10 +49,6 @@ public class WorkflowInstanceEventFactory {
 
   public Event info(Message message) {
     return Event.info(workflowInstance, message);
-  }
-
-  public Event created(String executionId, String dockerImage) {
-    return Event.created(workflowInstance, executionId, dockerImage);
   }
 
   public Event dequeue(Set<String> resourceIds) {
@@ -93,10 +85,6 @@ public class WorkflowInstanceEventFactory {
 
   public Event retryAfter(int delayMillis) {
     return Event.retryAfter(workflowInstance, delayMillis);
-  }
-
-  public Event retry() {
-    return Event.retry(workflowInstance);
   }
 
   public Event stop() {

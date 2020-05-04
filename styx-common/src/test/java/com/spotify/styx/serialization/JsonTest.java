@@ -32,7 +32,7 @@ import org.junit.Test;
 
 public class JsonTest {
 
-  private static final Event EVENT = Event.retry(TestData.WORKFLOW_INSTANCE);
+  private static final Event EVENT = Event.retryAfter(TestData.WORKFLOW_INSTANCE, 0);
   private static final Trigger TRIGGER = Trigger.adhoc("foobar");
 
   @Test

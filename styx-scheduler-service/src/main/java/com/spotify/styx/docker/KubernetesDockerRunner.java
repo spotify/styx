@@ -789,11 +789,6 @@ class KubernetesDockerRunner implements DockerRunner {
   private static class PullImageErrorMatcher implements EventVisitor<Boolean> {
 
     @Override
-    public Boolean timeTrigger(WorkflowInstance workflowInstance) {
-      return false;
-    }
-
-    @Override
     public Boolean triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return false;
@@ -806,11 +801,6 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
-      return false;
-    }
-
-    @Override
-    public Boolean created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
       return false;
     }
 
@@ -847,11 +837,6 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      return false;
-    }
-
-    @Override
-    public Boolean retry(WorkflowInstance workflowInstance) {
       return false;
     }
 

@@ -158,6 +158,14 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .build();
 
+  public static final ExecutionDescription EXECUTION_DESCRIPTION2 =
+      ExecutionDescription.builder()
+          .dockerImage("busybox:1.2")
+          .dockerArgs("foo", "bar")
+          .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
+          .commitSha(VALID_SHA)
+          .build();
+
   public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
 

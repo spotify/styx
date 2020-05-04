@@ -276,8 +276,8 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void shouldFailOnInjectRetryEvent() throws Exception {
-    Event injectedEvent = Event.retry(WFI);
+  public void shouldFailOnInjectRetryAfterEvent() throws Exception {
+    Event injectedEvent = Event.retryAfter(WFI, 0);
     ByteString eventPayload = serialize(injectedEvent);
     CompletionStage<Response<ByteString>> post =
         serviceHelper.request("POST", BASE + "/events", eventPayload);

@@ -56,11 +56,6 @@ public final class EventUtil {
     INSTANCE;
 
     @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "";
-    }
-
-    @Override
     public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return String.format("Trigger id: %s, Parameters: %s", TriggerUtil.triggerId(trigger),
@@ -70,11 +65,6 @@ public final class EventUtil {
     @Override
     public String info(WorkflowInstance workflowInstance, Message message) {
       return message.line();
-    }
-
-    @Override
-    public String created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      return String.format("Execution id: %s, Docker image: %s", executionId, dockerImage);
     }
 
     @Override
@@ -105,11 +95,6 @@ public final class EventUtil {
     @Override
     public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
       return String.format("Delay (seconds): %d", TimeUnit.MILLISECONDS.toSeconds(delayMillis));
-    }
-
-    @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "";
     }
 
     @Override
@@ -146,11 +131,6 @@ public final class EventUtil {
     INSTANCE;
 
     @Override
-    public String timeTrigger(WorkflowInstance workflowInstance) {
-      return "timeTrigger";
-    }
-
-    @Override
     public String triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
       return "triggerExecution";
@@ -164,12 +144,6 @@ public final class EventUtil {
     @Override
     public String dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       return "dequeue";
-    }
-
-    @Override
-    public String created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage) {
-      return "created";
     }
 
     @Override
@@ -195,11 +169,6 @@ public final class EventUtil {
     @Override
     public String retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
       return "retryAfter";
-    }
-
-    @Override
-    public String retry(WorkflowInstance workflowInstance) {
-      return "retry";
     }
 
     @Override

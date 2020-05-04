@@ -123,23 +123,6 @@ public abstract class RunState {
 
   private class TransitionVisitor implements EventVisitor<RunState> {
 
-    @Deprecated
-    @Override
-    public RunState timeTrigger(WorkflowInstance workflowInstance) {
-      switch (state()) {
-        case NEW:
-          return state( // for backwards compatibility
-              SUBMITTED,
-              data().builder()
-                  .trigger(Trigger.unknown("UNKNOWN"))
-                  .triggerId("UNKNOWN") // for backwards compatibility
-                  .build());
-
-        default:
-          throw illegalTransition("timeTrigger");
-      }
-    }
-
     @Override
     public RunState triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
         TriggerParameters parameters) {
@@ -155,26 +138,6 @@ public abstract class RunState {
 
         default:
           throw illegalTransition("triggerExecution");
-      }
-    }
-
-    @Deprecated
-    @Override
-    public RunState created(WorkflowInstance workflowInstance, String executionId,
-        String dockerImage) {
-      switch (state()) {
-        case PREPARE:
-        case QUEUED:
-          return state(
-              SUBMITTED, // for backwards compatibility
-              data().builder()
-                  .executionId(executionId)
-                  .executionDescription(ExecutionDescription.forImage(dockerImage))
-                  .tries(data().tries() + 1)
-                  .build());
-
-        default:
-          throw illegalTransition("created");
       }
     }
 
@@ -249,8 +212,11 @@ public abstract class RunState {
     public RunState started(WorkflowInstance workflowInstance) {
       switch (state()) {
         case SUBMITTED:
-        case PREPARE:
           return state(RUNNING);
+        case PREPARE:
+          return state(RUNNING, data().builder()
+              .tries(data().tries() + 1)
+              .build());
 
         default:
           throw illegalTransition("started");
@@ -361,20 +327,6 @@ public abstract class RunState {
 
         default:
           throw illegalTransition("retryAfter");
-      }
-    }
-
-    @Deprecated
-    @Override
-    public RunState retry(WorkflowInstance workflowInstance) {
-      switch (state()) {
-        case TERMINATED:
-        case FAILED:
-        case QUEUED:
-          return state(PREPARE);
-
-        default:
-          throw illegalTransition("retry");
       }
     }
 

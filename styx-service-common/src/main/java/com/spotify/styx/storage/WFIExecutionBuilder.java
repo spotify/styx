@@ -101,15 +101,6 @@ class WFIExecutionBuilder {
   private class Reducer implements EventVisitor<Void> {
 
     @Override
-    public Void timeTrigger(WorkflowInstance workflowInstance) {
-      currWorkflowInstance = workflowInstance;
-      completed = false;
-
-      triggerTs = eventTs;
-      return null;
-    }
-
-    @Override
     public Void triggerExecution(WorkflowInstance workflowInstance, com.spotify.styx.state.Trigger trigger,
         TriggerParameters parameters) {
       currWorkflowInstance = workflowInstance;
@@ -130,17 +121,6 @@ class WFIExecutionBuilder {
     @Override
     public Void dequeue(WorkflowInstance workflowInstance, Set<String> resourceIds) {
       currWorkflowInstance = workflowInstance;
-      return null;
-    }
-
-    @Override
-    public Void created(WorkflowInstance workflowInstance, String executionId, String dockerImage) {
-      currWorkflowInstance = workflowInstance;
-      currExecutionId = executionId;
-      currDockerImg = dockerImage;
-
-      executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
-          Optional.empty()));
       return null;
     }
 
@@ -228,12 +208,6 @@ class WFIExecutionBuilder {
 
     @Override
     public Void retryAfter(WorkflowInstance workflowInstance, long delayMillis) {
-      currWorkflowInstance = workflowInstance;
-      return null;
-    }
-
-    @Override
-    public Void retry(WorkflowInstance workflowInstance) {
       currWorkflowInstance = workflowInstance;
       return null;
     }
