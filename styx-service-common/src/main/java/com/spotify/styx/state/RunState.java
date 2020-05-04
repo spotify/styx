@@ -176,7 +176,6 @@ public abstract class RunState {
     public RunState submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       switch (state()) {
-        case QUEUED: // for backwards compatibility
         case PREPARE:
           return state(
               SUBMITTING,
@@ -213,10 +212,6 @@ public abstract class RunState {
       switch (state()) {
         case SUBMITTED:
           return state(RUNNING);
-        case PREPARE:
-          return state(RUNNING, data().builder()
-              .tries(data().tries() + 1)
-              .build());
 
         default:
           throw illegalTransition("started");
