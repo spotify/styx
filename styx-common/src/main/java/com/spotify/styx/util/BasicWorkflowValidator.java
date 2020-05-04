@@ -139,7 +139,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     cfg.retryCondition().ifPresent(retryCondition -> {
       try {
         new SpelExpressionParser().parseRaw(retryCondition);
-      } catch (Exception ex) {
+      } catch (RuntimeException ex) {
         e.add(format("invalid retry condition: %s", ex.getMessage()));
       }
     });
