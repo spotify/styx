@@ -108,7 +108,7 @@ secret:
   mount_path: /etc/my-keys
 service_account: my-service-account@my-project.iam.gserviceaccount.com
 running_timeout: PT2H
-retry_condition: #exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == "natural"
+retry_condition: "(#tries < 2 && #triggerType == 'backfill') || (#triggerType != 'backfill')"
 ```
 
 #### `id` **[string]**
