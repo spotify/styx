@@ -20,21 +20,26 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.testdata.TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.model.DockerExecConfBuilder;
+import com.spotify.styx.model.FlyteExecConfBuilder;
+import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -45,9 +50,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import junitparams.naming.TestCaseName;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -267,7 +275,119 @@ public class BasicWorkflowValidatorTest {
             empty());
   }
 
-  private String limit(String msg, Object value, Object limit) {
+  @Test
+  public void shouldAcceptValidDockerExecConf() {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", DOCKER_EXEC_WORKFLOW_CONFIGURATION)),
+        empty()
+    );
+  }
+
+  @Test
+  public void shouldRejectInvalidImageInDockerExecConf() {
+    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of("foo", "bar"));
+
+    var errors = sut.validateWorkflow(Workflow.create("test", DOCKER_EXEC_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, containsInAnyOrder("invalid image: foo", "invalid image: bar"));
+  }
+
+  @Test
+  public void shouldAcceptValidFlyteExecConf() {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", FLYTE_WORKFLOW_CONFIGURATION)),
+        empty()
+    );
+  }
+
+  @Test
+  @TestCaseName("{method} - {1}")
+  @Parameters(source = InvalidFlyteConfExecArgsProvider.class)
+  public void shouldRejectInvalidFlyteExecConf(WorkflowConfiguration configuration,
+                                               String expectedError) {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", configuration)),
+        Matchers.allOf(
+            Matchers.<String>hasSize(1),
+            Matchers.contains(expectedError)
+        )
+    );
+  }
+
+  @Test
+  public void shouldRejectMismatchingDockerConf() {
+    var configuration = WorkflowConfigurationBuilder.from(DOCKER_EXEC_WORKFLOW_CONFIGURATION)
+        .dockerImage("gcr.io/different-image")
+        .dockerArgs(List.of("other", "args"))
+        .dockerTerminationLogging(false) //Not verified :(
+        .build();
+
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", configuration)),
+        containsInAnyOrder(
+            "mismatching dockerImage configuration: \"gcr.io/different-image\" != \"busybox\"",
+            "mismatching dockerArgs configuration: \"[other, args]\" != \"[x, y]\""
+        )
+    );
+  }
+
+  @Test
+  @Parameters()
+  public void shouldRejectConflictingExecConf(WorkflowConfiguration configuration) {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", configuration)),
+        containsInAnyOrder("configuration cannot specify both docker and flyte parameters")
+    );
+  }
+
+  public Object[] parametersForShouldRejectConflictingExecConf() {
+    return new Object[] {
+        WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+            .dockerExecConf(new DockerExecConfBuilder()
+                .dockerImage("gcr.io/different-image")
+                .dockerArgs(List.of("other", "args"))
+                .build())
+            .build(),
+        WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+            .dockerImage("gcr.io/different-image")
+            .dockerArgs(List.of("other", "args"))
+            .build()
+    };
+  }
+
+  public static class InvalidFlyteConfExecArgsProvider {
+
+    private InvalidFlyteConfExecArgsProvider() {}
+
+    public static Object[] provideNotALaunchPlanResource() {
+        return new Object[] {
+            flyteConf(builder -> builder.resourceType("wf")), "only launch plans (\"lp\") are supported: wf"
+        };
+    }
+
+    public static Object[] provideEmptyFields() {
+      return new Object[] {
+          new Object[] { flyteConf(builder -> builder.project("")), "project cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.domain("")), "domain cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.name("")), "name cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.version("")), "version cannot be empty" }
+      };
+    }
+
+    private static WorkflowConfiguration flyteConf(Consumer<FlyteIdentifierBuilder> identifierMutator) {
+      var confBuilder = WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION);
+      var flyteExecConf = confBuilder.flyteExecConf().orElseThrow();
+      var referenceIdBuilder = FlyteIdentifierBuilder.from(flyteExecConf.referenceId());
+      identifierMutator.accept(referenceIdBuilder);
+      return confBuilder.flyteExecConf(
+          FlyteExecConfBuilder.from(flyteExecConf)
+              .referenceId(referenceIdBuilder.build())
+              .build())
+          .build();
+    }
+  }
+
+    private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }

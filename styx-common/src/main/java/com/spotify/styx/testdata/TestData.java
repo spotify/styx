@@ -27,7 +27,10 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
+import com.spotify.styx.model.DockerExecConfBuilder;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConfBuilder;
+import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -138,6 +141,37 @@ public final class TestData {
           .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
           .retryCondition("#exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == \"natural\"")
+          .build();
+
+  public static final WorkflowConfiguration DOCKER_EXEC_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .dockerExecConf(new DockerExecConfBuilder()
+              .dockerImage("busybox")
+              .dockerArgs(List.of("x", "y"))
+              .dockerTerminationLogging(true)
+              .build())
+          .build();
+
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(new FlyteExecConfBuilder()
+              .referenceId(new FlyteIdentifierBuilder()
+                  .resourceType("lp")
+                  .project("flyte-test")
+                  .domain("production")
+                  .name("test-wrokflow")
+                  .version("1.0")
+                  .build())
+              .inputFields("foo", "bar")
+              .build())
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =
