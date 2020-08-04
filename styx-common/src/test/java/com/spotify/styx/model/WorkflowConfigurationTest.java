@@ -20,6 +20,7 @@
 
 package com.spotify.styx.model;
 
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.testdata.TestData.DAILY_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION_WITH_VALID_OFFSET;
@@ -29,12 +30,21 @@ import static com.spotify.styx.testdata.TestData.YEARLY_WORKFLOW_CONFIGURATION;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static java.time.temporal.ChronoUnit.HOURS;
 import static java.time.temporal.ChronoUnit.MINUTES;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
+import junitparams.naming.TestCaseName;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
+@RunWith(JUnitParamsRunner.class)
 public class WorkflowConfigurationTest {
 
   private static final Instant NOW = Instant.now();
@@ -75,5 +85,117 @@ public class WorkflowConfigurationTest {
             .build()
             .defaultOffset(),
         is("PT0S"));
+  }
+
+  @Test
+  @TestCaseName("{method}: {0}")
+  @Parameters(source = ParseJsonArgsProvider.class)
+  public void shouldParseFromJson(String testCase, String json, WorkflowConfiguration expected)
+      throws JsonProcessingException {
+    final var conf = OBJECT_MAPPER.readValue(json, WorkflowConfiguration.class);
+
+    assertThat(conf, is(expected));
+  }
+
+  public static class ParseJsonArgsProvider {
+
+    private ParseJsonArgsProvider(){
+      // Prevents instantiation
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] provideDockerCentredConf() {
+      return new Object[] {
+          "Original docker centred conf",
+          buildJson(
+              "\"docker_image\":\"gcr.io/some-bucket/some-image\","
+              + "\"docker_args\":[\"1\",\"2\",\"3\"],"
+              + "\"docker_termination_logging\":true"),
+          configurationBuilder()
+              .dockerImage("gcr.io/some-bucket/some-image")
+              .dockerArgs(Arrays.asList("1", "2", "3"))
+              .dockerTerminationLogging(true)
+              .build()
+      };
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] provideDockerExecConf() {
+      return new Object[] {
+          "Docker exec conf",
+          buildJson(
+              "\"docker_exec_conf\":{"
+              + "  \"docker_image\":\"gcr.io/some-bucket/some-image\", "
+              + "  \"docker_args\":[\"1\",\"2\",\"3\"], "
+              + "  \"docker_termination_logging\":true"
+              + "}"),
+          configurationBuilder()
+              .dockerExecConf(new DockerExecConfBuilder()
+                  .dockerImage("gcr.io/some-bucket/some-image")
+                  .dockerArgs(Arrays.asList("1", "2", "3"))
+                  .dockerTerminationLogging(true)
+                  .build())
+              .build()
+      };
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] provideFlyteExecConf() {
+      return new Object[] {
+          "Flyte exec conf",
+          buildJson(
+              "\"flyte_exec_conf\":{"
+              + "  \"reference_id\":{"
+              + "    \"resource_type\":\"launch-plan\","
+              + "    \"domain\":\"production\","
+              + "    \"project\":\"flyte-test\","
+              + "    \"name\":\"TestWorkflow\","
+              + "    \"version\":\"1.0\""
+              + "  },"
+              + "  \"input_fields\":{\"foo\": \"bar\"}"
+              + "}"),
+          configurationBuilder()
+              .flyteExecConf(new FlyteExecConfBuilder()
+                  .referenceId(new FlyteIdentifierBuilder()
+                      .resourceType("launch-plan")
+                      .domain("production")
+                      .project("flyte-test")
+                      .name("TestWorkflow")
+                      .version("1.0")
+                      .build())
+                  .inputFields("foo", "bar")
+                  .build())
+              .build()
+      };
+    }
+
+    private static WorkflowConfigurationBuilder configurationBuilder() {
+      return WorkflowConfiguration.builder()
+          .id("id")
+          .schedule(Schedule.DAYS)
+          .offset("P1D")
+          .commitSha("817cdc3f95382c4e4e11232e3a2de484de8a2bea")
+          .serviceAccount("foo@project.com")
+          .resources(Collections.singletonList("resource"))
+          .env(Collections.singletonMap("STYX_FOO", "bar"))
+          .runningTimeout(Duration.ofHours(3))
+          .retryCondition("true");
+    }
+
+    public static String buildJson(String execConf) {
+      return "{"
+             + "\"id\":\"id\","
+             + "\"schedule\":\"days\","
+             + "\"offset\":\"P1D\","
+             + "\"commit_sha\":\"817cdc3f95382c4e4e11232e3a2de484de8a2bea\","
+             + "\"secret\":null,"
+             + "\"service_account\":\"foo@project.com\","
+             + "\"resources\":[\"resource\"],"
+             + "\"env\":{\"STYX_FOO\":\"bar\"},"
+             + "\"running_timeout\":10800.000000000,"
+             + "\"retry_condition\":\"true\","
+             + execConf
+             + "}";
+    }
   }
 }
