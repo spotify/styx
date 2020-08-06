@@ -23,7 +23,6 @@ package com.spotify.styx.api;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
-import static com.spotify.apollo.Status.OK;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.styx.api.SchedulerResource.BASE;
