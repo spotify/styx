@@ -307,8 +307,8 @@ public class DatastoreStorageTest {
   @Test
   @Parameters(method = "configurations")
   public void shouldDeleteWorkflows(WorkflowConfiguration configuration) throws Exception {
-    var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
-    var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
+    var foo = Workflow.create("foo", configuration);
+    var bar = Workflow.create("bar", configuration);
 
     storage.store(foo);
     storage.store(bar);
