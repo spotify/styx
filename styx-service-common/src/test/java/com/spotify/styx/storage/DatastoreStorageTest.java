@@ -43,6 +43,7 @@ import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -58,7 +59,6 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -82,7 +82,10 @@ import com.google.cloud.datastore.StringValue;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
+import com.spotify.styx.model.DockerExecConfBuilder;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConfBuilder;
+import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
@@ -222,10 +225,35 @@ public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
+  private static final String DOCKER_IMAGE = "gcr.io/foo/bar";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id(WORKFLOW_ID.id())
           .schedule(DAYS)
+          .dockerImage(DOCKER_IMAGE)
+          .build();
+  private static final WorkflowConfiguration DOCKER_EXEC_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id(WORKFLOW_ID.id())
+          .schedule(DAYS)
+          .dockerExecConf(new DockerExecConfBuilder()
+              .dockerImage(DOCKER_IMAGE)
+              .build())
+          .build();
+  private static final WorkflowConfiguration FLYTE_EXEC_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id(WORKFLOW_ID.id())
+          .schedule(DAYS)
+          .flyteExecConf(new FlyteExecConfBuilder()
+              .referenceId(new FlyteIdentifierBuilder()
+                  .resourceType("lp")
+                  .project("some-project")
+                  .domain("production")
+                  .name("GoldenPath")
+                  .version("1.0")
+                  .build())
+              .inputFields(Map.of("foo", "bar"))
+              .build())
           .build();
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
       WORKFLOW_CONFIGURATION);
@@ -261,17 +289,24 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldPersistWorkflows() throws Exception {
-    Workflow workflow = Workflow.create("test",
-                                        FULL_WORKFLOW_CONFIGURATION);
+  @Parameters(method = "configurations")
+  public void shouldPersistWorkflows(WorkflowConfiguration configuration) throws Exception {
+    Workflow workflow = Workflow.create("test", configuration);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
 
     assertThat(retrieved, is(Optional.of(workflow)));
   }
 
+  private static WorkflowConfiguration[] configurations() {
+    return new WorkflowConfiguration[] {
+        FULL_WORKFLOW_CONFIGURATION, DOCKER_EXEC_WORKFLOW_CONFIGURATION, FLYTE_EXEC_WORKFLOW_CONFIGURATION
+    };
+  }
+
   @Test
-  public void shouldDeleteWorkflows() throws Exception {
+  @Parameters(method = "configurations")
+  public void shouldDeleteWorkflows(WorkflowConfiguration configuration) throws Exception {
     var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
     var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
 
