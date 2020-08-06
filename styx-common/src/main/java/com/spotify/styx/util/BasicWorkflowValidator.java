@@ -28,6 +28,7 @@ import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
 
     cfg.offset().ifPresent(offset -> {
       try {
-        TimeUtil.addOffset(ZonedDateTime.now(), offset);
+        TimeUtil.addOffset(ZonedDateTime.now(ZoneOffset.UTC), offset);
       } catch (DateTimeParseException ex) {
         e.add(format("invalid offset: %s", ex.getMessage()));
       }
