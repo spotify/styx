@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -189,6 +189,9 @@ public class SchedulerResource {
               "An error occurred while retrieving workflow specifications"));
     }
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
+    if (workflow.configuration().flyteExecConf().isPresent()) {
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Cannot trigger flyte workflows"));
+    }
     if (workflow.configuration().dockerImage().isEmpty()) {
       return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing docker image"));
     }
