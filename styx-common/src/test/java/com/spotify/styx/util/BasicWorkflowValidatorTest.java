@@ -332,7 +332,7 @@ public class BasicWorkflowValidatorTest {
   }
 
   @Test
-  @Parameters()
+  @Parameters(method = "conflictingConfigurations")
   public void shouldRejectConflictingExecConf(WorkflowConfiguration configuration) {
     assertThat(
         sut.validateWorkflow(Workflow.create("test", configuration)),
@@ -340,8 +340,8 @@ public class BasicWorkflowValidatorTest {
     );
   }
 
-  public Object[] parametersForShouldRejectConflictingExecConf() {
-    return new Object[] {
+  public WorkflowConfiguration[] conflictingConfigurations() {
+    return new WorkflowConfiguration[] {
         WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
             .dockerExecConf(new DockerExecConfBuilder()
                 .dockerImage("gcr.io/different-image")
@@ -387,7 +387,7 @@ public class BasicWorkflowValidatorTest {
     }
   }
 
-    private String limit(String msg, Object value, Object limit) {
+  private String limit(String msg, Object value, Object limit) {
     return msg + ": " + value + ", limit = " + limit;
   }
 }
