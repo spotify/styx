@@ -152,7 +152,8 @@ class TriggerManager implements Closeable {
   private void tryTriggering0(Workflow workflow,
                                  TriggerInstantSpec instantSpec,
                                  Set<WorkflowId> enabledWorkflows) {
-    if (enabledWorkflows.contains(workflow.id())) {
+    // Ignore flyte workflows
+    if (enabledWorkflows.contains(workflow.id()) && workflow.configuration().flyteExecConf().isEmpty()) {
       try {
         triggerListener.event(workflow, Trigger.natural(), instantSpec.instant(), TriggerParameters.zero());
       } catch (Exception e) {
