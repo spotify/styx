@@ -1,0 +1,306 @@
+syntax = "proto3";
+package flyteidl.service;
+
+option go_package = "github.com/lyft/flyteidl/gen/pb-go/flyteidl/service";
+
+import "google/api/annotations.proto";
+import "flyteidl/admin/project.proto";
+import "flyteidl/admin/project_domain_attributes.proto";
+import "flyteidl/admin/task.proto";
+import "flyteidl/admin/workflow.proto";
+import "flyteidl/admin/workflow_attributes.proto";
+import "flyteidl/admin/launch_plan.proto";
+import "flyteidl/admin/event.proto";
+import "flyteidl/admin/execution.proto";
+import "flyteidl/admin/matchable_resource.proto";
+import "flyteidl/admin/node_execution.proto";
+import "flyteidl/admin/task_execution.proto";
+import "flyteidl/admin/common.proto";
+
+// The following defines an RPC service that is also served over HTTP via grpc-gateway.
+// Standard response codes for both are defined here: https://github.com/grpc-ecosystem/grpc-gateway/blob/master/runtime/errors.go
+service AdminService {
+  rpc CreateTask (flyteidl.admin.TaskCreateRequest) returns (flyteidl.admin.TaskCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/tasks"
+      body: "*"
+    };
+  }
+
+  rpc GetTask (flyteidl.admin.ObjectGetRequest) returns (flyteidl.admin.Task) {
+    option (google.api.http) = {
+      get: "/api/v1/tasks/{id.project}/{id.domain}/{id.name}/{id.version}"
+    };
+  }
+
+  rpc ListTaskIds (flyteidl.admin.NamedEntityIdentifierListRequest) returns (flyteidl.admin.NamedEntityIdentifierList) {
+    option (google.api.http) = {
+      get: "/api/v1/task_ids/{project}/{domain}"
+    };
+  }
+
+  rpc ListTasks (flyteidl.admin.ResourceListRequest) returns (flyteidl.admin.TaskList) {
+    option (google.api.http) = {
+      get: "/api/v1/tasks/{id.project}/{id.domain}/{id.name}"
+      additional_bindings {
+        get: "/api/v1/tasks/{id.project}/{id.domain}"
+      }
+    };
+  }
+
+  rpc CreateWorkflow (flyteidl.admin.WorkflowCreateRequest) returns (flyteidl.admin.WorkflowCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workflows"
+      body: "*"
+    };
+  }
+
+  rpc GetWorkflow (flyteidl.admin.ObjectGetRequest) returns (flyteidl.admin.Workflow) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{id.project}/{id.domain}/{id.name}/{id.version}"
+    };
+  }
+
+  rpc ListWorkflowIds (flyteidl.admin.NamedEntityIdentifierListRequest) returns (flyteidl.admin.NamedEntityIdentifierList) {
+    option (google.api.http) = {
+      get: "/api/v1/workflow_ids/{project}/{domain}"
+    };
+  }
+
+  rpc ListWorkflows (flyteidl.admin.ResourceListRequest) returns (flyteidl.admin.WorkflowList) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{id.project}/{id.domain}/{id.name}"
+      additional_bindings {
+        get: "/api/v1/workflows/{id.project}/{id.domain}"
+      }
+    };
+  }
+
+  rpc CreateLaunchPlan (flyteidl.admin.LaunchPlanCreateRequest) returns (flyteidl.admin.LaunchPlanCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/launch_plans"
+      body: "*"
+    };
+  }
+
+  rpc GetLaunchPlan (flyteidl.admin.ObjectGetRequest) returns (flyteidl.admin.LaunchPlan) {
+    option (google.api.http) = {
+      get: "/api/v1/launch_plans/{id.project}/{id.domain}/{id.name}/{id.version}"
+    };
+  }
+
+  rpc GetActiveLaunchPlan (flyteidl.admin.ActiveLaunchPlanRequest) returns (flyteidl.admin.LaunchPlan) {
+    option (google.api.http) = {
+      get: "/api/v1/active_launch_plans/{id.project}/{id.domain}/{id.name}"
+    };
+  }
+
+  rpc ListActiveLaunchPlans (flyteidl.admin.ActiveLaunchPlanListRequest) returns (flyteidl.admin.LaunchPlanList) {
+    option (google.api.http) = {
+      get: "/api/v1/active_launch_plans/{project}/{domain}"
+    };
+  }
+
+  rpc ListLaunchPlanIds (flyteidl.admin.NamedEntityIdentifierListRequest) returns (flyteidl.admin.NamedEntityIdentifierList) {
+    option (google.api.http) = {
+      get: "/api/v1/launch_plan_ids/{project}/{domain}"
+    };
+  }
+
+  rpc ListLaunchPlans (flyteidl.admin.ResourceListRequest) returns (flyteidl.admin.LaunchPlanList) {
+    option (google.api.http) = {
+      get: "/api/v1/launch_plans/{id.project}/{id.domain}/{id.name}"
+      additional_bindings {
+        get: "/api/v1/launch_plans/{id.project}/{id.domain}"
+      }
+    };
+  }
+
+  rpc UpdateLaunchPlan (flyteidl.admin.LaunchPlanUpdateRequest) returns (flyteidl.admin.LaunchPlanUpdateResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/launch_plans/{id.project}/{id.domain}/{id.name}/{id.version}"
+      body: "*"
+    };
+  }
+
+  rpc CreateExecution (flyteidl.admin.ExecutionCreateRequest) returns (flyteidl.admin.ExecutionCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/executions"
+      body: "*"
+    };
+  }
+
+  rpc RelaunchExecution (flyteidl.admin.ExecutionRelaunchRequest) returns (flyteidl.admin.ExecutionCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/executions/relaunch"
+      body: "*"
+    };
+  }
+
+  rpc GetExecution (flyteidl.admin.WorkflowExecutionGetRequest) returns (flyteidl.admin.Execution) {
+    option (google.api.http) = {
+      get: "/api/v1/executions/{id.project}/{id.domain}/{id.name}"
+    };
+  }
+
+  rpc GetExecutionData (flyteidl.admin.WorkflowExecutionGetDataRequest) returns (flyteidl.admin.WorkflowExecutionGetDataResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/data/executions/{id.project}/{id.domain}/{id.name}"
+    };
+  };
+
+  rpc ListExecutions (flyteidl.admin.ResourceListRequest) returns (flyteidl.admin.ExecutionList) {
+    option (google.api.http) = {
+      get: "/api/v1/executions/{id.project}/{id.domain}"
+    };
+  }
+
+  rpc TerminateExecution (flyteidl.admin.ExecutionTerminateRequest) returns (flyteidl.admin.ExecutionTerminateResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/executions/{id.project}/{id.domain}/{id.name}"
+      body: "*"
+    };
+  }
+
+  rpc GetNodeExecution (flyteidl.admin.NodeExecutionGetRequest) returns (flyteidl.admin.NodeExecution) {
+    option (google.api.http) = {
+      get: "/api/v1/node_executions/{id.execution_id.project}/{id.execution_id.domain}/{id.execution_id.name}/{id.node_id}"
+    };
+  }
+
+  rpc ListNodeExecutions (flyteidl.admin.NodeExecutionListRequest) returns (flyteidl.admin.NodeExecutionList) {
+    option (google.api.http) = {
+      get: "/api/v1/node_executions/{workflow_execution_id.project}/{workflow_execution_id.domain}/{workflow_execution_id.name}"
+    };
+  }
+
+  rpc ListNodeExecutionsForTask (flyteidl.admin.NodeExecutionForTaskListRequest) returns (flyteidl.admin.NodeExecutionList) {
+    option (google.api.http) = {
+      get: "/api/v1/children/task_executions/{task_execution_id.node_execution_id.execution_id.project}/{task_execution_id.node_execution_id.execution_id.domain}/{task_execution_id.node_execution_id.execution_id.name}/{task_execution_id.node_execution_id.node_id}/{task_execution_id.task_id.project}/{task_execution_id.task_id.domain}/{task_execution_id.task_id.name}/{task_execution_id.task_id.version}/{task_execution_id.retry_attempt}"
+    };
+  }
+
+  rpc GetNodeExecutionData (flyteidl.admin.NodeExecutionGetDataRequest) returns (flyteidl.admin.NodeExecutionGetDataResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/data/node_executions/{id.execution_id.project}/{id.execution_id.domain}/{id.execution_id.name}/{id.node_id}"
+    };
+  };
+
+  rpc RegisterProject (flyteidl.admin.ProjectRegisterRequest) returns (flyteidl.admin.ProjectRegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/projects"
+      body: "*"
+    };
+  }
+
+  rpc ListProjects (flyteidl.admin.ProjectListRequest) returns (flyteidl.admin.Projects) {
+    option (google.api.http) = {
+      get:  "/api/v1/projects"
+    };
+  }
+
+  rpc CreateWorkflowEvent (flyteidl.admin.WorkflowExecutionEventRequest) returns (flyteidl.admin.WorkflowExecutionEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/events/workflows"
+      body: "*"
+    };
+  }
+
+  rpc CreateNodeEvent (flyteidl.admin.NodeExecutionEventRequest) returns (flyteidl.admin.NodeExecutionEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/events/nodes"
+      body: "*"
+    };
+  }
+
+  rpc CreateTaskEvent (flyteidl.admin.TaskExecutionEventRequest) returns (flyteidl.admin.TaskExecutionEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/events/tasks"
+      body: "*"
+    };
+  }
+
+  rpc GetTaskExecution (flyteidl.admin.TaskExecutionGetRequest) returns (flyteidl.admin.TaskExecution) {
+    option (google.api.http) = {
+        get: "/api/v1/task_executions/{id.node_execution_id.execution_id.project}/{id.node_execution_id.execution_id.domain}/{id.node_execution_id.execution_id.name}/{id.node_execution_id.node_id}/{id.task_id.project}/{id.task_id.domain}/{id.task_id.name}/{id.task_id.version}/{id.retry_attempt}"
+    };
+  }
+
+  rpc ListTaskExecutions (flyteidl.admin.TaskExecutionListRequest) returns (flyteidl.admin.TaskExecutionList) {
+    option (google.api.http) = {
+        get: "/api/v1/task_executions/{node_execution_id.execution_id.project}/{node_execution_id.execution_id.domain}/{node_execution_id.execution_id.name}/{node_execution_id.node_id}"
+    };
+  }
+
+  rpc GetTaskExecutionData (flyteidl.admin.TaskExecutionGetDataRequest) returns (flyteidl.admin.TaskExecutionGetDataResponse) {
+    option (google.api.http) = {
+        get: "/api/v1/data/task_executions/{id.node_execution_id.execution_id.project}/{id.node_execution_id.execution_id.domain}/{id.node_execution_id.execution_id.name}/{id.node_execution_id.node_id}/{id.task_id.project}/{id.task_id.domain}/{id.task_id.name}/{id.task_id.version}/{id.retry_attempt}"
+    };
+  }
+
+  rpc UpdateProjectDomainAttributes (flyteidl.admin.ProjectDomainAttributesUpdateRequest) returns (flyteidl.admin.ProjectDomainAttributesUpdateResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/project_domain_attributes/{attributes.project}/{attributes.domain}"
+      body: "*"
+    };
+  }
+
+  rpc GetProjectDomainAttributes (flyteidl.admin.ProjectDomainAttributesGetRequest) returns (flyteidl.admin.ProjectDomainAttributesGetResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/project_domain_attributes/{project}/{domain}"
+    };
+  }
+
+  rpc DeleteProjectDomainAttributes (flyteidl.admin.ProjectDomainAttributesDeleteRequest) returns (flyteidl.admin.ProjectDomainAttributesDeleteResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/project_domain_attributes/{project}/{domain}"
+      body: "*"
+    };
+  }
+
+  rpc UpdateWorkflowAttributes (flyteidl.admin.WorkflowAttributesUpdateRequest) returns (flyteidl.admin.WorkflowAttributesUpdateResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/workflow_attributes/{attributes.project}/{attributes.domain}/{attributes.workflow}"
+      body: "*"
+    };
+  }
+
+  rpc GetWorkflowAttributes (flyteidl.admin.WorkflowAttributesGetRequest) returns (flyteidl.admin.WorkflowAttributesGetResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflow_attributes/{project}/{domain}/{workflow}"
+    };
+  }
+
+  rpc DeleteWorkflowAttributes (flyteidl.admin.WorkflowAttributesDeleteRequest) returns (flyteidl.admin.WorkflowAttributesDeleteResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workflow_attributes/{project}/{domain}/{workflow}"
+      body: "*"
+    };
+  }
+
+  rpc ListMatchableAttributes (flyteidl.admin.ListMatchableAttributesRequest) returns (flyteidl.admin.ListMatchableAttributesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/matchable_attributes"
+    };
+  }
+
+
+  rpc ListNamedEntities (flyteidl.admin.NamedEntityListRequest) returns (flyteidl.admin.NamedEntityList) {
+    option (google.api.http) = {
+      get: "/api/v1/named_entities/{resource_type}/{project}/{domain}"
+    };
+  }
+
+  rpc GetNamedEntity (flyteidl.admin.NamedEntityGetRequest) returns (flyteidl.admin.NamedEntity) {
+    option (google.api.http) = {
+      get: "/api/v1/named_entities/{resource_type}/{id.project}/{id.domain}/{id.name}"
+    };
+  }
+
+  rpc UpdateNamedEntity (flyteidl.admin.NamedEntityUpdateRequest) returns (flyteidl.admin.NamedEntityUpdateResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/named_entities/{resource_type}/{id.project}/{id.domain}/{id.name}"
+      body: "*"
+    };
+  }
+}
