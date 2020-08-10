@@ -104,7 +104,7 @@ public class WorkflowConfigurationTest {
     }
 
     @SuppressWarnings("unused")
-    public static Object[] provideDockerCentredConf() {
+    public static Object[] provideOldStyleDockerConf() {
       return new Object[] {
           "Original docker centred conf",
           buildJson(
@@ -120,7 +120,7 @@ public class WorkflowConfigurationTest {
     }
 
     @SuppressWarnings("unused")
-    public static Object[] provideDockerExecConf() {
+    public static Object[] provideNewStyleDockerExecConf() {
       return new Object[] {
           "Docker exec conf",
           buildJson(
