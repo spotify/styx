@@ -36,10 +36,12 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.FlyteExecConfBuilder;
 import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
@@ -78,7 +80,20 @@ public class BasicWorkflowValidatorTest {
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
-  
+  private static final String NOT_VALID_IMAGE = "not-valid-image";
+
+  private static final WorkflowConfiguration INVALID_DOCKER_EXEC_WORKFLOW_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(DOCKER_EXEC_WORKFLOW_CONFIGURATION)
+          .dockerExecConf(DockerExecConf.builder()
+              .dockerImage(NOT_VALID_IMAGE)
+              .build())
+          .build();
+  private static final WorkflowConfiguration INVALID_DOCKER_WORKFLOW_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+          .dockerImage(NOT_VALID_IMAGE)
+          .build();
+
+
   @Mock
   private DockerImageValidator dockerImageValidator;
 
@@ -88,6 +103,8 @@ public class BasicWorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of());
+    when(dockerImageValidator.validateImageReference(eq(NOT_VALID_IMAGE)))
+        .thenReturn(Set.of("error"));
     sut = new BasicWorkflowValidator(dockerImageValidator);
   }
 
@@ -125,9 +142,9 @@ public class BasicWorkflowValidatorTest {
   @Test
 
   public void validateInvalidDockerImage() {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of("foo", "bar"));
-    final List<String> errors = sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
-    assertThat(errors, containsInAnyOrder("invalid image: foo", "invalid image: bar"));
+    var errors = sut.validateWorkflow(Workflow.create("test", INVALID_DOCKER_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, containsInAnyOrder("invalid image: error"));
   }
 
 
@@ -287,11 +304,9 @@ public class BasicWorkflowValidatorTest {
 
   @Test
   public void shouldRejectInvalidImageInDockerExecConf() {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of("foo", "bar"));
+    var errors = sut.validateWorkflow(Workflow.create("test", INVALID_DOCKER_EXEC_WORKFLOW_CONFIGURATION));
 
-    var errors = sut.validateWorkflow(Workflow.create("test", DOCKER_EXEC_WORKFLOW_CONFIGURATION));
-
-    assertThat(errors, containsInAnyOrder("invalid image: foo", "invalid image: bar"));
+    assertThat(errors, containsInAnyOrder("invalid image: error"));
   }
 
   @Test
