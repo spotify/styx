@@ -34,6 +34,7 @@ import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Duration;
@@ -172,6 +173,26 @@ public final class TestData {
                   .build())
               .inputFields("foo", "bar")
               .build())
+          .build();
+
+  public static final WorkflowConfiguration OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+          .dockerExecConf(new DockerExecConfBuilder()
+              .dockerImage("gcr.io/image")
+              .dockerArgs(List.of("other", "args"))
+              .build())
+          .build();
+  public static final WorkflowConfiguration NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+          .dockerExecConf(new DockerExecConfBuilder()
+              .dockerImage("gcr.io/image")
+              .dockerArgs(List.of("other", "args"))
+              .build())
+          .build();
+  public static final WorkflowConfiguration OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+          .dockerImage("gcr.io/image")
+          .dockerArgs(List.of("other", "args"))
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =

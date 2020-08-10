@@ -23,6 +23,9 @@ package com.spotify.styx.util;
 import static com.spotify.styx.testdata.TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -37,7 +40,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DockerExecConfBuilder;
 import com.spotify.styx.model.FlyteExecConfBuilder;
 import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
@@ -76,7 +78,7 @@ public class BasicWorkflowValidatorTest {
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
-
+  
   @Mock
   private DockerImageValidator dockerImageValidator;
 
@@ -327,28 +329,15 @@ public class BasicWorkflowValidatorTest {
   public Object[] conflictingConfigurations() {
     return new Object[]{
         new Object[]{
-            WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
-                .dockerExecConf(new DockerExecConfBuilder()
-                    .dockerImage("gcr.io/image")
-                    .dockerArgs(List.of("other", "args"))
-                    .build())
-                .build(),
+            OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION,
             "configuration cannot docker parameters in new and old style"
         },
         new Object[]{
-            WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-                .dockerExecConf(new DockerExecConfBuilder()
-                    .dockerImage("gcr.io/image")
-                    .dockerArgs(List.of("other", "args"))
-                    .build())
-                .build(),
+            NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION,
             "configuration cannot specify both docker and flyte parameters"
         },
         new Object[]{
-            WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-                .dockerImage("gcr.io/image")
-                .dockerArgs(List.of("other", "args"))
-                .build(),
+            OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION,
             "configuration cannot specify both docker and flyte parameters"
         }
     };
@@ -358,12 +347,14 @@ public class BasicWorkflowValidatorTest {
 
     private InvalidFlyteConfExecArgsProvider() {}
 
+    @SuppressWarnings("unused")
     public static Object[] provideNotALaunchPlanResource() {
         return new Object[] {
             flyteConf(builder -> builder.resourceType("wf")), "only launch plans (\"lp\") are supported: wf"
         };
     }
 
+    @SuppressWarnings("unused")
     public static Object[] provideEmptyFields() {
       return new Object[] {
           new Object[] { flyteConf(builder -> builder.project("")), "project cannot be empty" },
