@@ -24,7 +24,6 @@ import static com.spotify.styx.util.WorkflowValidator.lowerLimit;
 import static com.spotify.styx.util.WorkflowValidator.upperLimit;
 import static java.lang.String.format;
 
-import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
@@ -34,8 +33,6 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 
@@ -137,9 +134,10 @@ public class BasicWorkflowValidator implements WorkflowValidator {
       }
     });
 
-    validateDockerExecConf(e, cfg);
-    validateFlyteExecConf(e, cfg);
     validateConflictingExecConf(e, cfg);
+    validateOldDockerExecConf(e, cfg);
+    validateNewDockerExecConf(e, cfg);
+    validateFlyteExecConf(e, cfg);
 
     return e;
   }
@@ -149,45 +147,33 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     return matcher.matches();
   }
 
-  private void validateDockerExecConf(List<String> errors, WorkflowConfiguration config) {
-    validateDockerParam(errors, "dockerImage", config.dockerImage(),
-        config.dockerExecConf().flatMap(DockerExecConf::dockerImage),
-        this::validateDockerImage);
-    validateDockerParam(errors, "dockerArgs", config.dockerArgs(),
-        config.dockerExecConf().flatMap(DockerExecConf::dockerArgs),
-        this::validateDockerArgs);
+  private void validateConflictingExecConf(List<String> e, WorkflowConfiguration cfg) {
+    var hasOldStyleDockerConf = cfg.dockerImage().isPresent() || cfg.dockerArgs().isPresent();
+    var hasNewStyleDockerConf = cfg.dockerExecConf().isPresent();
 
-    // not verifying dockerTerminationLogging as it defaults to false
-    // So for
-    //       WorkflowConfiguration.builder()
-    //          .id("styx.TestEndpoint")
-    //          .commitSha(VALID_SHA)
-    //          .schedule(DAYS)
-    //          .serviceAccount("foo@bar.baz.quux")
-    //          .dockerExecConf(new DockerExecConfBuilder()
-    //              .dockerImage("busybox")
-    //              .dockerArgs(List.of("x", "y"))
-    //              .dockerTerminationLogging(true)
-    //              .build())
-    //          .build();
-    // will fail as default at upper level is false but inside dockerExecConf is set to true
+    if (hasNewStyleDockerConf && hasOldStyleDockerConf) {
+      e.add("configuration cannot docker parameters in new and old style");
+    }
+    if (cfg.flyteExecConf().isPresent() && (hasNewStyleDockerConf || hasOldStyleDockerConf)) {
+      e.add("configuration cannot specify both docker and flyte parameters");
+    }
   }
 
-  @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-  private <T> void validateDockerParam(List<String> errors, String paramName, Optional<T> valueA, Optional<T> valueB,
-                                       BiConsumer<List<String>, T> validateFunction) {
-    valueA.ifPresent(a -> validateFunction.accept(errors, a));
-    valueB.ifPresent(b -> validateFunction.accept(errors, b));
+  private void validateOldDockerExecConf(List<String> errors, WorkflowConfiguration config) {
+    config.dockerArgs().ifPresent(args -> validateDockerArgs(errors, args));
+    config.dockerImage().ifPresent(image -> validateDockerImage(errors, image));
+  }
 
-    valueA.ifPresent(a ->
-        valueB.ifPresent(b -> same(errors, paramName, a, b))
-    );
+  private void validateNewDockerExecConf(List<String> errors, WorkflowConfiguration config) {
+    config.dockerExecConf().ifPresent(dockerExecConf -> {
+      dockerExecConf.dockerArgs().ifPresent(args -> validateDockerArgs(errors, args));
+      dockerExecConf.dockerImage().ifPresent(image -> validateDockerImage(errors, image));
+    });
   }
 
   private void validateDockerImage(List<String> errors, String image) {
-    dockerImageValidator.validateImageReference(image).stream()
-        .map(s -> "invalid image: " + s)
-        .forEach(errors::add);
+    dockerImageValidator.validateImageReference(image)
+        .forEach(error-> errors.add("invalid image: " + error));
   }
 
   private void validateDockerArgs(List<String> errors, List<String> args) {
@@ -211,23 +197,9 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     });
   }
 
-  private void validateConflictingExecConf(List<String> e, WorkflowConfiguration cfg) {
-    var hasDockerConf = cfg.dockerExecConf().isPresent() || cfg.dockerImage().isPresent()
-                        || cfg.dockerArgs().isPresent();
-    if (cfg.flyteExecConf().isPresent() && hasDockerConf) {
-      e.add("configuration cannot specify both docker and flyte parameters");
-    }
-  }
-
   private void empty(List<String> errors, String fieldName, String value) {
     if (value.isEmpty()) {
       errors.add(fieldName + " cannot be empty");
-    }
-  }
-
-  private <T> void same(List<String> errors, String fieldName, T valueA, T valueB) {
-    if (!Objects.equals(valueA, valueB)) {
-      errors.add(String.format("mismatching %s configuration: \"%s\" != \"%s\"", fieldName, valueA, valueB));
     }
   }
 }

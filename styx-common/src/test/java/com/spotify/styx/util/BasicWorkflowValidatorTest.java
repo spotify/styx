@@ -315,43 +315,42 @@ public class BasicWorkflowValidatorTest {
   }
 
   @Test
-  public void shouldRejectMismatchingDockerConf() {
-    var configuration = WorkflowConfigurationBuilder.from(DOCKER_EXEC_WORKFLOW_CONFIGURATION)
-        .dockerImage("gcr.io/different-image")
-        .dockerArgs(List.of("other", "args"))
-        .dockerTerminationLogging(false) //Not verified :(
-        .build();
-
-    assertThat(
-        sut.validateWorkflow(Workflow.create("test", configuration)),
-        containsInAnyOrder(
-            "mismatching dockerImage configuration: \"gcr.io/different-image\" != \"busybox\"",
-            "mismatching dockerArgs configuration: \"[other, args]\" != \"[x, y]\""
-        )
-    );
-  }
-
-  @Test
   @Parameters(method = "conflictingConfigurations")
-  public void shouldRejectConflictingExecConf(WorkflowConfiguration configuration) {
+  public void shouldRejectConflictingExecConf(WorkflowConfiguration configuration,
+                                              String expectedError) {
     assertThat(
         sut.validateWorkflow(Workflow.create("test", configuration)),
-        containsInAnyOrder("configuration cannot specify both docker and flyte parameters")
+        containsInAnyOrder(expectedError)
     );
   }
 
-  public WorkflowConfiguration[] conflictingConfigurations() {
-    return new WorkflowConfiguration[] {
-        WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-            .dockerExecConf(new DockerExecConfBuilder()
-                .dockerImage("gcr.io/different-image")
+  public Object[] conflictingConfigurations() {
+    return new Object[]{
+        new Object[]{
+            WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+                .dockerExecConf(new DockerExecConfBuilder()
+                    .dockerImage("gcr.io/image")
+                    .dockerArgs(List.of("other", "args"))
+                    .build())
+                .build(),
+            "configuration cannot docker parameters in new and old style"
+        },
+        new Object[]{
+            WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+                .dockerExecConf(new DockerExecConfBuilder()
+                    .dockerImage("gcr.io/image")
+                    .dockerArgs(List.of("other", "args"))
+                    .build())
+                .build(),
+            "configuration cannot specify both docker and flyte parameters"
+        },
+        new Object[]{
+            WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+                .dockerImage("gcr.io/image")
                 .dockerArgs(List.of("other", "args"))
-                .build())
-            .build(),
-        WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-            .dockerImage("gcr.io/different-image")
-            .dockerArgs(List.of("other", "args"))
-            .build()
+                .build(),
+            "configuration cannot specify both docker and flyte parameters"
+        }
     };
   }
 
