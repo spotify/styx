@@ -54,23 +54,21 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.slf4j.Logger;
 
 @RunWith(MockitoJUnitRunner.class)
 public class TriggerManagerTest {
 
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
 
-  private static Workflow WORKFLOW_DAILY =
+  private static final Workflow WORKFLOW_DAILY =
       Workflow.create("comp", FULL_WORKFLOW_CONFIGURATION);
 
-  private static Workflow FLYTE_WORKFLOW =
+  private static final Workflow FLYTE_WORKFLOW =
       Workflow.create("comp", FLYTE_WORKFLOW_CONFIGURATION);
 
   @Mock Storage storage;
   @Mock TriggerListener triggerListener;
   @Mock StyxConfig config;
-  @Mock Logger logger;
 
   private TriggerManager triggerManager;
   private final Time MANAGER_TIME = () -> parse("2016-10-10T13:11:11Z");
@@ -87,7 +85,7 @@ public class TriggerManagerTest {
   public void setUp() throws IOException {
     when(config.globalEnabled()).thenReturn(true);
     when(storage.config()).thenReturn(config);
-    triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP, logger);
+    triggerManager = new TriggerManager(triggerListener, MANAGER_TIME, storage, Stats.NOOP);
   }
 
   @Test
@@ -139,19 +137,6 @@ public class TriggerManagerTest {
     verify(storage).updateNextNaturalTrigger(
         WORKFLOW_DAILY.id(),
         TriggerInstantSpec.create(parse("2016-10-10T00:00:00Z"), parse("2016-10-11T00:00:00Z")));
-  }
-
-  @Test
-  public void shouldNotTriggerFlyteWorkflowExecutionWithNextNaturalTrigger() throws IOException {
-    setupWithNextNaturalTrigger(true, parse("2016-10-01T00:00:00Z"), FLYTE_WORKFLOW);
-
-    triggerManager.tick();
-
-    verify(triggerListener, never()).event(any(), any(), any(), any());
-    verify(storage).updateNextNaturalTrigger(
-        FLYTE_WORKFLOW.id(),
-        TriggerInstantSpec.create(parse("2016-10-02T00:00:00Z"), parse("2016-10-03T00:00:00Z")));
-    verify(logger).info("Skip triggering flyte workflow");
   }
 
   @Test

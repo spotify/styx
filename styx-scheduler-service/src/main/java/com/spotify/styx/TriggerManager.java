@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -66,8 +65,7 @@ import org.slf4j.LoggerFactory;
  */
 class TriggerManager implements Closeable {
 
-  private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(TriggerManager.class);
-  private final Logger log;
+  private static final Logger LOG = LoggerFactory.getLogger(TriggerManager.class);
 
   private static final String TICK_TYPE = UPPER_CAMEL.to(LOWER_UNDERSCORE,
                                                          TriggerManager.class.getSimpleName());
@@ -87,21 +85,12 @@ class TriggerManager implements Closeable {
                  Time time,
                  Storage storage,
                  Stats stats) {
-    this(triggerListener, time, storage, stats, DEFAULT_LOG);
-  }
-
-  TriggerManager(TriggerListener triggerListener,
-                 Time time,
-                 Storage storage,
-                 Stats stats,
-                 Logger logger) {
     this.triggerListener = requireNonNull(triggerListener);
     this.time = requireNonNull(time);
     this.storage = requireNonNull(storage);
     this.stats = requireNonNull(stats);
     final ForkJoinPool forkJoinPool = register(closer, new ForkJoinPool(TRIGGER_CONCURRENCY), "trigger-manager");
     this.executor = Context.currentContextExecutor(forkJoinPool);
-    this.log = Objects.requireNonNull(logger, "logger");
   }
 
   void tick() {
@@ -118,11 +107,11 @@ class TriggerManager implements Closeable {
 
     try {
       if (!storage.config().globalEnabled()) {
-        log.info("Triggering has been disabled globally.");
+        LOG.info("Triggering has been disabled globally.");
         return;
       }
     } catch (IOException e) {
-      log.warn("Couldn't fetch global enabled status, skipping this run", e);
+      LOG.warn("Couldn't fetch global enabled status, skipping this run", e);
       return;
     }
 
@@ -132,7 +121,7 @@ class TriggerManager implements Closeable {
       canBeTriggeredWorkflows = storage.workflowsWithNextNaturalTrigger();
       enabledWorkflows = storage.enabled();
     } catch (IOException e) {
-      log.warn("Couldn't fetch workflows to trigger, skipping this run", e);
+      LOG.warn("Couldn't fetch workflows to trigger, skipping this run", e);
       return;
     }
 
@@ -164,11 +153,7 @@ class TriggerManager implements Closeable {
                                  TriggerInstantSpec instantSpec,
                                  Set<WorkflowId> enabledWorkflows) {
 
-    boolean isFlyteWorkflow = workflow.configuration().flyteExecConf().isPresent();
-
-    if (isFlyteWorkflow) {
-      log.info("Skip triggering flyte workflow");
-    } else if (enabledWorkflows.contains(workflow.id())) {
+    if (enabledWorkflows.contains(workflow.id())) {
       try {
         triggerListener.event(workflow, Trigger.natural(), instantSpec.instant(), TriggerParameters.zero());
       } catch (Exception e) {
@@ -176,10 +161,10 @@ class TriggerManager implements Closeable {
             toParameter(workflow.configuration().schedule(), instantSpec.instant()));
 
         if (findCause(e, AlreadyInitializedException.class) != null) {
-          log.debug("{} already triggered", workflowInstance, e);
+          LOG.debug("{} already triggered", workflowInstance, e);
           // move on to update next natural trigger
         } else {
-          log.debug("Failed to trigger {}", workflowInstance, e);
+          LOG.debug("Failed to trigger {}", workflowInstance, e);
           return;
         }
       }
@@ -195,7 +180,7 @@ class TriggerManager implements Closeable {
     try {
       storage.updateNextNaturalTrigger(workflow.id(), nextSpec);
     } catch (IOException e) {
-      log.error(
+      LOG.error(
           "Sent trigger for workflow {}, but didn't succeed storing next scheduled run {}.",
           workflow.id(), nextTrigger);
       throw new RuntimeException(e);
