@@ -22,7 +22,6 @@ package com.spotify.styx.flyte.client;
 
 import com.google.auto.value.AutoValue;
 import flyteidl.admin.ExecutionOuterClass;
-import flyteidl.core.IdentifierOuterClass;
 
 @AutoValue
 public abstract class WorkflowExecutionIdentifier {
@@ -34,7 +33,7 @@ public abstract class WorkflowExecutionIdentifier {
   public abstract String name();
 
   static WorkflowExecutionIdentifier fromProto(final ExecutionOuterClass.ExecutionCreateResponse response) {
-    final IdentifierOuterClass.WorkflowExecutionIdentifier id = response.getId();
+    var id = response.getId();
     return create(id.getDomain(), id.getProject(), id.getName());
   }
 

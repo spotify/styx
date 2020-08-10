@@ -24,56 +24,54 @@ import static com.google.common.base.Verify.verifyNotNull;
 
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.service.AdminServiceGrpc;
-import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FlyteAdminClient {
 
   private static final Logger log = LoggerFactory.getLogger(FlyteAdminClient.class);
-  static final String TRIGGERING_PRINCIPAL = "styx";
-  static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
+  private static final String TRIGGERING_PRINCIPAL = "styx";
+  private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
-  private final ManagedChannel channel;
 
-  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub, ManagedChannel channel) {
-    this.stub = stub;
-    this.channel = channel;
+  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
+    this.stub = Objects.requireNonNull(stub, "stub");
   }
 
-  static FlyteAdminClient create(String target, boolean insecure) {
-    ManagedChannelBuilder<?> builder = ManagedChannelBuilder.forTarget(target);
+  public static FlyteAdminClient create(String target, boolean insecure) {
+    var builder = ManagedChannelBuilder.forTarget(target);
 
     if (insecure) {
       builder.usePlaintext();
     }
 
-    ManagedChannel channel = builder.build();
+    var channel = builder.build();
 
-    return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(builder.build()), channel);
+    return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
   }
 
-  WorkflowExecutionIdentifier createExecution(String domain, String project,
+  public WorkflowExecutionIdentifier createExecution(String domain, String project,
                                               LaunchPlanIdentifier launchPlanId,
                                               ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
     log.debug("createExecution {} {} {}", domain, project, launchPlanId);
 
-    ExecutionOuterClass.ExecutionMetadata metadata =
+    var metadata =
         ExecutionOuterClass.ExecutionMetadata.newBuilder()
             .setMode(executionMode)
             .setPrincipal(TRIGGERING_PRINCIPAL)
             .setNesting(USER_TRIGGERED_EXECUTION_NESTING)
             .build();
 
-    ExecutionOuterClass.ExecutionSpec spec =
+    var spec =
         ExecutionOuterClass.ExecutionSpec.newBuilder()
             .setLaunchPlan(launchPlanId.toProto())
             .setMetadata(metadata)
             .build();
 
-    ExecutionOuterClass.ExecutionCreateResponse response =
+    var response =
         stub.createExecution(
             ExecutionOuterClass.ExecutionCreateRequest.newBuilder()
                 .setDomain(domain)

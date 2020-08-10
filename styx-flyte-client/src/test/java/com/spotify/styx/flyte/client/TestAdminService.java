@@ -20,14 +20,13 @@
 
 package com.spotify.styx.flyte.client;
 
-import static com.spotify.styx.flyte.client.FlyteAdminClientTest.WF_EXECUTION_ID;
-
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.stub.StreamObserver;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
+  static final String WF_EXECUTION_ID = "wf_execution_id_1";
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,

@@ -25,8 +25,6 @@ import static org.hamcrest.Matchers.equalTo;
 
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.service.AdminServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
@@ -38,11 +36,10 @@ import org.junit.Test;
 
 public class FlyteAdminClientTest {
 
-  private static String DOMAIN = "testing";
-  private static String PROJECT = "styx_flyte_test";
-  private static String LP_NAME = "launch_plan_1";
-  private static String LP_VERSION = "launch_plan_version_1";
-  static String WF_EXECUTION_ID = "wf_execution_id_1";
+  private static final String DOMAIN = "testing";
+  private static final String PROJECT = "styx_flyte_test";
+  private static final String LP_NAME = "launch_plan_1";
+  private static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
   private TestAdminService testAdminService;
 
@@ -51,37 +48,33 @@ public class FlyteAdminClientTest {
       LaunchPlanIdentifier.create(DOMAIN, PROJECT, LP_NAME, LP_VERSION);
 
   @Before
-  public void setup() throws IOException {
+  public void setUp() throws IOException {
     testAdminService = new TestAdminService();
     String serverName = InProcessServerBuilder.generateName();
-    final Server server = InProcessServerBuilder
+    var server = InProcessServerBuilder
         .forName(serverName)
         .directExecutor()
         .addService(testAdminService)
         .build();
-    final ManagedChannel channel = InProcessChannelBuilder
+    var channel = InProcessChannelBuilder
         .forName(serverName)
         .directExecutor()
         .build();
 
     flyteAdminClient =
-        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), channel);
+        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
 
     grpcCleanup.register(server.start());
     grpcCleanup.register(channel);
   }
 
-  @After
-  public void tearDown() {
-  }
-
   @Test
   public void shouldPropagateCreateExecutionToStub() {
-    final WorkflowExecutionIdentifier flyteExecution =
+    var workflowExecution =
         flyteAdminClient.createExecution(DOMAIN, PROJECT, LP_IDENTIFIER,
             ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-    assertThat(DOMAIN, equalTo(flyteExecution.domain()));
-    assertThat(PROJECT, equalTo(flyteExecution.project()));
-    assertThat(WF_EXECUTION_ID, equalTo(flyteExecution.name()));
+    assertThat(DOMAIN, equalTo(workflowExecution.domain()));
+    assertThat(PROJECT, equalTo(workflowExecution.project()));
+    assertThat(TestAdminService.WF_EXECUTION_ID, equalTo(workflowExecution.name()));
   }
 }
