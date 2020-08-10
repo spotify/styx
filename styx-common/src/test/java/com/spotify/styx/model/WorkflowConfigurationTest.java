@@ -130,7 +130,7 @@ public class WorkflowConfigurationTest {
               + "  \"docker_termination_logging\":true"
               + "}"),
           configurationBuilder()
-              .dockerExecConf(new DockerExecConfBuilder()
+              .dockerExecConf(DockerExecConf.builder()
                   .dockerImage("gcr.io/some-bucket/some-image")
                   .dockerArgs(Arrays.asList("1", "2", "3"))
                   .dockerTerminationLogging(true)
@@ -155,8 +155,8 @@ public class WorkflowConfigurationTest {
               + "  \"input_fields\":{\"foo\": \"bar\"}"
               + "}"),
           configurationBuilder()
-              .flyteExecConf(new FlyteExecConfBuilder()
-                  .referenceId(new FlyteIdentifierBuilder()
+              .flyteExecConf(FlyteExecConf.builder()
+                  .referenceId(FlyteIdentifier.builder()
                       .resourceType("launch-plan")
                       .domain("production")
                       .project("flyte-test")

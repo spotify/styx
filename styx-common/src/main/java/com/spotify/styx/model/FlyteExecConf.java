@@ -27,4 +27,8 @@ import java.util.Map;
 public interface FlyteExecConf {
   FlyteIdentifier referenceId();
   Map<String, String> inputFields();
+
+  static FlyteExecConfBuilder builder() {
+    return new FlyteExecConfBuilder();
+  }
 }

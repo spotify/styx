@@ -27,10 +27,10 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.model.DockerExecConfBuilder;
+import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.FlyteExecConfBuilder;
-import com.spotify.styx.model.FlyteIdentifierBuilder;
+import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
@@ -150,7 +150,7 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .schedule(DAYS)
           .serviceAccount("foo@bar.baz.quux")
-          .dockerExecConf(new DockerExecConfBuilder()
+          .dockerExecConf(DockerExecConf.builder()
               .dockerImage("busybox")
               .dockerArgs(List.of("x", "y"))
               .dockerTerminationLogging(true)
@@ -163,8 +163,8 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .schedule(DAYS)
           .serviceAccount("foo@bar.baz.quux")
-          .flyteExecConf(new FlyteExecConfBuilder()
-              .referenceId(new FlyteIdentifierBuilder()
+          .flyteExecConf(FlyteExecConf.builder()
+              .referenceId(FlyteIdentifier.builder()
                   .resourceType("lp")
                   .project("flyte-test")
                   .domain("production")
@@ -177,14 +177,14 @@ public final class TestData {
 
   public static final WorkflowConfiguration OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
-          .dockerExecConf(new DockerExecConfBuilder()
+          .dockerExecConf(DockerExecConf.builder()
               .dockerImage("gcr.io/image")
               .dockerArgs(List.of("other", "args"))
               .build())
           .build();
   public static final WorkflowConfiguration NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-          .dockerExecConf(new DockerExecConfBuilder()
+          .dockerExecConf(DockerExecConf.builder()
               .dockerImage("gcr.io/image")
               .dockerArgs(List.of("other", "args"))
               .build())

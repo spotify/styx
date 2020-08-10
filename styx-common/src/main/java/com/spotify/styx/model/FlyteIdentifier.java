@@ -29,4 +29,8 @@ public interface FlyteIdentifier {
   String domain();
   String name();
   String version();
+
+  static FlyteIdentifierBuilder builder() {
+    return new FlyteIdentifierBuilder();
+  }
 }

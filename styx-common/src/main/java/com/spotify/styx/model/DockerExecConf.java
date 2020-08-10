@@ -37,4 +37,8 @@ public interface DockerExecConf {
    * return 0 when in fact the container has been killed. See https://github.com/kubernetes/kubernetes/issues/41516
    */
   boolean dockerTerminationLogging();
+
+  static DockerExecConfBuilder builder() {
+    return new DockerExecConfBuilder();
+  }
 }

@@ -35,7 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DockerExecConfBuilder;
+import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
@@ -155,7 +155,7 @@ public class StateInitializingTriggerTest {
             .dockerImage(Optional.empty())
             .build(),
         WorkflowConfigurationBuilder.from(TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION)
-            .dockerExecConf(new DockerExecConfBuilder()
+            .dockerExecConf(DockerExecConf.builder()
                 .dockerImage(Optional.empty())
                 .build())
             .build()
