@@ -23,13 +23,11 @@ package com.spotify.styx.flyte.client;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -72,7 +70,7 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(DOMAIN, PROJECT, LP_IDENTIFIER,
-            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
+            ExecutionMode.SCHEDULED);
     assertThat(DOMAIN, equalTo(workflowExecution.domain()));
     assertThat(PROJECT, equalTo(workflowExecution.project()));
     assertThat(TestAdminService.WF_EXECUTION_ID, equalTo(workflowExecution.name()));

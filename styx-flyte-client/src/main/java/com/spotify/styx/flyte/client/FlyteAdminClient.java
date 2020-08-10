@@ -55,12 +55,12 @@ public class FlyteAdminClient {
 
   public WorkflowExecutionIdentifier createExecution(String domain, String project,
                                               LaunchPlanIdentifier launchPlanId,
-                                              ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
+                                              ExecutionMode executionMode) {
     log.debug("createExecution {} {} {}", domain, project, launchPlanId);
 
     var metadata =
         ExecutionOuterClass.ExecutionMetadata.newBuilder()
-            .setMode(executionMode)
+            .setMode(executionMode.toProto())
             .setPrincipal(TRIGGERING_PRINCIPAL)
             .setNesting(USER_TRIGGERED_EXECUTION_NESTING)
             .build();
