@@ -135,8 +135,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     });
 
     validateConflictingExecConf(e, cfg);
-    validateOldDockerExecConf(e, cfg);
-    validateNewDockerExecConf(e, cfg);
+    validateDockerConf(e, cfg);
     validateFlyteExecConf(e, cfg);
 
     return e;
@@ -148,27 +147,15 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   }
 
   private void validateConflictingExecConf(List<String> e, WorkflowConfiguration cfg) {
-    var hasOldStyleDockerConf = cfg.dockerImage().isPresent() || cfg.dockerArgs().isPresent();
-    var hasNewStyleDockerConf = cfg.dockerExecConf().isPresent();
-
-    if (hasNewStyleDockerConf && hasOldStyleDockerConf) {
-      e.add("configuration cannot specify both docker parameters in new and old style");
-    }
-    if (cfg.flyteExecConf().isPresent() && (hasNewStyleDockerConf || hasOldStyleDockerConf)) {
+    var hasDockerConf = cfg.dockerImage().isPresent() || cfg.dockerArgs().isPresent();
+    if (cfg.flyteExecConf().isPresent() && hasDockerConf) {
       e.add("configuration cannot specify both docker and flyte parameters");
     }
   }
 
-  private void validateOldDockerExecConf(List<String> errors, WorkflowConfiguration config) {
+  private void validateDockerConf(List<String> errors, WorkflowConfiguration config) {
     config.dockerArgs().ifPresent(args -> validateDockerArgs(errors, args));
     config.dockerImage().ifPresent(image -> validateDockerImage(errors, image));
-  }
-
-  private void validateNewDockerExecConf(List<String> errors, WorkflowConfiguration config) {
-    config.dockerExecConf().ifPresent(dockerExecConf -> {
-      dockerExecConf.dockerArgs().ifPresent(args -> validateDockerArgs(errors, args));
-      dockerExecConf.dockerImage().ifPresent(image -> validateDockerImage(errors, image));
-    });
   }
 
   private void validateDockerImage(List<String> errors, String image) {

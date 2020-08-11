@@ -69,8 +69,6 @@ public interface WorkflowConfiguration {
 
   Optional<String> retryCondition();
 
-  Optional<DockerExecConf> dockerExecConf();
-
   Optional<FlyteExecConf> flyteExecConf();
 
   default Instant addOffset(Instant next) {

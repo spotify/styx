@@ -20,12 +20,9 @@
 
 package com.spotify.styx.util;
 
-import static com.spotify.styx.testdata.TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
-import static com.spotify.styx.testdata.TestData.NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
-import static com.spotify.styx.testdata.TestData.OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION;
-import static com.spotify.styx.testdata.TestData.OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -41,7 +38,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.FlyteExecConfBuilder;
 import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
@@ -82,12 +78,6 @@ public class BasicWorkflowValidatorTest {
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
   private static final String NOT_VALID_IMAGE = "not-valid-image";
 
-  private static final WorkflowConfiguration INVALID_DOCKER_EXEC_WORKFLOW_CONFIGURATION =
-      WorkflowConfigurationBuilder.from(DOCKER_EXEC_WORKFLOW_CONFIGURATION)
-          .dockerExecConf(DockerExecConf.builder()
-              .dockerImage(NOT_VALID_IMAGE)
-              .build())
-          .build();
   private static final WorkflowConfiguration INVALID_DOCKER_WORKFLOW_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
           .dockerImage(NOT_VALID_IMAGE)
@@ -295,21 +285,6 @@ public class BasicWorkflowValidatorTest {
   }
 
   @Test
-  public void shouldAcceptValidDockerExecConf() {
-    assertThat(
-        sut.validateWorkflow(Workflow.create("test", DOCKER_EXEC_WORKFLOW_CONFIGURATION)),
-        empty()
-    );
-  }
-
-  @Test
-  public void shouldRejectInvalidImageInDockerExecConf() {
-    var errors = sut.validateWorkflow(Workflow.create("test", INVALID_DOCKER_EXEC_WORKFLOW_CONFIGURATION));
-
-    assertThat(errors, containsInAnyOrder("invalid image: error"));
-  }
-
-  @Test
   public void shouldAcceptValidFlyteExecConf() {
     assertThat(
         sut.validateWorkflow(Workflow.create("test", FLYTE_WORKFLOW_CONFIGURATION)),
@@ -332,30 +307,11 @@ public class BasicWorkflowValidatorTest {
   }
 
   @Test
-  @Parameters(method = "conflictingConfigurations")
-  public void shouldRejectConflictingExecConf(WorkflowConfiguration configuration,
-                                              String expectedError) {
+  public void shouldRejectConflictingExecConf() {
     assertThat(
-        sut.validateWorkflow(Workflow.create("test", configuration)),
-        containsInAnyOrder(expectedError)
+        sut.validateWorkflow(Workflow.create("test", DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION)),
+        containsInAnyOrder("configuration cannot specify both docker and flyte parameters")
     );
-  }
-
-  public Object[] conflictingConfigurations() {
-    return new Object[]{
-        new Object[]{
-            OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION,
-            "configuration cannot specify both docker parameters in new and old style"
-        },
-        new Object[]{
-            NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION,
-            "configuration cannot specify both docker and flyte parameters"
-        },
-        new Object[]{
-            OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION,
-            "configuration cannot specify both docker and flyte parameters"
-        }
-    };
   }
 
   public static class InvalidFlyteConfExecArgsProvider {

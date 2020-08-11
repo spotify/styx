@@ -22,7 +22,6 @@ package com.spotify.styx;
 
 import static com.spotify.styx.util.ParameterUtil.toParameter;
 
-import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
@@ -57,8 +56,7 @@ final class StateInitializingTrigger implements TriggerListener {
       LOG.info("{} is a Flyte Workflow, skipping as not supported at the moment", workflow.id());
       return;
     }
-    if (configuration.dockerImage().isEmpty()
-        && configuration.dockerExecConf().flatMap(DockerExecConf::dockerImage).isEmpty()) {
+    if (configuration.dockerImage().isEmpty()) {
       LOG.warn("{} has no docker image, skipping", workflow.id());
       return;
     }

@@ -104,7 +104,7 @@ public class WorkflowConfigurationTest {
     }
 
     @SuppressWarnings("unused")
-    public static Object[] provideOldStyleDockerConf() {
+    public static Object[] provideDockerConf() {
       return new Object[] {
           "Original docker centred conf",
           buildJson(
@@ -115,26 +115,6 @@ public class WorkflowConfigurationTest {
               .dockerImage("gcr.io/some-bucket/some-image")
               .dockerArgs(Arrays.asList("1", "2", "3"))
               .dockerTerminationLogging(true)
-              .build()
-      };
-    }
-
-    @SuppressWarnings("unused")
-    public static Object[] provideNewStyleDockerExecConf() {
-      return new Object[] {
-          "Docker exec conf",
-          buildJson(
-              "\"docker_exec_conf\":{"
-              + "  \"docker_image\":\"gcr.io/some-bucket/some-image\", "
-              + "  \"docker_args\":[\"1\",\"2\",\"3\"], "
-              + "  \"docker_termination_logging\":true"
-              + "}"),
-          configurationBuilder()
-              .dockerExecConf(DockerExecConf.builder()
-                  .dockerImage("gcr.io/some-bucket/some-image")
-                  .dockerArgs(Arrays.asList("1", "2", "3"))
-                  .dockerTerminationLogging(true)
-                  .build())
               .build()
       };
     }

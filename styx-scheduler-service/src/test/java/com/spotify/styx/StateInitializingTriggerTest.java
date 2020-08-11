@@ -35,7 +35,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableList;
-import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
@@ -49,15 +48,13 @@ import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import junitparams.JUnitParamsRunner;
-import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnitRunner;
 
-@RunWith(JUnitParamsRunner.class)
+@RunWith(MockitoJUnitRunner.class)
 public class StateInitializingTriggerTest {
 
   private static final Instant TIME = Instant.parse("2016-01-18T09:11:22.333Z");
@@ -81,27 +78,18 @@ public class StateInitializingTriggerTest {
 
   @Before
   public void setUp() {
-    MockitoAnnotations.initMocks(this);
     trigger = new StateInitializingTrigger(stateManager);
   }
 
   @Test
-  @Parameters(method = "validConfigurations")
-  public void shouldTriggerWorkflowInstance(WorkflowConfiguration workflowConfiguration) throws Exception {
+  public void shouldTriggerWorkflowInstance() throws Exception {
+    var workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     verify(stateManager).trigger(
         WorkflowInstance.create(workflow.id(), toParameter(workflowConfiguration.schedule(), TIME)),
         Trigger.natural(), PARAMETERS);
-  }
-
-  @SuppressWarnings("unused")
-  private static WorkflowConfiguration[] validConfigurations() {
-    return new WorkflowConfiguration[] {
-        workflowConfiguration(HOURS),
-        TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION
-    };
   }
 
   @Test
@@ -140,26 +128,14 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
-  @Parameters(method = "noDockerImageConfigurations")
-  public void shouldDoNothingIfDockerImageMissing(WorkflowConfiguration configuration) {
+  public void shouldDoNothingIfDockerImageMissing() {
+    var configuration = WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
+        .dockerImage(Optional.empty())
+        .build();
     var workflow = Workflow.create("id", configuration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
     verifyNoInteractions(stateManager);
-  }
-
-  @SuppressWarnings("unused")
-  private static WorkflowConfiguration[] noDockerImageConfigurations() {
-    return new WorkflowConfiguration[] {
-        WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
-            .dockerImage(Optional.empty())
-            .build(),
-        WorkflowConfigurationBuilder.from(TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION)
-            .dockerExecConf(DockerExecConf.builder()
-                .dockerImage(Optional.empty())
-                .build())
-            .build()
-    };
   }
 
   @Test

@@ -27,7 +27,6 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
-import com.spotify.styx.model.DockerExecConf;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
@@ -144,19 +143,6 @@ public final class TestData {
           .retryCondition("#exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == \"natural\"")
           .build();
 
-  public static final WorkflowConfiguration DOCKER_EXEC_WORKFLOW_CONFIGURATION =
-      WorkflowConfiguration.builder()
-          .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .schedule(DAYS)
-          .serviceAccount("foo@bar.baz.quux")
-          .dockerExecConf(DockerExecConf.builder()
-              .dockerImage("busybox")
-              .dockerArgs(List.of("x", "y"))
-              .dockerTerminationLogging(true)
-              .build())
-          .build();
-
   public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
@@ -175,21 +161,7 @@ public final class TestData {
               .build())
           .build();
 
-  public static final WorkflowConfiguration OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION =
-      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
-          .dockerExecConf(DockerExecConf.builder()
-              .dockerImage("gcr.io/image")
-              .dockerArgs(List.of("other", "args"))
-              .build())
-          .build();
-  public static final WorkflowConfiguration NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
-      WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
-          .dockerExecConf(DockerExecConf.builder()
-              .dockerImage("gcr.io/image")
-              .dockerArgs(List.of("other", "args"))
-              .build())
-          .build();
-  public static final WorkflowConfiguration OLD_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
+  public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
           .dockerImage("gcr.io/image")
           .dockerArgs(List.of("other", "args"))

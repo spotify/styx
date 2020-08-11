@@ -38,7 +38,6 @@ import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_WORKFLOW_JSON;
 import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
-import static com.spotify.styx.testdata.TestData.DOCKER_EXEC_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
@@ -274,7 +273,7 @@ public class DatastoreStorageTest {
   @SuppressWarnings("unused")
   private static WorkflowConfiguration[] configurations() {
     return new WorkflowConfiguration[] {
-        FULL_WORKFLOW_CONFIGURATION, DOCKER_EXEC_WORKFLOW_CONFIGURATION, FLYTE_WORKFLOW_CONFIGURATION
+        FULL_WORKFLOW_CONFIGURATION, FLYTE_WORKFLOW_CONFIGURATION
     };
   }
 
