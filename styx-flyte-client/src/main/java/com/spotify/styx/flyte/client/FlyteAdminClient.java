@@ -24,6 +24,7 @@ import static com.google.common.base.Verify.verifyNotNull;
 
 import com.google.common.annotations.VisibleForTesting;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
 import java.util.Objects;
@@ -55,21 +56,21 @@ public class FlyteAdminClient {
     return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
   }
 
-  public WorkflowExecutionIdentifier createExecution(String domain, String project,
-                                              LaunchPlanIdentifier launchPlanId,
-                                              ExecutionMode executionMode) {
+  public ExecutionOuterClass.ExecutionCreateResponse createExecution(String domain, String project,
+                                                                     IdentifierOuterClass.Identifier launchPlanId,
+                                                                     ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
     log.debug("createExecution {} {} {}", domain, project, launchPlanId);
 
     var metadata =
         ExecutionOuterClass.ExecutionMetadata.newBuilder()
-            .setMode(executionMode.toProto())
+            .setMode(executionMode)
             .setPrincipal(TRIGGERING_PRINCIPAL)
             .setNesting(USER_TRIGGERED_EXECUTION_NESTING)
             .build();
 
     var spec =
         ExecutionOuterClass.ExecutionSpec.newBuilder()
-            .setLaunchPlan(launchPlanId.toProto())
+            .setLaunchPlan(launchPlanId)
             .setMetadata(metadata)
             .build();
 
@@ -88,6 +89,6 @@ public class FlyteAdminClient {
         project,
         domain);
 
-    return WorkflowExecutionIdentifier.fromProto(response);
+    return response;
   }
 }

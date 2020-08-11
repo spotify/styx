@@ -23,6 +23,8 @@ package com.spotify.styx.flyte.client;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
+import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
@@ -42,8 +44,13 @@ public class FlyteAdminClientTest {
   private TestAdminService testAdminService;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
-  private static final LaunchPlanIdentifier LP_IDENTIFIER =
-      LaunchPlanIdentifier.create(DOMAIN, PROJECT, LP_NAME, LP_VERSION);
+  private static final IdentifierOuterClass.Identifier LP_IDENTIFIER =
+      IdentifierOuterClass.Identifier.newBuilder()
+          .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
+          .setDomain(DOMAIN)
+          .setProject(PROJECT)
+          .setName(LP_NAME)
+          .setVersion(LP_VERSION).build();
 
   @Before
   public void setUp() throws IOException {
@@ -70,9 +77,9 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(DOMAIN, PROJECT, LP_IDENTIFIER,
-            ExecutionMode.SCHEDULED);
-    assertThat(DOMAIN, equalTo(workflowExecution.domain()));
-    assertThat(PROJECT, equalTo(workflowExecution.project()));
-    assertThat(TestAdminService.WF_EXECUTION_ID, equalTo(workflowExecution.name()));
+            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
+    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
+    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
+    assertThat(TestAdminService.WF_EXECUTION_ID, equalTo(workflowExecution.getId().getName()));
   }
 }

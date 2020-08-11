@@ -7,4 +7,5 @@ The definitions are taken from the [flyteidl repo](https://github.com/lyft/flyte
 ## Update protos
 ```
 cd into this directory
-sh update_protos.sh
+$ chmod +x update_protos.sh
+$ ./update_protos.sh
