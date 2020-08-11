@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 FLYTEIDL_VERSION="0.17.7"
 
 
