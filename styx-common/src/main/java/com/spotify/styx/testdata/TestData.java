@@ -154,7 +154,7 @@ public final class TestData {
                   .resourceType("lp")
                   .project("flyte-test")
                   .domain("production")
-                  .name("test-wrokflow")
+                  .name("test-workflow")
                   .version("1.0")
                   .build())
               .inputFields("foo", "bar")
