@@ -48,7 +48,7 @@ public class FlyteAdminClientTest {
   @Before
   public void setUp() throws IOException {
     testAdminService = new TestAdminService();
-    String serverName = InProcessServerBuilder.generateName();
+    var serverName = InProcessServerBuilder.generateName();
     var server = InProcessServerBuilder
         .forName(serverName)
         .directExecutor()

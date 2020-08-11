@@ -22,6 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static com.google.common.base.Verify.verifyNotNull;
 
+import com.google.common.annotations.VisibleForTesting;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
@@ -37,6 +38,7 @@ public class FlyteAdminClient {
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
+  @VisibleForTesting
   FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
     this.stub = Objects.requireNonNull(stub, "stub");
   }
