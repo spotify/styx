@@ -20,7 +20,6 @@
 
 package com.spotify.styx;
 
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static java.time.Instant.parse;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,9 +61,6 @@ public class TriggerManagerTest {
 
   private static final Workflow WORKFLOW_DAILY =
       Workflow.create("comp", FULL_WORKFLOW_CONFIGURATION);
-
-  private static final Workflow FLYTE_WORKFLOW =
-      Workflow.create("comp", FLYTE_WORKFLOW_CONFIGURATION);
 
   @Mock Storage storage;
   @Mock TriggerListener triggerListener;

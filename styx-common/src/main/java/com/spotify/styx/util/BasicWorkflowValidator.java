@@ -152,7 +152,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     var hasNewStyleDockerConf = cfg.dockerExecConf().isPresent();
 
     if (hasNewStyleDockerConf && hasOldStyleDockerConf) {
-      e.add("configuration cannot docker parameters in new and old style");
+      e.add("configuration cannot specify both docker parameters in new and old style");
     }
     if (cfg.flyteExecConf().isPresent() && (hasNewStyleDockerConf || hasOldStyleDockerConf)) {
       e.add("configuration cannot specify both docker and flyte parameters");

@@ -345,7 +345,7 @@ public class BasicWorkflowValidatorTest {
     return new Object[]{
         new Object[]{
             OLD_AND_NEW_CONFLICTING_DOCKER_CONFIGURATION,
-            "configuration cannot docker parameters in new and old style"
+            "configuration cannot specify both docker parameters in new and old style"
         },
         new Object[]{
             NEW_DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION,
