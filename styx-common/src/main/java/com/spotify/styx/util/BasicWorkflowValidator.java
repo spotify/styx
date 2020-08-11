@@ -25,7 +25,9 @@ import static com.spotify.styx.util.WorkflowValidator.upperLimit;
 import static java.lang.String.format;
 
 import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
 import java.time.Duration;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -66,15 +68,13 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     final List<String> e = new ArrayList<>();
 
     var componentId = workflowId.componentId();
-    if (componentId.isEmpty()) {
-      e.add("component id cannot be empty");
-    } else if (componentId.contains("#")) {
+
+    empty(e, "component id", workflowId.componentId());
+    if (componentId.contains("#")) {
       e.add("component id cannot contain #");
     }
 
-    if (workflowId.id().isEmpty()) {
-      e.add("workflow id cannot be empty");
-    }
+    empty(e, "workflow id", workflowId.id());
 
     if (!workflowId.id().equals(cfg.id())) {
       e.add("workflow id mismatch");
@@ -100,22 +100,12 @@ public class BasicWorkflowValidator implements WorkflowValidator {
     upperLimit(e, cfg.retryCondition().map(String::length).orElse(0),
         MAX_RETRY_CONDITION_LENGTH, "retry condition too long");
 
-    cfg.dockerImage().ifPresent(image ->
-        dockerImageValidator.validateImageReference(image).stream()
-            .map(s -> "invalid image: " + s)
-            .forEach(e::add));
-
     cfg.resources().stream().map(String::length).forEach(v ->
         upperLimit(e, v, MAX_RESOURCE_LENGTH, "resource name too long"));
 
-    cfg.dockerArgs().ifPresent(args -> {
-      final int dockerArgs = args.size() + args.stream().mapToInt(String::length).sum();
-      upperLimit(e, dockerArgs, MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
-    });
-
     cfg.offset().ifPresent(offset -> {
       try {
-        TimeUtil.addOffset(ZonedDateTime.now(), offset);
+        TimeUtil.addOffset(ZonedDateTime.now(ZoneOffset.UTC), offset);
       } catch (DateTimeParseException ex) {
         e.add(format("invalid offset: %s", ex.getMessage()));
       }
@@ -144,11 +134,59 @@ public class BasicWorkflowValidator implements WorkflowValidator {
       }
     });
 
+    validateConflictingExecConf(e, cfg);
+    validateDockerConf(e, cfg);
+    validateFlyteExecConf(e, cfg);
+
     return e;
   }
 
   private static boolean validateServiceAccount(String serviceAccount) {
     var matcher = VALID_EMAIL_ADDRESS_REGEX.matcher(serviceAccount);
     return matcher.matches();
+  }
+
+  private void validateConflictingExecConf(List<String> e, WorkflowConfiguration cfg) {
+    var hasDockerConf = cfg.dockerImage().isPresent() || cfg.dockerArgs().isPresent();
+    if (cfg.flyteExecConf().isPresent() && hasDockerConf) {
+      e.add("configuration cannot specify both docker and flyte parameters");
+    }
+  }
+
+  private void validateDockerConf(List<String> errors, WorkflowConfiguration config) {
+    config.dockerArgs().ifPresent(args -> validateDockerArgs(errors, args));
+    config.dockerImage().ifPresent(image -> validateDockerImage(errors, image));
+  }
+
+  private void validateDockerImage(List<String> errors, String image) {
+    dockerImageValidator.validateImageReference(image)
+        .forEach(error-> errors.add("invalid image: " + error));
+  }
+
+  private void validateDockerArgs(List<String> errors, List<String> args) {
+    final int dockerArgs = args.size() + args.stream().mapToInt(String::length).sum();
+    upperLimit(errors, dockerArgs, MAX_DOCKER_ARGS_TOTAL, "docker args is too large");
+  }
+
+  private void validateFlyteExecConf(List<String> errors, WorkflowConfiguration config) {
+    config.flyteExecConf().ifPresent(flyteExecConf -> {
+      var flyteIdentifier = flyteExecConf.referenceId();
+
+      var resourceType = flyteIdentifier.resourceType();
+      if (!"lp".equals(resourceType)) {
+        errors.add("only launch plans (\"lp\") are supported: " + resourceType);
+      }
+
+      empty(errors, "domain", flyteIdentifier.domain());
+      empty(errors, "project", flyteIdentifier.project());
+      empty(errors, "name", flyteIdentifier.name());
+      empty(errors, "version", flyteIdentifier.version());
+    });
+  }
+
+  private void empty(List<String> errors, String fieldName, String value) {
+    if (value.isEmpty()) {
+      errors.add(fieldName + " cannot be empty");
+    }
   }
 }

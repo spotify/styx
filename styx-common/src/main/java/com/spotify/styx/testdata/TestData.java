@@ -28,9 +28,12 @@ import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfiguration.Secret;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Duration;
@@ -138,6 +141,30 @@ public final class TestData {
           .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
           .retryCondition("#exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == \"natural\"")
+          .build();
+
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(FlyteExecConf.builder()
+              .referenceId(FlyteIdentifier.builder()
+                  .resourceType("lp")
+                  .project("flyte-test")
+                  .domain("production")
+                  .name("test-workflow")
+                  .version("1.0")
+                  .build())
+              .inputFields("foo", "bar")
+              .build())
+          .build();
+
+  public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
+          .dockerImage("gcr.io/image")
+          .dockerArgs(List.of("other", "args"))
           .build();
 
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =

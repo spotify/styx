@@ -21,6 +21,7 @@
 package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
@@ -96,6 +97,10 @@ public class SchedulerResourceTest {
                                                            TestData.WEEKLY_WORKFLOW_CONFIGURATION);
   private final Workflow MONTHLY_WORKFLOW = Workflow.create("styx",
                                                             TestData.MONTHLY_WORKFLOW_CONFIGURATION);
+
+  private final Workflow FLYTE_WORKFLOW = Workflow.create("flytewf",
+      TestData.FLYTE_WORKFLOW_CONFIGURATION);
+
   private Optional<Workflow> triggeredWorkflow = Optional.empty();
   private Optional<Instant> triggeredInstant = Optional.empty();
 
@@ -320,6 +325,16 @@ public class SchedulerResourceTest {
         TriggerRequest.of(FULL_DAILY_WORKFLOW.id(), "2014-12-31"));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
+
+    verifyZeroInteractions(triggerListener);
+  }
+
+  @Test
+  public void testTriggerShouldFailForFlyteWorkflow() throws Exception {
+    final Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(
+        TriggerRequest.of(FLYTE_WORKFLOW.id(), "2014-12-31"));
+
+    assertThat(response, hasStatus(withCode(BAD_REQUEST)));
 
     verifyZeroInteractions(triggerListener);
   }

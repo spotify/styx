@@ -20,20 +20,20 @@
 
 package com.spotify.styx.storage;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.EnvironmentVariables;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
@@ -42,8 +42,6 @@ public class DatastoreEmulatorTest {
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
   @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
-
-  @Rule public final ExpectedException exception = ExpectedException.none();
 
   private Datastore[] clients() {
     return new Datastore[]{
@@ -66,11 +64,12 @@ public class DatastoreEmulatorTest {
   }
 
   @Test
-  public void shouldFailIfNotGcloudEmulator() {
+  public void shouldFailIfNotGcloudEmulator() throws InterruptedException {
     environmentVariables.clear("PATH");
     var emulator = new DatastoreEmulator();
-    exception.expect(AssertionError.class);
-    exception.expectMessage(Matchers.startsWith("Not using gcloud sdk datastore emulator"));
-    emulator.before();
+
+    var exception = Assert.assertThrows(AssertionError.class, emulator::before);
+
+    assertThat(exception.getMessage(), Matchers.startsWith("Not using gcloud sdk datastore emulator"));
   }
 }

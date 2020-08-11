@@ -42,9 +42,9 @@ public interface WorkflowConfiguration {
 
   Optional<String> offset();
 
-  Optional<String> dockerImage();
-
   Optional<String> commitSha();
+
+  Optional<String> dockerImage();
 
   Optional<List<String>> dockerArgs();
 
@@ -68,6 +68,8 @@ public interface WorkflowConfiguration {
   Optional<Duration> runningTimeout();
 
   Optional<String> retryCondition();
+
+  Optional<FlyteExecConf> flyteExecConf();
 
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);
@@ -121,7 +123,7 @@ public interface WorkflowConfiguration {
     static Secret create(
         String name,
         String mountPath) {
-      return builder()
+      return Secret.builder()
           .name(name)
           .mountPath(mountPath)
           .build();

@@ -50,13 +50,19 @@ final class StateInitializingTrigger implements TriggerListener {
   @Override
   public void event(Workflow workflow, Trigger trigger, Instant instant,
                     TriggerParameters parameters) {
-    if (workflow.configuration().dockerImage().isEmpty()) {
+    final var configuration = workflow.configuration();
+    // We should verify Flyte conf first because those doesn't have docker image configured
+    if (configuration.flyteExecConf().isPresent()) {
+      LOG.info("{} is a Flyte Workflow, skipping as not supported at the moment", workflow.id());
+      return;
+    }
+    if (configuration.dockerImage().isEmpty()) {
       LOG.warn("{} has no docker image, skipping", workflow.id());
       return;
     }
 
-    final String parameter = toParameter(workflow.configuration().schedule(), instant);
-    final WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
+    final var parameter = toParameter(configuration.schedule(), instant);
+    final var workflowInstance = WorkflowInstance.create(workflow.id(), parameter);
 
     try {
       stateManager.trigger(workflowInstance, trigger, parameters);

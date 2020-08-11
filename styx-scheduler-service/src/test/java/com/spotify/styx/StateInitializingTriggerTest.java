@@ -25,9 +25,14 @@ import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.model.Schedule.MONTHS;
 import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.util.ParameterUtil.toParameter;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableList;
 import com.spotify.styx.model.Schedule;
@@ -39,10 +44,10 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -78,7 +83,7 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldTriggerWorkflowInstance() throws Exception {
-    WorkflowConfiguration workflowConfiguration = workflowConfiguration(HOURS);
+    var workflowConfiguration = workflowConfiguration(HOURS);
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
@@ -124,18 +129,24 @@ public class StateInitializingTriggerTest {
 
   @Test
   public void shouldDoNothingIfDockerImageMissing() {
-    final WorkflowConfiguration configuration =
-        WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
-            .dockerImage(Optional.empty())
-            .build();
-    Workflow workflow = Workflow.create("id", configuration);
+    var configuration = WorkflowConfigurationBuilder.from(TestData.DAILY_WORKFLOW_CONFIGURATION)
+        .dockerImage(Optional.empty())
+        .build();
+    var workflow = Workflow.create("id", configuration);
     trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
 
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
   }
 
   @Test
-  @Parameters()
+  public void shouldDoNothingIfFlyteWorkflow() {
+    var workflow = Workflow.create("id", TestData.FLYTE_WORKFLOW_CONFIGURATION);
+    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
+
+    verifyNoInteractions(stateManager);
+  }
+
+  @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
       reset(stateManager);
@@ -150,12 +161,26 @@ public class StateInitializingTriggerTest {
     }
   }
 
-  private WorkflowConfiguration workflowConfiguration(Schedule schedule, String... args) {
+  private static WorkflowConfiguration workflowConfiguration(Schedule schedule, String... args) {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(schedule)
         .dockerImage("busybox")
         .dockerArgs(ImmutableList.copyOf(args))
         .build();
+  }
+
+  @Test
+  public void shouldWrapIsClosedExceptionIntoRuntime() throws Exception {
+    var cause = new IsClosedException();
+    doThrow(cause).when(stateManager).trigger(any(), any(), any());
+    Workflow workflow = Workflow.create("id", workflowConfiguration(HOURS));
+
+    var exception = assertThrows(
+        RuntimeException.class,
+        () -> trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS)
+    );
+
+    assertThat(exception.getCause(), equalTo(cause));
   }
 }

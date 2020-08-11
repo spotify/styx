@@ -28,6 +28,7 @@ import static com.spotify.styx.api.JsonMatchers.assertJson;
 import static com.spotify.styx.api.JsonMatchers.assertJsonNullValue;
 import static com.spotify.styx.api.JsonMatchers.assertNoJson;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.RESOURCE_IDS;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -606,6 +607,29 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldFailPostBackfillForFlyteWorkflow() throws Exception {
+    reset(storage);
+
+    storage.storeWorkflow(Workflow.create(
+        "flytewf",
+        FLYTE_WORKFLOW_CONFIGURATION));
+
+    final String json = "{\"start\":\"2017-01-01T00:00:00Z\"," +
+                        "\"end\":\"2017-02-01T00:00:00Z\"," +
+                        "\"component\":\"flytewf\"," +
+                        "\"workflow\":\"" + FLYTE_WORKFLOW_CONFIGURATION.id() + "\","+
+                        "\"concurrency\":1}";
+
+    final Response<ByteString> response = awaitResponse(
+        serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
+
+    assertThat(response.status(),
+        is(Status.BAD_REQUEST.withReasonPhrase("Cannot run backfill for flyte workflow")));
+
+    verify(storage, never()).storeBackfill(any());
+  }
+
+  @Test
   public void shouldFailHaltBackfillIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -902,7 +926,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     } finally {
       this.currentTime = previousTime;
     }
-   
+
     assertThat(response.status().reasonPhrase(),
         response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
 

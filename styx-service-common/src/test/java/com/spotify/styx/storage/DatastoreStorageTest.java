@@ -39,10 +39,12 @@ import static com.spotify.styx.storage.DatastoreStorage.globalConfigKey;
 import static com.spotify.styx.storage.DatastoreStorage.instantToTimestamp;
 import static com.spotify.styx.storage.DatastoreStorage.workflowKey;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -58,7 +60,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -122,9 +124,7 @@ import junitparams.Parameters;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -139,8 +139,6 @@ public class DatastoreStorageTest {
       .setTotalTimeout(Duration.ofSeconds(5))
       .setMaxAttempts(3)
       .build();
-
-  @Rule public ExpectedException exception = ExpectedException.none();
 
   private static final WorkflowId WORKFLOW_ID1 = WorkflowId.create("component", "endpoint1");
   private static final WorkflowId WORKFLOW_ID2 = WorkflowId.create("component", "endpoint2");
@@ -222,10 +220,12 @@ public class DatastoreStorageTest {
 
   private static final WorkflowId WORKFLOW_ID = WorkflowId.create("dockerComp", "dockerEndpoint");
 
+  private static final String DOCKER_IMAGE = "gcr.io/foo/bar";
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id(WORKFLOW_ID.id())
           .schedule(DAYS)
+          .dockerImage(DOCKER_IMAGE)
           .build();
   static final Workflow WORKFLOW = Workflow.create(WORKFLOW_ID.componentId(),
       WORKFLOW_CONFIGURATION);
@@ -261,19 +261,27 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldPersistWorkflows() throws Exception {
-    Workflow workflow = Workflow.create("test",
-                                        FULL_WORKFLOW_CONFIGURATION);
+  @Parameters(method = "configurations")
+  public void shouldPersistWorkflows(WorkflowConfiguration configuration) throws Exception {
+    Workflow workflow = Workflow.create("test", configuration);
     storage.store(workflow);
     Optional<Workflow> retrieved = storage.workflow(workflow.id());
 
     assertThat(retrieved, is(Optional.of(workflow)));
   }
 
+  @SuppressWarnings("unused")
+  private static WorkflowConfiguration[] configurations() {
+    return new WorkflowConfiguration[] {
+        FULL_WORKFLOW_CONFIGURATION, FLYTE_WORKFLOW_CONFIGURATION
+    };
+  }
+
   @Test
-  public void shouldDeleteWorkflows() throws Exception {
-    var foo = Workflow.create("foo", WORKFLOW_CONFIGURATION);
-    var bar = Workflow.create("bar", WORKFLOW_CONFIGURATION);
+  @Parameters(method = "configurations")
+  public void shouldDeleteWorkflows(WorkflowConfiguration configuration) throws Exception {
+    var foo = Workflow.create("foo", configuration);
+    var bar = Workflow.create("bar", configuration);
 
     storage.store(foo);
     storage.store(bar);
@@ -478,10 +486,11 @@ public class DatastoreStorageTest {
 
   @Test
   public void readActiveStatesShouldPropagateIOException() throws Exception {
-    final IOException cause = new IOException("foobar");
+    var cause = new IOException("foobar");
     doThrow(cause).when(datastore).query(any());
-    exception.expect(is(cause));
-    storage.readActiveStates();
+
+    var exception = assertThrows(IOException.class, () -> storage.readActiveStates());
+    assertThat(exception, is(cause));
   }
 
   @Test
@@ -678,8 +687,7 @@ public class DatastoreStorageTest {
     assertThat(storage.workflows(Set.of(WORKFLOW_ID1, WORKFLOW_ID2)), is(Map.of(WORKFLOW_ID2, workflow2)));
     assertThat(storage.workflows(WORKFLOW_ID1.componentId()), contains(workflow2));
 
-    exception.expect(IOException.class);
-    storage.workflow(workflow1.id());
+    assertThrows(IOException.class, () -> storage.workflow(workflow1.id()));
   }
 
   @Test
@@ -1096,8 +1104,13 @@ public class DatastoreStorageTest {
   public void runInTransactionWithRetriesShouldThrowIfDatastoreNewTransactionFails() throws Exception {
     var cause = new DatastoreIOException(new DatastoreException(1, "", ""));
     doThrow(cause).when(datastore).newTransaction();
-    exception.expect(is(cause));
-    storage.runInTransactionWithRetries(transactionFunction);
+
+    var exception = assertThrows(
+        DatastoreIOException.class,
+        () -> storage.runInTransactionWithRetries(transactionFunction)
+    );
+
+    assertThat(exception, is(cause));
   }
 
   @Test
@@ -1170,11 +1183,12 @@ public class DatastoreStorageTest {
   }
 
   @Test
-  public void shouldGetExceptionForUnknownCounter() throws IOException {
-    exception.expect(IllegalArgumentException.class);
-    exception.expectMessage("No limit found in Datastore for bar-resource");
+  public void shouldGetExceptionForUnknownCounter() {
+    var exception = assertThrows(
+        IllegalArgumentException.class,
+        () -> storage.getLimitForCounter("bar-resource"));
 
-    storage.getLimitForCounter("bar-resource");
+    assertThat(exception.getMessage(), is("No limit found in Datastore for bar-resource"));
   }
 
   @Test

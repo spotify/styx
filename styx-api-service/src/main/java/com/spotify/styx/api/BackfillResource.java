@@ -352,6 +352,9 @@ public final class BackfillResource implements Closeable {
 
     var activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
 
+    if (workflow.configuration().flyteExecConf().isPresent()) {
+      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Cannot run backfill for flyte workflow"));
+    }
     // Validate backfill & workflow
     var validationError = validate(rc, input, workflow);
     if (validationError.isPresent()) {

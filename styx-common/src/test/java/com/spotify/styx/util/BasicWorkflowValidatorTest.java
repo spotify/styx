@@ -20,21 +20,26 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.testdata.TestData.DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.spotify.styx.model.FlyteExecConfBuilder;
+import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -45,9 +50,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import junitparams.naming.TestCaseName;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,6 +76,13 @@ public class BasicWorkflowValidatorTest {
   private static final int MAX_ENV_VARS = 128;
   private static final int MAX_ENV_SIZE = 16 * 1024;
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
+  private static final String NOT_VALID_IMAGE = "not-valid-image";
+
+  private static final WorkflowConfiguration INVALID_DOCKER_WORKFLOW_CONFIGURATION =
+      WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
+          .dockerImage(NOT_VALID_IMAGE)
+          .build();
+
 
   @Mock
   private DockerImageValidator dockerImageValidator;
@@ -78,6 +93,8 @@ public class BasicWorkflowValidatorTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of());
+    when(dockerImageValidator.validateImageReference(eq(NOT_VALID_IMAGE)))
+        .thenReturn(Set.of("error"));
     sut = new BasicWorkflowValidator(dockerImageValidator);
   }
 
@@ -115,9 +132,9 @@ public class BasicWorkflowValidatorTest {
   @Test
 
   public void validateInvalidDockerImage() {
-    when(dockerImageValidator.validateImageReference(anyString())).thenReturn(Set.of("foo", "bar"));
-    final List<String> errors = sut.validateWorkflow(Workflow.create("test", FULL_WORKFLOW_CONFIGURATION));
-    assertThat(errors, containsInAnyOrder("invalid image: foo", "invalid image: bar"));
+    var errors = sut.validateWorkflow(Workflow.create("test", INVALID_DOCKER_WORKFLOW_CONFIGURATION));
+
+    assertThat(errors, containsInAnyOrder("invalid image: error"));
   }
 
 
@@ -265,6 +282,70 @@ public class BasicWorkflowValidatorTest {
 
     assertThat(sut.validateWorkflow(Workflow.create("test", configuration)),
             empty());
+  }
+
+  @Test
+  public void shouldAcceptValidFlyteExecConf() {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", FLYTE_WORKFLOW_CONFIGURATION)),
+        empty()
+    );
+  }
+
+  @Test
+  @TestCaseName("{method} - {1}")
+  @Parameters(source = InvalidFlyteConfExecArgsProvider.class)
+  public void shouldRejectInvalidFlyteExecConf(WorkflowConfiguration configuration,
+                                               String expectedError) {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", configuration)),
+        Matchers.allOf(
+            Matchers.<String>hasSize(1),
+            Matchers.contains(expectedError)
+        )
+    );
+  }
+
+  @Test
+  public void shouldRejectConflictingExecConf() {
+    assertThat(
+        sut.validateWorkflow(Workflow.create("test", DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION)),
+        containsInAnyOrder("configuration cannot specify both docker and flyte parameters")
+    );
+  }
+
+  public static class InvalidFlyteConfExecArgsProvider {
+
+    private InvalidFlyteConfExecArgsProvider() {}
+
+    @SuppressWarnings("unused")
+    public static Object[] provideNotALaunchPlanResource() {
+        return new Object[] {
+            flyteConf(builder -> builder.resourceType("wf")), "only launch plans (\"lp\") are supported: wf"
+        };
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] provideEmptyFields() {
+      return new Object[] {
+          new Object[] { flyteConf(builder -> builder.project("")), "project cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.domain("")), "domain cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.name("")), "name cannot be empty" },
+          new Object[] { flyteConf(builder -> builder.version("")), "version cannot be empty" }
+      };
+    }
+
+    private static WorkflowConfiguration flyteConf(Consumer<FlyteIdentifierBuilder> identifierMutator) {
+      var confBuilder = WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION);
+      var flyteExecConf = confBuilder.flyteExecConf().orElseThrow();
+      var referenceIdBuilder = FlyteIdentifierBuilder.from(flyteExecConf.referenceId());
+      identifierMutator.accept(referenceIdBuilder);
+      return confBuilder.flyteExecConf(
+          FlyteExecConfBuilder.from(flyteExecConf)
+              .referenceId(referenceIdBuilder.build())
+              .build())
+          .build();
+    }
   }
 
   private String limit(String msg, Object value, Object limit) {
