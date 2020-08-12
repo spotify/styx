@@ -194,6 +194,11 @@
 
       <!-- general utility libs -->
       <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-handler-proxy</artifactId>
+        <version>4.1.38.Final</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>28.2-jre</version>

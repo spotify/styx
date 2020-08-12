@@ -15,9 +15,22 @@
   <artifactId>styx-flyte-client</artifactId>
 
   <dependencies>
+    <!--
+      The grpc bom pins a version of netty-handler-proxy different than the io.grpc:groc-netty supports.
+      This causes the maven enforcer to complain.
+      I excluded it from the artifact and introduced the same version manually to overcome the maven complain.
+      This explicit import should be removed on a later grpc-bom version where the latest supported and
+      the imported versions are the same.
+     -->
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-handler-proxy</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
@@ -26,6 +39,10 @@
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler-proxy</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.auto.value</groupId>
