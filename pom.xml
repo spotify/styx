@@ -31,7 +31,6 @@
     <auto-value.version>1.7</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
     <errorprone.version>2.3.4</errorprone.version>
-    <grpc.version>1.27.2</grpc.version>
   </properties>
 
   <repositories>
@@ -53,7 +52,6 @@
     <module>styx-standalone-service</module>
     <module>styx-report</module>
     <module>styx-e2e-test</module>
-    <module>styx-flyte-client</module>
   </modules>
 
   <licenses>
@@ -116,7 +114,7 @@
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-bom</artifactId>
-        <version>${grpc.version}</version>
+        <version>1.27.2</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -159,11 +157,6 @@
       <dependency>
         <groupId>com.spotify</groupId>
         <artifactId>styx-common</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.spotify</groupId>
-        <artifactId>styx-flyte-client</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -736,13 +729,6 @@
   </profiles>
 
   <build>
-    <extensions>
-      <extension>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>1.6.2</version>
-      </extension>
-    </extensions>
     <pluginManagement>
       <plugins>
         <plugin>
