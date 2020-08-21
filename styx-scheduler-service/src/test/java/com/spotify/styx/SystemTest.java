@@ -33,6 +33,7 @@ import static org.junit.Assert.assertThat;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -648,7 +649,9 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     givenNextNaturalTrigger(HOURLY_WORKFLOW, "2016-03-14T16:00:00Z");
 
     givenActiveState(workflowInstance, RunState.create(workflowInstance,
-        RunState.State.RUNNING, StateData.newBuilder().trigger(TRIGGER1).build(),
+        RunState.State.RUNNING,
+        StateData.newBuilder().executionId("id").executionDescription(ExecutionDescription.forImage(
+            "image")).trigger(TRIGGER1).build(),
         Instant.parse("2016-03-14T15:17:45Z"), 2L));
 
     styxStarts();

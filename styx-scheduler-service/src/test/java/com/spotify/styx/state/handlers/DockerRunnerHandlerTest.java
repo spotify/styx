@@ -204,7 +204,7 @@ public class DockerRunnerHandlerTest {
     Workflow workflow = Workflow.create("id", workflowConfiguration);
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
     RunState runState = RunState.create(workflowInstance, state,
-        StateData.newBuilder().executionId(TEST_EXECUTION_ID).build());
+        StateData.newBuilder().executionDescription(ExecutionDescription.forImage("image")).executionId(TEST_EXECUTION_ID).build());
 
     dockerRunnerHandler.transitionInto(runState, eventRouter);
 

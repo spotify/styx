@@ -84,6 +84,7 @@ import com.spotify.styx.state.consumers.PublisherHandler;
 import com.spotify.styx.state.consumers.TransitionLogger;
 import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.state.handlers.ExecutionDescriptionHandler;
+import com.spotify.styx.state.handlers.FlyteRunnerHandler;
 import com.spotify.styx.state.handlers.TerminationHandler;
 import com.spotify.styx.state.handlers.TimeoutHandler;
 import com.spotify.styx.storage.AggregateStorage;
@@ -373,6 +374,7 @@ public class StyxScheduler implements AppInit {
 
     // These output handlers will be invoked in order.
     var outputHandlers = OutputHandler.tracing(List.of(
+        new FlyteRunnerHandler(),
         new DockerRunnerHandler(dockerRunner),
         new TerminationHandler(retryUtil, workflowCache),
         new MonitoringHandler(stats),

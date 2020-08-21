@@ -33,6 +33,7 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.ResourceNotFoundException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -58,6 +59,24 @@ public class DockerRunnerHandler implements OutputHandler {
 
   @Override
   public void transitionInto(RunState state, EventRouter eventRouter) {
+    switch (state.state()) {
+      case SUBMITTING:
+      case SUBMITTED:
+      case RUNNING:
+        if (state.data().executionDescription().isEmpty()) {
+          LOG.error("Unable to start procedure. Missing execution description for " + state.workflowInstance());
+          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
+          return;
+        }
+        if (state.data().executionId().isEmpty()) {
+          LOG.error("Unable to start procedure. Missing execution id for " + state.workflowInstance());
+          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
+          return;
+        }
+        if(state.data().executionDescription().get().flyteExecConf().isPresent()) {
+          return;
+        }
+    }
     switch (state.state()) {
       case SUBMITTING:
         final RunSpec runSpec;
