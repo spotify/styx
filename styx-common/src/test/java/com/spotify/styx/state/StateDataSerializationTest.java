@@ -33,6 +33,7 @@ import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
+import java.util.List;
 import org.junit.Test;
 
 public class StateDataSerializationTest {
@@ -103,7 +104,7 @@ public class StateDataSerializationTest {
       .executionId("styx-run-12172683-c62f-4f32-899a-63a9741b73f9")
       .executionDescription(ExecutionDescription.builder()
           .dockerImage("pipeline-core:474339e")
-          .dockerArgs("echo", "hello", "world")
+          .dockerArgs(List.of("echo", "hello", "world"))
           .secret(WorkflowConfiguration.Secret.create("pipeline-core-secret", "/etc/keys"))
           .commitSha("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           .build())

@@ -200,7 +200,7 @@ public class DatastoreStorageTest {
           .runnerId("test")
           .executionDescription(ExecutionDescription.builder()
               .dockerImage("foo/bar:34234")
-              .dockerArgs("foo", "the", "bar", "baz")
+              .dockerArgs(List.of("foo", "the", "bar", "baz"))
               .dockerTerminationLogging(true)
               .secret(Secret.create("foobar", "/var/quux/baz"))
               .serviceAccount("foo@bar.baz")

@@ -27,6 +27,7 @@ import static java.util.Objects.requireNonNull;
 import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
@@ -43,6 +44,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,11 +109,6 @@ public class ExecutionDescriptionHandler implements OutputHandler {
 
     var workflow = workflowWithState.workflow();
 
-    var dockerImage = workflow.configuration().dockerImage().orElseThrow(
-        () -> new MissingRequiredPropertyException(
-            format("%s has no docker image, halting %s", workflowId, workflowInstance))
-    );
-
     var isWorkflowEnabled = workflowWithState.state().enabled().orElse(false);
     var isNaturalTrigger = data.trigger().map(t -> t.equals(Trigger.natural())).orElse(false);
 
@@ -126,14 +123,19 @@ public class ExecutionDescriptionHandler implements OutputHandler {
           workflowId, workflowInstance, errors));
     }
 
-    final List<String> dockerArgs = workflow.configuration().dockerArgs()
-        .orElse(Collections.emptyList());
-    final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
-
     final Map<String, String> env = new HashMap<>(workflow.configuration().env());
     data.triggerParameters().ifPresent(p -> env.putAll(p.env()));
 
-    return ExecutionDescription.builder()
+    final Optional<String> dockerImage = workflow.configuration().dockerImage();
+    final List<String> dockerArgs = workflow.configuration().dockerArgs()
+        .orElse(Collections.emptyList());
+    final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
+    final Optional<FlyteExecConf> flyteExecConf = workflow.configuration().flyteExecConf();
+
+    if (workflow.configuration().flyteExecConf().isEmpty() && dockerImage.isEmpty()) {
+      throw new MissingRequiredPropertyException(format("%s has no execution configuration, halting %s", workflowId,workflowInstance));
+    }
+      return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .dockerArgs(command)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
@@ -143,6 +145,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .env(env)
         .runningTimeout(workflow.configuration().runningTimeout())
         .retryCondition(workflow.configuration().retryCondition())
+        .flyteExecConf(flyteExecConf)
         .build();
   }
 

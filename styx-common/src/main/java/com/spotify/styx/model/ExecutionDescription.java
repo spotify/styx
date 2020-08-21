@@ -29,8 +29,8 @@ import java.util.Optional;
 @AutoMatter
 public interface ExecutionDescription {
 
-  String dockerImage();
-  List<String> dockerArgs();
+  Optional<String> dockerImage();
+  Optional<List<String>> dockerArgs();
   boolean dockerTerminationLogging();
   Optional<WorkflowConfiguration.Secret> secret();
   Optional<String> serviceAccount();
@@ -38,6 +38,7 @@ public interface ExecutionDescription {
   Map<String, String> env();
   Optional<Duration> runningTimeout();
   Optional<String> retryCondition();
+  Optional<FlyteExecConf> flyteExecConf();
 
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();

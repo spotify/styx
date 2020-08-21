@@ -114,8 +114,8 @@ public class ExecutionDescriptionHandlerTest {
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
-    assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
-    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), hasSize(0));
+    assertThat(executionDescriptionCaptor.getValue().dockerImage().orElseThrow(), is(DOCKER_IMAGE));
+    assertThat(executionDescriptionCaptor.getValue().dockerArgs().orElseThrow(), hasSize(0));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
   }
 
@@ -144,9 +144,10 @@ public class ExecutionDescriptionHandlerTest {
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
-    assertThat(executionDescriptionCaptor.getValue().dockerImage(), is(DOCKER_IMAGE));
+    assertThat(executionDescriptionCaptor.getValue().dockerImage().get(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
-    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), contains("--date", "2016-03-14", "--bar"));
+    assertThat(executionDescriptionCaptor.getValue().dockerArgs().orElseThrow(), contains("--date", "2016-03"
+                                                                                       + "-14", "--bar"));
     assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));
     assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(Optional.of(Duration.ZERO)));
     assertThat(executionDescriptionCaptor.getValue().retryCondition(), is(Optional.of("#tries<2")));

@@ -118,8 +118,8 @@ public class DockerRunnerHandler implements OutputHandler {
     final String executionId = state.data().executionId().orElseThrow(
         () -> new ResourceNotFoundException("Missing execution id for " + state.workflowInstance()));
 
-    final String dockerImage = executionDescription.dockerImage();
-    final List<String> dockerArgs = executionDescription.dockerArgs();
+    final String dockerImage = executionDescription.dockerImage().get();
+    final List<String> dockerArgs = executionDescription.dockerArgs().orElse(Collections.emptyList());
     final String parameter = state.workflowInstance().parameter();
     final List<String> command = argsReplace(dockerArgs, parameter);
     return RunSpec.builder()
