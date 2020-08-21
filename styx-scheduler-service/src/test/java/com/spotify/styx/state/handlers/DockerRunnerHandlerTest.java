@@ -21,6 +21,9 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionDescription;
+import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionId;
+import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldTransitionIntoSubmitted;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -126,18 +129,7 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    WorkflowConfiguration workflowConfiguration = configuration("--date", "{}", "--bar");
-    Workflow workflow = Workflow.create("id", workflowConfiguration);
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
-        .executionId(TEST_EXECUTION_ID)
-        .executionDescription(EXECUTION_DESCRIPTION)
-        .build());
-
-    dockerRunnerHandler.transitionInto(runState, eventRouter);
-    
-    verify(eventRouter, timeout(60_000)).receive(Event.submitted(workflowInstance, TEST_EXECUTION_ID, TEST_RUNNER_ID),
-        runState.counter());
+    _shouldTransitionIntoSubmitted(EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler, TEST_RUNNER_ID);
   }
 
   @Test
@@ -169,32 +161,16 @@ public class DockerRunnerHandlerTest {
     verifyNoMoreInteractions(eventRouter);
   }
 
+  @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
-  public void shouldHaltIfMissingExecutionDescription() {
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
-        .executionId(TEST_EXECUTION_ID)
-        .build(), NOW, COUNTER);
-
-    dockerRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
-    verifyNoMoreInteractions(eventRouter);
+  public void shouldHaltIfMissingExecutionDescription(State state) {
+    _shouldHaltIfMissingExecutionDescription(state, EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler);
   }
 
+  @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
-  public void shouldHaltIfMissingExecutionId() {
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14T15");
-    RunState runState = RunState.create(workflowInstance, State.SUBMITTING, StateData.newBuilder()
-        .executionDescription(EXECUTION_DESCRIPTION)
-        .build(), NOW, COUNTER);
-
-    dockerRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
-    verifyNoMoreInteractions(eventRouter);
+  public void shouldHaltIfMissingExecutionId(State state) {
+    _shouldHaltIfMissingExecutionId(state, EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler);
   }
 
   @Parameters({"SUBMITTED", "RUNNING"})

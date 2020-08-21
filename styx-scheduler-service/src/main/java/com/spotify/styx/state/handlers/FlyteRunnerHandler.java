@@ -31,6 +31,9 @@ import org.slf4j.LoggerFactory;
 
 public class FlyteRunnerHandler implements OutputHandler {
 
+  public static final String STATIC_RUNNER_ID = "replace-me";
+  public static final Optional<Integer> STATIC_EXIT_CODE = Optional.of(0);
+
   private static final Logger LOG = LoggerFactory.getLogger(FlyteRunnerHandler.class);
 
   @Override
@@ -56,7 +59,8 @@ public class FlyteRunnerHandler implements OutputHandler {
     switch (state.state()) {
       case SUBMITTING:
         LOG.info("Start flyte exec");
-        final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().get(), "flyte-runner-id");
+        final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().get(),
+            STATIC_RUNNER_ID);
         try {
           LOG.info("Issue submitted event");
           eventRouter.receive(submitted, state.counter());
@@ -75,7 +79,7 @@ public class FlyteRunnerHandler implements OutputHandler {
         break;
       case RUNNING:
         LOG.info("Polling state");
-        final Event terminate = Event.terminate(state.workflowInstance(), Optional.of(0));
+        final Event terminate = Event.terminate(state.workflowInstance(), STATIC_EXIT_CODE);
         try {
           LOG.info("Issue terminate event");
           eventRouter.receive(terminate, state.counter());
