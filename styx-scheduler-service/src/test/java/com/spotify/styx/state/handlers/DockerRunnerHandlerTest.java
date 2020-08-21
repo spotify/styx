@@ -47,6 +47,7 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.IsClosedException;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -70,7 +71,7 @@ public class DockerRunnerHandlerTest {
   private static final String TEST_DOCKER_IMAGE = "busybox:1.1";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
       .dockerImage(TEST_DOCKER_IMAGE)
-      .dockerArgs("--date", "{}", "--bar")
+      .dockerArgs(List.of("--date", "{}", "--bar"))
       .build();
 
   @Mock DockerRunner dockerRunner;

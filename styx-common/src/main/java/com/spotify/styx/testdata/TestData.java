@@ -180,7 +180,7 @@ public final class TestData {
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
       ExecutionDescription.builder()
           .dockerImage("busybox:1.1")
-          .dockerArgs("foo", "bar")
+          .dockerArgs(List.of("foo", "bar"))
           .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
           .commitSha(VALID_SHA)
           .build();

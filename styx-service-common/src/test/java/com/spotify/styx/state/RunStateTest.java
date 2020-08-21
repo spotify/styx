@@ -74,7 +74,7 @@ public class RunStateTest {
   private static final String DOCKER_IMAGE = "busybox:1.1";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
       .dockerImage(DOCKER_IMAGE)
-      .dockerArgs("--date", "{}", "--bar")
+      .dockerArgs(List.of("--date", "{}", "--bar"))
       .build();
 
   private static final Trigger UNKNOWN_TRIGGER = Trigger.unknown("trig");
@@ -608,7 +608,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "1"));
 
     assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage(),
+        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage().orElseThrow(),
         equalTo(DOCKER_IMAGE + "1"));
   }
 
@@ -623,7 +623,7 @@ public class RunStateTest {
     transitioner.receive(eventFactory.created(TEST_EXECUTION_ID_1, DOCKER_IMAGE + "2"));
 
     assertThat(
-        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage(),
+        transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow().dockerImage().orElseThrow(),
         equalTo(DOCKER_IMAGE + "2"));
   }
 

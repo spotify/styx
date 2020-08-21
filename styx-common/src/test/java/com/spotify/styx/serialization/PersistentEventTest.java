@@ -34,6 +34,7 @@ import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.Trigger;
+import java.util.List;
 import java.util.Optional;
 import okio.ByteString;
 import org.junit.Assert;
@@ -55,7 +56,7 @@ public class PersistentEventTest {
   private static final String COMMIT_SHA = "00000ef508c1cb905e360590ce3e7e9193f6b370";
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
       .dockerImage(DOCKER_IMAGE)
-      .dockerArgs("foo", "bar")
+      .dockerArgs(List.of("foo", "bar"))
       .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
       .commitSha(COMMIT_SHA)
       .build();

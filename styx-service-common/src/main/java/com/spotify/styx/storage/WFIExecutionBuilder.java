@@ -148,7 +148,10 @@ class WFIExecutionBuilder {
     public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       currWorkflowInstance = workflowInstance;
-      currDockerImg = executionDescription.dockerImage();
+      // TODO: What does this do? Should there be an equivalent for Flyte
+      if(executionDescription.dockerImage().isPresent()) {
+        currDockerImg = executionDescription.dockerImage().get();
+      }
       if (executionDescription.commitSha().isPresent()) {
         currCommitSha = executionDescription.commitSha().get();
       }
