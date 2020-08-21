@@ -139,14 +139,6 @@ public class StateInitializingTriggerTest {
   }
 
   @Test
-  public void shouldDoNothingIfFlyteWorkflow() {
-    var workflow = Workflow.create("id", TestData.FLYTE_WORKFLOW_CONFIGURATION);
-    trigger.event(workflow, NATURAL_TRIGGER, TIME, PARAMETERS);
-
-    verifyNoInteractions(stateManager);
-  }
-
-  @Test
   public void shouldCreateWorkflowInstanceParameter() throws Exception {
     for (Map.Entry<Schedule, String> scheduleCase : SCHEDULE_ARG_EXPECTS.entrySet()) {
       reset(stateManager);

@@ -51,13 +51,9 @@ final class StateInitializingTrigger implements TriggerListener {
   public void event(Workflow workflow, Trigger trigger, Instant instant,
                     TriggerParameters parameters) {
     final var configuration = workflow.configuration();
-    // We should verify Flyte conf first because those doesn't have docker image configured
-    if (configuration.flyteExecConf().isPresent()) {
-      LOG.info("{} is a Flyte Workflow, skipping as not supported at the moment", workflow.id());
-      return;
-    }
-    if (configuration.dockerImage().isEmpty()) {
-      LOG.warn("{} has no docker image, skipping", workflow.id());
+
+    if (configuration.flyteExecConf().isEmpty() && configuration.dockerImage().isEmpty()) {
+      LOG.warn("{} has no execution execution info, skipping", workflow.id());
       return;
     }
 
