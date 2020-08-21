@@ -22,6 +22,7 @@ package com.spotify.styx.storage;
 
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
@@ -41,7 +42,7 @@ import javax.annotation.Nullable;
 
 class WFIExecutionBuilder {
 
-  private List<Trigger> triggerList = new ArrayList<>();
+  private final List<Trigger> triggerList = new ArrayList<>();
   private List<Execution> executionList = new ArrayList<>();
   private List<ExecStatus> executionStatusList = new ArrayList<>();
 
@@ -51,6 +52,7 @@ class WFIExecutionBuilder {
   private TriggerParameters currTriggerParameters = TriggerParameters.zero();
   @Nullable private String currDockerImg;
   @Nullable private String currCommitSha;
+  @Nullable private FlyteExecConf currFlyteExecConf;
   @Nullable private String currRunnerId;
 
   private boolean completed;
@@ -75,6 +77,7 @@ class WFIExecutionBuilder {
         Optional.ofNullable(currExecutionId),
         Optional.ofNullable(currDockerImg),
         Optional.ofNullable(currCommitSha),
+        Optional.ofNullable(currFlyteExecConf),
         Optional.ofNullable(currRunnerId),
         executionStatusList);
     executionList.add(execution);
@@ -83,6 +86,7 @@ class WFIExecutionBuilder {
     currExecutionId = null;
     currDockerImg = null;
     currCommitSha = null;
+    currFlyteExecConf = null;
   }
 
   private void closeTrigger() {
@@ -138,6 +142,9 @@ class WFIExecutionBuilder {
       currWorkflowInstance = workflowInstance;
       currExecutionId = executionId;
       currDockerImg = dockerImage;
+      // Created event are deprecated and we only keep them for reading historic events
+      // Flyte support was added later that the deprecated events
+      currFlyteExecConf = null;
 
       executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
           Optional.empty()));
@@ -148,13 +155,9 @@ class WFIExecutionBuilder {
     public Void submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
         String executionId) {
       currWorkflowInstance = workflowInstance;
-      // TODO: What does this do? Should there be an equivalent for Flyte
-      if(executionDescription.dockerImage().isPresent()) {
-        currDockerImg = executionDescription.dockerImage().get();
-      }
-      if (executionDescription.commitSha().isPresent()) {
-        currCommitSha = executionDescription.commitSha().get();
-      }
+      executionDescription.dockerImage().ifPresent(image -> currDockerImg = image);
+      executionDescription.commitSha().ifPresent(sha -> currCommitSha = sha);
+      executionDescription.flyteExecConf().ifPresent(conf -> currFlyteExecConf = conf);
       currExecutionId = executionId;
 
       return null;

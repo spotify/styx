@@ -23,6 +23,7 @@ package com.spotify.styx.model.data;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
+import com.spotify.styx.model.FlyteExecConf;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,18 +43,43 @@ public abstract class Execution {
   public abstract Optional<String> commitSha();
 
   @JsonProperty
+  public abstract Optional<FlyteExecConf> flyteExecConf();
+
+  @JsonProperty
   public abstract Optional<String> runnerId();
 
   @JsonProperty
   public abstract List<ExecStatus> statuses();
 
+  @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
   @JsonCreator
   public static Execution create(
       @JsonProperty("execution_id") Optional<String> executionId,
       @JsonProperty("docker_image") Optional<String> dockerImage,
       @JsonProperty("commit_sha") Optional<String> commitSha,
+      @JsonProperty("flyte_exec_conf") Optional<FlyteExecConf> flyteExecConf,
       @JsonProperty("runner_id") Optional<String> runnerId,
       @JsonProperty("statuses") List<ExecStatus> statuses) {
-    return new AutoValue_Execution(executionId, dockerImage, commitSha, runnerId, statuses);
+    return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, runnerId, statuses);
+  }
+
+  @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+  public static Execution create(
+      Optional<String> executionId,
+      Optional<String> dockerImage,
+      Optional<String> commitSha,
+      Optional<String> runnerId,
+      List<ExecStatus> statuses) {
+    return create(executionId, dockerImage, commitSha, Optional.empty(), runnerId, statuses);
+  }
+
+
+  @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+  public static Execution create(
+      Optional<String> executionId,
+      Optional<FlyteExecConf> flyteExecConf,
+      Optional<String> runnerId,
+      List<ExecStatus> statuses) {
+    return create(executionId, Optional.empty(), Optional.empty(), flyteExecConf, runnerId, statuses);
   }
 }

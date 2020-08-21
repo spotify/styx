@@ -21,12 +21,14 @@
 package com.spotify.styx.storage;
 
 import static com.spotify.styx.WorkflowInstanceEventFactory.TEST_RUNNER_ID;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import com.spotify.styx.WorkflowInstanceEventFactory;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
@@ -55,16 +57,34 @@ public class WFIExecutionBuilderTest {
       UNKNOWN_TRIGGER1 = com.spotify.styx.state.Trigger.unknown("trig1");
   private static final Set<String> RESOURCE_IDS = Set.of("foo-resource", "bar-resource");
 
-  private ExecutionDescription desc(String dockerImage, String commitSha) {
+  private ExecutionDescription dockerDesc(String dockerImage, String commitSha) {
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .commitSha(commitSha)
         .build();
   }
 
-  private ExecutionDescription desc(String dockerImage) {
+  private ExecutionDescription dockerDesc(String dockerImage) {
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
+        .build();
+  }
+
+  private ExecutionDescription flyteDesc(String name, String version) {
+    return ExecutionDescription.builder()
+        .flyteExecConf(flyteConf(name, version))
+        .build();
+  }
+
+  private FlyteExecConf flyteConf(String name, String version) {
+    return FlyteExecConf.builder()
+        .referenceId(FlyteIdentifier.builder()
+            .resourceType("lp")
+            .project("flytetest")
+            .domain("testing")
+            .name(name)
+            .version(version)
+            .build())
         .build();
   }
 
@@ -153,14 +173,14 @@ public class WFIExecutionBuilderTest {
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
         SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.terminate(RunState.MISSING_DEPS_EXIT_CODE), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
@@ -168,14 +188,14 @@ public class WFIExecutionBuilderTest {
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("09:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("09:55")),
-        SequenceEvent.create(E.submit(desc("img3", "sha3"), "exec-id-10"), c++, ts("09:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img3", "sha3"), "exec-id-10"), c++, ts("09:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("09:56")),
         SequenceEvent.create(E.started(), c++, ts("09:57")),
         SequenceEvent.create(E.terminate(1), c++, ts("09:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("09:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("10:56")),
-        SequenceEvent.create(E.submit(desc("img4", "sha4"), "exec-id-11"), c++, ts("10:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img4", "sha4"), "exec-id-11"), c++, ts("10:55")),
         SequenceEvent.create(E.submitted("exec-id-11"), c++, ts("10:56")),
         SequenceEvent.create(E.started(), c++, ts("10:57"))
     );
@@ -253,12 +273,118 @@ public class WFIExecutionBuilderTest {
   }
 
   @Test
+  public void testGeneralFlyteExample() {
+    long c = 0L;
+    TriggerParameters triggerParameters = TriggerParameters.builder()
+        .env("FOO", "foo",
+            "BAR", "bar")
+        .build();
+    List<SequenceEvent> events = List.of(
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0, triggerParameters), c++, ts("07:55")),
+        SequenceEvent.create(E.info(Message.info("foo bar")), c++, ts("07:55")),
+        SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(flyteDesc("wf1", "1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
+        SequenceEvent.create(E.started(), c++, ts("07:57")),
+        SequenceEvent.create(E.terminate(RunState.MISSING_DEPS_EXIT_CODE), c++, ts("07:58")),
+        SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
+
+        SequenceEvent.create(E.retry(), c++, ts("08:56")),
+        SequenceEvent.create(E.submit(flyteDesc("wf1", "2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
+        SequenceEvent.create(E.started(), c++, ts("08:57")),
+        SequenceEvent.create(E.terminate(0), c++, ts("08:58")),
+        SequenceEvent.create(E.success(), c++, ts("08:59")),
+
+        SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("09:55")),
+        SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("09:55")),
+        SequenceEvent.create(E.submit(flyteDesc("wf1", "3"), "exec-id-10"), c++, ts("09:55")),
+        SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("09:56")),
+        SequenceEvent.create(E.started(), c++, ts("09:57")),
+        SequenceEvent.create(E.terminate(1), c++, ts("09:58")),
+        SequenceEvent.create(E.retryAfter(10), c++, ts("09:59")),
+
+        SequenceEvent.create(E.retry(), c++, ts("10:56")),
+        SequenceEvent.create(E.submit(flyteDesc("wf1", "4"), "exec-id-11"), c++, ts("10:55")),
+        SequenceEvent.create(E.submitted("exec-id-11"), c++, ts("10:56")),
+        SequenceEvent.create(E.started(), c++, ts("10:57"))
+    );
+    assertValidTransitionSequence(events);
+
+    WorkflowInstanceExecutionData workflowInstanceExecutionData =
+        new WFIExecutionBuilder().executionInfo(events);
+    WorkflowInstanceExecutionData expected =
+        WorkflowInstanceExecutionData.create(
+            WORKFLOW_INSTANCE,
+            List.of(
+                Trigger.create(
+                    "trig0",
+                    time("07:55"),
+                    triggerParameters,
+                    true,
+                    List.of(
+                        Execution.create(
+                            Optional.of("exec-id-00"),
+                            Optional.of(flyteConf("wf1", "1")),
+                            Optional.of(TEST_RUNNER_ID),
+                            List.of(
+                                ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("07:58"), "MISSING_DEPS", Optional.empty())
+                            )
+                        ),
+                        Execution.create(
+                            Optional.of("exec-id-01"),
+                            Optional.of(flyteConf("wf1", "2")),
+                            Optional.of(TEST_RUNNER_ID),
+                            List.of(
+                                ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("08:58"), "SUCCESS", Optional.empty())
+                            )
+                        )
+                    )
+                ),
+                Trigger.create(
+                    "trig1",
+                    time("09:55"),
+                    TriggerParameters.zero(),
+                    false,
+                    List.of(
+                        Execution.create(
+                            Optional.of("exec-id-10"),
+                            Optional.of(flyteConf("wf1", "3")),
+                            Optional.of(TEST_RUNNER_ID),
+                            List.of(
+                                ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
+                                ExecStatus.create(time("09:58"), "FAILED", Optional.of("Exit code: 1"))
+                            )
+                        ),
+                        Execution.create(
+                            Optional.of("exec-id-11"),
+                            Optional.of(flyteConf("wf1", "4")),
+                            Optional.of(TEST_RUNNER_ID),
+                            List.of(
+                                ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
+                                ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
+                            )
+                        )
+                    )
+                )
+            )
+        );
+
+    assertThat(workflowInstanceExecutionData, is(expected));
+  }
+
+  @Test
   public void testFailureNoExitCode() {
     long c = 0L;
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.terminate(Optional.empty()), c++, ts("07:58"))
@@ -302,14 +428,14 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57")),
         SequenceEvent.create(E.timeout(), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -362,7 +488,7 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.timeout(), c++, ts("07:54")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.started(), c++, ts("07:57"))
     );
@@ -403,12 +529,12 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59"))
@@ -461,13 +587,13 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.submitted("exec-id-00"), c++, ts("07:56")),
         SequenceEvent.create(E.halt(), c++, ts("07:57")),
 
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER1), c++, ts("08:56")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-10"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img2", "sha2"), "exec-id-10"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-10"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57"))
     );
@@ -527,12 +653,12 @@ public class WFIExecutionBuilderTest {
     List<SequenceEvent> events = List.of(
         SequenceEvent.create(E.triggerExecution(UNKNOWN_TRIGGER0), c++, ts("07:55")),
         SequenceEvent.create(E.dequeue(RESOURCE_IDS), c++, ts("07:55")),
-        SequenceEvent.create(E.submit(desc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img1", "sha1"), "exec-id-00"), c++, ts("07:55")),
         SequenceEvent.create(E.runError("First failure"), c++, ts("07:58")),
         SequenceEvent.create(E.retryAfter(10), c++, ts("07:59")),
 
         SequenceEvent.create(E.retry(), c++, ts("08:56")),
-        SequenceEvent.create(E.submit(desc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
+        SequenceEvent.create(E.submit(dockerDesc("img2", "sha2"), "exec-id-01"), c++, ts("08:55")),
         SequenceEvent.create(E.submitted("exec-id-01"), c++, ts("08:56")),
         SequenceEvent.create(E.started(), c++, ts("08:57")),
         SequenceEvent.create(E.runError("Second failure"), c++, ts("08:59")),
