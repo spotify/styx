@@ -56,6 +56,13 @@ public final class TestData {
   public static final WorkflowInstance WORKFLOW_INSTANCE =
       WorkflowInstance.create(WORKFLOW_ID, "2016-09-01");
 
+  public static final WorkflowConfiguration MINIMAL_WORKFLOW_CONFIGURATION =
+      WorkflowConfiguration.builder()
+          .id("wf")
+          .commitSha(VALID_SHA)
+          .schedule(HOURS)
+          .build();
+
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
@@ -160,6 +167,9 @@ public final class TestData {
                   .build())
               .inputFields("foo", "bar")
               .build())
+          .runningTimeout(Duration.parse("PT20H"))
+          .retryCondition("#tries<2")
+          .env("foo","bar")
           .build();
 
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
