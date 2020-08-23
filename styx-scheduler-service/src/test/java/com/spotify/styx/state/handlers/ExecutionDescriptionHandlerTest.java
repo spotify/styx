@@ -23,7 +23,9 @@ package com.spotify.styx.state.handlers;
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.PREPARE;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.MINIMAL_WORKFLOW_CONFIGURATION;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
@@ -120,7 +122,7 @@ public class ExecutionDescriptionHandlerTest {
   }
 
   @Test
-  public void shouldTransitionIntoSubmitting() throws Exception {
+  public void shouldTransitionDockerWorkflowIntoSubmitting() throws Exception {
     var workflow = Workflow.create("id", workflowConfiguration("--date", "{}", "--bar"));
     var workflowState = WorkflowState.builder().enabled(true).build();
     var workflowWithState = WorkflowWithState.create(workflow, workflowState);
@@ -144,13 +146,46 @@ public class ExecutionDescriptionHandlerTest {
         .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
-    assertThat(executionDescriptionCaptor.getValue().dockerImage().get(), is(DOCKER_IMAGE));
+    assertThat(executionDescriptionCaptor.getValue().dockerImage().orElseThrow(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
     assertThat(executionDescriptionCaptor.getValue().dockerArgs().orElseThrow(), contains("--date", "2016-03"
                                                                                        + "-14", "--bar"));
     assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));
     assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(Optional.of(Duration.ZERO)));
     assertThat(executionDescriptionCaptor.getValue().retryCondition(), is(Optional.of("#tries<2")));
+  }
+
+  @Test
+  public void shouldTransitionFlyteWorkflowIntoSubmitting() throws Exception {
+    var workflow = Workflow.create("id", FLYTE_WORKFLOW_CONFIGURATION);
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    var runState = RunState.create(workflowInstance,
+        PREPARE,
+        StateData.newBuilder().trigger(Trigger.natural()).build(),
+        NOW,
+        COUNTER);
+
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
+
+    toTest.transitionInto(runState, eventRouter);
+
+    verify(eventRouter).receive(eventCaptor.capture(), eq(COUNTER));
+
+    var event = eventCaptor.getValue();
+    event.accept(eventVisitor);
+
+    verify(eventVisitor)
+        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
+
+    assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
+    assertThat(executionDescriptionCaptor.getValue().flyteExecConf(),
+        is(FLYTE_WORKFLOW_CONFIGURATION.flyteExecConf()));
+    assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(FLYTE_WORKFLOW_CONFIGURATION.commitSha().get()));
+    assertThat(executionDescriptionCaptor.getValue().env(), is(FLYTE_WORKFLOW_CONFIGURATION.env()));
+    assertThat(executionDescriptionCaptor.getValue().runningTimeout(), is(FLYTE_WORKFLOW_CONFIGURATION.runningTimeout()));
+    assertThat(executionDescriptionCaptor.getValue().retryCondition(), is(FLYTE_WORKFLOW_CONFIGURATION.retryCondition()));
   }
 
   @Test
@@ -181,10 +216,11 @@ public class ExecutionDescriptionHandlerTest {
   }
 
   @Test
-  public void shouldHaltIfMissingDockerImage() throws Exception {
+  public void shouldHaltIfMissingDockerImageAndFlyteExecDescription() throws Exception {
     var workflowConfiguration =
-        WorkflowConfigurationBuilder.from(workflowConfiguration("foo", "bar"))
+        WorkflowConfigurationBuilder.from(MINIMAL_WORKFLOW_CONFIGURATION)
             .dockerImage(Optional.empty())
+            .flyteExecConf(Optional.empty())
             .build();
     var workflow = Workflow.create("id", workflowConfiguration);
     var workflowState = WorkflowState.builder().enabled(true).build();

@@ -133,7 +133,8 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     final Optional<FlyteExecConf> flyteExecConf = workflow.configuration().flyteExecConf();
 
     if (workflow.configuration().flyteExecConf().isEmpty() && dockerImage.isEmpty()) {
-      throw new MissingRequiredPropertyException(format("%s has no execution configuration, halting %s", workflowId,workflowInstance));
+      throw new MissingRequiredPropertyException(format("%s has no execution configuration, "
+                                                        + "halting %s", workflowId, workflowInstance));
     }
       return ExecutionDescription.builder()
         .dockerImage(dockerImage)
