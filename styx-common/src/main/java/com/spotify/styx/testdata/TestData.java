@@ -151,22 +151,24 @@ public final class TestData {
           .retryCondition("#exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == \"natural\"")
           .build();
 
+  public static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
+      .referenceId(FlyteIdentifier.builder()
+          .resourceType("lp")
+          .project("flyte-test")
+          .domain("production")
+          .name("test-workflow")
+          .version("1.0")
+          .build())
+      .inputFields("foo", "bar")
+      .build();
+
   public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
           .commitSha(VALID_SHA)
           .schedule(DAYS)
           .serviceAccount("foo@bar.baz.quux")
-          .flyteExecConf(FlyteExecConf.builder()
-              .referenceId(FlyteIdentifier.builder()
-                  .resourceType("lp")
-                  .project("flyte-test")
-                  .domain("production")
-                  .name("test-workflow")
-                  .version("1.0")
-                  .build())
-              .inputFields("foo", "bar")
-              .build())
+          .flyteExecConf(FLYTE_EXEC_CONF)
           .runningTimeout(Duration.parse("PT20H"))
           .retryCondition("#tries<2")
           .env("foo","bar")
@@ -196,16 +198,8 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .build();
 
-  public static final ExecutionDescription FLYTE_EXECUTION_DESCRIPTION = ExecutionDescription.builder().flyteExecConf(FlyteExecConf.builder()
-      .referenceId(FlyteIdentifier.builder()
-          .resourceType("lp")
-          .project("flyte-test")
-          .domain("production")
-          .name("test-workflow")
-          .version("0.9")
-          .build())
-      .inputFields("foo", "bar")
-      .build()).build();
+  public static final ExecutionDescription FLYTE_EXECUTION_DESCRIPTION =
+      ExecutionDescription.builder().flyteExecConf(FLYTE_EXEC_CONF).build();
 
   public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
