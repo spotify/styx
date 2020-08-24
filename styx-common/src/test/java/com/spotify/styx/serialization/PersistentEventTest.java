@@ -22,6 +22,8 @@ package com.spotify.styx.serialization;
 
 import static com.spotify.styx.serialization.Json.deserializeEvent;
 import static com.spotify.styx.serialization.Json.serialize;
+import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
+import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -83,6 +85,7 @@ public class PersistentEventTest {
     assertRoundtrip(Event.timeout(INSTANCE1));
     assertRoundtrip(Event.halt(INSTANCE1));
     assertRoundtrip(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME));
+    assertRoundtrip(Event.submit(INSTANCE1, FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID));
     assertRoundtrip(Event.submitted(INSTANCE1, POD_NAME, RUNNER_ID));
   }
 
@@ -114,6 +117,29 @@ public class PersistentEventTest {
                                                + "\"}, "
                                                + "\"execution_id\": \"" + POD_NAME + "\"")),
         is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME)));
+    assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
+                                               + "\"flyte_exec_conf\":{"
+                                               + "\"reference_id\":{"
+                                               + "\"resource_type\":\"lp\","
+                                               + "\"project\":\"flyte-test\","
+                                               + "\"domain\":\"production\","
+                                               + "\"name\":\"test-workflow\","
+                                               + "\"version\":1.0"
+                                               + "},"
+                                               + "\"input_fields\":{\"foo\": \"bar\"}}}")),
+        is(Event.submit(INSTANCE1, FLYTE_EXECUTION_DESCRIPTION, null)));
+    assertThat(deserializeEvent(json("submit", "\"execution_description\":{"
+                                               + "\"flyte_exec_conf\":{"
+                                                 + "\"reference_id\":{"
+                                                 + "\"resource_type\":\"lp\","
+                                                 + "\"project\":\"flyte-test\","
+                                                 + "\"domain\":\"production\","
+                                                 + "\"name\":\"test-workflow\","
+                                                 + "\"version\":1.0"
+                                                 + "},"
+                                               + "\"input_fields\":{\"foo\": \"bar\"}}},"
+                                               + "\"execution_id\": \"" + EXECUTION_ID + "\"")),
+        is(Event.submit(INSTANCE1, FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID)));
     assertThat(
         deserializeEvent(json("info", "\"message\":{\"line\":\"InfoMessage\",\"level\":\"INFO\"}")),
         is(Event.info(INSTANCE1, Message.info("InfoMessage"))));
