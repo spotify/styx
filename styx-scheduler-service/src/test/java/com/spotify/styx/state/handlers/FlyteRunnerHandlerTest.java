@@ -33,6 +33,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import java.io.IOException;
+import java.util.Optional;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -83,7 +84,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(eventRouter).receive(Event.terminate(WORKFLOW_INSTANCE, STATIC_EXIT_CODE),
+    verify(eventRouter).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(STATIC_EXIT_CODE)),
         runState.counter());
   }
 
