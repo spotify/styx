@@ -190,7 +190,7 @@ public class SchedulerResource {
     }
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
     if (workflow.configuration().dockerImage().isEmpty() && workflow.configuration().flyteExecConf().isEmpty()) {
-      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing run "
+      return Response.forStatus(BAD_REQUEST.withReasonPhrase("Workflow is missing execution "
                                                              + "configuration"));
     }
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);

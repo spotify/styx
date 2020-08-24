@@ -32,7 +32,6 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,10 +103,9 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
     final var executionDescription = state.data().executionDescription().orElseThrow();
     final var executionId = state.data().executionId().orElseThrow();
     final var dockerImage = executionDescription.dockerImage().orElseThrow();
-    final var dockerArgs = executionDescription.dockerArgs().orElse(Collections.emptyList());
+    final var dockerArgs = executionDescription.dockerArgs();
     final var parameter = state.workflowInstance().parameter();
     final var command = argsReplace(dockerArgs, parameter);
-
     return RunSpec.builder()
         .executionId(executionId)
         .imageName(dockerImage)

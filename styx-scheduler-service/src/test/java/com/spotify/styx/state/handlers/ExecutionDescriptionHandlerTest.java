@@ -117,7 +117,7 @@ public class ExecutionDescriptionHandlerTest {
 
     assertThat(executionIdCaptor.getValue(), startsWith("styx-run-"));
     assertThat(executionDescriptionCaptor.getValue().dockerImage().orElseThrow(), is(DOCKER_IMAGE));
-    assertThat(executionDescriptionCaptor.getValue().dockerArgs().orElseThrow(), hasSize(0));
+    assertThat(executionDescriptionCaptor.getValue().dockerArgs(), hasSize(0));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
   }
 
@@ -149,7 +149,7 @@ public class ExecutionDescriptionHandlerTest {
     assertThat(executionDescriptionCaptor.getValue().dockerImage().orElseThrow(), is(DOCKER_IMAGE));
     assertThat(executionDescriptionCaptor.getValue().commitSha(), isPresentAndIs(COMMIT_SHA));
     assertThat(
-        executionDescriptionCaptor.getValue().dockerArgs().orElseThrow(), 
+        executionDescriptionCaptor.getValue().dockerArgs(),
         contains("--date", "2016-03-14", "--bar")
     );
     assertThat(executionDescriptionCaptor.getValue().env(), is(Map.of("foo", "bar")));

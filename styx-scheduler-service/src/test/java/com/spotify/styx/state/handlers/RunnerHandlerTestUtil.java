@@ -44,7 +44,7 @@ class RunnerHandlerTestUtil {
     // no instantiation
   }
 
-  protected static void shouldHaltIfMissingExecutionId(RunState.State state,
+  static void shouldHaltIfMissingExecutionId(RunState.State state,
                                                        ExecutionDescription executionDescription,
                                                        EventRouter eventRouter,
                                                        OutputHandler handler) {
@@ -58,7 +58,7 @@ class RunnerHandlerTestUtil {
     verifyNoMoreInteractions(eventRouter);
   }
 
-  protected static void shouldHaltIfMissingExecutionDescription(RunState.State state,
+  static void shouldHaltIfMissingExecutionDescription(RunState.State state,
                                                                 EventRouter eventRouter,
                                                                 OutputHandler handler) {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
@@ -71,7 +71,7 @@ class RunnerHandlerTestUtil {
     verifyNoMoreInteractions(eventRouter);
   }
 
-  protected static void shouldTransitionIntoSubmitted(ExecutionDescription executionDescription,
+  static void shouldTransitionIntoSubmitted(ExecutionDescription executionDescription,
                                                       EventRouter eventRouter,
                                                       OutputHandler handler,
                                                       String runnerId)

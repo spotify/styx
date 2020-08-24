@@ -533,7 +533,8 @@ public class SchedulerResourceTest {
     final WorkflowConfiguration workflowConfiguration =
         WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
             .dockerImage(Optional.empty())
-            .flyteExecConf(Optional.empty()).build();
+            .flyteExecConf(Optional.empty())
+            .build();
     final Workflow workflow = Workflow.create("styx", workflowConfiguration);
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
     TriggerRequest toTrigger = TriggerRequest.of(workflow.id(), "2015-12-31");
@@ -541,7 +542,7 @@ public class SchedulerResourceTest {
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing run "
+               is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing execution "
                                                       + "configuration")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
