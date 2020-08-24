@@ -59,7 +59,6 @@ class RunnerHandlerTestUtil {
   }
 
   public static void _shouldHaltIfMissingExecutionDescription(RunState.State state,
-                                                              ExecutionDescription executionDescription,
                                                               EventRouter eventRouter,
                                                               OutputHandler handler) {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
