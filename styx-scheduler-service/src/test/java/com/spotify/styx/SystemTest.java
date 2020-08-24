@@ -21,6 +21,7 @@
 package com.spotify.styx;
 
 import static com.spotify.styx.model.WorkflowInstance.create;
+import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
@@ -175,6 +176,41 @@ public class SystemTest extends StyxSchedulerServiceFixture {
     assertThat(workflowInstance.workflowId(), is(HOURLY_WORKFLOW.id()));
     assertThat(workflowInstance.parameter(), is("2016-03-14T15:15:00Z"));
   }
+  }
+
+  public static class ShouldRunFlyteWorkflowToCompletion extends SystemTest {
+    @Test
+    public void shouldRunFlyteWorkflowToCompletion() throws Exception {
+      Workflow wf = Workflow.create(
+          "comp",
+          WorkflowConfiguration.builder()
+              .id("flyte-wf")
+              .schedule(Schedule.parse("15,45 12,15 * * *"))
+              .flyteExecConf(FLYTE_EXEC_CONF)
+              .build());
+
+      System.out.println(Schedule.parse("45 12 * * *"));
+      givenTheTimeIs("2016-03-14T15:30:00Z");
+      givenWorkflow(wf);
+      givenWorkflowEnabledStateIs(wf, true);
+      givenNextNaturalTrigger(wf, "2016-03-14T12:45:00Z");
+
+      WorkflowInstance wfi =
+          create(wf.id(), "2016-03-14T12:45:00Z");
+      styxStarts();
+      tickTriggerManager();
+
+      final SequenceEvent expectedEvent =
+          SequenceEvent.create(
+              Event.triggerExecution(wfi, Trigger.natural(), TriggerParameters.zero()),
+              0,
+              Instant.parse("2016-03-14T15:30:00Z").toEpochMilli());
+
+      awaitUntilConsumedEvent(expectedEvent, RunState.State.QUEUED);
+      tickScheduler();
+      awaitWorkflowInstanceCompletion(wfi);
+      assertThat(getState(wfi), is(Optional.empty()));
+    }
   }
 
   @RunWith(JUnitParamsRunner.class)
