@@ -21,9 +21,6 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.model.Schedule.HOURS;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionDescription;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionId;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldTransitionIntoSubmitted;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -129,7 +126,8 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    _shouldTransitionIntoSubmitted(EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler, TEST_RUNNER_ID);
+    RunnerHandlerTestUtil
+        .shouldTransitionIntoSubmitted(EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler, TEST_RUNNER_ID);
   }
 
   @Test
@@ -164,13 +162,14 @@ public class DockerRunnerHandlerTest {
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
-    _shouldHaltIfMissingExecutionDescription(state, eventRouter, dockerRunnerHandler);
+    RunnerHandlerTestUtil
+        .shouldHaltIfMissingExecutionDescription(state, eventRouter, dockerRunnerHandler);
   }
 
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionId(State state) {
-    _shouldHaltIfMissingExecutionId(state, EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler);
+    RunnerHandlerTestUtil.shouldHaltIfMissingExecutionId(state, EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler);
   }
 
   @Parameters({"SUBMITTED", "RUNNING"})

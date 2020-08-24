@@ -136,7 +136,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       throw new MissingRequiredPropertyException(format("%s has no execution configuration, "
                                                         + "halting %s", workflowId, workflowInstance));
     }
-      return ExecutionDescription.builder()
+    return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .dockerArgs(command)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())

@@ -185,11 +185,10 @@ public class SystemTest extends StyxSchedulerServiceFixture {
           "comp",
           WorkflowConfiguration.builder()
               .id("flyte-wf")
-              .schedule(Schedule.parse("15,45 12,15 * * *"))
+              .schedule(Schedule.parse("45 12 * * *"))
               .flyteExecConf(FLYTE_EXEC_CONF)
               .build());
 
-      System.out.println(Schedule.parse("45 12 * * *"));
       givenTheTimeIs("2016-03-14T15:30:00Z");
       givenWorkflow(wf);
       givenWorkflowEnabledStateIs(wf, true);

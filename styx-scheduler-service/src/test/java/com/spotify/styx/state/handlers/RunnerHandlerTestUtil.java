@@ -44,10 +44,10 @@ class RunnerHandlerTestUtil {
     // no instantiation
   }
 
-  public static void _shouldHaltIfMissingExecutionId(RunState.State state,
-                                                     ExecutionDescription executionDescription,
-                                                     EventRouter eventRouter,
-                                                     OutputHandler handler) {
+  protected static void shouldHaltIfMissingExecutionId(RunState.State state,
+                                                       ExecutionDescription executionDescription,
+                                                       EventRouter eventRouter,
+                                                       OutputHandler handler) {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
         .executionDescription(executionDescription)
         .build(), NOW, COUNTER);
@@ -58,9 +58,9 @@ class RunnerHandlerTestUtil {
     verifyNoMoreInteractions(eventRouter);
   }
 
-  public static void _shouldHaltIfMissingExecutionDescription(RunState.State state,
-                                                              EventRouter eventRouter,
-                                                              OutputHandler handler) {
+  protected static void shouldHaltIfMissingExecutionDescription(RunState.State state,
+                                                                EventRouter eventRouter,
+                                                                OutputHandler handler) {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .build(), NOW, COUNTER);
@@ -71,10 +71,10 @@ class RunnerHandlerTestUtil {
     verifyNoMoreInteractions(eventRouter);
   }
 
-  public static void _shouldTransitionIntoSubmitted(ExecutionDescription executionDescription,
-                                                   EventRouter eventRouter,
-                                                   OutputHandler handler,
-                                                    String runnerId)
+  protected static void shouldTransitionIntoSubmitted(ExecutionDescription executionDescription,
+                                                      EventRouter eventRouter,
+                                                      OutputHandler handler,
+                                                      String runnerId)
       throws IsClosedException {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
         .executionId(EXECUTION_ID)

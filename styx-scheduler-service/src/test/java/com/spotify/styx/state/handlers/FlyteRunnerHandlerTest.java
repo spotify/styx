@@ -22,9 +22,6 @@ package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_EXIT_CODE;
 import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_RUNNER_ID;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionDescription;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldHaltIfMissingExecutionId;
-import static com.spotify.styx.state.handlers.RunnerHandlerTestUtil._shouldTransitionIntoSubmitted;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
@@ -59,7 +56,8 @@ public class FlyteRunnerHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    _shouldTransitionIntoSubmitted(FLYTE_EXECUTION_DESCRIPTION, eventRouter, flyteRunnerHandler,
+    RunnerHandlerTestUtil
+        .shouldTransitionIntoSubmitted(FLYTE_EXECUTION_DESCRIPTION, eventRouter, flyteRunnerHandler,
         STATIC_RUNNER_ID);
   }
 
@@ -92,14 +90,15 @@ public class FlyteRunnerHandlerTest {
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
-    _shouldHaltIfMissingExecutionDescription(state, eventRouter,
+    RunnerHandlerTestUtil.shouldHaltIfMissingExecutionDescription(state, eventRouter,
         flyteRunnerHandler);
   }
 
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionId(State state) {
-    _shouldHaltIfMissingExecutionId(state, FLYTE_EXECUTION_DESCRIPTION, eventRouter,
+    RunnerHandlerTestUtil
+        .shouldHaltIfMissingExecutionId(state, FLYTE_EXECUTION_DESCRIPTION, eventRouter,
         flyteRunnerHandler);
   }
 }
