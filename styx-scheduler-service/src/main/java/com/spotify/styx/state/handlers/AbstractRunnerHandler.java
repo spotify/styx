@@ -31,8 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An abstract {@link OutputHandler}  starts docker runs on
- * {@link RunState.State#SUBMITTED} transitions
+ * An abstract {@link OutputHandler} that verify that {@link RunState} contains {@code executionId} and
+ * {@code executionDescription} before delegating transitioning to sub-classes.
  */
 abstract class AbstractRunnerHandler implements OutputHandler {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractRunnerHandler.class);
@@ -64,9 +64,12 @@ abstract class AbstractRunnerHandler implements OutputHandler {
         if(!applicableFn.test(maybeExecutionDescription.orElseThrow())) {
           return;
         }
-    }
 
-    safeTransitionInto(state, eventRouter);
+        safeTransitionInto(state, eventRouter);
+
+      default:
+        // Any other state we just return as RunnerHandlers only care about SUBMITTING, SUBMITTED and RUNNING
+    }
   }
 
   /**
