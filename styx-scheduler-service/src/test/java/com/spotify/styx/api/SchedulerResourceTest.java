@@ -21,7 +21,6 @@
 package com.spotify.styx.api;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
-import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
@@ -330,16 +329,6 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerShouldFailForFlyteWorkflow() throws Exception {
-    final Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(
-        TriggerRequest.of(FLYTE_WORKFLOW.id(), "2014-12-31"));
-
-    assertThat(response, hasStatus(withCode(BAD_REQUEST)));
-
-    verifyZeroInteractions(triggerListener);
-  }
-
-  @Test
   public void testTriggeredWorkflowGeneratesTrigger() throws Exception {
     when(storage.workflow(HOURLY_WORKFLOW.id())).thenReturn(Optional.of(HOURLY_WORKFLOW));
     TriggerParameters expectedParameters = TriggerParameters.zero();
@@ -392,6 +381,19 @@ public class SchedulerResourceTest {
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2015-12-28T00:00:00.000Z");
     verify(triggerListener).event(eq(WEEKLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
+  }
+
+  @Test
+  public void testTriggerFlyteWorkflowInstance() throws Exception {
+    when(storage.workflow(FLYTE_WORKFLOW.id())).thenReturn(Optional.of(FLYTE_WORKFLOW));
+    TriggerParameters expectedParameters = TriggerParameters.zero();
+    TriggerRequest toTrigger = TriggerRequest.of(FLYTE_WORKFLOW.id(), "2014-12-31");
+
+    Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
+
+    assertThat(response.status(), is(Status.OK));
+    final Instant expectedInstant = Instant.parse("2014-12-31T00:00:00.00Z");
+    verify(triggerListener).event(eq(FLYTE_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
   }
 
   @Test
@@ -527,10 +529,11 @@ public class SchedulerResourceTest {
   }
 
   @Test
-  public void testTriggerMissingImage() throws Exception {
+  public void testTriggerMissingImageAndFlyteExecConfig() throws Exception {
     final WorkflowConfiguration workflowConfiguration =
         WorkflowConfigurationBuilder.from(FULL_DAILY_WORKFLOW.configuration())
-            .dockerImage(Optional.empty()).build();
+            .dockerImage(Optional.empty())
+            .flyteExecConf(Optional.empty()).build();
     final Workflow workflow = Workflow.create("styx", workflowConfiguration);
     when(storage.workflow(workflow.id())).thenReturn(Optional.of(workflow));
     TriggerRequest toTrigger = TriggerRequest.of(workflow.id(), "2015-12-31");
@@ -538,7 +541,8 @@ public class SchedulerResourceTest {
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
 
     assertThat(response.status(),
-               is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
+               is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing run "
+                                                      + "configuration")));
     assertThat(triggeredWorkflow, isEmpty());
     assertThat(triggeredInstant, isEmpty());
   }
