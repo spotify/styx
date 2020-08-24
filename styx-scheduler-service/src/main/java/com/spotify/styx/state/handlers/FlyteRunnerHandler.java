@@ -29,37 +29,26 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FlyteRunnerHandler implements OutputHandler {
+/**
+ * A dummy, for now, {@link OutputHandler} for triggering Flyte's launch plans.
+ */
+public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
   public static final String STATIC_RUNNER_ID = "replace-me";
-  public static final Optional<Integer> STATIC_EXIT_CODE = Optional.of(0);
+  public static final int STATIC_EXIT_CODE = 0;
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteRunnerHandler.class);
 
+  public FlyteRunnerHandler() {
+    super(desc -> desc.flyteExecConf().isPresent());
+  }
+
   @Override
-  public void transitionInto(final RunState state, final EventRouter eventRouter) {
-    switch (state.state()) {
-      case SUBMITTING:
-      case SUBMITTED:
-      case RUNNING:
-        if (state.data().executionDescription().isEmpty()) {
-          LOG.error("Unable to start procedure. Missing execution description for " + state.workflowInstance());
-          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
-          return;
-        }
-        if (state.data().executionId().isEmpty()) {
-          LOG.error("Unable to start procedure. Missing execution id for " + state.workflowInstance());
-          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
-          return;
-        }
-        if(state.data().executionDescription().get().flyteExecConf().isEmpty()) {
-          return;
-        }
-    }
+  public void safeTransitionInto(final RunState state, final EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
         LOG.info("Start flyte exec");
-        final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().get(),
+        final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().orElseThrow(),
             STATIC_RUNNER_ID);
         try {
           LOG.info("Issue submitted event");
@@ -69,7 +58,7 @@ public class FlyteRunnerHandler implements OutputHandler {
         }
         break;
       case SUBMITTED:
-        final Event started = Event.started(state.workflowInstance());
+        final var started = Event.started(state.workflowInstance());
         try {
           LOG.info("Issue started event");
           eventRouter.receive(started, state.counter());
@@ -79,7 +68,7 @@ public class FlyteRunnerHandler implements OutputHandler {
         break;
       case RUNNING:
         LOG.info("Polling state");
-        final Event terminate = Event.terminate(state.workflowInstance(), STATIC_EXIT_CODE);
+        final var terminate = Event.terminate(state.workflowInstance(), Optional.of(STATIC_EXIT_CODE));
         try {
           LOG.info("Issue terminate event");
           eventRouter.receive(terminate, state.counter());

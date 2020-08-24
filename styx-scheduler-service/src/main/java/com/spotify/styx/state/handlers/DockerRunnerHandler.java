@@ -32,24 +32,21 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
-import com.spotify.styx.util.ResourceNotFoundException;
 import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * An {@link OutputHandler} that starts docker runs on {@link RunState.State#SUBMITTED} transitions
  */
-public class DockerRunnerHandler implements OutputHandler {
+public class DockerRunnerHandler extends AbstractRunnerHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(DockerRunnerHandler.class);
 
   private final DockerRunner dockerRunner;
 
-  public DockerRunnerHandler(
-      DockerRunner dockerRunner) {
+  public DockerRunnerHandler(DockerRunner dockerRunner) {
+    super(desc -> desc.dockerImage().isPresent());
     this.dockerRunner = requireNonNull(dockerRunner);
   }
 
@@ -58,35 +55,10 @@ public class DockerRunnerHandler implements OutputHandler {
   }
 
   @Override
-  public void transitionInto(RunState state, EventRouter eventRouter) {
+  public void safeTransitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
-      case SUBMITTED:
-      case RUNNING:
-        if (state.data().executionDescription().isEmpty()) {
-          LOG.error("Unable to start procedure. Missing execution description for " + state.workflowInstance());
-          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
-          return;
-        }
-        if (state.data().executionId().isEmpty()) {
-          LOG.error("Unable to start procedure. Missing execution id for " + state.workflowInstance());
-          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
-          return;
-        }
-        if(state.data().executionDescription().get().flyteExecConf().isPresent()) {
-          return;
-        }
-    }
-    switch (state.state()) {
-      case SUBMITTING:
-        final RunSpec runSpec;
-        try {
-          runSpec = createRunSpec(state);
-        } catch (ResourceNotFoundException e) {
-          LOG.error("Unable to start docker procedure.", e);
-          eventRouter.receiveIgnoreClosed(Event.halt(state.workflowInstance()), state.counter());
-          return;
-        }
+        final var runSpec = createRunSpec(state);
 
         final String runnerId;
         try {
@@ -94,7 +66,7 @@ public class DockerRunnerHandler implements OutputHandler {
           runnerId = dockerRunner.start(state, runSpec);
         } catch (Throwable e) {
           try {
-            final String msg = "Failed the docker starting procedure for " + state.workflowInstance();
+            final var msg = "Failed the docker starting procedure for " + state.workflowInstance();
             if (isUserError(e)) {
               LOG.info("{}: {}", msg, e.getMessage());
             } else {
@@ -108,7 +80,7 @@ public class DockerRunnerHandler implements OutputHandler {
         }
 
         // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
-        final Event submitted = Event.submitted(state.workflowInstance(), runSpec.executionId(), runnerId);
+        final var submitted = Event.submitted(state.workflowInstance(), runSpec.executionId(), runnerId);
         try {
           eventRouter.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {
@@ -128,19 +100,14 @@ public class DockerRunnerHandler implements OutputHandler {
     }
   }
 
-  private RunSpec createRunSpec(RunState state) throws ResourceNotFoundException {
-    final Optional<ExecutionDescription> executionDescriptionOpt = state.data().executionDescription();
+  private RunSpec createRunSpec(RunState state) {
+    final var executionDescription = state.data().executionDescription().orElseThrow();
+    final var executionId = state.data().executionId().orElseThrow();
+    final var dockerImage = executionDescription.dockerImage().orElseThrow();
+    final var dockerArgs = executionDescription.dockerArgs().orElse(Collections.emptyList());
+    final var parameter = state.workflowInstance().parameter();
+    final var command = argsReplace(dockerArgs, parameter);
 
-    final ExecutionDescription executionDescription = executionDescriptionOpt.orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution description for " + state.workflowInstance()));
-
-    final String executionId = state.data().executionId().orElseThrow(
-        () -> new ResourceNotFoundException("Missing execution id for " + state.workflowInstance()));
-
-    final String dockerImage = executionDescription.dockerImage().get();
-    final List<String> dockerArgs = executionDescription.dockerArgs().orElse(Collections.emptyList());
-    final String parameter = state.workflowInstance().parameter();
-    final List<String> command = argsReplace(dockerArgs, parameter);
     return RunSpec.builder()
         .executionId(executionId)
         .imageName(dockerImage)
