@@ -30,7 +30,7 @@ import java.util.Optional;
 public interface ExecutionDescription {
 
   Optional<String> dockerImage();
-  Optional<List<String>> dockerArgs();
+  List<String> dockerArgs();
   boolean dockerTerminationLogging();
   Optional<WorkflowConfiguration.Secret> secret();
   Optional<String> serviceAccount();

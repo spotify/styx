@@ -47,35 +47,39 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
   public void safeTransitionInto(final RunState state, final EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
-        LOG.info("Start flyte exec");
+        LOG.info("Entered state SUBMITTING for: " + state.workflowInstance());
         final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().orElseThrow(),
             STATIC_RUNNER_ID);
         try {
-          LOG.info("Issue submitted event");
+          LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
           eventRouter.receive(submitted, state.counter());
         } catch (IsClosedException isClosedException) {
-          LOG.warn("Could not emit 'submitted' event", isClosedException);
+          LOG.warn("Could not emit 'submitted' event for: " + state.workflowInstance(),
+              isClosedException);
         }
         break;
       case SUBMITTED:
+        LOG.info("Entered state SUBMITTED for: " + state.workflowInstance());
         final var started = Event.started(state.workflowInstance());
         try {
-          LOG.info("Issue started event");
+          LOG.info("Issue 'started' event for: " + state.workflowInstance());
           eventRouter.receive(started, state.counter());
         } catch (IsClosedException isClosedException) {
-          LOG.warn("Could not emit 'started' event", isClosedException);
+          LOG.warn("Could not emit 'started' event for: " + state.workflowInstance(),
+              isClosedException);
         }
         break;
       case RUNNING:
-        LOG.info("Polling state");
+        LOG.info("Entered state RUNNING for: " + state.workflowInstance());
         final var terminate = Event.terminate(state.workflowInstance(), Optional.of(STATIC_EXIT_CODE));
         try {
-          LOG.info("Issue terminate event");
+          LOG.info("Issue 'terminate' event for: " + state.workflowInstance());
           eventRouter.receive(terminate, state.counter());
         } catch (IsClosedException isClosedException) {
-          LOG.warn("Could not emit 'started' event", isClosedException);
+          LOG.warn("Could not emit 'terminate' event for: " + state.workflowInstance(),
+              isClosedException);
         }
-        LOG.info("Done");
+        break;
       default:
         // do nothing
     }
