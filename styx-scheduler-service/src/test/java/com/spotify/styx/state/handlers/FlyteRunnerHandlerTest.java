@@ -92,7 +92,7 @@ public class FlyteRunnerHandlerTest {
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
-    _shouldHaltIfMissingExecutionDescription(state, FLYTE_EXECUTION_DESCRIPTION, eventRouter,
+    _shouldHaltIfMissingExecutionDescription(state, eventRouter,
         flyteRunnerHandler);
   }
 

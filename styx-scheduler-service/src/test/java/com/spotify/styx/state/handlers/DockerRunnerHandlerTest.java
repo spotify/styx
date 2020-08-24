@@ -164,7 +164,7 @@ public class DockerRunnerHandlerTest {
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
-    _shouldHaltIfMissingExecutionDescription(state, EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler);
+    _shouldHaltIfMissingExecutionDescription(state, eventRouter, dockerRunnerHandler);
   }
 
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
