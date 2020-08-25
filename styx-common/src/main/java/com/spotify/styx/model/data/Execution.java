@@ -60,6 +60,12 @@ public abstract class Execution {
       @JsonProperty("flyte_exec_conf") Optional<FlyteExecConf> flyteExecConf,
       @JsonProperty("runner_id") Optional<String> runnerId,
       @JsonProperty("statuses") List<ExecStatus> statuses) {
+    if (dockerImage.isPresent() && flyteExecConf.isPresent()) {
+      throw new IllegalArgumentException(
+          "Conflicting configuration: Both docker image and flyte conf specified for exec id: "
+          + executionId.orElse("unknown")
+      );
+    }
     return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, runnerId, statuses);
   }
 

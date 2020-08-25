@@ -21,6 +21,7 @@
 package com.spotify.styx.model.data;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
@@ -109,5 +110,24 @@ public class ExecutionTest {
     var actualExecution = Json.deserialize(ByteString.encodeUtf8(json), Execution.class);
 
     assertEquals(expectedExecution, actualExecution);
+  }
+
+  @Test
+  public void shouldNotBePossibleToCreateExecutionForDockerAndFlyte() {
+    var exception = assertThrows(IllegalArgumentException.class, () ->
+        Execution.create(
+            Optional.of("123"),
+            Optional.of("busybox"),
+            Optional.of("1"),
+            Optional.of(FLYTE_EXEC_CONF),
+            Optional.of("1"),
+            STATUS_LIST
+        )
+    );
+
+    assertEquals(
+        "Conflicting configuration: Both docker image and flyte conf specified for exec id: 123",
+        exception.getMessage()
+    );
   }
 }
