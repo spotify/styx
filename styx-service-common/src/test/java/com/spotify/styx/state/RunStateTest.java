@@ -32,10 +32,10 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -695,5 +695,37 @@ public class RunStateTest {
 
     assertThat(transitioner.get(WORKFLOW_INSTANCE).state(), equalTo(FAILED));
     assertThat(transitioner.get(WORKFLOW_INSTANCE).data().resourceIds(), isEmpty());
+  }
+
+  @Test
+  public void testExecutionDescriptionIsPersistedThroughTransitions() {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow(),
+        equalTo(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow(),
+        equalTo(EXECUTION_DESCRIPTION));
+    transitioner.receive(eventFactory.started());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionDescription().orElseThrow(),
+        equalTo(EXECUTION_DESCRIPTION));
+  }
+
+  @Test
+  public void testExecutionIdIsPersistedThroughTransitions() {
+    transitioner.initialize(RunState.fresh(WORKFLOW_INSTANCE));
+    transitioner.receive(eventFactory.triggerExecution(UNKNOWN_TRIGGER));
+    transitioner.receive(eventFactory.dequeue(ImmutableSet.of()));
+    transitioner.receive(eventFactory.submit(EXECUTION_DESCRIPTION, TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(),
+        equalTo(TEST_EXECUTION_ID_1));
+    transitioner.receive(eventFactory.submitted(TEST_EXECUTION_ID_1));
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(),
+        equalTo(TEST_EXECUTION_ID_1));
+    transitioner.receive(eventFactory.started());
+    assertThat(transitioner.get(WORKFLOW_INSTANCE).data().executionId().orElseThrow(),
+        equalTo(TEST_EXECUTION_ID_1));
   }
 }
