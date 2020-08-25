@@ -39,8 +39,7 @@ import org.junit.Test;
 public class ScheduledTriggeringIT extends EndToEndTestBase {
 
   @Test
-  public void testScheduledTriggering() throws Exception {
-
+  public void testScheduledTriggeringForDockerWorkflow() throws Exception {
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,
@@ -48,6 +47,30 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
         "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "{}")));
+    testScheduledTriggering(workflowJson);
+  }
+
+  @Test
+  public void testScheduledTriggeringForFlyteWorkflow() throws Exception {
+    // Generate workflow configuration
+    var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
+        "id", workflowId1,
+        "schedule", "* * * * *",
+        "service_account", workflowServiceAccount.getEmail(),
+        "flyte_exec_conf", "{"
+                           + "  \"reference_id\":{"
+                           + "    \"resource_type\":\"launch-plan\","
+                           + "    \"domain\":\"production\","
+                           + "    \"project\":\"flyte-test\","
+                           + "    \"name\":\"TestWorkflow\","
+                           + "    \"version\":\"1.0\""
+                           + "  },"
+                           + "  \"input_fields\":{\"foo\": \"bar\"}"
+                           + "}"));
+    testScheduledTriggering(workflowJson);
+  }
+
+  private void testScheduledTriggering(String workflowJson) throws Exception {
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
