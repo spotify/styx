@@ -20,13 +20,20 @@
 
 package com.spotify.styx.flyte.client;
 
+import static com.spotify.styx.flyte.client.FlyteAdminClientTest.DOMAIN;
+import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
+
+import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.stub.StreamObserver;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
-  static final String WF_EXECUTION_ID = "wf_execution_id_1";
+  static final String WF_EXECUTION_ID_1 = "wf_execution_id_1";
+  static final String WF_EXECUTION_ID_2 = "wf_execution_id_2";
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
@@ -37,8 +44,69 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .newBuilder()
             .setDomain(request.getDomain())
             .setProject(request.getProject())
-            .setName(WF_EXECUTION_ID)
+            .setName(WF_EXECUTION_ID_1)
             .build())
+        .build());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void getExecution(final ExecutionOuterClass.WorkflowExecutionGetRequest request,
+                           final StreamObserver<ExecutionOuterClass.Execution> responseObserver) {
+    responseObserver.onNext(ExecutionOuterClass.Execution
+        .newBuilder()
+        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+            .newBuilder()
+            .setProject(request.getId().getProject())
+            .setDomain(request.getId().getDomain())
+            .setName(WF_EXECUTION_ID_1)
+            .build())
+        .build());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void terminateExecution(final ExecutionOuterClass.ExecutionTerminateRequest request,
+                                 final StreamObserver<ExecutionOuterClass.ExecutionTerminateResponse> responseObserver) {
+    responseObserver.onNext(ExecutionOuterClass.ExecutionTerminateResponse.getDefaultInstance());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void listExecutions(final Common.ResourceListRequest request,
+                             final StreamObserver<ExecutionOuterClass.ExecutionList> responseObserver) {
+    final var executions = List.of(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+                .newBuilder()
+                .setProject(PROJECT)
+                .setDomain(DOMAIN)
+                .setName(WF_EXECUTION_ID_1)
+                .build())
+            .build(),
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+                .newBuilder()
+                .setProject(PROJECT)
+                .setDomain(DOMAIN)
+                .setName(WF_EXECUTION_ID_2))
+            .build(),
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+                .newBuilder()
+                .setProject("other_project")
+                .setDomain("other_domain")
+                .setName("other_name"))
+            .build()
+    );
+    responseObserver.onNext(ExecutionOuterClass.ExecutionList.newBuilder()
+        .addAllExecutions(executions.stream()
+            .filter(e -> e.getId().getProject().equals(request.getId().getProject()) && e.getId().getDomain().equals(request.getId().getDomain()))
+            .limit(request.getLimit())
+            .collect(Collectors.toList()))
         .build());
     responseObserver.onCompleted();
   }
