@@ -22,6 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
@@ -36,10 +37,10 @@ import org.junit.Test;
 
 public class FlyteAdminClientTest {
 
-  private static final String DOMAIN = "testing";
-  private static final String PROJECT = "styx_flyte_test";
-  private static final String LP_NAME = "launch_plan_1";
-  private static final String LP_VERSION = "launch_plan_version_1";
+  static final String PROJECT = "styx_flyte_test";
+  static final String DOMAIN = "testing";
+  static final String LP_NAME = "launch_plan_1";
+  static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
   private TestAdminService testAdminService;
 
@@ -76,10 +77,40 @@ public class FlyteAdminClientTest {
   @Test
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
-        flyteAdminClient.createExecution(DOMAIN, PROJECT, LP_IDENTIFIER,
+        flyteAdminClient.createExecution(PROJECT, DOMAIN, LP_IDENTIFIER,
             ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
     assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
-    assertThat(TestAdminService.WF_EXECUTION_ID, equalTo(workflowExecution.getId().getName()));
+    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
+    assertThat(TestAdminService.WF_EXECUTION_ID_1, equalTo(workflowExecution.getId().getName()));
+  }
+
+  @Test
+  public void shouldPropagateGetExecutionToStub() {
+    var workflowExecution =
+        flyteAdminClient.getExecution(PROJECT, DOMAIN, LP_NAME);
+    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
+    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
+    assertThat(TestAdminService.WF_EXECUTION_ID_1, equalTo(workflowExecution.getId().getName()));
+  }
+
+  @Test
+  public void shouldPropagateTerminateExecutionToStub() {
+    var terminationResponse =
+        flyteAdminClient.terminateExecution(PROJECT, DOMAIN, LP_NAME, "Cause of termination");
+    assertThat(terminationResponse, notNullValue());
+  }
+
+  @Test
+  public void shouldPropagateListExecutionToStub() {
+    var listExecutions =
+        flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, "token", "filters");
+
+    listExecutions.getExecutionsList().forEach(
+        e -> {
+          assertThat(PROJECT, equalTo(e.getId().getProject()));
+          assertThat(DOMAIN, equalTo(e.getId().getDomain()));
+        }
+    );
+    assertThat(2, equalTo(listExecutions.getExecutionsCount()));
   }
 }
