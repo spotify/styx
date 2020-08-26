@@ -92,22 +92,13 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
                 .setProject(PROJECT)
                 .setDomain(DOMAIN)
                 .setName(WF_EXECUTION_ID_2))
-            .build(),
-        ExecutionOuterClass.Execution
-            .newBuilder()
-            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-                .newBuilder()
-                .setProject("other_project")
-                .setDomain("other_domain")
-                .setName("other_name"))
             .build()
     );
-    responseObserver.onNext(ExecutionOuterClass.ExecutionList.newBuilder()
-        .addAllExecutions(executions.stream()
-            .filter(e -> e.getId().getProject().equals(request.getId().getProject()) && e.getId().getDomain().equals(request.getId().getDomain()))
-            .limit(request.getLimit())
-            .collect(Collectors.toList()))
-        .build());
+
+    final ExecutionOuterClass.ExecutionList response = ExecutionOuterClass.ExecutionList.newBuilder()
+        .addAllExecutions(executions)
+        .build();
+    responseObserver.onNext(response);
     responseObserver.onCompleted();
   }
 }

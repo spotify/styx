@@ -22,6 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
@@ -36,10 +37,10 @@ import org.junit.Test;
 
 public class FlyteAdminClientTest {
 
-  protected static final String PROJECT = "styx_flyte_test";
-  protected static final String DOMAIN = "testing";
-  protected static final String LP_NAME = "launch_plan_1";
-  protected static final String LP_VERSION = "launch_plan_version_1";
+  static final String PROJECT = "styx_flyte_test";
+  static final String DOMAIN = "testing";
+  static final String LP_NAME = "launch_plan_1";
+  static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
   private TestAdminService testAdminService;
 
@@ -96,6 +97,7 @@ public class FlyteAdminClientTest {
   public void shouldPropagateTerminateExecutionToStub() {
     var terminationResponse =
         flyteAdminClient.terminateExecution(PROJECT, DOMAIN, LP_NAME, "Cause of termination");
+    assertThat(terminationResponse, notNullValue());
   }
 
   @Test
