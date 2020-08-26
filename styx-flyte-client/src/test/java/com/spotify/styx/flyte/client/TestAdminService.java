@@ -29,7 +29,6 @@ import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   static final String WF_EXECUTION_ID_1 = "wf_execution_id_1";
