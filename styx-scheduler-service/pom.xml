@@ -15,6 +15,10 @@
       <groupId>com.spotify</groupId>
       <artifactId>styx-service-common</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.spotify</groupId>
+      <artifactId>styx-flyte-client</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.spotify</groupId>
