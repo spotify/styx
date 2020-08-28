@@ -58,4 +58,15 @@ public class FlyteExecution {
     return "ex" + ":" + project + ":" + domain + ":" + name;
   }
 
+  public String getProject() {
+    return project;
+  }
+
+  public String getDomain() {
+    return domain;
+  }
+
+  public String getName() {
+    return name;
+  }
 }
