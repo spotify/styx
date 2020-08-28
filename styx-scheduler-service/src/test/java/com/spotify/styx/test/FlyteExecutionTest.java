@@ -26,7 +26,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import com.spotify.styx.flyte.FlyteExecution;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class FlyteExecutionTest {
 
@@ -56,5 +58,22 @@ public class FlyteExecutionTest {
     assertThat(flyteExecution.getDomain(), is("testing"));
     assertThat(flyteExecution.getName(), is("test-from-proto-creation"));
     assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+  }
+
+  @Rule
+  public ExpectedException exceptionRule = ExpectedException.none();
+
+  @Test
+  public void testFromUrnMalformedString() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    exceptionRule.expectMessage("Expected 4 parts in URN.");
+    FlyteExecution.fromUrn("ex:flyte-test:testing");
+  }
+
+  @Test
+  public void testFromUrlWrongPrefix() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    exceptionRule.expectMessage("Expected URN to start with ex.");
+    FlyteExecution.fromUrn("lp:flyte-test:testing:test-from-url-wrong-prefix");
   }
 }

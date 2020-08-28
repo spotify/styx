@@ -49,8 +49,8 @@ public class FlyteExecution {
    */
   public static FlyteExecution fromUrn(String urn) {
     final String[] splitted = urn.split(":");
-    Preconditions.checkArgument(splitted.length == 4);
-    Preconditions.checkArgument(splitted[0].equals("ex"));
+    Preconditions.checkArgument(splitted.length == 4, "Expected 4 parts in URN.");
+    Preconditions.checkArgument(splitted[0].equals("ex"), "Expected URN to start with ex.");
     return new FlyteExecution(splitted[1], splitted[2], splitted[3]);
   }
 
