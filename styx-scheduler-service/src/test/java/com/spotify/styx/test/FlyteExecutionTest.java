@@ -41,23 +41,24 @@ public class FlyteExecutionTest {
                 .newBuilder()
                 .setProject("flyte-test")
                 .setDomain("testing")
-                .setName("test-from-proto-creation")
+                .setName("execution-name")
                 .build())
             .build();
     final FlyteExecution flyteExecution = FlyteExecution.fromProto(response);
     assertThat(flyteExecution.getProject(), is("flyte-test"));
     assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-from-proto-creation"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+    assertThat(flyteExecution.getName(), is("execution-name"));
+    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:execution-name"));
   }
 
   @Test
   public void testFromUrn() {
-    final FlyteExecution flyteExecution = FlyteExecution.fromUrn("ex:flyte-test:testing:test-from-proto-creation");
+    final FlyteExecution flyteExecution = FlyteExecution.fromUrn(
+        "ex:flyte-test:testing:execution-name");
     assertThat(flyteExecution.getProject(), is("flyte-test"));
     assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-from-proto-creation"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+    assertThat(flyteExecution.getName(), is("execution-name"));
+    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:execution-name"));
   }
 
   @Rule

@@ -39,6 +39,7 @@ public class FlyteAdminClientTest {
 
   static final String PROJECT = "styx_flyte_test";
   static final String DOMAIN = "testing";
+  static final String EXECUTION_NAME = "execution_name";
   static final String LP_NAME = "launch_plan_1";
   static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
@@ -77,20 +78,20 @@ public class FlyteAdminClientTest {
   @Test
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
-        flyteAdminClient.createExecution(PROJECT, DOMAIN, LP_IDENTIFIER,
+        flyteAdminClient.createExecution(PROJECT, DOMAIN, EXECUTION_NAME, LP_IDENTIFIER,
             ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
     assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
     assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(TestAdminService.WF_EXECUTION_ID_1, equalTo(workflowExecution.getId().getName()));
+    assertThat(EXECUTION_NAME, equalTo(workflowExecution.getId().getName()));
   }
 
   @Test
   public void shouldPropagateGetExecutionToStub() {
     var workflowExecution =
-        flyteAdminClient.getExecution(PROJECT, DOMAIN, LP_NAME);
+        flyteAdminClient.getExecution(PROJECT, DOMAIN, EXECUTION_NAME);
     assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
     assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(TestAdminService.WF_EXECUTION_ID_1, equalTo(workflowExecution.getId().getName()));
+    assertThat(EXECUTION_NAME, equalTo(workflowExecution.getId().getName()));
   }
 
   @Test

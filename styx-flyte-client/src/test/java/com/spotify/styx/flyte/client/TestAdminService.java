@@ -31,8 +31,6 @@ import io.grpc.stub.StreamObserver;
 import java.util.List;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
-  static final String WF_EXECUTION_ID_1 = "wf_execution_id_1";
-  static final String WF_EXECUTION_ID_2 = "wf_execution_id_2";
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
@@ -43,7 +41,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .newBuilder()
             .setDomain(request.getDomain())
             .setProject(request.getProject())
-            .setName(WF_EXECUTION_ID_1)
+            .setName(request.getName())
             .build())
         .build());
     responseObserver.onCompleted();
@@ -58,7 +56,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .newBuilder()
             .setProject(request.getId().getProject())
             .setDomain(request.getId().getDomain())
-            .setName(WF_EXECUTION_ID_1)
+            .setName(request.getId().getName())
             .build())
         .build());
     responseObserver.onCompleted();
@@ -81,7 +79,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
                 .newBuilder()
                 .setProject(PROJECT)
                 .setDomain(DOMAIN)
-                .setName(WF_EXECUTION_ID_1)
+                .setName(request.getId().getName())
                 .build())
             .build(),
         ExecutionOuterClass.Execution
@@ -90,7 +88,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
                 .newBuilder()
                 .setProject(PROJECT)
                 .setDomain(DOMAIN)
-                .setName(WF_EXECUTION_ID_2))
+                .setName(request.getId().getName()))
             .build()
     );
 

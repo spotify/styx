@@ -24,9 +24,12 @@ import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_EXIT_COD
 import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_RUNNER_ID;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
+import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
@@ -47,19 +50,28 @@ public class FlyteRunnerHandlerTest {
 
   private FlyteRunnerHandler flyteRunnerHandler;
 
+  @Mock FlyteRunner flyteRunner;
   @Mock EventRouter eventRouter;
 
   @Before
   public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
-    flyteRunnerHandler = new FlyteRunnerHandler();
+    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner);
   }
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    RunnerHandlerTestUtil
-        .shouldTransitionIntoSubmitted(FLYTE_EXECUTION_DESCRIPTION, eventRouter, flyteRunnerHandler,
-        STATIC_RUNNER_ID);
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).createExecution(EXECUTION_ID, FLYTE_EXEC_CONF);
+
+    verify(eventRouter, timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, STATIC_RUNNER_ID),
+        runState.counter());
   }
 
   @Test

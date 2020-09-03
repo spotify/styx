@@ -22,7 +22,6 @@ package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -32,7 +31,6 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
-import com.spotify.styx.util.IsClosedException;
 import java.time.Instant;
 
 class RunnerHandlerTestUtil {
@@ -69,21 +67,5 @@ class RunnerHandlerTestUtil {
 
     verify(eventRouter).receiveIgnoreClosed(Event.halt(WORKFLOW_INSTANCE), COUNTER);
     verifyNoMoreInteractions(eventRouter);
-  }
-
-  static void shouldTransitionIntoSubmitted(ExecutionDescription executionDescription,
-                                            EventRouter eventRouter,
-                                            OutputHandler handler,
-                                            String runnerId)
-      throws IsClosedException {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
-        .executionId(EXECUTION_ID)
-        .executionDescription(executionDescription)
-        .build());
-
-    handler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter,  timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, runnerId),
-        runState.counter());
   }
 }

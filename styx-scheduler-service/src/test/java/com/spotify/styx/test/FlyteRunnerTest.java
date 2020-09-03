@@ -45,29 +45,31 @@ public class FlyteRunnerTest {
   @Test
   public void testCreateExecution() {
     FlyteRunner flyteRunner = new FlyteRunner(flyteAdminClient);
-    when(flyteAdminClient.createExecution(any(), any(), any(),any())).thenReturn(
+    when(flyteAdminClient.createExecution(any(), any(), any(), any(),any())).thenReturn(
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
                 .newBuilder()
                 .setProject("flyte-test")
                 .setDomain("testing")
-                .setName("test-create-execution")
+                .setName("execution-name")
                 .build())
             .build());
     final FlyteExecConf flyteExecConf = FlyteExecConf.builder()
         .referenceId(FlyteIdentifier.builder()
             .project("flyte-test")
             .domain("testing")
-            .name("test-create-execution")
+            .name("wf-name")
             .version("1234")
             .resourceType("lp")
             .build())
         .build();
-    final FlyteExecution flyteExecution = flyteRunner.createExecution(flyteExecConf);
+    final FlyteExecution flyteExecution = flyteRunner.createExecution("execution-name",
+        flyteExecConf);
 
     assertThat(flyteExecution.getProject(), is("flyte-test"));
     assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-create-execution"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-create-execution"));  }
+    assertThat(flyteExecution.getName(), is("execution-name"));
+    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:execution-name"));
+  }
 }

@@ -20,7 +20,11 @@
 
 package com.spotify.styx.state.handlers;
 
+import static java.util.Objects.requireNonNull;
+
+import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
@@ -38,9 +42,11 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
   public static final int STATIC_EXIT_CODE = 0;
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteRunnerHandler.class);
+  private final FlyteRunner flyteRunner;
 
-  public FlyteRunnerHandler() {
+  public FlyteRunnerHandler(FlyteRunner flyteRunner) {
     super(desc -> desc.flyteExecConf().isPresent());
+    this.flyteRunner = requireNonNull(flyteRunner);
   }
 
   @Override
@@ -48,7 +54,26 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     switch (state.state()) {
       case SUBMITTING:
         LOG.info("Entered state SUBMITTING for: " + state.workflowInstance());
-        final Event submitted = Event.submitted(state.workflowInstance(), state.data().executionId().orElseThrow(),
+
+        final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
+        final String executionId = state.data().executionId().orElseThrow();
+        try {
+          LOG.info("running:{}, spec:{}, state:{}", state.workflowInstance(), flyteExecConf, state);
+          flyteRunner.createExecution(executionId, flyteExecConf);
+        } catch (Exception e) {
+          // TODO: Figure out what exceptions to handle
+          try {
+            final var msg = "Failed to start execution " + state.workflowInstance();
+            LOG.error(msg, e);
+            eventRouter.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
+          } catch (IsClosedException isClosedException) {
+            LOG.warn("Failed to send 'runError' event", isClosedException);
+          }
+          return;
+        }
+
+        // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
+        final Event submitted = Event.submitted(state.workflowInstance(), executionId,
             STATIC_RUNNER_ID);
         try {
           LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
@@ -58,6 +83,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
               isClosedException);
         }
         break;
+
       case SUBMITTED:
         LOG.info("Entered state SUBMITTED for: " + state.workflowInstance());
         final var started = Event.started(state.workflowInstance());

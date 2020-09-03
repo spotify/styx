@@ -60,6 +60,7 @@ public class FlyteAdminClient {
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
       String project,
       String domain,
+      String executionName,
       IdentifierOuterClass.Identifier launchPlanId,
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
     log.debug("createExecution {} {} {}", project, domain, launchPlanId);
@@ -83,6 +84,7 @@ public class FlyteAdminClient {
                 .setDomain(domain)
                 .setProject(project)
                 .setSpec(spec)
+                .setName(executionName)
                 .build());
 
     verifyNotNull(
@@ -95,15 +97,15 @@ public class FlyteAdminClient {
     return response;
   }
 
-  public ExecutionOuterClass.Execution getExecution(String project, String domain, String name) {
-    log.debug("getExecution {} {} {}", project, domain, name);
+  public ExecutionOuterClass.Execution getExecution(String project, String domain, String executionName) {
+    log.debug("getExecution {} {} {}", project, domain, executionName);
     var request = ExecutionOuterClass.WorkflowExecutionGetRequest
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
             .newBuilder()
             .setProject(project)
             .setDomain(domain)
-            .setName(name)
+            .setName(executionName)
             .build())
         .build();
     final var execution = stub.getExecution(request);
@@ -113,9 +115,9 @@ public class FlyteAdminClient {
   public ExecutionOuterClass.ExecutionTerminateResponse terminateExecution(
       String project,
       String domain,
-      String name,
+      String executionName,
       String cause) {
-    log.debug("terminateExecution {} {} {}", project, domain, name);
+    log.debug("terminateExecution {} {} {}", project, domain, executionName);
 
     final var request =
         ExecutionOuterClass.ExecutionTerminateRequest
@@ -124,7 +126,7 @@ public class FlyteAdminClient {
                 .newBuilder()
                 .setProject(project)
                 .setDomain(domain)
-                .setName(name)
+                .setName(executionName)
                 .build())
             .setCause(cause)
             .build();
