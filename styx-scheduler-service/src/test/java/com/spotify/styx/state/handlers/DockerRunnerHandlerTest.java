@@ -21,6 +21,8 @@
 package com.spotify.styx.state.handlers;
 
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
+import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
@@ -126,8 +128,15 @@ public class DockerRunnerHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    RunnerHandlerTestUtil
-        .shouldTransitionIntoSubmitted(EXECUTION_DESCRIPTION, eventRouter, dockerRunnerHandler, TEST_RUNNER_ID);
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(EXECUTION_DESCRIPTION)
+        .build());
+
+    dockerRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(eventRouter,  timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, TEST_RUNNER_ID),
+        runState.counter());
   }
 
   @Test

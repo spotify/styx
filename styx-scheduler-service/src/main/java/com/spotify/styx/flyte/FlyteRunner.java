@@ -33,12 +33,14 @@ public class FlyteRunner {
     this.flyteAdminClient = flyteAdminClient;
   }
 
-  public FlyteExecution createExecution(final FlyteExecConf flyteExecConf) {
+  public FlyteExecution createExecution(final String name,
+                                        final FlyteExecConf flyteExecConf) {
     final var flyteIdentifier = flyteExecConf.referenceId();
     final ExecutionOuterClass.ExecutionCreateResponse response =
         flyteAdminClient.createExecution(
             flyteIdentifier.project(),
             flyteIdentifier.domain(),
+            name,
             IdentifierOuterClass.Identifier.newBuilder()
                 .setName(flyteIdentifier.name())
                 .setProject(flyteIdentifier.project())
