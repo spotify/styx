@@ -60,6 +60,7 @@ public class FlyteAdminClient {
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
       String project,
       String domain,
+      String name,
       IdentifierOuterClass.Identifier launchPlanId,
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
     log.debug("createExecution {} {} {}", project, domain, launchPlanId);
@@ -82,13 +83,14 @@ public class FlyteAdminClient {
             ExecutionOuterClass.ExecutionCreateRequest.newBuilder()
                 .setDomain(domain)
                 .setProject(project)
+                .setName(name)
                 .setSpec(spec)
                 .build());
 
     verifyNotNull(
         response,
         "Unexpected null response when creating execution %s on project %s domain %s",
-        launchPlanId,
+        name,
         project,
         domain);
 

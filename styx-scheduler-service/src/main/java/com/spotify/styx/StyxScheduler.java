@@ -59,6 +59,8 @@ import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunnerId;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
+import com.spotify.styx.flyte.FlyteRunner;
+import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.Workflow;
@@ -107,6 +109,7 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
+import io.grpc.inprocess.InProcessServerBuilder;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -372,9 +375,14 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
+    // TODO: Not sure how to create this
+    final FlyteAdminClient flyteAdminClient =
+        FlyteAdminClient.create(InProcessServerBuilder.generateName(), false);
+    final FlyteRunner flyteRunner = new FlyteRunner(flyteAdminClient);
+
     // These output handlers will be invoked in order.
     var outputHandlers = OutputHandler.tracing(List.of(
-        new FlyteRunnerHandler(),
+        new FlyteRunnerHandler(flyteRunner),
         new DockerRunnerHandler(dockerRunner),
         new TerminationHandler(retryUtil, workflowCache),
         new MonitoringHandler(stats),

@@ -45,7 +45,7 @@ public class FlyteRunnerTest {
   @Test
   public void testCreateExecution() {
     FlyteRunner flyteRunner = new FlyteRunner(flyteAdminClient);
-    when(flyteAdminClient.createExecution(any(), any(), any(),any())).thenReturn(
+    when(flyteAdminClient.createExecution(any(), any(), any(), any(),any())).thenReturn(
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -59,12 +59,12 @@ public class FlyteRunnerTest {
         .referenceId(FlyteIdentifier.builder()
             .project("flyte-test")
             .domain("testing")
-            .name("test-create-execution")
+            .name("wf-name")
             .version("1234")
             .resourceType("lp")
             .build())
         .build();
-    final FlyteExecution flyteExecution = flyteRunner.createExecution(flyteExecConf);
+    final FlyteExecution flyteExecution = flyteRunner.createExecution("test-create-execution", flyteExecConf);
 
     assertThat(flyteExecution.getProject(), is("flyte-test"));
     assertThat(flyteExecution.getDomain(), is("testing"));
