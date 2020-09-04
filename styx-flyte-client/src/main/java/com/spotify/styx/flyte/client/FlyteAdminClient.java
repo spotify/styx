@@ -85,6 +85,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
+                // TODO: Pass inputs
                 .build());
 
     verifyNotNull(

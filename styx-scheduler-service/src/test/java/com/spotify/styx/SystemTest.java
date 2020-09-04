@@ -207,6 +207,7 @@ public class SystemTest extends StyxSchedulerServiceFixture {
 
       awaitUntilConsumedEvent(expectedEvent, RunState.State.QUEUED);
       tickScheduler();
+      assertThat(flyteExecCreations.size(), is(1));
       awaitWorkflowInstanceCompletion(wfi);
       assertThat(getState(wfi), is(Optional.empty()));
     }

@@ -45,9 +45,11 @@ public class FlyteRunner {
                 .setName(flyteIdentifier.name())
                 .setProject(flyteIdentifier.project())
                 .setDomain(flyteIdentifier.domain())
+                // TODO: Don't hard code this + add to tests
                 .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
                 .setVersion(flyteIdentifier.version())
                 .build(),
+            // TODO: Don't hard code this + add to tests
             ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
     return FlyteExecution.fromProto(response);
   }

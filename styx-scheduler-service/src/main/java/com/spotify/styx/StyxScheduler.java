@@ -173,6 +173,7 @@ public class StyxScheduler implements AppInit {
   private final Time time;
   private final StorageFactory storageFactory;
   private final DockerRunnerFactory dockerRunnerFactory;
+  private final FlyteRunnerFactory flyteRunnerFactory;
   private final StatsFactory statsFactory;
   private final ExecutorFactory executorFactory;
   private final PublisherFactory publisherFactory;
@@ -204,6 +205,11 @@ public class StyxScheduler implements AppInit {
   }
 
   @FunctionalInterface
+  interface FlyteRunnerFactory {
+    FlyteRunner create(Environment environment);
+  }
+
+  @FunctionalInterface
   interface ExecutorFactory {
     ScheduledExecutorService create(
         int threads,
@@ -216,6 +222,7 @@ public class StyxScheduler implements AppInit {
     private Time time = Instant::now;
     private StorageFactory storageFactory = StyxScheduler::storage;
     private DockerRunnerFactory dockerRunnerFactory = StyxScheduler::createDockerRunner;
+    private FlyteRunnerFactory flyteRunnerFactory = StyxScheduler::createFlyteRunner;
     private StatsFactory statsFactory = StyxScheduler::stats;
     private ExecutorFactory executorFactory = Executors::newScheduledThreadPool;
     private PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
@@ -243,6 +250,11 @@ public class StyxScheduler implements AppInit {
 
     public Builder setDockerRunnerFactory(DockerRunnerFactory dockerRunnerFactory) {
       this.dockerRunnerFactory = dockerRunnerFactory;
+      return this;
+    }
+
+    public Builder setFlyteRunnerFactory(FlyteRunnerFactory flyteRunnerFactory) {
+      this.flyteRunnerFactory = flyteRunnerFactory;
       return this;
     }
 
@@ -308,6 +320,7 @@ public class StyxScheduler implements AppInit {
     this.time = requireNonNull(builder.time);
     this.storageFactory = requireNonNull(builder.storageFactory);
     this.dockerRunnerFactory = requireNonNull(builder.dockerRunnerFactory);
+    this.flyteRunnerFactory = requireNonNull(builder.flyteRunnerFactory);
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.executorFactory = requireNonNull(builder.executorFactory);
     this.publisherFactory = requireNonNull(builder.publisherFactory);
@@ -375,10 +388,7 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
-    // TODO: Not sure how to create this
-    final FlyteAdminClient flyteAdminClient =
-        FlyteAdminClient.create(InProcessServerBuilder.generateName(), false);
-    final FlyteRunner flyteRunner = new FlyteRunner(flyteAdminClient);
+    final FlyteRunner flyteRunner = flyteRunnerFactory.create(environment);
 
     // These output handlers will be invoked in order.
     var outputHandlers = OutputHandler.tracing(List.of(
@@ -608,6 +618,15 @@ public class StyxScheduler implements AppInit {
             Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(id, fabric8Client, stateManager, stats,
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
+  }
+
+  private static FlyteRunner createFlyteRunner(Environment environment){
+    final Config config = environment.config();
+    var channel =
+        ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST),
+            config.getInt(FLYTEADMIN_PORT)).usePlaintext().build();
+    var stub = AdminServiceGrpc.newBlockingStub(channel);
+    return new FlyteRunner(new FlyteAdminClient(stub));
   }
 
   @VisibleForTesting
