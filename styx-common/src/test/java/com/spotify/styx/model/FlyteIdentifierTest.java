@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify Styx Common
  * --
- * Copyright (C) 2017 Spotify AB
+ * Copyright (C) 2016 - 2020 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,29 +20,26 @@
 
 package com.spotify.styx.model;
 
-import io.norberg.automatter.AutoMatter;
-import java.util.StringJoiner;
 
-@AutoMatter
-public interface FlyteIdentifier {
-  String resourceType();
-  String project();
-  String domain();
-  String name();
-  String version();
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
-  @AutoMatter.ToString
-  default String urn() {
-    return new StringJoiner(":")
-        .add(resourceType())
-        .add(project())
-        .add(domain())
-        .add(name())
-        .add(version())
-        .toString();
-  }
+import org.junit.Test;
 
-  static FlyteIdentifierBuilder builder() {
-    return new FlyteIdentifierBuilder();
+public class FlyteIdentifierTest {
+
+  @Test
+  public void testUrn() {
+    final var identifier = FlyteIdentifier.builder()
+        .resourceType("lp")
+        .project("flytetester")
+        .domain("production")
+        .name("HelloWorldWorkflow")
+        .version("1")
+        .build();
+
+    final var urn = identifier.urn();
+
+    assertThat(urn, is("lp:flytetester:production:HelloWorldWorkflow:1"));
   }
 }

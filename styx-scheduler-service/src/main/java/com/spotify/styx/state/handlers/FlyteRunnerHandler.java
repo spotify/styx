@@ -74,13 +74,12 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
         final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
 
         try {
-          LOG.info("running:{}, spec:{}, state:{}", state.workflowInstance(), flyteExecConf, state);
+          LOG.info("running:{}, conf:{}, state:{}", state.workflowInstance(), flyteExecConf, state);
           flyteRunner.createExecution(execName, flyteExecConf);
         } catch (Exception e) {
-          // TODO: Figure out what exceptions to handle
           try {
-            final var msg = "Failed to start execution " + state.workflowInstance();
-            LOG.error(msg, e);
+            final var errMessage = "Failed to start execution for " + state.workflowInstance();
+            LOG.error(errMessage, e);
             eventRouter.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
           } catch (IsClosedException isClosedException) {
             LOG.warn("Failed to send 'runError' event", isClosedException);

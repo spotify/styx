@@ -39,7 +39,6 @@ import com.spotify.styx.flyte.FlyteExecution;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -351,18 +350,12 @@ public class StyxSchedulerServiceFixture {
   }
 
   private FlyteRunner fakeFlyteRunner() {
-    return new FlyteRunner(null) {
-      @Override
-      public FlyteExecution createExecution(final String name,
-                                            final FlyteExecConf flyteExecConf) {
-
-
-        final FlyteExecution response =
-            new FlyteExecution(flyteExecConf.referenceId().project(),
-                flyteExecConf.referenceId().domain(), name);
-        flyteExecCreations.add(response);
-        return response;
-      }
+    return (name, flyteExecConf) -> {
+      final FlyteExecution response =
+          new FlyteExecution(flyteExecConf.referenceId().project(),
+              flyteExecConf.referenceId().domain(), name);
+      flyteExecCreations.add(response);
+      return response;
     };
   }
 

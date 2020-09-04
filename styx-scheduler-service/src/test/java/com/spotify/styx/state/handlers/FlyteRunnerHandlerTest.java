@@ -26,6 +26,8 @@ import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
@@ -35,7 +37,6 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
-import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
@@ -55,7 +56,7 @@ public class FlyteRunnerHandlerTest {
   @Mock FlyteRunner flyteRunner;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() {
     MockitoAnnotations.initMocks(this);
     flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, Function.identity());
   }
@@ -113,4 +114,21 @@ public class FlyteRunnerHandlerTest {
         .shouldHaltIfMissingExecutionId(state, FLYTE_EXECUTION_DESCRIPTION, eventRouter,
         flyteRunnerHandler);
   }
+
+  @Test
+  public void shouldReportRunErrorIfCatchCreateExecutionException() throws Exception {
+    doThrow(new FlyteRunner.CreateExecutionException("Houston we have a problem", null))
+        .when(flyteRunner).createExecution(any(), any());
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).createExecution(EXECUTION_ID, FLYTE_EXEC_CONF);
+    verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
+        runState.counter());
+  }
+
 }
