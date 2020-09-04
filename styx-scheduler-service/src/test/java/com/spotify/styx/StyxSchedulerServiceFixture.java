@@ -35,8 +35,11 @@ import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
+import com.spotify.styx.flyte.FlyteExecution;
+import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.Workflow;
@@ -103,6 +106,7 @@ public class StyxSchedulerServiceFixture {
   // captured fields from fakes
   private Queue<Tuple2<RunState, RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
   Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
+  Queue<FlyteExecution> flyteExecCreations = new ConcurrentLinkedQueue<>();
 
   // service and helper
   private StyxScheduler styxScheduler;
@@ -135,6 +139,8 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.PublisherFactory publisherFactory = (env) -> Publisher.NOOP;
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, stats, debug, secretWhitelist, time) -> fakeDockerRunner();
+    StyxScheduler.FlyteRunnerFactory flyteRunnerFactory =
+        (env) -> fakeFlyteRunner();
     WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
@@ -147,6 +153,7 @@ public class StyxSchedulerServiceFixture {
         .setTime(time)
         .setStorageFactory(storageFactory)
         .setDockerRunnerFactory(dockerRunnerFactory)
+        .setFlyteRunnerFactory(flyteRunnerFactory)
         .setStatsFactory(statsFactory)
         .setExecutorFactory(executorFactory)
         .setPublisherFactory(publisherFactory)
@@ -339,6 +346,22 @@ public class StyxSchedulerServiceFixture {
       @Override
       public void close() {
         // nop
+      }
+    };
+  }
+
+  private FlyteRunner fakeFlyteRunner() {
+    return new FlyteRunner(null) {
+      @Override
+      public FlyteExecution createExecution(final String name,
+                                            final FlyteExecConf flyteExecConf) {
+
+
+        final FlyteExecution response =
+            new FlyteExecution(flyteExecConf.referenceId().project(),
+                flyteExecConf.referenceId().domain(), name);
+        flyteExecCreations.add(response);
+        return response;
       }
     };
   }

@@ -29,7 +29,7 @@ public class FlyteExecution {
   private final String domain;
   private final String name;
 
-  FlyteExecution(final String project, final String domain, final String name) {
+  public FlyteExecution(final String project, final String domain, final String name) {
     this.project = project;
     this.domain = domain;
     this.name = name;
