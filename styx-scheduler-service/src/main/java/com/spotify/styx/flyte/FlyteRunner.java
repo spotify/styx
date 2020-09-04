@@ -20,37 +20,24 @@
 
 package com.spotify.styx.flyte;
 
-import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.FlyteExecConf;
-import flyteidl.admin.ExecutionOuterClass;
-import flyteidl.core.IdentifierOuterClass;
 
-public class FlyteRunner {
+public interface FlyteRunner {
+  FlyteExecution createExecution(final String name, final FlyteExecConf flyteExecConf) throws CreateExecutionException;
 
-  private FlyteAdminClient flyteAdminClient;
+  class CreateExecutionException extends Exception {
+    CreateExecutionException(FlyteExecConf conf, Throwable cause) {
+      super("Couldn't create execution for:" + conf, cause);
+    }
 
-  public FlyteRunner(final FlyteAdminClient flyteAdminClient) {
-    this.flyteAdminClient = flyteAdminClient;
+    public CreateExecutionException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 
-  public FlyteExecution createExecution(final String name,
-                                        final FlyteExecConf flyteExecConf) {
-    final var flyteIdentifier = flyteExecConf.referenceId();
-    final ExecutionOuterClass.ExecutionCreateResponse response =
-        flyteAdminClient.createExecution(
-            flyteIdentifier.project(),
-            flyteIdentifier.domain(),
-            name,
-            IdentifierOuterClass.Identifier.newBuilder()
-                .setName(flyteIdentifier.name())
-                .setProject(flyteIdentifier.project())
-                .setDomain(flyteIdentifier.domain())
-                // TODO: Don't hard code this + add to tests
-                .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
-                .setVersion(flyteIdentifier.version())
-                .build(),
-            // TODO: Don't hard code this + add to tests
-            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-    return FlyteExecution.fromProto(response);
+  class LaunchPlanNotFound extends CreateExecutionException {
+    public LaunchPlanNotFound(FlyteExecConf conf, Throwable cause) {
+      super("Launch plan not found: " + conf.referenceId(), cause);
+    }
   }
 }

@@ -22,7 +22,6 @@ package com.spotify.styx.flyte.client;
 
 import static com.google.common.base.Verify.verifyNotNull;
 
-import com.google.common.annotations.VisibleForTesting;
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
@@ -40,8 +39,7 @@ public class FlyteAdminClient {
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
-  @VisibleForTesting
-  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
+  public FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
     this.stub = Objects.requireNonNull(stub, "stub");
   }
 
@@ -109,8 +107,7 @@ public class FlyteAdminClient {
             .setName(name)
             .build())
         .build();
-    final var execution = stub.getExecution(request);
-    return execution;
+    return stub.getExecution(request);
   }
 
   public ExecutionOuterClass.ExecutionTerminateResponse terminateExecution(
@@ -131,9 +128,8 @@ public class FlyteAdminClient {
                 .build())
             .setCause(cause)
             .build();
-    final var executionTerminateResponse = stub.terminateExecution(request);
 
-    return executionTerminateResponse;
+    return stub.terminateExecution(request);
   }
 
   public ExecutionOuterClass.ExecutionList listExecutions(
@@ -157,8 +153,7 @@ public class FlyteAdminClient {
         // TODO: .setSortBy()
         .build();
 
-    final var executions = stub.listExecutions(request);
-    return executions;
+    return stub.listExecutions(request);
   }
 
 }

@@ -59,6 +59,7 @@ import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunnerId;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
+import com.spotify.styx.flyte.FlyteAdminClientRunner;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
@@ -105,11 +106,12 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.typesafe.config.Config;
+import flyteidl.service.AdminServiceGrpc;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
-import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.ManagedChannelBuilder;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -152,6 +154,9 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_ENVIRONMENT = "styx.environment";
   private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
+
+  private static final String FLYTEADMIN_HOST = "styx.flyte.admin.host";
+  private static final String FLYTEADMIN_PORT = "styx.flyte.admin.port";
 
   private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -579,7 +584,7 @@ public class StyxScheduler implements AppInit {
       stats.registerActiveStatesMetric(state, "none", () ->
           activeStatesCache.get().values().stream()
               .filter(runState -> runState.state().equals(state))
-              .filter(runState -> !runState.data().trigger().isPresent())
+              .filter(runState -> runState.data().trigger().isEmpty())
               .count());
     }
 
@@ -626,7 +631,7 @@ public class StyxScheduler implements AppInit {
         ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST),
             config.getInt(FLYTEADMIN_PORT)).usePlaintext().build();
     var stub = AdminServiceGrpc.newBlockingStub(channel);
-    return new FlyteRunner(new FlyteAdminClient(stub));
+    return new FlyteAdminClientRunner(new FlyteAdminClient(stub));
   }
 
   @VisibleForTesting
