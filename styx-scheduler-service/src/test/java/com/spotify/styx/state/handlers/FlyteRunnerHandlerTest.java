@@ -37,6 +37,7 @@ import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -56,7 +57,7 @@ public class FlyteRunnerHandlerTest {
   @Before
   public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
-    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner);
+    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, Function.identity());
   }
 
   @Test
