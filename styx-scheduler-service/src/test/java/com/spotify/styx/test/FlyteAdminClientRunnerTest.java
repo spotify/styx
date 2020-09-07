@@ -32,7 +32,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.FlyteAdminClientRunner;
-import com.spotify.styx.flyte.FlytePhase;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
@@ -168,7 +167,9 @@ public class FlyteAdminClientRunnerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    when(FlytePhase.fromProto(any(Execution.WorkflowExecution.Phase.class))).thenReturn(FlytePhase.SUCCEEDED);
+
+    final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
+    when(mockExecution.getClosure().getPhase()).thenReturn(Execution.WorkflowExecution.Phase.SUCCEEDED);
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
@@ -187,12 +188,12 @@ public class FlyteAdminClientRunnerTest {
       "ABORTED, USER:AnythingElse, 1",
       "TIMED_OUT, USER:AnythingElse, 1",
   })
-  public void testTransititionRunningToTerminateExitCodes(FlytePhase phase, String flyteExitCode, int exitCode) throws Exception {
+  public void testTransititionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    when(FlytePhase.fromProto(any(Execution.WorkflowExecution.Phase.class))).thenReturn(phase);
     final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
+    when(mockExecution.getClosure().getPhase()).thenReturn(phase);
     when(mockExecution.getClosure().getError().getCode()).thenReturn(flyteExitCode);
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
