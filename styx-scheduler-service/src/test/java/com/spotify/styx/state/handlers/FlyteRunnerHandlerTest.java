@@ -28,8 +28,10 @@ import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
@@ -58,6 +60,7 @@ public class FlyteRunnerHandlerTest {
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
+    when(flyteRunner.isEnabled()).thenReturn(true);
     flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, Function.identity());
   }
 
@@ -131,4 +134,18 @@ public class FlyteRunnerHandlerTest {
         runState.counter());
   }
 
+  @Test
+  @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
+  public void shouldHaltTransitionsWhenFlyteRunnerIsNotEnabled(State state) throws Exception {
+    when(flyteRunner.isEnabled()).thenReturn(false);
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner, never()).createExecution(any(), any());
+    verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.halt(WORKFLOW_INSTANCE), runState.counter());
+  }
 }

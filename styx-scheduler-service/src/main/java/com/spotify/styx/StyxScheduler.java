@@ -156,6 +156,7 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
+  private static final String FLYTE_ENABLED = "styx.flyte.enabled";
   private static final String FLYTEADMIN_HOST = "styx.flyte.admin.host";
   private static final String FLYTEADMIN_PORT = "styx.flyte.admin.port";
   private static final String FLYTEADMIN_INSECURE = "styx.flyte.admin.insecure";
@@ -629,6 +630,10 @@ public class StyxScheduler implements AppInit {
 
   private static FlyteRunner createFlyteRunner(Environment environment){
     final Config config = environment.config();
+    if (!config.getBoolean(FLYTE_ENABLED)) {
+      return FlyteRunner.noop();
+    }
+
     var builder =
         ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST),
             config.getInt(FLYTEADMIN_PORT));
