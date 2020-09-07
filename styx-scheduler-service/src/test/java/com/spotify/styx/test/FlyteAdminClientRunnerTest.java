@@ -20,31 +20,45 @@
 
 package com.spotify.styx.test;
 
+import static com.spotify.styx.model.Schedule.HOURS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.FlyteAdminClientRunner;
+import com.spotify.styx.flyte.FlytePhase;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
+import com.spotify.styx.model.Workflow;
+import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.EventRouter;
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.Optional;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(JUnitParamsRunner.class)
 public class FlyteAdminClientRunnerTest {
 
   private static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
@@ -58,10 +72,14 @@ public class FlyteAdminClientRunnerTest {
       .build();
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
+  @Mock private RunState runState;
+  @Mock EventRouter eventRouter;
+
   private FlyteAdminClientRunner flyteRunner;
 
   @Before
   public void setUp() {
+    MockitoAnnotations.initMocks(this);
     flyteRunner = new FlyteAdminClientRunner(flyteAdminClient, stateManager);
   }
 
@@ -118,5 +136,85 @@ public class FlyteAdminClientRunnerTest {
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
         () -> flyteRunner.createExecution("exec", FLYTE_EXEC_CONF));
+  }
+
+  @Test
+  public void testPollProjectCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    flyteRunner.poll(null, "testing", "test-null-project", null)
+    );
+  }
+
+  @Test
+  public void testPollDomainCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    flyteRunner.poll("flyte-test", null, "test-null-domain", null)
+    );
+  }
+
+  @Test
+  public void testPollNameCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    flyteRunner.poll("flyte-test", "testing", null, null)
+    );
+  }
+
+  @Test
+  public void testTransititionRunningToTerminateSuccessfulRun() throws Exception {
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+
+    when(FlytePhase.fromProto(any())).thenReturn(FlytePhase.SUCCEEDED);
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
+    verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(1)));
+  }
+
+  @Test
+  @Parameters({
+      "FAILED, USER:NotReady, 20",
+      "ABORTED, USER:NotReady, 20",
+      "TIMED_OUT, USER:NotReady, 20",
+      "FAILED, USER:NotRetryble, 50",
+      "ABORTED, USER:NotRetryble, 50",
+      "TIMED_OUT, USER:NotRetryble, 50",
+      "FAILED, USER:AnythingElse, 1",
+      "ABORTED, USER:AnythingElse, 1",
+      "TIMED_OUT, USER:AnythingElse, 1",
+  })
+  public void testTransititionRunningToTerminateExitCodes(FlytePhase phase, String flyteExitCode, int exitCode) throws Exception {
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+
+    when(FlytePhase.fromProto(any())).thenReturn(phase);
+    final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
+    when(mockExecution.getClosure().getError().getCode()).thenReturn(flyteExitCode);
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
+    verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
+  }
+
+  public WorkflowConfiguration configuration(String... args) {
+    return WorkflowConfiguration.builder()
+        .id("styx.TestEndpoint")
+        .schedule(HOURS)
+        .flyteExecConf(FlyteExecConf
+            .builder()
+            .referenceId(FlyteIdentifier
+                .builder()
+                .resourceType("lp")
+                .project("flyte-test")
+                .domain("testing")
+                .name("test-lp")
+                .version("1")
+                .build())
+            .build()
+        )
+        .build();
   }
 }
