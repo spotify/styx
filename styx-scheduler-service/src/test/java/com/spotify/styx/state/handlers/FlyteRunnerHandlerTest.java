@@ -132,7 +132,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).createExecution(EXECUTION_ID, FLYTE_EXEC_CONF);
+    verify(flyteRunner).createExecution(reverse.apply(EXECUTION_ID), FLYTE_EXEC_CONF);
     verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
         runState.counter());
   }
