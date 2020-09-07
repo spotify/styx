@@ -23,11 +23,23 @@ package com.spotify.styx.flyte;
 import com.spotify.styx.model.FlyteExecConf;
 
 public interface FlyteRunner {
+  default boolean isEnabled() {
+    return true;
+  }
+
   FlyteExecution createExecution(final String name, final FlyteExecConf flyteExecConf) throws CreateExecutionException;
+
+  static FlyteRunner noop() {
+    return new NoopFlyteRunner();
+  }
 
   class CreateExecutionException extends Exception {
     CreateExecutionException(FlyteExecConf conf, Throwable cause) {
       super("Couldn't create execution for:" + conf, cause);
+    }
+
+    public CreateExecutionException(String message) {
+      super(message);
     }
 
     public CreateExecutionException(String message, Throwable cause) {
