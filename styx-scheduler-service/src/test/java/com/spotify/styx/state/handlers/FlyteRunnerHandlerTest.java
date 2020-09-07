@@ -58,11 +58,14 @@ public class FlyteRunnerHandlerTest {
   @Mock EventRouter eventRouter;
   @Mock FlyteRunner flyteRunner;
 
+  static private final Function<String, String> reverse =
+      (id) -> new StringBuilder(id).reverse().toString();
+
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     when(flyteRunner.isEnabled()).thenReturn(true);
-    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, Function.identity());
+    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, reverse);
   }
 
   @Test
@@ -73,7 +76,7 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
-    verify(flyteRunner).createExecution(EXECUTION_ID, FLYTE_EXEC_CONF);
+    verify(flyteRunner).createExecution(reverse.apply(EXECUTION_ID), FLYTE_EXEC_CONF);
     verify(eventRouter,  timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, STATIC_RUNNER_ID),
         runState.counter());
   }

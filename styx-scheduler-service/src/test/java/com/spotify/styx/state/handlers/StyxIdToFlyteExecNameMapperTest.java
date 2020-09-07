@@ -67,6 +67,15 @@ public class StyxIdToFlyteExecNameMapperTest {
   }
 
   @Test
+  @Parameters(method = "styxRunIds")
+  public void shouldMapStyxRunIdsDeterministically(String styxRunId) {
+    var execName1 = mapper.apply(styxRunId);
+    var execName2 = mapper.apply(styxRunId);
+
+    assertTrue(execName1.equals(execName2));
+  }
+
+  @Test
   public void differentStyxRunIdsShouldMapIdsToDifferentFlyteExecNames() {
     var distinctCount = Stream.of(styxRunIds())
         .map(mapper)
