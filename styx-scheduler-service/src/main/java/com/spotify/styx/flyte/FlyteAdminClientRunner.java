@@ -21,18 +21,28 @@
 package com.spotify.styx.flyte;
 
 import com.spotify.styx.flyte.client.FlyteAdminClient;
+import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateManager;
+import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.Objects;
+import java.util.Optional;
 
 public class FlyteAdminClientRunner implements FlyteRunner {
 
   private final FlyteAdminClient flyteAdminClient;
+  private final StateManager stateManager;
 
-  public FlyteAdminClientRunner(final FlyteAdminClient flyteAdminClient) {
+  public FlyteAdminClientRunner(final FlyteAdminClient flyteAdminClient,
+                                final StateManager stateManager) {
     this.flyteAdminClient = flyteAdminClient;
+    this.stateManager = stateManager;
   }
 
   public FlyteExecution createExecution(final String name, final FlyteExecConf flyteExecConf)
@@ -62,4 +72,46 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       throw new CreateExecutionException(flyteExecConf, e);
     }
   }
+
+  public void poll(final String project, final String domain, final String name, RunState runState) {
+    Objects.requireNonNull(project);
+    Objects.requireNonNull(domain);
+    Objects.requireNonNull(name);
+    final ExecutionOuterClass.Execution execution =
+        flyteAdminClient.getExecution(project, domain, name);
+    emitFlyteEvents(execution, runState);
+  }
+
+  private void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
+    final Execution.WorkflowExecution.Phase phase = execution.getClosure().getPhase();
+    final FlytePhase flytePhase = FlytePhase.fromProto(phase);
+    try {
+      switch (flytePhase) {
+        case SUCCEEDED:
+          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(0)));
+          break;
+        case FAILED:
+        case ABORTED:
+        case TIMED_OUT:
+          final String flyteCode = execution.getClosure().getError().getCode();
+          final int styxCode = flyteCodeToStyx(flyteCode);
+          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
+          break;
+      }
+    } catch (IsClosedException e) {
+      return;
+    }
+  }
+
+  private int flyteCodeToStyx(final String flyteCode) {
+      switch (flyteCode) {
+        case "USER:NotReady":
+          return 20;
+        case "USER:NotRetryable":
+          return 50;
+        default:
+          return 1;
+    }
+  }
+
 }

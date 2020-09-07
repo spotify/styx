@@ -33,6 +33,7 @@ import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
+import com.spotify.styx.state.StateManager;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
@@ -56,11 +57,12 @@ public class FlyteAdminClientRunnerTest {
           .build())
       .build();
   @Mock private FlyteAdminClient flyteAdminClient;
+  @Mock private StateManager stateManager;
   private FlyteAdminClientRunner flyteRunner;
 
   @Before
   public void setUp() {
-    flyteRunner = new FlyteAdminClientRunner(flyteAdminClient);
+    flyteRunner = new FlyteAdminClientRunner(flyteAdminClient, stateManager);
   }
 
   @Test
