@@ -21,7 +21,6 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.DOMAIN;
-import static com.spotify.styx.flyte.client.FlyteAdminClientTest.NAME;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
 
 import flyteidl.admin.Common;
@@ -32,6 +31,9 @@ import io.grpc.stub.StreamObserver;
 import java.util.List;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
+
+  private static final String EXEC_NAME_1 = "exec_name_1";
+  private static final String EXEC_NAME_2 = "exec_name_2";
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
@@ -80,7 +82,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
                 .newBuilder()
                 .setProject(PROJECT)
                 .setDomain(DOMAIN)
-                .setName(NAME)
+                .setName(EXEC_NAME_1)
                 .build())
             .build(),
         ExecutionOuterClass.Execution
@@ -89,7 +91,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
                 .newBuilder()
                 .setProject(PROJECT)
                 .setDomain(DOMAIN)
-                .setName(NAME))
+                .setName(EXEC_NAME_2))
             .build()
     );
 

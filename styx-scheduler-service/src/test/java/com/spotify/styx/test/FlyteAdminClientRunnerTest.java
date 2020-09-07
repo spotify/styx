@@ -23,6 +23,7 @@ package com.spotify.styx.test;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -60,6 +61,11 @@ public class FlyteAdminClientRunnerTest {
   @Before
   public void setUp() {
     flyteRunner = new FlyteAdminClientRunner(flyteAdminClient);
+  }
+
+  @Test
+  public void testIsEnabled() {
+    assertTrue(flyteRunner.isEnabled());
   }
 
   @Test

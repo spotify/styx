@@ -88,10 +88,11 @@ public class FlyteAdminClient {
 
     verifyNotNull(
         response,
-        "Unexpected null response when creating execution %s on project %s domain %s",
+        "Unexpected null response when creating execution %s on project %s domain %s for %s",
         name,
         project,
-        domain);
+        domain,
+        launchPlanId);
 
     return response;
   }
