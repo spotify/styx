@@ -25,7 +25,6 @@ import static java.lang.Math.abs;
 import static java.util.Objects.requireNonNull;
 
 import androidx.annotation.VisibleForTesting;
-import com.google.common.io.BaseEncoding;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -33,10 +32,8 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +84,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  public void transitionSubmitting(RunState state, EventRouter eventRouter) {
+  private void transitionSubmitting(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state SUBMITTING for: " + state.workflowInstance());
 
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
@@ -120,7 +117,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  public void transitionSubmitted(RunState state, EventRouter eventRouter) {
+  private void transitionSubmitted(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state SUBMITTED for: " + state.workflowInstance());
     final var started = Event.started(state.workflowInstance());
     try {
@@ -132,7 +129,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  public void transitionRunning(RunState state, EventRouter eventRouter) {
+  private void transitionRunning(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state RUNNING for: " + state.workflowInstance());
     final var terminate = Event.terminate(state.workflowInstance(), Optional.of(STATIC_EXIT_CODE));
     try {
@@ -144,42 +141,4 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  /**
-   * Map Styx id to Flyte exec names.
-   *
-   * Flyte exec names should be 20 characters long and it have conform to DNS-1123 subdomain,
-   * however for some reason it must start with a lowercase alphabetic character.
-   */
-  static class StyxIdToFlyteExecNameMapper implements Function<String, String> {
-
-    private static final String STYX_ID_PREFIX = "styx-run-";
-    private static final String UUID_REGEX = "[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}";
-    private static final Pattern STYX_RUN_ID_REGEX = Pattern.compile("^" + STYX_ID_PREFIX + UUID_REGEX + "$");
-
-    private static final int FLYTE_EXEC_NAME_SIZE = 20;
-    private static final BaseEncoding BASE16_ENCODER = BaseEncoding.base16().lowerCase();
-    private static final BaseEncoding BASE32_ENCODER = BaseEncoding.base32().omitPadding().lowerCase();
-    private static final String ALPHAS = "abcdefghijklmnopqrstuvwxyz";
-
-    @Override
-    public String apply(String styxRunId) {
-      checkArgument(
-          STYX_RUN_ID_REGEX.matcher(styxRunId).matches(),
-          "Not valid styx run id:",
-          styxRunId);
-      // hex encodes only 4 bits per character
-      var hexEncodedUuid = styxRunId.substring(STYX_ID_PREFIX.length()).replace("-", "");
-      var uuidBytes = BASE16_ENCODER.decode(hexEncodedUuid);
-
-      // base32 encodes 5 bits per character
-      var base32EncodedUuid = BASE32_ENCODER.encode(uuidBytes);
-
-      // I am not happy with this solution yet but it is good for now.
-      // We are encoding 19 * 5 bits of entropy plus whatever we get from the start character.
-      // According to https://en.wikipedia.org/wiki/Birthday_problem#Probability_table,
-      // we should expect a collision with a probability around 1*10-12 once we have created 4.0×10^8 names.
-      var start = ALPHAS.charAt(abs(Arrays.hashCode(uuidBytes) % ALPHAS.length()));
-      return (start + base32EncodedUuid).substring(0, FLYTE_EXEC_NAME_SIZE);
-    }
-  }
 }
