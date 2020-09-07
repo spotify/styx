@@ -55,7 +55,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
@@ -167,9 +166,12 @@ public class FlyteAdminClientRunnerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-
-    final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
-    when(mockExecution.getClosure().getPhase()).thenReturn(Execution.WorkflowExecution.Phase.SUCCEEDED);
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
+                    .setPhase(Execution.WorkflowExecution.Phase.SUCCEEDED).build())
+            .build());
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
@@ -192,9 +194,16 @@ public class FlyteAdminClientRunnerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
-    when(mockExecution.getClosure().getPhase()).thenReturn(phase);
-    when(mockExecution.getClosure().getError().getCode()).thenReturn(flyteExitCode);
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder().setError(
+                Execution.ExecutionError
+                    .newBuilder()
+                    .setCode(flyteExitCode)
+                    .build())
+                .setPhase(phase).build())
+            .build());
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
