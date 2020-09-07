@@ -106,7 +106,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
 
     // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
-    final Event submitted = Event.submitted(state.workflowInstance(), execName,
+    final Event submitted = Event.submitted(state.workflowInstance(), executionId,
         STATIC_RUNNER_ID);
     try {
       LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
