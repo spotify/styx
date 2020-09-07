@@ -20,8 +20,6 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.lang.Math.abs;
 import static java.util.Objects.requireNonNull;
 
 import androidx.annotation.VisibleForTesting;
@@ -92,7 +90,8 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
 
     try {
-      LOG.info("running:{}, conf:{}, state:{}", state.workflowInstance(), flyteExecConf, state);
+      LOG.info("running:{}, conf:{}, state:{}, flyte exec name:{}",
+          state.workflowInstance(), flyteExecConf, state, execName);
       flyteRunner.createExecution(execName, flyteExecConf);
     } catch (Exception e) {
       try {
