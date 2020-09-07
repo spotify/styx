@@ -45,6 +45,7 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -167,7 +168,7 @@ public class FlyteAdminClientRunnerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    when(FlytePhase.fromProto(any())).thenReturn(FlytePhase.SUCCEEDED);
+    when(FlytePhase.fromProto(any(Execution.WorkflowExecution.Phase.class))).thenReturn(FlytePhase.SUCCEEDED);
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
@@ -190,7 +191,7 @@ public class FlyteAdminClientRunnerTest {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
 
-    when(FlytePhase.fromProto(any())).thenReturn(phase);
+    when(FlytePhase.fromProto(any(Execution.WorkflowExecution.Phase.class))).thenReturn(phase);
     final ExecutionOuterClass.Execution mockExecution = Mockito.mock(ExecutionOuterClass.Execution.class);
     when(mockExecution.getClosure().getError().getCode()).thenReturn(flyteExitCode);
     when(runState.workflowInstance()).thenReturn(workflowInstance);
