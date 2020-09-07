@@ -111,6 +111,7 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
+import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -157,6 +158,7 @@ public class StyxScheduler implements AppInit {
 
   private static final String FLYTEADMIN_HOST = "styx.flyte.admin.host";
   private static final String FLYTEADMIN_PORT = "styx.flyte.admin.port";
+  private static final String FLYTEADMIN_INSECURE = "styx.flyte.admin.insecure";
 
   private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -627,9 +629,14 @@ public class StyxScheduler implements AppInit {
 
   private static FlyteRunner createFlyteRunner(Environment environment){
     final Config config = environment.config();
-    var channel =
+    var builder =
         ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST),
-            config.getInt(FLYTEADMIN_PORT)).usePlaintext().build();
+            config.getInt(FLYTEADMIN_PORT));
+    if (config.getBoolean(FLYTEADMIN_INSECURE)) {
+      builder.usePlaintext();
+    }
+    final ManagedChannel channel = builder.build();
+
     var stub = AdminServiceGrpc.newBlockingStub(channel);
     return new FlyteAdminClientRunner(new FlyteAdminClient(stub));
   }
