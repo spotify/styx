@@ -94,50 +94,40 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
           state.workflowInstance(), flyteExecConf, state, execName);
       flyteRunner.createExecution(execName, flyteExecConf);
     } catch (Exception e) {
-      try {
-        final var errMessage = "Failed to start execution for " + state.workflowInstance();
-        LOG.error(errMessage, e);
-        eventRouter.receive(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
-      } catch (IsClosedException isClosedException) {
-        LOG.warn("Failed to send 'runError' event", isClosedException);
-      }
+      final var errMessage = "Failed to start execution for " + state.workflowInstance();
+      LOG.error(errMessage, e);
+      sendEventIgnoreClosed(state, eventRouter, "runError",
+          Event.runError(state.workflowInstance(), e.getMessage()));
       return;
     }
 
     // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
     final Event submitted = Event.submitted(state.workflowInstance(), executionId,
         STATIC_RUNNER_ID);
-    try {
-      LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
-      eventRouter.receive(submitted, state.counter());
-    } catch (IsClosedException isClosedException) {
-      LOG.warn("Could not emit 'submitted' event for: " + state.workflowInstance(),
-          isClosedException);
-    }
+    LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
+    sendEventIgnoreClosed(state, eventRouter, "submitted", submitted);
   }
 
   private void transitionSubmitted(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state SUBMITTED for: " + state.workflowInstance());
     final var started = Event.started(state.workflowInstance());
-    try {
-      LOG.info("Issue 'started' event for: " + state.workflowInstance());
-      eventRouter.receive(started, state.counter());
-    } catch (IsClosedException isClosedException) {
-      LOG.warn("Could not emit 'started' event for: " + state.workflowInstance(),
-          isClosedException);
-    }
+    LOG.info("Issue 'started' event for: " + state.workflowInstance());
+    sendEventIgnoreClosed(state, eventRouter, "started", started);
   }
 
   private void transitionRunning(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state RUNNING for: " + state.workflowInstance());
     final var terminate = Event.terminate(state.workflowInstance(), Optional.of(STATIC_EXIT_CODE));
+    LOG.info("Issue 'terminate' event for: " + state.workflowInstance());
+    sendEventIgnoreClosed(state, eventRouter, "terminate", terminate);
+  }
+
+  private void sendEventIgnoreClosed(RunState state, EventRouter eventRouter, String eventType, Event event) {
     try {
-      LOG.info("Issue 'terminate' event for: " + state.workflowInstance());
-      eventRouter.receive(terminate, state.counter());
+      eventRouter.receive(event, state.counter());
     } catch (IsClosedException isClosedException) {
-      LOG.warn("Could not emit 'terminate' event for: " + state.workflowInstance(),
+      LOG.warn("Could not emit '" + eventType + "' event for: " + state.workflowInstance(),
           isClosedException);
     }
   }
-
 }

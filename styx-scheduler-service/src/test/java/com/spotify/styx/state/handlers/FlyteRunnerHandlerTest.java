@@ -27,6 +27,7 @@ import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -39,6 +40,7 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
+import com.spotify.styx.util.IsClosedException;
 import java.util.Optional;
 import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
@@ -150,5 +152,20 @@ public class FlyteRunnerHandlerTest {
 
     verify(flyteRunner, never()).createExecution(any(), any());
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.halt(WORKFLOW_INSTANCE), runState.counter());
+  }
+
+
+  @Test
+  @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
+  public void shouldNotThrowExceptionIfEvenRouterIsClosed(State state) throws Exception {
+    doThrow(IsClosedException.class).when(eventRouter).receive(any(), anyLong());
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(eventRouter,  timeout(60_000)).receive(any(), anyLong());
   }
 }
