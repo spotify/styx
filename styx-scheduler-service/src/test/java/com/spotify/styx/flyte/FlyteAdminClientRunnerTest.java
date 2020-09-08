@@ -157,8 +157,7 @@ public class FlyteAdminClientRunnerTest {
 
   @Test
   public void testTransititionRunningToTerminateSuccessfulRun() throws Exception {
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
 
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
@@ -177,8 +176,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   @Parameters(method = "parametersForTestTransititionRunningToTerminateExitCodes")
   public void testTransititionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
 
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
@@ -217,8 +215,7 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new StatusRuntimeException(Status.NOT_FOUND))
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     assertThrows(
@@ -232,8 +229,7 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new StatusRuntimeException(Status.INTERNAL))
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     assertThrows(
@@ -247,8 +243,7 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new RuntimeException())
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     assertThrows(
@@ -259,9 +254,7 @@ public class FlyteAdminClientRunnerTest {
 
   @Test
   public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
-
-    Workflow workflow = Workflow.create("id", configuration());
-    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    WorkflowInstance workflowInstance = createWorkflowInstance();
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
     doThrow(new IsClosedException())
@@ -272,6 +265,11 @@ public class FlyteAdminClientRunnerTest {
         () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
             ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
                 Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), runState));
+  }
+
+  private WorkflowInstance createWorkflowInstance() {
+    Workflow workflow = Workflow.create("id", configuration());
+    return WorkflowInstance.create(workflow.id(), "2016-03-14");
   }
 
   private WorkflowConfiguration configuration(String... args) {
