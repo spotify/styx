@@ -155,7 +155,7 @@ public class FlyteRunnerHandlerTest {
   }
 
 
-  @Test
+  @Test(expected = Test.None.class)
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   public void shouldNotThrowExceptionIfEvenRouterIsClosed(State state) throws Exception {
     doThrow(IsClosedException.class).when(eventRouter).receive(any(), anyLong());
@@ -165,7 +165,5 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter,  timeout(60_000)).receive(any(), anyLong());
   }
 }
