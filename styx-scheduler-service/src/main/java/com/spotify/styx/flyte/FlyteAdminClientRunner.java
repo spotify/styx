@@ -105,25 +105,21 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @VisibleForTesting
-  void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
+  void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState)
+      throws IsClosedException {
     final Execution.WorkflowExecution.Phase phase = execution.getClosure().getPhase();
     final FlytePhase flytePhase = FlytePhase.fromProto(phase);
-    try {
-      switch (flytePhase) {
-        case SUCCEEDED:
-          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));
-          break;
-        case FAILED:
-        case ABORTED:
-        case TIMED_OUT:
-          final String flyteCode = execution.getClosure().getError().getCode();
-          final int styxCode = flyteErrorCodeToStyx(flyteCode);
-          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
-          break;
-      }
-    } catch (IsClosedException e) {
-      LOG.warn("Could not emit 'terminate' event", e);
-      return;
+    switch (flytePhase) {
+      case SUCCEEDED:
+        stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));
+        break;
+      case FAILED:
+      case ABORTED:
+      case TIMED_OUT:
+        final String flyteCode = execution.getClosure().getError().getCode();
+        final int styxCode = flyteErrorCodeToStyx(flyteCode);
+        stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
+        break;
     }
   }
 
