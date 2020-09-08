@@ -27,7 +27,7 @@ public interface FlyteRunner {
     return true;
   }
 
-  FlyteExecution createExecution(final String name, final FlyteExecConf flyteExecConf) throws CreateExecutionException;
+  FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf) throws CreateExecutionException;
 
   static FlyteRunner noop() {
     return new NoopFlyteRunner();

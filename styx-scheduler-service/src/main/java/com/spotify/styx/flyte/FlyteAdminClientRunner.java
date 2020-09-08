@@ -45,7 +45,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     this.stateManager = stateManager;
   }
 
-  public FlyteExecution createExecution(final String name, final FlyteExecConf flyteExecConf)
+  public FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     final var flyteIdentifier = flyteExecConf.referenceId();
     try {
@@ -62,7 +62,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .build(),
           // TODO: We should propagate Styx natural trigger and what not
           ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-      return FlyteExecution.fromProto(response);
+      return FlyteExecutionId.fromProto(response);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
         throw new LaunchPlanNotFound(flyteExecConf, e);
@@ -73,12 +73,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     }
   }
 
-  public void poll(final String project, final String domain, final String name, RunState runState) {
-    Objects.requireNonNull(project);
-    Objects.requireNonNull(domain);
-    Objects.requireNonNull(name);
+  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
+    Objects.requireNonNull(flyteExecutionId);
+    Objects.requireNonNull(runState);
     final ExecutionOuterClass.Execution execution =
-        flyteAdminClient.getExecution(project, domain, name);
+        flyteAdminClient.getExecution(flyteExecutionId.getProject(),
+            flyteExecutionId.getDomain(), flyteExecutionId.getName());
     emitFlyteEvents(execution, runState);
   }
 

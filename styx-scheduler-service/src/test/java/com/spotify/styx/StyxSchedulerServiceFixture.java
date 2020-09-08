@@ -35,7 +35,7 @@ import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.flyte.FlyteExecution;
+import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Event;
@@ -105,7 +105,7 @@ public class StyxSchedulerServiceFixture {
   // captured fields from fakes
   private Queue<Tuple2<RunState, RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
   Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
-  Queue<FlyteExecution> flyteExecCreations = new ConcurrentLinkedQueue<>();
+  Queue<FlyteExecutionId> flyteExecCreations = new ConcurrentLinkedQueue<>();
 
   // service and helper
   private StyxScheduler styxScheduler;
@@ -351,8 +351,8 @@ public class StyxSchedulerServiceFixture {
 
   private FlyteRunner fakeFlyteRunner() {
     return (name, flyteExecConf) -> {
-      final FlyteExecution response =
-          new FlyteExecution(flyteExecConf.referenceId().project(),
+      final FlyteExecutionId response =
+          new FlyteExecutionId(flyteExecConf.referenceId().project(),
               flyteExecConf.referenceId().domain(), name);
       flyteExecCreations.add(response);
       return response;

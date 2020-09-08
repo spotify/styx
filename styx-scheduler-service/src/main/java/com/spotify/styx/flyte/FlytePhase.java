@@ -48,7 +48,6 @@ public enum FlytePhase {
       .build();
 
   public static FlytePhase fromProto(Execution.WorkflowExecution.Phase phase) {
-    final var flytePhase = phaseMapper.get(phase);
     if (!phaseMapper.containsKey(phase)) {
       throw new NoSuchElementException();
     }

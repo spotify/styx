@@ -23,14 +23,14 @@ package com.spotify.styx.test;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import com.spotify.styx.flyte.FlyteExecution;
+import com.spotify.styx.flyte.FlyteExecutionId;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-public class FlyteExecutionTest {
+public class FlyteExecutionIdTest {
 
   @Test
   public void testFromProto() {
@@ -44,20 +44,20 @@ public class FlyteExecutionTest {
                 .setName("test-from-proto-creation")
                 .build())
             .build();
-    final FlyteExecution flyteExecution = FlyteExecution.fromProto(response);
-    assertThat(flyteExecution.getProject(), is("flyte-test"));
-    assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-from-proto-creation"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+    final FlyteExecutionId flyteExecutionId = FlyteExecutionId.fromProto(response);
+    assertThat(flyteExecutionId.getProject(), is("flyte-test"));
+    assertThat(flyteExecutionId.getDomain(), is("testing"));
+    assertThat(flyteExecutionId.getName(), is("test-from-proto-creation"));
+    assertThat(flyteExecutionId.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
   }
 
   @Test
   public void testFromUrn() {
-    final FlyteExecution flyteExecution = FlyteExecution.fromUrn("ex:flyte-test:testing:test-from-proto-creation");
-    assertThat(flyteExecution.getProject(), is("flyte-test"));
-    assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-from-proto-creation"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+    final FlyteExecutionId flyteExecutionId = FlyteExecutionId.fromUrn("ex:flyte-test:testing:test-from-proto-creation");
+    assertThat(flyteExecutionId.getProject(), is("flyte-test"));
+    assertThat(flyteExecutionId.getDomain(), is("testing"));
+    assertThat(flyteExecutionId.getName(), is("test-from-proto-creation"));
+    assertThat(flyteExecutionId.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
   }
 
   @Rule
@@ -67,13 +67,13 @@ public class FlyteExecutionTest {
   public void testFromUrnMalformedString() {
     exceptionRule.expect(IllegalArgumentException.class);
     exceptionRule.expectMessage("Expected 4 parts in URN.");
-    FlyteExecution.fromUrn("ex:flyte-test:testing");
+    FlyteExecutionId.fromUrn("ex:flyte-test:testing");
   }
 
   @Test
   public void testFromUrlWrongPrefix() {
     exceptionRule.expect(IllegalArgumentException.class);
     exceptionRule.expectMessage("Expected URN to start with ex.");
-    FlyteExecution.fromUrn("lp:flyte-test:testing:test-from-url-wrong-prefix");
+    FlyteExecutionId.fromUrn("lp:flyte-test:testing:test-from-url-wrong-prefix");
   }
 }
