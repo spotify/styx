@@ -30,7 +30,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
-import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.Execution;
