@@ -30,6 +30,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.handlers.DockerRunnerHandler;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.Execution;
@@ -38,9 +39,12 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FlyteAdminClientRunner implements FlyteRunner {
 
+  private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
   private final FlyteAdminClient flyteAdminClient;
   private final StateManager stateManager;
 
@@ -115,6 +119,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           break;
       }
     } catch (IsClosedException e) {
+      LOG.warn("Could not emit 'terminate' event", e);
       return;
     }
   }
