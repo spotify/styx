@@ -54,8 +54,10 @@ import java.util.Set;
 @AutoValue
 public abstract class RunState {
 
-  private static final int SUCCESS_EXIT_CODE = 0;
+  public static final int SUCCESS_EXIT_CODE = 0;
   public static final int MISSING_DEPS_EXIT_CODE = 20;
+  public static final int UNRECOVERABLE_FAILURE_EXIT_CODE = 50;
+  public static final int UNKNOWN_ERROR_EXIT_CODE = 1;
 
   private static final double FAILURE_COST = 1.0;
   private static final double MISSING_DEPS_COST = 0.1;

@@ -21,6 +21,7 @@
 package com.spotify.styx.flyte;
 
 import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.state.RunState;
 
 /**
  * No-op {@code FlyteRunner} meant to be used when Flyte is disabled or not available.
@@ -33,8 +34,14 @@ class NoopFlyteRunner implements FlyteRunner {
   }
 
   @Override
-  public FlyteExecution createExecution(String name, FlyteExecConf flyteExecConf)
+  public FlyteExecutionId createExecution(String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     throw new CreateExecutionException("Cannot create execution for: " + flyteExecConf);
+  }
+
+  @Override
+  public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState)
+      throws PollingException {
+    throw new PollingException("Cannot poll for execution: " + flyteExecutionId.toUrn());
   }
 }

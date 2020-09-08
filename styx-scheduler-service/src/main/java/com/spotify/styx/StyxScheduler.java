@@ -643,7 +643,7 @@ public class StyxScheduler implements AppInit {
     final ManagedChannel channel = builder.build();
 
     var stub = AdminServiceGrpc.newBlockingStub(channel);
-    return new FlyteAdminClientRunner(new FlyteAdminClient(stub));
+    return new FlyteAdminClientRunner(new FlyteAdminClient(stub), environment.resolve(StateManager.class));
   }
 
   @VisibleForTesting

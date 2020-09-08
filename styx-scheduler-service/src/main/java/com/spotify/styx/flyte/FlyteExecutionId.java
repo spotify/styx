@@ -22,21 +22,26 @@ package com.spotify.styx.flyte;
 
 import com.google.common.base.Preconditions;
 import flyteidl.admin.ExecutionOuterClass;
+import java.util.Objects;
 
-public class FlyteExecution {
+public class FlyteExecutionId {
 
   private final String project;
   private final String domain;
   private final String name;
 
-  public FlyteExecution(final String project, final String domain, final String name) {
-    this.project = project;
-    this.domain = domain;
-    this.name = name;
+  FlyteExecutionId(final String project, final String domain, final String name) {
+    this.project = Objects.requireNonNull(project);
+    this.domain = Objects.requireNonNull(domain);
+    this.name = Objects.requireNonNull(name);
   }
 
-  public static FlyteExecution fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
-    return new FlyteExecution(
+  public static FlyteExecutionId create(final String project, final String domain, final String name) {
+    return new FlyteExecutionId(project, domain, name);
+  }
+
+  public static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
+    return new FlyteExecutionId(
         response.getId().getProject(),
         response.getId().getDomain(),
         response.getId().getName());
@@ -47,11 +52,11 @@ public class FlyteExecution {
    * @param urn
    * @return
    */
-  public static FlyteExecution fromUrn(String urn) {
+  public static FlyteExecutionId fromUrn(String urn) {
     final String[] splitted = urn.split(":");
     Preconditions.checkArgument(splitted.length == 4, "Expected 4 parts in URN.");
     Preconditions.checkArgument(splitted[0].equals("ex"), "Expected URN to start with ex.");
-    return new FlyteExecution(splitted[1], splitted[2], splitted[3]);
+    return new FlyteExecutionId(splitted[1], splitted[2], splitted[3]);
   }
 
   public String toUrn() {
