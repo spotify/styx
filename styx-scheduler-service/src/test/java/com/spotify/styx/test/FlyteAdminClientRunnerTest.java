@@ -21,6 +21,9 @@
 package com.spotify.styx.test;
 
 import static com.spotify.styx.model.Schedule.HOURS;
+import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
+import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
+import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -173,17 +176,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  @Parameters({
-      "FAILED, USER:NotReady, 20",
-      "ABORTED, USER:NotReady, 20",
-      "TIMED_OUT, USER:NotReady, 20",
-      "FAILED, USER:NotRetryable, 50",
-      "ABORTED, USER:NotRetryable, 50",
-      "TIMED_OUT, USER:NotRetryable, 50",
-      "FAILED, USER:AnythingElse, 1",
-      "ABORTED, USER:AnythingElse, 1",
-      "TIMED_OUT, USER:AnythingElse, 1",
-  })
+  @Parameters(method = "transitionRunningToTerminateExitCodesParameters")
   public void testTransititionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
@@ -205,6 +198,22 @@ public class FlyteAdminClientRunnerTest {
     flyteRunner.poll(flyteExecutionId, runState);
     verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
+
+  private Object[] transitionRunningToTerminateExitCodesParameters() {
+    return new Object[] {
+        new Object[] { Execution.NodeExecution.Phase.FAILED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.NodeExecution.Phase.ABORTED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.NodeExecution.Phase.TIMED_OUT, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.NodeExecution.Phase.FAILED, "USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE },
+        new Object[] { Execution.NodeExecution.Phase.ABORTED, "USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.NodeExecution.Phase.TIMED_OUT, "USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.NodeExecution.Phase.FAILED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE },
+        new Object[] { Execution.NodeExecution.Phase.ABORTED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+        new Object[] { Execution.NodeExecution.Phase.TIMED_OUT, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+    };
+  }
+
+
 
   @Test
   public void testPollingExceptionFlyteAdminClientExecutionNotFound() {
