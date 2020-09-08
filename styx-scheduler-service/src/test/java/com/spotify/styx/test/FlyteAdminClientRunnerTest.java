@@ -41,7 +41,6 @@ import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
-import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import flyteidl.admin.ExecutionOuterClass;
@@ -73,7 +72,6 @@ public class FlyteAdminClientRunnerTest {
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
   @Mock private RunState runState;
-  @Mock EventRouter eventRouter;
 
   private FlyteAdminClientRunner flyteRunner;
 
@@ -170,7 +168,7 @@ public class FlyteAdminClientRunnerTest {
     final FlyteExecutionId flyteExecutionId =
         FlyteExecutionId.create("flyte-test", "testing", "execution-name");
     flyteRunner.poll(flyteExecutionId, runState);
-    verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(1)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(1)));
   }
 
   @Test
@@ -204,7 +202,7 @@ public class FlyteAdminClientRunnerTest {
     final FlyteExecutionId flyteExecutionId =
         FlyteExecutionId.create("flyte-test", "testing", "execution-name");
     flyteRunner.poll(flyteExecutionId, runState);
-    verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 
   public WorkflowConfiguration configuration(String... args) {
