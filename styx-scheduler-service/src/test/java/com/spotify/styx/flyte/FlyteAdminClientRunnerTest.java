@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.test;
+package com.spotify.styx.flyte;
 
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
@@ -47,6 +47,7 @@ import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
@@ -241,6 +242,37 @@ public class FlyteAdminClientRunnerTest {
         FlyteRunner.PollingException.class,
         () -> flyteRunner.poll(
             FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+  }
+
+  @Test
+  public void testPollingException() {
+    doThrow(new Exception())
+        .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
+
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    assertThrows(
+        FlyteRunner.PollingException.class,
+        () -> flyteRunner.poll(
+            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+  }
+
+  @Test
+  public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
+    doThrow(new IsClosedException())
+        .when(stateManager).receive(any(), any());
+
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    assertThrows(
+        IsClosedException.class,
+        () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
+            ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
+                Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), runState));
   }
 
   private WorkflowConfiguration configuration(String... args) {

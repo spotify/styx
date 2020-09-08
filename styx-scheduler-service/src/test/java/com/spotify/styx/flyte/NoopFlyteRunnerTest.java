@@ -27,6 +27,7 @@ import com.spotify.styx.testdata.TestData;
 import org.junit.Test;
 
 public class NoopFlyteRunnerTest {
+
   private final NoopFlyteRunner runner = new NoopFlyteRunner();
 
   @Test
@@ -39,6 +40,15 @@ public class NoopFlyteRunnerTest {
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
         () -> runner.createExecution("name", TestData.FLYTE_EXEC_CONF)
+    );
+  }
+
+  @Test
+  public void testPollingThrowsException() {
+    assertThrows(
+        FlyteRunner.PollingException.class,
+        () -> runner
+            .poll(FlyteExecutionId.create("flyte-test", "testing", "noop-cannot-poll"), null)
     );
   }
 }

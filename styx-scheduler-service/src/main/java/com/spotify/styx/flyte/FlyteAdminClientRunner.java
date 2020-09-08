@@ -25,6 +25,7 @@ import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -103,7 +104,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
   }
 
-  private void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
+  @VisibleForTesting
+  void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
     final Execution.WorkflowExecution.Phase phase = execution.getClosure().getPhase();
     final FlytePhase flytePhase = FlytePhase.fromProto(phase);
     try {

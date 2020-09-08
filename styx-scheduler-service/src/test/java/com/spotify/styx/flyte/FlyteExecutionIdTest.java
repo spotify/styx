@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.test;
+package com.spotify.styx.flyte;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
