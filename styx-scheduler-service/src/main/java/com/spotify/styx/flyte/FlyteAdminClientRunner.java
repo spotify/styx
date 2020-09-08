@@ -94,7 +94,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         case ABORTED:
         case TIMED_OUT:
           final String flyteCode = execution.getClosure().getError().getCode();
-          final int styxCode = flyteCodeToStyx(flyteCode);
+          final int styxCode = flyteErrorCodeToStyx(flyteCode);
           stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
           break;
       }
@@ -103,8 +103,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     }
   }
 
-  private int flyteCodeToStyx(final String flyteCode) {
-      switch (flyteCode) {
+  private int flyteErrorCodeToStyx(final String errorCode) {
+      switch (errorCode) {
         case "USER:NotReady":
           return 20;
         case "USER:NotRetryable":
