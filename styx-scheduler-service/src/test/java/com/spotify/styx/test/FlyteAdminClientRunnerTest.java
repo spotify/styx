@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.FlyteAdminClientRunner;
+import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
@@ -138,26 +139,18 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testPollProjectCannotBeNull() {
+  public void testPollFlyteExecutionIdCannotBeNull() {
     assertThrows(
         NullPointerException.class,
-        () ->    flyteRunner.poll(null, "testing", "test-null-project", null)
+        () ->    flyteRunner.poll(null, RunState.create(null, null))
     );
   }
 
   @Test
-  public void testPollDomainCannotBeNull() {
+  public void testPollRunStateCannotBeNull() {
     assertThrows(
         NullPointerException.class,
-        () ->    flyteRunner.poll("flyte-test", null, "test-null-domain", null)
-    );
-  }
-
-  @Test
-  public void testPollNameCannotBeNull() {
-    assertThrows(
-        NullPointerException.class,
-        () ->    flyteRunner.poll("flyte-test", "testing", null, null)
+        () ->    flyteRunner.poll(FlyteExecutionId.create("flyte-test", "testing", "test-run-state-cannot-be-null"), null)
     );
   }
 
@@ -174,7 +167,9 @@ public class FlyteAdminClientRunnerTest {
             .build());
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
-    flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
     verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(1)));
   }
 
@@ -206,7 +201,9 @@ public class FlyteAdminClientRunnerTest {
             .build());
     when(runState.workflowInstance()).thenReturn(workflowInstance);
 
-    flyteRunner.poll("flyte-test", "testing", "execution-name", runState);
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
     verify(eventRouter,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 

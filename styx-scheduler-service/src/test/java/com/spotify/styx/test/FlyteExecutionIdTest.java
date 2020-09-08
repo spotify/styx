@@ -22,6 +22,7 @@ package com.spotify.styx.test;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.spotify.styx.flyte.FlyteExecutionId;
 import flyteidl.admin.ExecutionOuterClass;
@@ -75,5 +76,29 @@ public class FlyteExecutionIdTest {
     exceptionRule.expect(IllegalArgumentException.class);
     exceptionRule.expectMessage("Expected URN to start with ex.");
     FlyteExecutionId.fromUrn("lp:flyte-test:testing:test-from-url-wrong-prefix");
+  }
+
+  @Test
+  public void testProjectCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    FlyteExecutionId.create(null, "testing", "test-null-project")
+    );
+  }
+
+  @Test
+  public void testDomainCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    FlyteExecutionId.create("flyte-test", null, "test-null-domain")
+    );
+  }
+
+  @Test
+  public void testNameCannotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () ->    FlyteExecutionId.create("flyte-test", "testing", null)
+    );
   }
 }

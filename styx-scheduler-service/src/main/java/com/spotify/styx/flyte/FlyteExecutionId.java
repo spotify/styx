@@ -30,10 +30,14 @@ public class FlyteExecutionId {
   private final String domain;
   private final String name;
 
-  public FlyteExecutionId(final String project, final String domain, final String name) {
+  FlyteExecutionId(final String project, final String domain, final String name) {
     this.project = Objects.requireNonNull(project);
     this.domain = Objects.requireNonNull(domain);
     this.name = Objects.requireNonNull(name);
+  }
+
+  public static FlyteExecutionId create(final String project, final String domain, final String name) {
+    return new FlyteExecutionId(project, domain, name);
   }
 
   public static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {

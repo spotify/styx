@@ -352,7 +352,7 @@ public class StyxSchedulerServiceFixture {
   private FlyteRunner fakeFlyteRunner() {
     return (name, flyteExecConf) -> {
       final FlyteExecutionId response =
-          new FlyteExecutionId(flyteExecConf.referenceId().project(),
+          FlyteExecutionId.create(flyteExecConf.referenceId().project(),
               flyteExecConf.referenceId().domain(), name);
       flyteExecCreations.add(response);
       return response;
