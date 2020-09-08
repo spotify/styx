@@ -26,6 +26,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -205,7 +206,37 @@ public class FlyteAdminClientRunnerTest {
     verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 
-  public WorkflowConfiguration configuration(String... args) {
+  @Test
+  public void testPollingExceptionFlyteAdminClientExecutionNotFound() {
+    doThrow(new StatusRuntimeException(Status.NOT_FOUND))
+        .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
+
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    assertThrows(
+        FlyteRunner.ExecutionNotFoundException.class,
+        () -> flyteRunner.poll(
+            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+  }
+
+  @Test
+  public void testPollingExceptionFlyteAdminClientExecution() {
+    doThrow(new StatusRuntimeException(Status.INTERNAL))
+        .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
+
+    Workflow workflow = Workflow.create("id", configuration());
+    WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    assertThrows(
+        FlyteRunner.PollingException.class,
+        () -> flyteRunner.poll(
+            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+  }
+
+  private WorkflowConfiguration configuration(String... args) {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(HOURS)

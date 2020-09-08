@@ -21,6 +21,7 @@
 package com.spotify.styx.flyte;
 
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
+import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 
@@ -77,13 +78,24 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     }
   }
 
-  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
+  public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
+      throws PollingException {
     Objects.requireNonNull(flyteExecutionId);
     Objects.requireNonNull(runState);
-    final ExecutionOuterClass.Execution execution =
-        flyteAdminClient.getExecution(flyteExecutionId.getProject(),
-            flyteExecutionId.getDomain(), flyteExecutionId.getName());
-    emitFlyteEvents(execution, runState);
+    try {
+      final ExecutionOuterClass.Execution execution =
+          flyteAdminClient.getExecution(flyteExecutionId.getProject(),
+              flyteExecutionId.getDomain(), flyteExecutionId.getName());
+      emitFlyteEvents(execution, runState);
+    } catch (StatusRuntimeException e) {
+      if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
+        throw new ExecutionNotFoundException(flyteExecutionId, e);
+      }
+      throw new PollingException(flyteExecutionId, e);
+    } catch (Exception e) {
+      throw new PollingException(flyteExecutionId, e);
+    }
+
   }
 
   private void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
@@ -92,7 +104,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     try {
       switch (flytePhase) {
         case SUCCEEDED:
-          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(0)));
+          stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));
           break;
         case FAILED:
         case ABORTED:
