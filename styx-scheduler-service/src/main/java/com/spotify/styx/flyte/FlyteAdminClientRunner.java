@@ -111,6 +111,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     final FlytePhase flytePhase = FlytePhase.fromProto(phase);
     switch (flytePhase) {
       case SUCCEEDED:
+        LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
         stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));
         break;
       case FAILED:
@@ -118,6 +119,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       case TIMED_OUT:
         final String flyteCode = execution.getClosure().getError().getCode();
         final int styxCode = flyteErrorCodeToStyx(flyteCode);
+        LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
         stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
         break;
     }
