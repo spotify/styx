@@ -20,12 +20,13 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_EXIT_CODE;
 import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_RUNNER_ID;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.Is.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
@@ -34,14 +35,16 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Optional;
 import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -92,19 +95,6 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(eventRouter).receive(Event.started(WORKFLOW_INSTANCE),
-        runState.counter());
-  }
-
-  @Test
-  public void shouldTransitionIntoTerminated() throws Exception {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
-        .executionId(EXECUTION_ID)
-        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
-        .build());
-
-    flyteRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(STATIC_EXIT_CODE)),
         runState.counter());
   }
 
@@ -165,5 +155,24 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
+  }
+
+  @Test
+  public void shouldPollInRunning() throws FlyteRunner.PollingException {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID), runState);
+
+  }
+
+  private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
+    final FlyteIdentifier flyteIdentifier =
+        executionDescription.flyteExecConf().orElseThrow().referenceId();
+    return FlyteExecutionId.create(flyteIdentifier.project(), flyteIdentifier.domain(), executionId);
   }
 }
