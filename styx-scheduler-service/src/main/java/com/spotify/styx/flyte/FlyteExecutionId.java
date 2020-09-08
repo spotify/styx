@@ -22,6 +22,7 @@ package com.spotify.styx.flyte;
 
 import com.google.common.base.Preconditions;
 import flyteidl.admin.ExecutionOuterClass;
+import java.util.Objects;
 
 public class FlyteExecutionId {
 
@@ -30,9 +31,9 @@ public class FlyteExecutionId {
   private final String name;
 
   public FlyteExecutionId(final String project, final String domain, final String name) {
-    this.project = project;
-    this.domain = domain;
-    this.name = name;
+    this.project = Objects.requireNonNull(project);
+    this.domain = Objects.requireNonNull(domain);
+    this.name = Objects.requireNonNull(name);
   }
 
   public static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
