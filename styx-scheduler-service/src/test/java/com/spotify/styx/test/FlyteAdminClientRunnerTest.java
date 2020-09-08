@@ -168,7 +168,7 @@ public class FlyteAdminClientRunnerTest {
     final FlyteExecutionId flyteExecutionId =
         FlyteExecutionId.create("flyte-test", "testing", "execution-name");
     flyteRunner.poll(flyteExecutionId, runState);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(1)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(0)));
   }
 
   @Test
@@ -176,9 +176,9 @@ public class FlyteAdminClientRunnerTest {
       "FAILED, USER:NotReady, 20",
       "ABORTED, USER:NotReady, 20",
       "TIMED_OUT, USER:NotReady, 20",
-      "FAILED, USER:NotRetryble, 50",
-      "ABORTED, USER:NotRetryble, 50",
-      "TIMED_OUT, USER:NotRetryble, 50",
+      "FAILED, USER:NotRetryable, 50",
+      "ABORTED, USER:NotRetryable, 50",
+      "TIMED_OUT, USER:NotRetryable, 50",
       "FAILED, USER:AnythingElse, 1",
       "ABORTED, USER:AnythingElse, 1",
       "TIMED_OUT, USER:AnythingElse, 1",
