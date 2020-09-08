@@ -20,6 +20,10 @@
 
 package com.spotify.styx.flyte;
 
+import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
+import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
+import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
+
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -106,11 +110,11 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   private int flyteErrorCodeToStyx(final String errorCode) {
       switch (errorCode) {
         case "USER:NotReady":
-          return 20;
+          return MISSING_DEPS_EXIT_CODE;
         case "USER:NotRetryable":
-          return 50;
+          return UNRECOVERABLE_FAILURE_EXIT_CODE;
         default:
-          return 1;
+          return UNKNOWN_ERROR_EXIT_CODE;
     }
   }
 
