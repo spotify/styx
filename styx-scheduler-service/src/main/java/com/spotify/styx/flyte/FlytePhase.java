@@ -49,10 +49,10 @@ public enum FlytePhase {
 
   public static FlytePhase fromProto(Execution.WorkflowExecution.Phase phase) {
     final var flytePhase = phaseMapper.get(phase);
-    if (flytePhase != null) {
-      return flytePhase;
+    if (!phaseMapper.containsKey(phase)) {
+      throw new NoSuchElementException();
     }
-    throw new NoSuchElementException();
+    return phaseMapper.get(phase);
   }
 }
 
