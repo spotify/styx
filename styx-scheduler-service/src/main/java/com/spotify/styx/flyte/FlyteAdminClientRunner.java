@@ -54,6 +54,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     this.stateManager = stateManager;
   }
 
+  @Override
   public FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     final var flyteIdentifier = flyteExecConf.referenceId();
@@ -82,6 +83,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     }
   }
 
+  @Override
   public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
       throws PollingException {
     Objects.requireNonNull(flyteExecutionId);
