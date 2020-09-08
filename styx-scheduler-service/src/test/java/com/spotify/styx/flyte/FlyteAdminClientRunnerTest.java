@@ -22,6 +22,7 @@ package com.spotify.styx.flyte;
 
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
+import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 import static org.hamcrest.CoreMatchers.is;
@@ -29,6 +30,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
@@ -246,7 +248,7 @@ public class FlyteAdminClientRunnerTest {
 
   @Test
   public void testPollingException() {
-    doThrow(new Exception())
+    doThrow(new RuntimeException())
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
     Workflow workflow = Workflow.create("id", configuration());
@@ -261,12 +263,13 @@ public class FlyteAdminClientRunnerTest {
 
   @Test
   public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
-    doThrow(new IsClosedException())
-        .when(stateManager).receive(any(), any());
 
     Workflow workflow = Workflow.create("id", configuration());
     WorkflowInstance workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
     when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    doThrow(new IsClosedException())
+        .when(stateManager).receive(Event.terminate(workflowInstance, Optional.of(SUCCESS_EXIT_CODE)));
 
     assertThrows(
         IsClosedException.class,
