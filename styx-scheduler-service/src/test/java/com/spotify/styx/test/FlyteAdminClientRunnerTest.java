@@ -213,8 +213,6 @@ public class FlyteAdminClientRunnerTest {
     };
   }
 
-
-
   @Test
   public void testPollingExceptionFlyteAdminClientExecutionNotFound() {
     doThrow(new StatusRuntimeException(Status.NOT_FOUND))
