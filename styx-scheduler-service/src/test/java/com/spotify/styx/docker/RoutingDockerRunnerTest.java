@@ -20,49 +20,35 @@
 
 package com.spotify.styx.docker;
 
-import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.Maps;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
-import com.spotify.styx.state.RunState;
-import java.util.Map;
-import java.util.function.Function;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class RoutingDockerRunnerTest {
+public class RoutingDockerRunnerTest extends AbstractRoutingRunnerTest<DockerRunner> {
 
-  private int createCounter = 0;
-  private Map<String, DockerRunner> createdRunners = Maps.newHashMap();
-
-  @Mock private Function<RunState, String> dockerId;
-  @Mock private RunState runState;
   @Mock private RunSpec runSpec;
 
   private DockerRunner dockerRunner;
 
   @Before
   public void setUp() {
-    dockerRunner = new RoutingDockerRunner(this::create, dockerId);
-    when(dockerId.apply(runState)).thenReturn("default");
+    dockerRunner = new RoutingDockerRunner(this::create, runnerId);
+    when(runnerId.apply(runState)).thenReturn("default");
   }
 
   @Test
   public void testUsesCreatesRunnerOnStart() throws Exception {
     dockerRunner.start(runState, runSpec);
 
-    assertThat(createdRunners, hasKey("default"));
+    assertThatCreateCountersContains("default");
     verify(createdRunners.get("default")).start(runState, runSpec);
   }
 
@@ -70,7 +56,7 @@ public class RoutingDockerRunnerTest {
   public void testUsesCreatesRunnerOnPoll() {
     dockerRunner.poll(runState);
 
-    assertThat(createdRunners, hasKey("default"));
+    assertThatCreateCountersContains("default");
     verify(createdRunners.get("default")).poll(runState);
   }
 
@@ -79,7 +65,7 @@ public class RoutingDockerRunnerTest {
     dockerRunner.start(runState, runSpec);
     dockerRunner.cleanup();
 
-    assertThat(createdRunners, hasKey("default"));
+    assertThatCreateCountersContains("default");
     verify(createdRunners.get("default")).cleanup();
   }
 
@@ -88,43 +74,35 @@ public class RoutingDockerRunnerTest {
     dockerRunner.start(runState, runSpec);
     dockerRunner.start(runState, runSpec);
 
-    assertThat(createCounter, is(1));
-    assertThat(createdRunners.keySet(), hasSize(1));
-    assertThat(createdRunners, hasKey("default"));
+    assertThatCreateCountersContains("default");
   }
 
   @Test
   public void testSwitchesDockerRunner() throws Exception {
-    Mockito.<Function>reset(dockerId);
-    when(dockerId.apply(runState)).thenReturn("id-1", "id-2");
+    when(runnerId.apply(runState)).thenReturn("id-1", "id-2");
 
     dockerRunner.start(runState, runSpec);
     dockerRunner.start(runState, runSpec);
 
-    assertThat(createdRunners, hasKey("id-1"));
-    assertThat(createdRunners, hasKey("id-2"));
+    assertThatCreateCountersContains("id-1", "id-2");
   }
 
   @Test
   public void testCreatedRunnersAreClosed() throws Exception {
-    Mockito.<Function>reset(dockerId);
-    when(dockerId.apply(runState)).thenReturn("id-1", "id-2");
+    when(runnerId.apply(runState)).thenReturn("id-1", "id-2");
 
     dockerRunner.start(runState, runSpec);
     dockerRunner.start(runState, runSpec);
     dockerRunner.close();
 
-    assertThat(createCounter, is(2));
-    assertThat(createdRunners.keySet(), hasSize(2));
+    assertThatCreateCountersContains("id-1", "id-2");
     for (DockerRunner runner : createdRunners.values()) {
       verify(runner).close();
     }
   }
 
-  private DockerRunner create(String id) {
-    DockerRunner mock = mock(DockerRunner.class);
-    createCounter++;
-    createdRunners.put(id, mock);
-    return mock;
+  @Override
+  protected DockerRunner mockRunner() {
+    return mock(DockerRunner.class);
   }
 }

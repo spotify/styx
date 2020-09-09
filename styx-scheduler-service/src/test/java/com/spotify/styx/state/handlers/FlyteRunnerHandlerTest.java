@@ -59,7 +59,7 @@ public class FlyteRunnerHandlerTest {
   @Mock EventRouter eventRouter;
   @Mock FlyteRunner flyteRunner;
 
-  static private final Function<String, String> reverse =
+  private static final Function<String, String> reverse =
       (id) -> new StringBuilder(id).reverse().toString();
   private static final String EXECUTION_NAME = reverse.apply(EXECUTION_ID);
 
@@ -144,7 +144,7 @@ public class FlyteRunnerHandlerTest {
   }
 
 
-  @Test(expected = Test.None.class)
+  @Test()
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   public void shouldNotThrowExceptionIfEvenRouterIsClosed(State state) throws Exception {
     doThrow(IsClosedException.class).when(eventRouter).receive(any(), anyLong());
@@ -166,7 +166,7 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
-        reverse.apply(EXECUTION_ID)), runState);
+        EXECUTION_NAME), runState);
   }
 
   @Test

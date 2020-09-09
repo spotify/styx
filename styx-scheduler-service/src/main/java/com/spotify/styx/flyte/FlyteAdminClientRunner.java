@@ -60,6 +60,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @Override
   public String createExecution(RunState runState, final String execName, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
+    requireNonNull(runState, "runState");
+    requireNonNull(runState, "name");
+    requireNonNull(runState, "flyteExecConf");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
 
     // TODO: verify if the execution already exist
@@ -91,8 +94,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @Override
   public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
       throws PollingException {
-    requireNonNull(flyteExecutionId);
-    requireNonNull(runState);
+    requireNonNull(flyteExecutionId, "flyteExecutionId");
+    requireNonNull(runState, "runState");
     try {
       final ExecutionOuterClass.Execution execution =
           flyteAdminClient.getExecution(flyteExecutionId.project(),
@@ -140,5 +143,4 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           return UNKNOWN_ERROR_EXIT_CODE;
     }
   }
-
 }

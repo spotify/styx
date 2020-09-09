@@ -22,6 +22,7 @@ package com.spotify.styx.flyte;
 
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
+import java.util.function.Function;
 
 public interface FlyteRunner {
   default boolean isEnabled() {
@@ -38,6 +39,21 @@ public interface FlyteRunner {
     return new NoopFlyteRunner();
   }
 
+  /**
+   * Creates a {@link FlyteRunner} that will dynamically create and route to other Flyte runner
+   * instances using the given factory.
+   *
+   * <p>The active Flyte runner id will be read from runnerId supplier on each routing decision.
+   */
+  static FlyteRunner routing(FlyteRunner.FlyteRunnerFactory flyteRunnerFactory, Function<RunState, String> runnerId) {
+    return new RoutingFlyteRunner(flyteRunnerFactory, runnerId);
+  }
+
+  /**
+   * Factory for {@link FlyteRunner} instances identified by a string identifier
+   */
+  interface FlyteRunnerFactory extends Function<String, FlyteRunner> { }
+
   class CreateExecutionException extends Exception {
     CreateExecutionException(FlyteExecConf conf, Throwable cause) {
       super("Couldn't create execution for:" + conf, cause);
@@ -46,7 +62,6 @@ public interface FlyteRunner {
     public CreateExecutionException(String message) {
       super(message);
     }
-
     public CreateExecutionException(String message, Throwable cause) {
       super(message, cause);
     }
