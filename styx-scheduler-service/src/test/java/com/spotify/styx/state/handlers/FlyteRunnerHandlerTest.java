@@ -164,7 +164,8 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID), runState);
+    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
+        new StringBuilder(EXECUTION_ID).reverse().toString()), runState);
   }
 
   private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
