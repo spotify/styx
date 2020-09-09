@@ -90,8 +90,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     Objects.requireNonNull(runState);
     try {
       final ExecutionOuterClass.Execution execution =
-          flyteAdminClient.getExecution(flyteExecutionId.getProject(),
-              flyteExecutionId.getDomain(), flyteExecutionId.getName());
+          flyteAdminClient.getExecution(flyteExecutionId.project(),
+              flyteExecutionId.domain(), flyteExecutionId.name());
       emitFlyteEvents(execution, runState);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {

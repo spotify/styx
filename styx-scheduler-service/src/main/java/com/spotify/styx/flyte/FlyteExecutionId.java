@@ -22,56 +22,52 @@ package com.spotify.styx.flyte;
 
 import com.google.common.base.Preconditions;
 import flyteidl.admin.ExecutionOuterClass;
-import java.util.Objects;
+import io.norberg.automatter.AutoMatter;
 
-public class FlyteExecutionId {
+@AutoMatter
+public interface FlyteExecutionId {
 
-  private final String project;
-  private final String domain;
-  private final String name;
+  String project();
+  String domain();
+  String name();
 
-  FlyteExecutionId(final String project, final String domain, final String name) {
-    this.project = Objects.requireNonNull(project);
-    this.domain = Objects.requireNonNull(domain);
-    this.name = Objects.requireNonNull(name);
+  static FlyteExecutionId create(final String project, final String domain, final String name) {
+    return newBuilder()
+        .project(project)
+        .domain(domain)
+        .name(name)
+        .build();
   }
 
-  public static FlyteExecutionId create(final String project, final String domain, final String name) {
-    return new FlyteExecutionId(project, domain, name);
+  static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
+    return newBuilder()
+        .project(response.getId().getProject())
+        .domain(response.getId().getDomain())
+        .name(response.getId().getName())
+        .build();
   }
 
-  public static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
-    return new FlyteExecutionId(
-        response.getId().getProject(),
-        response.getId().getDomain(),
-        response.getId().getName());
+  static FlyteExecutionIdBuilder newBuilder() {
+    return new FlyteExecutionIdBuilder();
   }
-
   /**
    * ex:<project>:<domain>:<name>.
    * @param urn
    * @return
    */
-  public static FlyteExecutionId fromUrn(String urn) {
+  static FlyteExecutionId fromUrn(String urn) {
     final String[] splitted = urn.split(":");
     Preconditions.checkArgument(splitted.length == 4, "Expected 4 parts in URN.");
     Preconditions.checkArgument(splitted[0].equals("ex"), "Expected URN to start with ex.");
-    return new FlyteExecutionId(splitted[1], splitted[2], splitted[3]);
+    return newBuilder()
+        .project(splitted[1])
+        .domain(splitted[2])
+        .name(splitted[3])
+        .build();
   }
 
-  public String toUrn() {
-    return "ex" + ":" + project + ":" + domain + ":" + name;
+  default String toUrn() {
+    return "ex" + ":" + project() + ":" + domain() + ":" + name();
   }
 
-  public String getProject() {
-    return project;
-  }
-
-  public String getDomain() {
-    return domain;
-  }
-
-  public String getName() {
-    return name;
-  }
 }

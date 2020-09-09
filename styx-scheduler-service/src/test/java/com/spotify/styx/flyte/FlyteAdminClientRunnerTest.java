@@ -103,9 +103,9 @@ public class FlyteAdminClientRunnerTest {
             .build());
     var flyteExecution = flyteRunner.createExecution("test-create-execution", FLYTE_EXEC_CONF);
 
-    assertThat(flyteExecution.getProject(), is("flyte-test"));
-    assertThat(flyteExecution.getDomain(), is("testing"));
-    assertThat(flyteExecution.getName(), is("test-create-execution"));
+    assertThat(flyteExecution.project(), is("flyte-test"));
+    assertThat(flyteExecution.domain(), is("testing"));
+    assertThat(flyteExecution.name(), is("test-create-execution"));
     assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-create-execution"));
   }
 
