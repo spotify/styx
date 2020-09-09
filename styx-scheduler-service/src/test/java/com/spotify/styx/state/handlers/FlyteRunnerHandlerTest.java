@@ -165,7 +165,26 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
-        new StringBuilder(EXECUTION_ID).reverse().toString()), runState);
+        reverse.apply(EXECUTION_ID)), runState);
+  }
+
+  @Test
+  public void shouldReportRunErrorWhenCatchingExceptionDuringPolling()
+      throws FlyteRunner.PollingException, IsClosedException {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+    doThrow(new FlyteRunner.PollingException("Test polling exception"))
+        .when(flyteRunner)
+        .poll(any(), any());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    final var errMessage = "Test polling exception";
+
+    verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, errMessage),
+        runState.counter());
   }
 
   private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
