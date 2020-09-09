@@ -23,6 +23,7 @@ package com.spotify.styx.state.handlers;
 import static java.util.Objects.requireNonNull;
 
 import androidx.annotation.VisibleForTesting;
+import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -30,7 +31,6 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Optional;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,9 +117,18 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
   private void transitionRunning(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state RUNNING for: " + state.workflowInstance());
-    final var terminate = Event.terminate(state.workflowInstance(), Optional.of(STATIC_EXIT_CODE));
-    LOG.info("Issue 'terminate' event for: " + state.workflowInstance());
-    sendEventIgnoreClosed(state, eventRouter, "terminate", terminate);
+    final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
+    final String executionId = state.data().executionId().orElseThrow();
+    final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
+    try {
+      flyteRunner.poll(FlyteExecutionId.create(flyteExecConf.referenceId().project(), flyteExecConf.referenceId().domain(), execName), state);
+    } catch (Exception e) {
+      final var errMessage = "Failed to poll execution for " + state.workflowInstance();
+      LOG.error(errMessage, e);
+      sendEventIgnoreClosed(state, eventRouter, "runError",
+          Event.runError(state.workflowInstance(), e.getMessage()));
+      return;
+    }
   }
 
   private void sendEventIgnoreClosed(RunState state, EventRouter eventRouter, String eventType, Event event) {

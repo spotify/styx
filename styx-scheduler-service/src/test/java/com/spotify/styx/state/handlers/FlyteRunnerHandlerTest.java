@@ -20,7 +20,6 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_EXIT_CODE;
 import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STATIC_RUNNER_ID;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
@@ -34,14 +33,16 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Optional;
 import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -95,19 +96,6 @@ public class FlyteRunnerHandlerTest {
         runState.counter());
   }
 
-  @Test
-  public void shouldTransitionIntoTerminated() throws Exception {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
-        .executionId(EXECUTION_ID)
-        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
-        .build());
-
-    flyteRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(STATIC_EXIT_CODE)),
-        runState.counter());
-  }
-
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
@@ -155,7 +143,7 @@ public class FlyteRunnerHandlerTest {
   }
 
 
-  @Test
+  @Test(expected = Test.None.class)
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   public void shouldNotThrowExceptionIfEvenRouterIsClosed(State state) throws Exception {
     doThrow(IsClosedException.class).when(eventRouter).receive(any(), anyLong());
@@ -165,7 +153,43 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
+  }
 
-    verify(eventRouter,  timeout(60_000)).receive(any(), anyLong());
+  @Test
+  public void shouldPollInRunning() throws FlyteRunner.PollingException {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
+        reverse.apply(EXECUTION_ID)), runState);
+  }
+
+  @Test
+  public void shouldReportRunErrorWhenCatchingExceptionDuringPolling()
+      throws FlyteRunner.PollingException, IsClosedException {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+    doThrow(new FlyteRunner.PollingException("Test polling exception"))
+        .when(flyteRunner)
+        .poll(any(), any());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    final var errMessage = "Test polling exception";
+
+    verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, errMessage),
+        runState.counter());
+  }
+
+  private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
+    final FlyteIdentifier flyteIdentifier =
+        executionDescription.flyteExecConf().orElseThrow().referenceId();
+    return FlyteExecutionId.create(flyteIdentifier.project(), flyteIdentifier.domain(), executionId);
   }
 }

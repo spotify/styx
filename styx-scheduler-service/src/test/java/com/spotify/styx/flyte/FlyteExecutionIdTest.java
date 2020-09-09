@@ -46,18 +46,18 @@ public class FlyteExecutionIdTest {
                 .build())
             .build();
     final FlyteExecutionId flyteExecutionId = FlyteExecutionId.fromProto(response);
-    assertThat(flyteExecutionId.getProject(), is("flyte-test"));
-    assertThat(flyteExecutionId.getDomain(), is("testing"));
-    assertThat(flyteExecutionId.getName(), is("test-from-proto-creation"));
+    assertThat(flyteExecutionId.project(), is("flyte-test"));
+    assertThat(flyteExecutionId.domain(), is("testing"));
+    assertThat(flyteExecutionId.name(), is("test-from-proto-creation"));
     assertThat(flyteExecutionId.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
   }
 
   @Test
   public void testFromUrn() {
     final FlyteExecutionId flyteExecutionId = FlyteExecutionId.fromUrn("ex:flyte-test:testing:test-from-proto-creation");
-    assertThat(flyteExecutionId.getProject(), is("flyte-test"));
-    assertThat(flyteExecutionId.getDomain(), is("testing"));
-    assertThat(flyteExecutionId.getName(), is("test-from-proto-creation"));
+    assertThat(flyteExecutionId.project(), is("flyte-test"));
+    assertThat(flyteExecutionId.domain(), is("testing"));
+    assertThat(flyteExecutionId.name(), is("test-from-proto-creation"));
     assertThat(flyteExecutionId.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
   }
 
