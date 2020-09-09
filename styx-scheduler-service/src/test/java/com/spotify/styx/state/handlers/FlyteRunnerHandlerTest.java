@@ -25,8 +25,6 @@ import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
@@ -167,7 +165,6 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID), runState);
-
   }
 
   private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
