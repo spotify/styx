@@ -28,7 +28,11 @@ public interface FlyteRunner {
     return true;
   }
 
-  FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf) throws CreateExecutionException;
+  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
+      throws CreateExecutionException;
+
+  void poll(FlyteExecutionId flyteExecutionId, RunState runState)
+      throws PollingException;
 
   static FlyteRunner noop() {
     return new NoopFlyteRunner();
@@ -53,9 +57,6 @@ public interface FlyteRunner {
       super("Launch plan not found: " + conf.referenceId(), cause);
     }
   }
-
-  void poll(FlyteExecutionId flyteExecutionId, RunState runState)
-      throws PollingException;
 
   class PollingException extends Exception {
     public PollingException(FlyteExecutionId id, Throwable cause) {

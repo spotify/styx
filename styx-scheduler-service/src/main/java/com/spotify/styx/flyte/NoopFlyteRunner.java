@@ -34,7 +34,7 @@ class NoopFlyteRunner implements FlyteRunner {
   }
 
   @Override
-  public FlyteExecutionId createExecution(String name, FlyteExecConf flyteExecConf)
+  public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     throw new CreateExecutionException("Cannot create execution for: " + flyteExecConf);
   }

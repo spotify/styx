@@ -140,7 +140,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, stats, debug, secretWhitelist, time) -> fakeDockerRunner();
     StyxScheduler.FlyteRunnerFactory flyteRunnerFactory =
-        (config, stateManager) -> fakeFlyteRunner();
+        (id, config, stateManager) -> fakeFlyteRunner();
     WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
@@ -353,17 +353,15 @@ public class StyxSchedulerServiceFixture {
   private FlyteRunner fakeFlyteRunner() {
     return new FlyteRunner() {
       @Override
-      public FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf)
-          throws CreateExecutionException {
+      public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf) {
         final FlyteExecutionId response = FlyteExecutionId.create(flyteExecConf.referenceId().project(),
                 flyteExecConf.referenceId().domain(), name);
         flyteExecCreations.add(response);
-        return response;
+        return "fake-runner-id";
       }
 
       @Override
-      public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState)
-          throws PollingException {
+      public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
         // do nothing
       }
     };

@@ -25,6 +25,7 @@ import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
+import static flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -63,15 +64,18 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class FlyteAdminClientRunnerTest {
 
-  private static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
-      .referenceId(FlyteIdentifier.builder()
-          .project("flyte-test")
-          .domain("testing")
-          .name("wf-name")
-          .version("1234")
-          .resourceType("lp")
-          .build())
+  private static final FlyteIdentifier LAUNCH_PLAN_IDENTIFIER = FlyteIdentifier.builder()
+      .project("flyte-test")
+      .domain("testing")
+      .name("wf-name")
+      .version("1234")
+      .resourceType("lp")
       .build();
+  private static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
+      .referenceId(LAUNCH_PLAN_IDENTIFIER)
+      .build();
+
+  private static final String RUNNER_ID = "flyte-runner";
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
   @Mock private RunState runState;
@@ -81,7 +85,7 @@ public class FlyteAdminClientRunnerTest {
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    flyteRunner = new FlyteAdminClientRunner(flyteAdminClient, stateManager);
+    flyteRunner = new FlyteAdminClientRunner(RUNNER_ID, flyteAdminClient, stateManager);
   }
 
   @Test
@@ -91,22 +95,34 @@ public class FlyteAdminClientRunnerTest {
 
   @Test
   public void testCreateExecution() throws FlyteRunner.CreateExecutionException {
+    final var execName = "test-create-execution";
     when(flyteAdminClient.createExecution(any(), any(), any(), any(),any())).thenReturn(
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
                 .newBuilder()
-                .setProject("flyte-test")
-                .setDomain("testing")
-                .setName("test-create-execution")
+                .setProject(LAUNCH_PLAN_IDENTIFIER.project())
+                .setDomain(LAUNCH_PLAN_IDENTIFIER.domain())
+                .setName(execName)
                 .build())
             .build());
-    var flyteExecution = flyteRunner.createExecution("test-create-execution", FLYTE_EXEC_CONF);
 
-    assertThat(flyteExecution.project(), is("flyte-test"));
-    assertThat(flyteExecution.domain(), is("testing"));
-    assertThat(flyteExecution.name(), is("test-create-execution"));
-    assertThat(flyteExecution.toUrn(), is("ex:flyte-test:testing:test-create-execution"));
+    var runnerId = flyteRunner.createExecution(runState, execName, FLYTE_EXEC_CONF);
+
+    assertThat(runnerId, is(RUNNER_ID));
+    verify(flyteAdminClient).createExecution(
+        LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), execName,
+        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED);
+  }
+
+  private IdentifierOuterClass.Identifier toProto(FlyteIdentifier identifier) {
+    return IdentifierOuterClass.Identifier.newBuilder()
+        .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
+        .setProject(identifier.project())
+        .setDomain(identifier.domain())
+        .setName(identifier.name())
+        .setVersion(identifier.version())
+        .build();
   }
 
   @Test
@@ -116,7 +132,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
-        () -> flyteRunner.createExecution("exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -126,7 +142,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution("exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -136,7 +152,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution("exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -156,7 +172,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testTransititionRunningToTerminateSuccessfulRun() throws Exception {
+  public void testTransitionRunningToTerminateSuccessfulRun() throws Exception {
     WorkflowInstance workflowInstance = createWorkflowInstance();
 
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
@@ -174,8 +190,8 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  @Parameters(method = "parametersForTestTransititionRunningToTerminateExitCodes")
-  public void testTransititionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
+  @Parameters(method = "parametersForTestTransitionRunningToTerminateExitCodes")
+  public void testTransitionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
     WorkflowInstance workflowInstance = createWorkflowInstance();
 
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
@@ -196,7 +212,7 @@ public class FlyteAdminClientRunnerTest {
     verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 
-  private Object[] parametersForTestTransititionRunningToTerminateExitCodes() {
+  private Object[] parametersForTestTransitionRunningToTerminateExitCodes() {
     return new Object[] {
         new Object[] { Execution.WorkflowExecution.Phase.FAILED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
         new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
