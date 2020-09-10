@@ -69,10 +69,8 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
         transitionSubmitting(state, eventRouter);
         break;
       case SUBMITTED:
-        transitionSubmitted(state, eventRouter);
-        break;
       case RUNNING:
-        transitionRunning(state, eventRouter);
+        pollingExecution(state, eventRouter);
         break;
       default:
         // do nothing
@@ -105,18 +103,12 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     sendEventIgnoreClosed(state, eventRouter, "submitted", submitted);
   }
 
-  private void transitionSubmitted(RunState state, EventRouter eventRouter) {
-    LOG.info("Entered state SUBMITTED for: " + state.workflowInstance());
-    final var started = Event.started(state.workflowInstance());
-    LOG.info("Issue 'started' event for: " + state.workflowInstance());
-    sendEventIgnoreClosed(state, eventRouter, "started", started);
-  }
-
-  private void transitionRunning(RunState state, EventRouter eventRouter) {
-    LOG.info("Entered state RUNNING for: " + state.workflowInstance());
+  private void pollingExecution(RunState state, EventRouter eventRouter) {
+    LOG.info("Entered state" + state.state().toString() + " for: " + state.workflowInstance());
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
     final String executionId = state.data().executionId().orElseThrow();
     final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
+
     try {
       flyteRunner.poll(FlyteExecutionId.create(flyteExecConf.referenceId().project(), flyteExecConf.referenceId().domain(), execName), state);
     } catch (Exception e) {

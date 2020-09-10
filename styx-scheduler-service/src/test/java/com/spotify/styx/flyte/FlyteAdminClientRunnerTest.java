@@ -33,6 +33,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -232,7 +233,45 @@ public class FlyteAdminClientRunnerTest {
     verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 
-  private Object[] parametersForTestTransitionRunningToTerminateExitCodes() {
+  @Test
+  public void testTransitionSubmittedToRunning() throws Exception {
+    WorkflowInstance workflowInstance = createWorkflowInstance();
+
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
+                .setPhase(Execution.WorkflowExecution.Phase.RUNNING).build())
+            .build());
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+    when(runState.state()).thenReturn(RunState.State.SUBMITTED);
+
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
+    verify(stateManager,  timeout(60_000)).receive(Event.started(workflowInstance));
+  }
+
+  @Test
+  public void testTransitionRunningToRunningNoEventEmit() throws Exception {
+    WorkflowInstance workflowInstance = createWorkflowInstance();
+
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
+                .setPhase(Execution.WorkflowExecution.Phase.RUNNING).build())
+            .build());
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+    when(runState.state()).thenReturn(RunState.State.RUNNING);
+
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
+    verify(stateManager,  never()).receive(Event.started(workflowInstance));
+  }
+
+  private Object[] parametersForTestTransititionRunningToTerminateExitCodes() {
     return new Object[] {
         new Object[] { Execution.WorkflowExecution.Phase.FAILED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
         new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
