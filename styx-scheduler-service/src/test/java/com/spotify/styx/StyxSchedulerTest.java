@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.theInstance;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +45,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
+import com.spotify.styx.flyte.FlyteExecutionId;
+import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -266,5 +269,31 @@ public class StyxSchedulerTest {
 
     verifyNoMoreInteractions(storage);
     verifyNoMoreInteractions(stateManager);
+  }
+
+  @Test
+  public void testCreateNoopFlyteRunner() {
+    var configMap = ImmutableMap.<String, String>builder()
+        .put("styx.flyte.enabled", "false");
+    var config = ConfigFactory.parseMap(configMap.build());
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner(config, stateManager);
+
+    assertThat(flyteRunner, notNullValue());
+    assertThat(flyteRunner.isEnabled(), is(false));
+    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null));
+    assertThrows(FlyteRunner.PollingException.class, () -> flyteRunner.poll(FlyteExecutionId.create("flyte-test","testing","test"), null));
+  }
+
+  @Test
+  public void testCreateFlyteRunner() {
+    var configMap = ImmutableMap.<String, String>builder()
+        .put("styx.flyte.enabled", "true")
+        .put("styx.flyte.admin.host", "localhost")
+        .put("styx.flyte.admin.port", "81")
+        .put("styx.flyte.admin.insecure", "true");
+    var config = ConfigFactory.parseMap(configMap.build());
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner(config, stateManager);
+
+    assertThat(flyteRunner.isEnabled(), is(true));
   }
 }
