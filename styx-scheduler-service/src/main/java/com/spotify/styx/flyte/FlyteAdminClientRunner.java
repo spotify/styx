@@ -24,6 +24,7 @@ import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
+import static java.util.Objects.requireNonNull;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
@@ -37,7 +38,6 @@ import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,34 +45,39 @@ import org.slf4j.LoggerFactory;
 public class FlyteAdminClientRunner implements FlyteRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
+  private final String runnerId;
   private final FlyteAdminClient flyteAdminClient;
   private final StateManager stateManager;
 
-  public FlyteAdminClientRunner(final FlyteAdminClient flyteAdminClient,
+  public FlyteAdminClientRunner(final String runnerId,
+                                final FlyteAdminClient flyteAdminClient,
                                 final StateManager stateManager) {
-    this.flyteAdminClient = flyteAdminClient;
-    this.stateManager = stateManager;
+    this.runnerId = requireNonNull(runnerId);
+    this.flyteAdminClient = requireNonNull(flyteAdminClient);
+    this.stateManager = requireNonNull(stateManager);
   }
 
   @Override
-  public FlyteExecutionId createExecution(final String name, final FlyteExecConf flyteExecConf)
+  public String createExecution(RunState runState, final String execName, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
-    final var flyteIdentifier = flyteExecConf.referenceId();
+    final var launchPlanIdentifier = flyteExecConf.referenceId();
+
+    // TODO: verify if the execution already exist
     try {
-      final ExecutionOuterClass.ExecutionCreateResponse response = flyteAdminClient.createExecution(
-          flyteIdentifier.project(),
-          flyteIdentifier.domain(),
-          name,
+      flyteAdminClient.createExecution(
+          launchPlanIdentifier.project(),
+          launchPlanIdentifier.domain(),
+          execName,
           IdentifierOuterClass.Identifier.newBuilder()
-              .setName(flyteIdentifier.name())
-              .setProject(flyteIdentifier.project())
-              .setDomain(flyteIdentifier.domain())
+              .setName(launchPlanIdentifier.name())
+              .setProject(launchPlanIdentifier.project())
+              .setDomain(launchPlanIdentifier.domain())
               .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
-              .setVersion(flyteIdentifier.version())
+              .setVersion(launchPlanIdentifier.version())
               .build(),
           // TODO: We should propagate Styx natural trigger and what not
           ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-      return FlyteExecutionId.fromProto(response);
+      return runnerId;
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
         throw new LaunchPlanNotFound(flyteExecConf, e);
@@ -86,8 +91,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @Override
   public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
       throws PollingException {
-    Objects.requireNonNull(flyteExecutionId);
-    Objects.requireNonNull(runState);
+    requireNonNull(flyteExecutionId);
+    requireNonNull(runState);
     try {
       final ExecutionOuterClass.Execution execution =
           flyteAdminClient.getExecution(flyteExecutionId.project(),

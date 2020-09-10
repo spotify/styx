@@ -40,9 +40,6 @@ import org.slf4j.LoggerFactory;
  */
 public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
-  public static final String STATIC_RUNNER_ID = "replace-me";
-  public static final int STATIC_EXIT_CODE = 0;
-
   private static final Logger LOG = LoggerFactory.getLogger(FlyteRunnerHandler.class);
   private final FlyteRunner flyteRunner;
   private final Function<String, String> styxExecIdToFlyteNameMapper;
@@ -89,10 +86,11 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     final String executionId = state.data().executionId().orElseThrow();
     final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
 
+    final String runnerId;
     try {
       LOG.info("running:{}, conf:{}, state:{}, flyte exec name:{}",
           state.workflowInstance(), flyteExecConf, state, execName);
-      flyteRunner.createExecution(execName, flyteExecConf);
+      runnerId = flyteRunner.createExecution(state, execName, flyteExecConf);
     } catch (Exception e) {
       final var errMessage = "Failed to start execution for " + state.workflowInstance();
       LOG.error(errMessage, e);
@@ -102,8 +100,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     }
 
     // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
-    final Event submitted = Event.submitted(state.workflowInstance(), executionId,
-        STATIC_RUNNER_ID);
+    final Event submitted = Event.submitted(state.workflowInstance(), executionId, runnerId);
     LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
     sendEventIgnoreClosed(state, eventRouter, "submitted", submitted);
   }
@@ -127,7 +124,6 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
       LOG.error(errMessage, e);
       sendEventIgnoreClosed(state, eventRouter, "runError",
           Event.runError(state.workflowInstance(), e.getMessage()));
-      return;
     }
   }
 

@@ -276,11 +276,11 @@ public class StyxSchedulerTest {
     var configMap = ImmutableMap.<String, String>builder()
         .put("styx.flyte.enabled", "false");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner(config, stateManager);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager);
 
     assertThat(flyteRunner, notNullValue());
     assertThat(flyteRunner.isEnabled(), is(false));
-    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null));
+    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null, null));
     assertThrows(FlyteRunner.PollingException.class, () -> flyteRunner.poll(FlyteExecutionId.create("flyte-test","testing","test"), null));
   }
 
@@ -292,7 +292,7 @@ public class StyxSchedulerTest {
         .put("styx.flyte.admin.port", "81")
         .put("styx.flyte.admin.insecure", "true");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner(config, stateManager);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager);
 
     assertThat(flyteRunner.isEnabled(), is(true));
   }

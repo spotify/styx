@@ -214,7 +214,7 @@ public class StyxScheduler implements AppInit {
 
   @FunctionalInterface
   interface FlyteRunnerFactory {
-    FlyteRunner create(Config config, StateManager stateManager);
+    FlyteRunner create(String runnerId, Config config, StateManager stateManager);
   }
 
   @FunctionalInterface
@@ -396,7 +396,12 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
-    final FlyteRunner flyteRunner = flyteRunnerFactory.create(environment.config(), stateManager);
+    final FlyteRunner flyteRunner = flyteRunnerFactory.create(
+        //TODO: define globalFlyteRunnerId in styxConfig
+        styxConfig.get().globalDockerRunnerId(),
+        environment.config(),
+        stateManager
+    );
 
     // These output handlers will be invoked in order.
     var outputHandlers = OutputHandler.tracing(List.of(
@@ -628,7 +633,7 @@ public class StyxScheduler implements AppInit {
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 
-  static FlyteRunner createFlyteRunner(Config config, StateManager stateManager){
+  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager){
     if (!config.getBoolean(FLYTE_ENABLED)) {
       return FlyteRunner.noop();
     }
@@ -642,7 +647,7 @@ public class StyxScheduler implements AppInit {
     final ManagedChannel channel = builder.build();
 
     var stub = AdminServiceGrpc.newBlockingStub(channel);
-    return new FlyteAdminClientRunner(new FlyteAdminClient(stub), stateManager);
+    return new FlyteAdminClientRunner(runnerId, new FlyteAdminClient(stub), stateManager);
   }
 
   @VisibleForTesting

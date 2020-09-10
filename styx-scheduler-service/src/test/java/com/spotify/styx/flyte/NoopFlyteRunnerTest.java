@@ -23,12 +23,18 @@ package com.spotify.styx.flyte;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 
+import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class NoopFlyteRunnerTest {
 
   private final NoopFlyteRunner runner = new NoopFlyteRunner();
+  @Mock private RunState runState;
 
   @Test
   public void testRunnerInNotEnabled() {
@@ -39,7 +45,7 @@ public class NoopFlyteRunnerTest {
   public void testCreateExecutionThrowsException() {
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> runner.createExecution("name", TestData.FLYTE_EXEC_CONF)
+        () -> runner.createExecution(runState, "name", TestData.FLYTE_EXEC_CONF)
     );
   }
 
