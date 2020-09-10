@@ -84,19 +84,6 @@ public class FlyteRunnerHandlerTest {
         runState.counter());
   }
 
-  @Test
-  public void shouldTransitionIntoRunning() throws Exception {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, StateData.newBuilder()
-        .executionId(EXECUTION_ID)
-        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
-        .build());
-
-    flyteRunnerHandler.transitionInto(runState, eventRouter);
-
-    verify(eventRouter).receive(Event.started(WORKFLOW_INSTANCE),
-        runState.counter());
-  }
-
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
   @Test
   public void shouldHaltIfMissingExecutionDescription(State state) {
@@ -167,6 +154,19 @@ public class FlyteRunnerHandlerTest {
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
         EXECUTION_NAME), runState);
+  }
+
+  @Test
+  public void shouldPollInSubmitted() throws FlyteRunner.PollingException {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
+        reverse.apply(EXECUTION_ID)), runState);
   }
 
   @Test
