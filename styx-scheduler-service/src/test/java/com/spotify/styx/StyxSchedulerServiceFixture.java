@@ -140,7 +140,7 @@ public class StyxSchedulerServiceFixture {
     StyxScheduler.DockerRunnerFactory dockerRunnerFactory =
         (id, env, states, stats, debug, secretWhitelist, time) -> fakeDockerRunner();
     StyxScheduler.FlyteRunnerFactory flyteRunnerFactory =
-        (env) -> fakeFlyteRunner();
+        (config, stateManager) -> fakeFlyteRunner();
     WorkflowResourceDecorator resourceDecorator = (rs, cfg, res) ->
         Sets.union(res, resourceIdsToDecorateWith);
     StyxScheduler.EventConsumerFactory eventConsumerFactory =
