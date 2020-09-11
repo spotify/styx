@@ -157,9 +157,10 @@ public class StyxScheduler implements AppInit {
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
   private static final String FLYTE_ENABLED = "styx.flyte.enabled";
-  private static final String FLYTEADMIN_HOST = "styx.flyte.admin.host";
-  private static final String FLYTEADMIN_PORT = "styx.flyte.admin.port";
-  private static final String FLYTEADMIN_INSECURE = "styx.flyte.admin.insecure";
+  private static final String FLYTEADMIN_PATH = "styx.flyte.admin";
+  private static final String FLYTEADMIN_HOST = "host";
+  private static final String FLYTEADMIN_PORT = "port";
+  private static final String FLYTEADMIN_INSECURE = "insecure";
 
   private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -396,11 +397,10 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
-    final FlyteRunner flyteRunner = flyteRunnerFactory.create(
+    final FlyteRunner flyteRunner = FlyteRunner.routing(
+        id -> flyteRunnerFactory.create(id, environment.config(), stateManager),
         //TODO: define globalFlyteRunnerId in styxConfig
-        styxConfig.get().globalDockerRunnerId(),
-        environment.config(),
-        stateManager
+        runnerId
     );
 
     // These output handlers will be invoked in order.
@@ -633,21 +633,31 @@ public class StyxScheduler implements AppInit {
         serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
   }
 
-  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager){
+  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager) {
     if (!config.getBoolean(FLYTE_ENABLED)) {
       return FlyteRunner.noop();
     }
 
+    var flyteAdminClient = getFlyteAdminClient(config, runnerId);
+    return new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
+  }
+
+  private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId) {
+    var flyteAdminRootConfig = rootConfig.getConfig(FLYTEADMIN_PATH);
+    if (!flyteAdminRootConfig.hasPath(runnerId)) {
+      throw new IllegalArgumentException("There is no configuration for flyte admin for runner id: " + runnerId);
+    }
+
+    var config = flyteAdminRootConfig.getConfig(runnerId);
     var builder =
-        ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST),
-            config.getInt(FLYTEADMIN_PORT));
+        ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST), config.getInt(FLYTEADMIN_PORT));
     if (config.getBoolean(FLYTEADMIN_INSECURE)) {
       builder.usePlaintext();
     }
     final ManagedChannel channel = builder.build();
 
     var stub = AdminServiceGrpc.newBlockingStub(channel);
-    return new FlyteAdminClientRunner(runnerId, new FlyteAdminClient(stub), stateManager);
+    return new FlyteAdminClient(stub);
   }
 
   @VisibleForTesting

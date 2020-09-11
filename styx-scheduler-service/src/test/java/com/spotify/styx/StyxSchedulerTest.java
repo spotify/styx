@@ -22,11 +22,11 @@ package com.spotify.styx;
 
 import static com.spotify.styx.model.Schedule.DAYS;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.theInstance;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
@@ -288,12 +288,27 @@ public class StyxSchedulerTest {
   public void testCreateFlyteRunner() {
     var configMap = ImmutableMap.<String, String>builder()
         .put("styx.flyte.enabled", "true")
-        .put("styx.flyte.admin.host", "localhost")
-        .put("styx.flyte.admin.port", "81")
-        .put("styx.flyte.admin.insecure", "true");
+        .put("styx.flyte.admin.production.host", "localhost")
+        .put("styx.flyte.admin.production.port", "81")
+        .put("styx.flyte.admin.production.insecure", "true");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("production", config, stateManager);
 
     assertThat(flyteRunner.isEnabled(), is(true));
+  }
+
+  @Test
+  public void testCreateFlyteRunnerForMissingRunnerIdConfig() {
+    var configMap = ImmutableMap.<String, String>builder()
+        .put("styx.flyte.enabled", "true")
+        .put("styx.flyte.admin.production.host", "localhost")
+        .put("styx.flyte.admin.production.port", "81")
+        .put("styx.flyte.admin.production.insecure", "true");
+    var config = ConfigFactory.parseMap(configMap.build());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> StyxScheduler.createFlyteRunner("staging", config, stateManager)
+    );
   }
 }
