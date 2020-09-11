@@ -146,7 +146,7 @@ public class FlyteRunnerHandlerTest {
 
   @Test()
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
-  public void shouldNotThrowExceptionIfEvenRouterIsClosed(State state) throws Exception {
+  public void shouldNotThrowExceptionIfEventRouterIsClosed(State state) throws Exception {
     doThrow(IsClosedException.class).when(eventRouter).receive(any(), anyLong());
     RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
         .executionId(EXECUTION_ID)

@@ -61,8 +61,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   public String createExecution(RunState runState, final String execName, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     requireNonNull(runState, "runState");
-    requireNonNull(runState, "name");
-    requireNonNull(runState, "flyteExecConf");
+    requireNonNull(execName, "name");
+    requireNonNull(flyteExecConf, "flyteExecConf");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
 
     // TODO: verify if the execution already exist
