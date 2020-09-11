@@ -128,6 +128,7 @@ public class DatastoreStorage implements Closeable {
 
   private static final String PROPERTY_CONFIG_ENABLED = "enabled";
   static final String PROPERTY_CONFIG_DOCKER_RUNNER_ID = "dockerRunnerId";
+  static final String PROPERTY_CONFIG_FLYTE_RUNNER_ID = "flyteRunnerId";
   private static final String PROPERTY_CONFIG_CONCURRENCY = "concurrency";
   static final String PROPERTY_CONFIG_CLIENT_BLACKLIST = "clientBlacklist";
   private static final String PROPERTY_CONFIG_DEBUG_ENABLED = "debug";
@@ -174,6 +175,7 @@ public class DatastoreStorage implements Closeable {
 
   private static final boolean DEFAULT_CONFIG_ENABLED = true;
   private static final String DEFAULT_CONFIG_DOCKER_RUNNER_ID = "default";
+  private static final String DEFAULT_CONFIG_FLYTE_RUNNER_ID = "default";
   private static final boolean DEFAULT_WORKFLOW_ENABLED = false;
   private static final boolean DEFAULT_CONFIG_DEBUG_ENABLED = false;
 
@@ -227,6 +229,8 @@ public class DatastoreStorage implements Closeable {
         .submissionRateLimit(readOpt(entity, PROPERTY_SUBMISSION_RATE_LIMIT))
         .globalDockerRunnerId(
             read(entity, PROPERTY_CONFIG_DOCKER_RUNNER_ID, DEFAULT_CONFIG_DOCKER_RUNNER_ID))
+        .globalFlyteRunnerId(
+            read(entity, PROPERTY_CONFIG_FLYTE_RUNNER_ID, DEFAULT_CONFIG_FLYTE_RUNNER_ID))
         .clientBlacklist(this.<String>readStream(entity, PROPERTY_CONFIG_CLIENT_BLACKLIST)
             .collect(toSet()))
         .build();

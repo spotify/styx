@@ -66,10 +66,11 @@ public class StateUtilTest {
   @Mock private TimeoutConfig timeoutConfig;
   @Mock private Supplier<Map<WorkflowId, Workflow>> workflowCache;
 
-  private WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
+  private final WorkflowResourceDecorator resourceDecorator = WorkflowResourceDecorator.NOOP;
   final private StyxConfig config = StyxConfig.newBuilder()
       .globalConcurrency(Optional.of(100L))
       .globalDockerRunnerId("")
+      .globalFlyteRunnerId("")
       .build();
 
   @Before

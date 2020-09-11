@@ -57,7 +57,7 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
-import com.spotify.styx.docker.DockerRunnerId;
+import com.spotify.styx.docker.RunnerId;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
 import com.spotify.styx.flyte.FlyteAdminClientRunner;
 import com.spotify.styx.flyte.FlyteRunner;
@@ -384,23 +384,23 @@ public class StyxScheduler implements AppInit {
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
-    final Function<RunState, String> runnerId = new DockerRunnerId(styxConfig);
     final Debug debug = () -> styxConfig.get().debugEnabled();
     var secretWhitelist =
         get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     var workflowValidator = new ExtendedWorkflowValidator(
         new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
 
+    final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
         id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
-        runnerId);
+        dockerRunnerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
+    final Function<RunState, String> flyteRunnerId = RunnerId.flyteRunnerId(styxConfig);
     final FlyteRunner flyteRunner = FlyteRunner.routing(
         id -> flyteRunnerFactory.create(id, environment.config(), stateManager),
-        //TODO: define globalFlyteRunnerId in styxConfig
-        runnerId
+        flyteRunnerId
     );
 
     // These output handlers will be invoked in order.

@@ -33,6 +33,11 @@ public interface StyxConfig {
   String globalDockerRunnerId();
 
   /**
+   * Get the id of the current flyte runner id
+   */
+  String globalFlyteRunnerId();
+
+  /**
    * Get the global enabled flag for Styx.
    */
   boolean globalEnabled();
