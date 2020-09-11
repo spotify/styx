@@ -271,7 +271,7 @@ public class FlyteAdminClientRunnerTest {
     verify(stateManager,  never()).receive(Event.started(workflowInstance));
   }
 
-  private Object[] parametersForTestTransititionRunningToTerminateExitCodes() {
+  private Object[] parametersForTestTransitionRunningToTerminateExitCodes() {
     return new Object[] {
         new Object[] { Execution.WorkflowExecution.Phase.FAILED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
         new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "USER:NotReady", MISSING_DEPS_EXIT_CODE },
