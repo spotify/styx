@@ -591,6 +591,16 @@ public class DatastoreStorageTest {
   }
 
   @Test
+  public void getsGlobalFlyteRunnerId() throws Exception {
+    Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
+        .set(DatastoreStorage.PROPERTY_CONFIG_FLYTE_RUNNER_ID, "foobar")
+        .build();
+    datastoreClient.put(config);
+
+    assertThat(storage.config().globalFlyteRunnerId(), is("foobar"));
+  }
+
+  @Test
   public void shouldReturnEmptyClientBlacklist() throws IOException {
     Entity config = Entity.newBuilder(DatastoreStorage.globalConfigKey(datastore.newKeyFactory()))
         .set(DatastoreStorage.PROPERTY_CONFIG_CLIENT_BLACKLIST,
@@ -745,6 +755,7 @@ public class DatastoreStorageTest {
   public void testDefaultConfig() throws IOException {
     final StyxConfig expectedConfig = StyxConfig.newBuilder()
         .globalDockerRunnerId("default")
+        .globalFlyteRunnerId("default")
         .globalEnabled(true)
         .debugEnabled(false)
         .build();

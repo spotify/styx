@@ -20,25 +20,37 @@
 
 package com.spotify.styx.docker;
 
+import static java.util.Objects.requireNonNull;
+
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.state.RunState;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class DockerRunnerId implements Function<RunState, String> {
+public class RunnerId implements Function<RunState, String> {
 
-  private Supplier<StyxConfig> styxConfig;
+  private final Supplier<StyxConfig> styxConfig;
+  private final Function<StyxConfig, String> extractorFunction;
 
-  public DockerRunnerId(Supplier<StyxConfig> styxConfig) {
-    this.styxConfig = Objects.requireNonNull(styxConfig, "styxConfig");
+  private RunnerId(Supplier<StyxConfig> styxConfig,
+                  Function<StyxConfig, String> extractorFunction) {
+    this.styxConfig = requireNonNull(styxConfig, "styxConfig");
+    this.extractorFunction = requireNonNull(extractorFunction, "extractorFunction");
   }
 
   @Override
   public String apply(RunState runState) {
     if (runState.state() == RunState.State.SUBMITTING) {
-      return styxConfig.get().globalDockerRunnerId();
+      return extractorFunction.apply(styxConfig.get());
     }
-    return runState.data().runnerId().orElseGet(() -> styxConfig.get().globalDockerRunnerId());
+    return runState.data().runnerId().orElseGet(() -> extractorFunction.apply(styxConfig.get()));
+  }
+
+  public static RunnerId dockerRunnerId(Supplier<StyxConfig> styxConfig) {
+    return new RunnerId(styxConfig, StyxConfig::globalDockerRunnerId);
+  }
+
+  public static RunnerId flyteRunnerId(Supplier<StyxConfig> styxConfig) {
+    return new RunnerId(styxConfig, StyxConfig::globalFlyteRunnerId);
   }
 }
