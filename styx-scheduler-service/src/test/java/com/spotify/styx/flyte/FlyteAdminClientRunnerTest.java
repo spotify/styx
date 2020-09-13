@@ -46,7 +46,9 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.Execution;
@@ -77,9 +79,13 @@ public class FlyteAdminClientRunnerTest {
       .build();
 
   private static final String RUNNER_ID = "flyte-runner";
+  private static final WorkflowInstance WORKFLOW_INSTANCE = createWorkflowInstance();
+  private static final FlyteExecutionId FLYTE_EXECUTION_ID =
+      FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+  private static final RunState RUN_STATE = runState();
+
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
-  @Mock private RunState runState;
 
   private FlyteAdminClientRunner flyteRunner;
 
@@ -108,7 +114,7 @@ public class FlyteAdminClientRunnerTest {
                 .build())
             .build());
 
-    var runnerId = flyteRunner.createExecution(runState, execName, FLYTE_EXEC_CONF);
+    var runnerId = flyteRunner.createExecution(RUN_STATE, execName, FLYTE_EXEC_CONF);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
@@ -133,7 +139,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -143,7 +149,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -153,14 +159,14 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
   public void testPollFlyteExecutionIdCannotBeNull() {
     assertThrows(
         NullPointerException.class,
-        () ->    flyteRunner.poll(null, RunState.create(null, null))
+        () -> flyteRunner.poll(null, RUN_STATE)
     );
   }
 
@@ -168,26 +174,21 @@ public class FlyteAdminClientRunnerTest {
   public void testPollRunStateCannotBeNull() {
     assertThrows(
         NullPointerException.class,
-        () ->    flyteRunner.poll(FlyteExecutionId.create("flyte-test", "testing", "test-run-state-cannot-be-null"), null)
+        () -> flyteRunner.poll(FLYTE_EXECUTION_ID, null)
     );
   }
 
   @Test
   public void testTransitionRunningToTerminateSuccessfulRun() throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
             .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
                     .setPhase(Execution.WorkflowExecution.Phase.SUCCEEDED).build())
             .build());
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, runState);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(0)));
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
   }
 
   @Test
@@ -205,11 +206,8 @@ public class FlyteAdminClientRunnerTest {
                     .build())
                 .setPhase(phase).build())
             .build());
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, runState);
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
     verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
   }
 
@@ -232,13 +230,9 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new StatusRuntimeException(Status.NOT_FOUND))
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
-
     assertThrows(
         FlyteRunner.ExecutionNotFoundException.class,
-        () -> flyteRunner.poll(
-            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+        () -> flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE));
   }
 
   @Test
@@ -246,13 +240,9 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new StatusRuntimeException(Status.INTERNAL))
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
-
     assertThrows(
         FlyteRunner.PollingException.class,
-        () -> flyteRunner.poll(
-            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+        () -> flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE));
   }
 
   @Test
@@ -260,55 +250,53 @@ public class FlyteAdminClientRunnerTest {
     doThrow(new RuntimeException())
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
 
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
-
     assertThrows(
         FlyteRunner.PollingException.class,
-        () -> flyteRunner.poll(
-            FlyteExecutionId.create("flyte-test", "testing", "test-flyte-admin-client-exception-during-poll"), runState));
+        () -> flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE));
   }
 
   @Test
   public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
-
     doThrow(new IsClosedException())
-        .when(stateManager).receive(Event.terminate(workflowInstance, Optional.of(SUCCESS_EXIT_CODE)));
+        .when(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
 
     assertThrows(
         IsClosedException.class,
         () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
             ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
-                Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), runState));
+                Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE));
   }
 
   @Test
   public void testUndefinedShouldNotInteractWithStateManager() throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
             .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
                 .setPhase(Execution.WorkflowExecution.Phase.UNDEFINED).build())
             .build());
-    when(runState.workflowInstance()).thenReturn(workflowInstance);
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, runState);
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
 
     verifyNoInteractions(stateManager);
   }
 
-  private WorkflowInstance createWorkflowInstance() {
+  private static RunState runState() {
+    return RunState.create(
+        WORKFLOW_INSTANCE,
+        RunState.State.SUBMITTING,
+        StateData.newBuilder()
+            .trigger(Trigger.natural())
+            .build()
+    );
+  }
+
+  private static WorkflowInstance createWorkflowInstance() {
     Workflow workflow = Workflow.create("id", configuration());
     return WorkflowInstance.create(workflow.id(), "2016-03-14");
   }
 
-  private WorkflowConfiguration configuration(String... args) {
+  private static WorkflowConfiguration configuration(String... args) {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(HOURS)
