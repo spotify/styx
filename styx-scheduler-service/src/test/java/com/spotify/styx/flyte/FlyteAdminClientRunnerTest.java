@@ -285,7 +285,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testUndefinedShouldNotThrowException() throws Exception {
+  public void testUndefinedShouldNotInteractWithStateManager() throws Exception {
     WorkflowInstance workflowInstance = createWorkflowInstance();
 
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
