@@ -45,7 +45,9 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.Execution;
@@ -79,13 +81,19 @@ public class FlyteAdminClientRunnerTest {
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
   @Mock private RunState runState;
+  @Mock private WorkflowInstance wfInstance;
 
+  private RunState stateWithTrigger;
   private FlyteAdminClientRunner flyteRunner;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     flyteRunner = new FlyteAdminClientRunner(RUNNER_ID, flyteAdminClient, stateManager);
+    stateWithTrigger = RunState.create(wfInstance, RunState.State.SUBMITTING,
+        StateData.newBuilder()
+            .trigger(Trigger.natural())
+            .build());
   }
 
   @Test
@@ -107,7 +115,8 @@ public class FlyteAdminClientRunnerTest {
                 .build())
             .build());
 
-    var runnerId = flyteRunner.createExecution(runState, execName, FLYTE_EXEC_CONF);
+    var runnerId = flyteRunner.createExecution(stateWithTrigger, execName,
+        FLYTE_EXEC_CONF);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
@@ -132,7 +141,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(stateWithTrigger, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -142,7 +151,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(stateWithTrigger, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -152,7 +161,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(runState, "exec", FLYTE_EXEC_CONF));
+        () -> flyteRunner.createExecution(stateWithTrigger, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test

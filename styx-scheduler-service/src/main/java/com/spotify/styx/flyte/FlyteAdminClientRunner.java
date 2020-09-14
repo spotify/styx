@@ -20,6 +20,7 @@
 
 package com.spotify.styx.flyte;
 
+import static com.spotify.styx.flyte.FlyteAdminClientRunnerUtil.getExecutionMode;
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
@@ -78,8 +79,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
               .setVersion(launchPlanIdentifier.version())
               .build(),
-          // TODO: We should propagate Styx natural trigger and what not
-          ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
+          getExecutionMode(runState.data()));
       return runnerId;
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {

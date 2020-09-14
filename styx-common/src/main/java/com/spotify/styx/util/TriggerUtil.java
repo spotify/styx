@@ -42,6 +42,14 @@ public class TriggerUtil {
     return trigger.accept(TriggerIsBackfillVisitor.INSTANCE);
   }
 
+  public static boolean isNatural(Trigger trigger) {
+    return trigger.accept(TriggerIsNaturalVisitor.INSTANCE);
+  }
+
+  public static boolean isAdhoc(Trigger trigger) {
+    return trigger.accept(TriggerIsAdhocVisitor.INSTANCE);
+  }
+
   public static String triggerType(Trigger trigger) {
     return trigger.accept(TriggerTypeVisitor.INSTANCE);
   }
@@ -72,6 +80,54 @@ public class TriggerUtil {
     @Override
     public Boolean backfill(String triggerId) {
       return true;
+    }
+
+    @Override
+    public Boolean unknown(String triggerId) {
+      return false;
+    }
+  }
+
+  private enum TriggerIsNaturalVisitor implements TriggerVisitor<Boolean> {
+    INSTANCE;
+
+    @Override
+    public Boolean natural() {
+      return true;
+    }
+
+    @Override
+    public Boolean adhoc(String triggerId) {
+      return false;
+    }
+
+    @Override
+    public Boolean backfill(String triggerId) {
+      return false;
+    }
+
+    @Override
+    public Boolean unknown(String triggerId) {
+      return false;
+    }
+  }
+
+  private enum TriggerIsAdhocVisitor implements TriggerVisitor<Boolean> {
+    INSTANCE;
+
+    @Override
+    public Boolean natural() {
+      return false;
+    }
+
+    @Override
+    public Boolean adhoc(String triggerId) {
+      return true;
+    }
+
+    @Override
+    public Boolean backfill(String triggerId) {
+      return false;
     }
 
     @Override

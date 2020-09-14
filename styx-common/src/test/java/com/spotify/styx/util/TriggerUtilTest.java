@@ -20,10 +20,14 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.styx.util.TriggerUtil.isAdhoc;
+import static com.spotify.styx.util.TriggerUtil.isBackfill;
+import static com.spotify.styx.util.TriggerUtil.isNatural;
 import static com.spotify.styx.util.TriggerUtil.trigger;
 import static com.spotify.styx.util.TriggerUtil.triggerType;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import com.spotify.styx.state.Trigger;
 import org.junit.Test;
@@ -44,5 +48,12 @@ public class TriggerUtilTest {
     assertThat(trigger("adhoc", "foo"), is(Trigger.adhoc("foo")));
     assertThat(trigger("backfill", "bar"), is(Trigger.backfill("bar")));
     assertThat(trigger("unknown", "baz"), is(Trigger.unknown("baz")));
+  }
+
+  @Test
+  public void testIsTriggerType() {
+    assertTrue(isBackfill(trigger("backfill", "triggerId")));
+    assertTrue(isNatural(trigger("natural", "triggerId")));
+    assertTrue(isAdhoc(trigger("adhoc", "triggerId")));
   }
 }
