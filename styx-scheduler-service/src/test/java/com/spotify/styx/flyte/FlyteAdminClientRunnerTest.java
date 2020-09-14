@@ -283,6 +283,23 @@ public class FlyteAdminClientRunnerTest {
                 Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), runState));
   }
 
+  @Test
+  public void testUndefinedShouldNotThrowException() throws Exception {
+    WorkflowInstance workflowInstance = createWorkflowInstance();
+
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
+                .setPhase(Execution.WorkflowExecution.Phase.UNDEFINED).build())
+            .build());
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
+  }
+
   private WorkflowInstance createWorkflowInstance() {
     Workflow workflow = Workflow.create("id", configuration());
     return WorkflowInstance.create(workflow.id(), "2016-03-14");

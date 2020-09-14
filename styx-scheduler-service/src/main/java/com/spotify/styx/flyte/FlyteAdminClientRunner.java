@@ -118,6 +118,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     final Execution.WorkflowExecution.Phase phase = execution.getClosure().getPhase();
     final FlytePhase flytePhase = FlytePhase.fromProto(phase);
     switch (flytePhase) {
+      case UNDEFINED:
+        LOG.info("Keep polling with FlytePhase UNDEFINED for: " + runState.workflowInstance());
+        break;
       case SUCCEEDED:
         LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
         stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));

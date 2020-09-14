@@ -33,6 +33,7 @@ public class FlytePhaseTest {
 
   @Test
   public void testSuccessfulMapping() {
+    assertThat(FlytePhase.fromProto(Execution.WorkflowExecution.Phase.UNDEFINED), is(FlytePhase.UNDEFINED));
     assertThat(FlytePhase.fromProto(Execution.WorkflowExecution.Phase.QUEUED), is(FlytePhase.QUEUED));
     assertThat(FlytePhase.fromProto(Execution.WorkflowExecution.Phase.RUNNING), is(FlytePhase.RUNNING));
     assertThat(FlytePhase.fromProto(Execution.WorkflowExecution.Phase.SUCCEEDING), is(FlytePhase.SUCCEEDING));
@@ -45,7 +46,7 @@ public class FlytePhaseTest {
 
   @Test
   public void testUnknownMapping() {
-    assertThrows(NoSuchElementException.class, () -> FlytePhase.fromProto(Execution.WorkflowExecution.Phase.UNDEFINED));
+    assertThrows(NoSuchElementException.class, () -> FlytePhase.fromProto(Execution.WorkflowExecution.Phase.UNRECOGNIZED));
   }
 
 
