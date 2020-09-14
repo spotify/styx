@@ -146,7 +146,7 @@ public class FlyteAdminClientRunnerTest {
   private static Object[] styxTriggerToFlyteExecMode() {
     return new Object[] {
         new Object[] { Trigger.adhoc("id"), ExecutionMode.MANUAL },
-        new Object[] { Trigger.backfill("id"), ExecutionMode.RELAUNCH },
+        new Object[] { Trigger.backfill("id"), ExecutionMode.MANUAL },
         new Object[] { Trigger.natural(), SCHEDULED },
         new Object[] { Trigger.unknown("id"), ExecutionMode.UNRECOGNIZED },
         new Object[] { null, ExecutionMode.UNRECOGNIZED }
