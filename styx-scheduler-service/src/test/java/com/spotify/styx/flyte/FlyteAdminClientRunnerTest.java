@@ -51,6 +51,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
@@ -62,6 +63,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
@@ -130,6 +132,24 @@ public class FlyteAdminClientRunnerTest {
         .setName(identifier.name())
         .setVersion(identifier.version())
         .build();
+  }
+
+  @Test
+  @Parameters(method = "styxTriggerToFlyteExecMode")
+  public void testStyxTriggerTranslateToFlyteExecutionMode(Trigger styxTrigger, ExecutionMode flyteExecMode)
+      throws FlyteRunner.CreateExecutionException {
+    flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF);
+
+    verify(flyteAdminClient).createExecution(any(), any(), any(), any(), Mockito.eq(flyteExecMode));
+  }
+
+  private static Object[] styxTriggerToFlyteExecMode() {
+    return new Object[] {
+        new Object[] { Trigger.adhoc("id"), ExecutionMode.MANUAL },
+        new Object[] { Trigger.backfill("id"), ExecutionMode.RELAUNCH },
+        new Object[] { Trigger.natural(), SCHEDULED },
+        new Object[] { Trigger.unknown("id"), ExecutionMode.UNRECOGNIZED }
+    };
   }
 
   @Test
@@ -282,11 +302,15 @@ public class FlyteAdminClientRunnerTest {
   }
 
   private static RunState runState() {
+    return runState(Trigger.natural());
+  }
+
+  private static RunState runState(Trigger trigger) {
     return RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTING,
         StateData.newBuilder()
-            .trigger(Trigger.natural())
+            .trigger(trigger)
             .build()
     );
   }

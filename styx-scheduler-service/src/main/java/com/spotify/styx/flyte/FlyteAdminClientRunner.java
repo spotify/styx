@@ -32,8 +32,11 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.Trigger;
+import com.spotify.styx.state.TriggerVisitor;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
@@ -64,6 +67,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     requireNonNull(execName, "name");
     requireNonNull(flyteExecConf, "flyteExecConf");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
+    final var execMode = runState.data().trigger()
+        .map(this::toFlyteExecutionMode)
+        .orElse(ExecutionMode.UNRECOGNIZED);
 
     // TODO: verify if the execution already exist
     try {
@@ -78,8 +84,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
               .setVersion(launchPlanIdentifier.version())
               .build(),
-          // TODO: We should propagate Styx natural trigger and what not
-          ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
+          execMode);
       return runnerId;
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
@@ -145,5 +150,29 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         default:
           return UNKNOWN_ERROR_EXIT_CODE;
     }
+  }
+
+  private ExecutionMode toFlyteExecutionMode(Trigger trigger) {
+    return trigger.accept(new TriggerVisitor<ExecutionMode>() {
+      @Override
+      public ExecutionMode natural() {
+        return ExecutionMode.SCHEDULED;
+      }
+
+      @Override
+      public ExecutionMode adhoc(String triggerId) {
+        return ExecutionMode.MANUAL;
+      }
+
+      @Override
+      public ExecutionMode backfill(String triggerId) {
+        return ExecutionMode.RELAUNCH; //TODO: verify that this means the same
+      }
+
+      @Override
+      public ExecutionMode unknown(String triggerId) {
+        return ExecutionMode.UNRECOGNIZED;
+      }
+    });
   }
 }
