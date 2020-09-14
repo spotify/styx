@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 public enum FlytePhase {
+  UNDEFINED,
   QUEUED,
   RUNNING,
   SUCCEEDING,
@@ -37,6 +38,7 @@ public enum FlytePhase {
 
   private final static Map<Execution.WorkflowExecution.Phase, FlytePhase> phaseMapper =
     ImmutableMap.<Execution.WorkflowExecution.Phase, FlytePhase>builder()
+        .put(Execution.WorkflowExecution.Phase.UNDEFINED, FlytePhase.UNDEFINED)
         .put(Execution.WorkflowExecution.Phase.QUEUED, FlytePhase.QUEUED)
         .put(Execution.WorkflowExecution.Phase.RUNNING, FlytePhase.RUNNING)
         .put(Execution.WorkflowExecution.Phase.SUCCEEDING, FlytePhase.SUCCEEDING)
@@ -49,7 +51,7 @@ public enum FlytePhase {
 
   public static FlytePhase fromProto(Execution.WorkflowExecution.Phase phase) {
     if (!phaseMapper.containsKey(phase)) {
-      throw new NoSuchElementException();
+      throw new NoSuchElementException("Could not find phase with name: " + phase.name());
     }
     return phaseMapper.get(phase);
   }

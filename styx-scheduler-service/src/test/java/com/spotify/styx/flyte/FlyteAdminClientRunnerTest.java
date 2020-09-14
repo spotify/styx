@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.client.FlyteAdminClient;
@@ -281,6 +282,25 @@ public class FlyteAdminClientRunnerTest {
         () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
             ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
                 Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), runState));
+  }
+
+  @Test
+  public void testUndefinedShouldNotInteractWithStateManager() throws Exception {
+    WorkflowInstance workflowInstance = createWorkflowInstance();
+
+    when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
+        ExecutionOuterClass.Execution
+            .newBuilder()
+            .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
+                .setPhase(Execution.WorkflowExecution.Phase.UNDEFINED).build())
+            .build());
+    when(runState.workflowInstance()).thenReturn(workflowInstance);
+
+    final FlyteExecutionId flyteExecutionId =
+        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
+    flyteRunner.poll(flyteExecutionId, runState);
+
+    verifyNoInteractions(stateManager);
   }
 
   private WorkflowInstance createWorkflowInstance() {
