@@ -148,7 +148,8 @@ public class FlyteAdminClientRunnerTest {
         new Object[] { Trigger.adhoc("id"), ExecutionMode.MANUAL },
         new Object[] { Trigger.backfill("id"), ExecutionMode.RELAUNCH },
         new Object[] { Trigger.natural(), SCHEDULED },
-        new Object[] { Trigger.unknown("id"), ExecutionMode.UNRECOGNIZED }
+        new Object[] { Trigger.unknown("id"), ExecutionMode.UNRECOGNIZED },
+        new Object[] { null, ExecutionMode.UNRECOGNIZED }
     };
   }
 
@@ -310,7 +311,7 @@ public class FlyteAdminClientRunnerTest {
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTING,
         StateData.newBuilder()
-            .trigger(trigger)
+            .trigger(Optional.ofNullable(trigger))
             .build()
     );
   }
