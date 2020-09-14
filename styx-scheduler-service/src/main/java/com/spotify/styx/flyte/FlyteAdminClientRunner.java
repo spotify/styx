@@ -153,26 +153,31 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   private ExecutionMode toFlyteExecutionMode(Trigger trigger) {
-    return trigger.accept(new TriggerVisitor<ExecutionMode>() {
-      @Override
-      public ExecutionMode natural() {
-        return ExecutionMode.SCHEDULED;
-      }
+    return trigger.accept(TriggerToExecutionModeVisitor.INSTANCE);
+  }
 
-      @Override
-      public ExecutionMode adhoc(String triggerId) {
-        return ExecutionMode.MANUAL;
-      }
+  private static class TriggerToExecutionModeVisitor implements TriggerVisitor<ExecutionMode> {
+    private static final TriggerToExecutionModeVisitor INSTANCE = new TriggerToExecutionModeVisitor();
 
-      @Override
-      public ExecutionMode backfill(String triggerId) {
-        return ExecutionMode.RELAUNCH; //TODO: verify that this means the same
-      }
+    @Override
+    public ExecutionMode natural() {
+      return ExecutionMode.SCHEDULED;
+    }
 
-      @Override
-      public ExecutionMode unknown(String triggerId) {
-        return ExecutionMode.UNRECOGNIZED;
-      }
-    });
+    @Override
+    public ExecutionMode adhoc(String triggerId) {
+      return ExecutionMode.MANUAL;
+    }
+
+    @Override
+    public ExecutionMode backfill(String triggerId) {
+      // Backfills in Styx doesn't provide idempotency guaranties so ExecutionMode.RELAUNCH doesn't apply
+      return ExecutionMode.MANUAL;
+    }
+
+    @Override
+    public ExecutionMode unknown(String triggerId) {
+      return ExecutionMode.UNRECOGNIZED;
+    }
   }
 }
