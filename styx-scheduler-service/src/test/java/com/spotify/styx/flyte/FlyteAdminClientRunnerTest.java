@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.client.FlyteAdminClient;
@@ -298,6 +299,8 @@ public class FlyteAdminClientRunnerTest {
     final FlyteExecutionId flyteExecutionId =
         FlyteExecutionId.create("flyte-test", "testing", "execution-name");
     flyteRunner.poll(flyteExecutionId, runState);
+
+    verifyNoInteractions(stateManager);
   }
 
   private WorkflowInstance createWorkflowInstance() {
