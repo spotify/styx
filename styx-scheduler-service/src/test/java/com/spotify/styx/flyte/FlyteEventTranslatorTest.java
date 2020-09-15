@@ -108,6 +108,14 @@ public class FlyteEventTranslatorTest {
   }
 
   @Test
+  public void submittedToSubmittedWithUndefinedPhase(){
+    assertNoEvent(
+        RunState.State.SUBMITTED,
+        createExecution(Execution.WorkflowExecution.Phase.UNDEFINED)
+    );
+  }
+
+  @Test
   public void submittedToRunning(){
     assertGeneratesEventsAndTransitions(
         RunState.State.SUBMITTED,
