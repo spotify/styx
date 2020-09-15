@@ -118,7 +118,8 @@ public class AbstractRunnerHandlerTest {
     return new RunState.State[] {
         RunState.State.SUBMITTING,
         RunState.State.SUBMITTED,
-        RunState.State.RUNNING
+        RunState.State.RUNNING,
+        RunState.State.ERROR
     };
   }
 
@@ -130,7 +131,6 @@ public class AbstractRunnerHandlerTest {
         RunState.State.PREPARE,
         RunState.State.TERMINATED,
         RunState.State.FAILED,
-        RunState.State.ERROR,
         RunState.State.DONE
     };
   }
