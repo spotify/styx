@@ -304,10 +304,11 @@ public class FlyteAdminClientRunnerTest {
             .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
                 .setPhase(Execution.WorkflowExecution.Phase.RUNNING).build())
             .build());
+    RunState state = runState(RunState.State.RUNNING);
 
     final FlyteExecutionId flyteExecutionId =
         FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, RUN_STATE_SUBMITTED);
+    flyteRunner.poll(flyteExecutionId, state);
     verify(stateManager,  never()).receive(Event.started(workflowInstance));
   }
 
