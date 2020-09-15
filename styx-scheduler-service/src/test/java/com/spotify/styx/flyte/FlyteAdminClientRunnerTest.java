@@ -20,6 +20,7 @@
 
 package com.spotify.styx.flyte;
 
+import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
@@ -183,6 +184,30 @@ public class FlyteAdminClientRunnerTest {
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
+  }
+
+  @Test
+  public void testTerminateExecution() {
+    flyteRunner.terminateExecution(RUN_STATE, FLYTE_EXECUTION_ID);
+
+    verify(flyteAdminClient).terminateExecution(
+        FLYTE_EXECUTION_ID.project(), FLYTE_EXECUTION_ID.domain(), FLYTE_EXECUTION_ID.name(), TERMINATE_CAUSE);
+  }
+
+  @Test
+  @Parameters(method = "terminateExecutionExceptions")
+  public void testNoExceptionThrownFromTerminateExecution(Throwable ex) {
+    doThrow(ex).when(flyteAdminClient).terminateExecution(any(), any(), any(), any());
+
+    flyteRunner.terminateExecution(RUN_STATE, FLYTE_EXECUTION_ID);
+  }
+
+  private static Throwable[] terminateExecutionExceptions() {
+    return new Throwable[] {
+        new StatusRuntimeException(Status.NOT_FOUND),
+        new StatusRuntimeException(Status.UNKNOWN),
+        new RuntimeException("test")
+    };
   }
 
   @Test

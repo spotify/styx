@@ -44,6 +44,8 @@ import org.slf4j.LoggerFactory;
 public class FlyteAdminClientRunner implements FlyteRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
+  @VisibleForTesting static final String TERMINATE_CAUSE = "Styx halt";
+
   private final String runnerId;
   private final FlyteAdminClient flyteAdminClient;
   private final StateManager stateManager;
@@ -89,6 +91,27 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       throw new CreateExecutionException(flyteExecConf, e);
     } catch (Exception e) {
       throw new CreateExecutionException(flyteExecConf, e);
+    }
+  }
+
+  @Override
+  public void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId) {
+    requireNonNull(runState, "runState");
+    requireNonNull(flyteExecutionId, "flyteExecutionId");
+    try {
+      flyteAdminClient.terminateExecution(
+          flyteExecutionId.project(),
+          flyteExecutionId.domain(),
+          flyteExecutionId.name(),
+          TERMINATE_CAUSE);
+    } catch (StatusRuntimeException e) {
+      if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
+        LOG.warn("Trying to terminate non existent flyte execution: {}", flyteExecutionId);
+        return;
+      } // TODO: Consider other status codes that could be interesting
+      LOG.warn("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
+    } catch (Exception e) {
+      LOG.warn("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
     }
   }
 

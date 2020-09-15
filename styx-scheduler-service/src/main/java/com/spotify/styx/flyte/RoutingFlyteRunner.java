@@ -42,6 +42,11 @@ public class RoutingFlyteRunner extends AbstractRoutingRunner<FlyteRunner>
   }
 
   @Override
+  public void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId) {
+    runner(runState).terminateExecution(runState, flyteExecutionId);
+  }
+
+  @Override
   public void poll(FlyteExecutionId flyteExecutionId, RunState runState) throws PollingException {
     runner(runState).poll(flyteExecutionId, runState);
   }
