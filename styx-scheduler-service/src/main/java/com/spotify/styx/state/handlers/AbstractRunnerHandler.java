@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * An abstract {@link OutputHandler} that verify that {@link RunState} contains {@code executionId} and
- * {@code executionDescription} before delegating transitioning to sub-classes.
+ * {@code executionDescription} for the {@link RunState#state()} {@link RunState.State#SUBMITTING},
+ * {@link RunState.State#SUBMITTED} and {@link RunState.State#RUNNING}, before delegating transitioning to sub-classes.
  */
 abstract class AbstractRunnerHandler implements OutputHandler {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractRunnerHandler.class);
@@ -65,18 +66,20 @@ abstract class AbstractRunnerHandler implements OutputHandler {
           return;
         }
 
+        //fallthrough
+      case ERROR:
         safeTransitionInto(state, eventRouter);
 
       default:
-        // Any other state we just return as RunnerHandlers only care about SUBMITTING, SUBMITTED and RUNNING
+        // Any other state we just return as RunnerHandlers only care about SUBMITTING, SUBMITTED, RUNNING and ERROR
     }
   }
 
   /**
    * Same as {@link #transitionInto(RunState, EventRouter)} but subclasses can trust that {@link RunState}'s
    * {@link StateData#executionId()} and {@link StateData#executionDescription()} are both present when
-   * {@link RunState#state()} is {@link RunState.State#SUBMITTING}, {@link RunState.State#SUBMITTED} or
-   * {@link RunState.State#RUNNING}.
+   * {@link RunState#state()} is {@link RunState.State#SUBMITTING}, {@link RunState.State#SUBMITTED},
+   * {@link RunState.State#RUNNING} or {@link RunState.State#ERROR}.
    */
   protected abstract void safeTransitionInto(RunState state, EventRouter eventRouter);
 }
