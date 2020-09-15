@@ -20,10 +20,7 @@
 
 package com.spotify.styx.flyte;
 
-import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
-import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
-import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
-import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
+import static com.spotify.styx.flyte.FlyteEventTranslator.translate;
 import static java.util.Objects.requireNonNull;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -37,11 +34,10 @@ import com.spotify.styx.state.TriggerVisitor;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
-import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import java.util.Optional;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,41 +116,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting
   void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState)
       throws IsClosedException {
-    final Execution.WorkflowExecution.Phase phase = execution.getClosure().getPhase();
-    final FlytePhase flytePhase = FlytePhase.fromProto(phase);
-    switch (flytePhase) {
-      case UNDEFINED:
-        LOG.info("Keep polling with FlytePhase UNDEFINED for: " + runState.workflowInstance());
-        break;
-      case RUNNING:
-        if (runState.state() == RunState.State.SUBMITTED) {
-          LOG.info("Issue 'started' event for: " + runState.workflowInstance());
-          stateManager.receive(Event.started(runState.workflowInstance()));
-        }
-        break;
-      case SUCCEEDED:
-        LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
-        stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(SUCCESS_EXIT_CODE)));
-        break;
-      case FAILED:
-      case ABORTED:
-      case TIMED_OUT:
-        final String flyteCode = execution.getClosure().getError().getCode();
-        final int styxCode = flyteErrorCodeToStyx(flyteCode);
-        LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
-        stateManager.receive(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
-        break;
-    }
-  }
-
-  private int flyteErrorCodeToStyx(final String errorCode) {
-      switch (errorCode) {
-        case "USER:NotReady":
-          return MISSING_DEPS_EXIT_CODE;
-        case "USER:NotRetryable":
-          return UNRECOVERABLE_FAILURE_EXIT_CODE;
-        default:
-          return UNKNOWN_ERROR_EXIT_CODE;
+    final List<Event> events = translate(execution, runState);
+    for (int i = 0; i < events.size(); ++i) {
+      stateManager.receive(events.get(i));
     }
   }
 
