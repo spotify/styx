@@ -40,6 +40,11 @@ class NoopFlyteRunner implements FlyteRunner {
   }
 
   @Override
+  public void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId) {
+    throw new IllegalStateException("Cannot halt execution : " + flyteExecutionId);
+  }
+
+  @Override
   public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState)
       throws PollingException {
     throw new PollingException("Cannot poll for execution: " + flyteExecutionId.toUrn());

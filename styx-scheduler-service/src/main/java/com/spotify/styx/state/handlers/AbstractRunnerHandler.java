@@ -46,17 +46,19 @@ abstract class AbstractRunnerHandler implements OutputHandler {
   @Override
   public final void transitionInto(RunState state, EventRouter eventRouter) {
     var stateData = state.data();
+    var workflowInstance = state.workflowInstance();
+    var maybeExecutionId = stateData.executionId();
+    var maybeExecutionDescription = stateData.executionDescription();
+
     switch (state.state()) {
       case SUBMITTING:
       case SUBMITTED:
       case RUNNING:
-        var workflowInstance = state.workflowInstance();
-        if (stateData.executionId().isEmpty()) {
+        if (maybeExecutionId.isEmpty()) {
           LOG.error("Unable to start procedure. Missing execution id for " + workflowInstance);
           eventRouter.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
           return;
         }
-        var maybeExecutionDescription = stateData.executionDescription();
         if (maybeExecutionDescription.isEmpty()) {
           LOG.error("Unable to start procedure. Missing execution description for " + workflowInstance);
           eventRouter.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
@@ -65,10 +67,18 @@ abstract class AbstractRunnerHandler implements OutputHandler {
         if(!applicableFn.test(maybeExecutionDescription.orElseThrow())) {
           return;
         }
-
-        //fallthrough
-      case ERROR:
         safeTransitionInto(state, eventRouter);
+        break;
+
+      case ERROR:
+        if (maybeExecutionId.isEmpty()
+            || maybeExecutionDescription.isEmpty()
+            || !applicableFn.test(maybeExecutionDescription.orElseThrow())) {
+          // No execution info or not applicable, so nothing to cleanup
+          return;
+        }
+        safeTransitionInto(state, eventRouter);
+        break;
 
       default:
         // Any other state we just return as RunnerHandlers only care about SUBMITTING, SUBMITTED, RUNNING and ERROR

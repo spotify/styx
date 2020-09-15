@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.flyte.FlyteExecutionId;
@@ -187,6 +189,43 @@ public class FlyteRunnerHandlerTest {
 
     verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, errMessage),
         runState.counter());
+  }
+
+  @Test
+  public void shouldTerminateExecutionsOnErrorState() {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.ERROR, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner).terminateExecution(runState, FLYTE_EXECUTION_ID);
+    verifyNoInteractions(eventRouter);
+  }
+
+  @Test
+  @Parameters(method = "stateDataWithNoFlyteConfiguration")
+  public void shouldDoNothingOnErrorStateWithNoFlyteRuntimeConfiguration(StateData stateData) {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.ERROR, stateData);
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner, never()).terminateExecution(any(), any());
+    verifyNoInteractions(eventRouter);
+  }
+
+  private static StateData[] stateDataWithNoFlyteConfiguration() {
+    return new StateData[] {
+        StateData.newBuilder().build(),
+        StateData.newBuilder()
+            .executionId(EXECUTION_ID)
+            .build(),
+        StateData.newBuilder()
+            .executionId(EXECUTION_ID)
+            .executionDescription(EXECUTION_DESCRIPTION) //docker
+            .build()
+    };
   }
 
   private static FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {

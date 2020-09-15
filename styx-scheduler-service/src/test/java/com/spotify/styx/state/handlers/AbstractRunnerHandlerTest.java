@@ -33,6 +33,8 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.testdata.TestData;
+import java.util.Arrays;
+import java.util.stream.Stream;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Test;
@@ -69,7 +71,7 @@ public class AbstractRunnerHandlerTest {
   }
 
   @Test
-  @Parameters(method = "relevantRunnerHandlerStates")
+  @Parameters(method = "execRunnerHandlerStates")
   public void shouldRejectStateWithNoExecutionId(RunState.State state) {
     var runState = runState(state, NO_EXEC_ID_STATE_DATA);
 
@@ -80,7 +82,7 @@ public class AbstractRunnerHandlerTest {
   }
 
   @Test
-  @Parameters(method = "relevantRunnerHandlerStates")
+  @Parameters(method = "execRunnerHandlerStates")
   public void shouldRejectStateWithNoExecutionDescription(RunState.State state) {
     var runState = runState(state, NO_EXEC_DESC_STATE_DATA);
 
@@ -114,13 +116,20 @@ public class AbstractRunnerHandlerTest {
   }
 
   @SuppressWarnings("unused")
-  private static RunState.State[] relevantRunnerHandlerStates() {
+  private static RunState.State[] execRunnerHandlerStates() {
     return new RunState.State[] {
         RunState.State.SUBMITTING,
         RunState.State.SUBMITTED,
         RunState.State.RUNNING,
-        RunState.State.ERROR
     };
+  }
+
+  @SuppressWarnings("unused")
+  private static RunState.State[] relevantRunnerHandlerStates() {
+    return Stream.concat(
+        Arrays.stream(execRunnerHandlerStates()),
+        Stream.of(RunState.State.ERROR)
+    ).toArray(RunState.State[]::new);
   }
 
   @SuppressWarnings("unused")

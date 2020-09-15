@@ -32,6 +32,8 @@ public interface FlyteRunner {
   String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException;
 
+  void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId);
+
   void poll(FlyteExecutionId flyteExecutionId, RunState runState)
       throws PollingException;
 

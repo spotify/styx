@@ -72,6 +72,8 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
       case RUNNING:
         pollingExecution(state, eventRouter);
         break;
+      case ERROR:
+        cleanUpExecution(state);
       default:
         // do nothing
     }
@@ -110,13 +112,31 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
 
     try {
-      flyteRunner.poll(FlyteExecutionId.create(flyteExecConf.referenceId().project(), flyteExecConf.referenceId().domain(), execName), state);
+      flyteRunner.poll(getExecutionId(state), state);
     } catch (Exception e) {
       final var errMessage = "Failed to poll execution for " + state.workflowInstance();
       LOG.error(errMessage, e);
       sendEventIgnoreClosed(state, eventRouter, "runError",
           Event.runError(state.workflowInstance(), e.getMessage()));
     }
+  }
+
+  private void cleanUpExecution(RunState state) {
+    flyteRunner.terminateExecution(state, getExecutionId(state));
+  }
+
+  private FlyteExecutionId getExecutionId(RunState state) {
+    final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
+    final String executionId = state.data().executionId().orElseThrow();
+    final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
+    return getFlyteExecutionId(flyteExecConf, execName);
+  }
+
+  private FlyteExecutionId getFlyteExecutionId(FlyteExecConf flyteExecConf, String execName) {
+    return FlyteExecutionId.create(
+        flyteExecConf.referenceId().project(),
+        flyteExecConf.referenceId().domain(),
+        execName);
   }
 
   private void sendEventIgnoreClosed(RunState state, EventRouter eventRouter, String eventType, Event event) {

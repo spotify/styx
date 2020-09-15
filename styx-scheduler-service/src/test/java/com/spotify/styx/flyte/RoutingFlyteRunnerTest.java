@@ -57,6 +57,14 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
   }
 
   @Test
+  public void shouldCreateRunnerOnTerminateExecution() {
+    flyteRunner.terminateExecution(runState, executionId);
+
+    assertThatCreateCountersContains("default");
+    verify(createdRunners.get("default")).terminateExecution(runState, executionId);
+  }
+
+  @Test
   public void testUsesCreatesRunnerOnPoll() throws FlyteRunner.PollingException {
     flyteRunner.poll(executionId, runState);
 
