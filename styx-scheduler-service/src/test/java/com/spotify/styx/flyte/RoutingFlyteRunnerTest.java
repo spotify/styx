@@ -65,7 +65,7 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
   }
 
   @Test
-  public void testCreatesOnlyOneRunnerPerDockerId() throws Exception {
+  public void testCreatesOnlyOneRunnerPerRunnerId() throws Exception {
     flyteRunner.createExecution(runState, EXEC_NAME, execConf);
     flyteRunner.createExecution(runState, EXEC_NAME, execConf);
 
@@ -73,7 +73,7 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
   }
 
   @Test
-  public void testSwitchesDockerRunner() throws Exception {
+  public void testSwitchesRunners() throws Exception {
     when(runnerId.apply(runState)).thenReturn("id-1", "id-2");
 
     flyteRunner.createExecution(runState, EXEC_NAME, execConf);

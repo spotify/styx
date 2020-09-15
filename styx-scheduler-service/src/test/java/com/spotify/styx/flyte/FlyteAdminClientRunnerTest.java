@@ -217,8 +217,6 @@ public class FlyteAdminClientRunnerTest {
   @Test
   @Parameters(method = "parametersForTestTransitionPollingToTerminateExitCodes")
   public void testTransitionRunningToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode, int exitCode) throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -231,15 +229,13 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
   }
 
   @Test
   @Parameters(method = "parametersForTestTransitionPollingToTerminateExitCodes")
   public void testTransitionSubmittedToTerminateExitCodes(Execution.WorkflowExecution.Phase phase, String flyteExitCode,
                                                  int exitCode) throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -251,18 +247,14 @@ public class FlyteAdminClientRunnerTest {
                 .setPhase(phase).build())
             .build());
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, RUN_STATE_SUBMITTED);
-    verify(stateManager, timeout(60_000)).receive(Event.started(workflowInstance));
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
+    verify(stateManager, timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
 
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(exitCode)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
   }
 
   @Test
   public void testTransitionSubmittedToRunning() throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -270,16 +262,12 @@ public class FlyteAdminClientRunnerTest {
                 .setPhase(Execution.WorkflowExecution.Phase.RUNNING).build())
             .build());
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(workflowInstance));
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
   }
 
   @Test
   public void testTransitionSubmittedToTerminate() throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -287,17 +275,13 @@ public class FlyteAdminClientRunnerTest {
                 .setPhase(Execution.WorkflowExecution.Phase.SUCCEEDED).build())
             .build());
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(workflowInstance));
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(workflowInstance, Optional.of(SUCCESS_EXIT_CODE)));
+    flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
   }
 
   @Test
   public void testTransitionRunningToRunningNoEventEmit() throws Exception {
-    WorkflowInstance workflowInstance = createWorkflowInstance();
-
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -306,10 +290,8 @@ public class FlyteAdminClientRunnerTest {
             .build());
     RunState state = runState(RunState.State.RUNNING);
 
-    final FlyteExecutionId flyteExecutionId =
-        FlyteExecutionId.create("flyte-test", "testing", "execution-name");
-    flyteRunner.poll(flyteExecutionId, state);
-    verify(stateManager,  never()).receive(Event.started(workflowInstance));
+    flyteRunner.poll(FLYTE_EXECUTION_ID, state);
+    verify(stateManager,  never()).receive(Event.started(WORKFLOW_INSTANCE));
   }
 
   private Object[] parametersForTestTransitionPollingToTerminateExitCodes() {
@@ -401,7 +383,7 @@ public class FlyteAdminClientRunnerTest {
         WORKFLOW_INSTANCE,
         state,
         StateData.newBuilder()
-            .trigger(Optional.ofNullable(Trigger.natural()))
+            .trigger(Trigger.natural())
             .build()
     );
   }

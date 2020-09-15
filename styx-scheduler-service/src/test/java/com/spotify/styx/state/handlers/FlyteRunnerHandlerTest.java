@@ -62,6 +62,8 @@ public class FlyteRunnerHandlerTest {
   private static final Function<String, String> reverse =
       (id) -> new StringBuilder(id).reverse().toString();
   private static final String EXECUTION_NAME = reverse.apply(EXECUTION_ID);
+  private static final FlyteExecutionId FLYTE_EXECUTION_ID = getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
+      EXECUTION_NAME);
 
   @Before
   public void setUp() {
@@ -152,8 +154,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
-        EXECUTION_NAME), runState);
+    verify(flyteRunner).poll(FLYTE_EXECUTION_ID, runState);
   }
 
   @Test
@@ -188,7 +189,7 @@ public class FlyteRunnerHandlerTest {
         runState.counter());
   }
 
-  private FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
+  private static FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {
     final FlyteIdentifier flyteIdentifier =
         executionDescription.flyteExecConf().orElseThrow().referenceId();
     return FlyteExecutionId.create(flyteIdentifier.project(), flyteIdentifier.domain(), executionId);

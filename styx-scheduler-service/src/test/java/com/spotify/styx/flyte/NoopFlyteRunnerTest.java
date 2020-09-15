@@ -33,6 +33,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class NoopFlyteRunnerTest {
 
+  private static final FlyteExecutionId FLYTE_EXECUTION_ID =
+      FlyteExecutionId.create("flyte-test", "testing", "exec-name");
+
   private final NoopFlyteRunner runner = new NoopFlyteRunner();
   @Mock private RunState runState;
 
@@ -53,8 +56,7 @@ public class NoopFlyteRunnerTest {
   public void testPollingThrowsException() {
     assertThrows(
         FlyteRunner.PollingException.class,
-        () -> runner
-            .poll(FlyteExecutionId.create("flyte-test", "testing", "noop-cannot-poll"), null)
+        () -> runner.poll(FLYTE_EXECUTION_ID, null)
     );
   }
 }
