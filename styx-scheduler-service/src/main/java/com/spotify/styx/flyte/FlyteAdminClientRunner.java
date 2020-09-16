@@ -111,9 +111,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         LOG.warn("Trying to terminate non existent flyte execution: {}", flyteExecutionId);
         return;
       } // TODO: Consider other status codes that could be interesting
-      LOG.warn("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
+      LOG.error("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
     } catch (Exception e) {
-      LOG.warn("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
+      LOG.error("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
     }
   }
 
