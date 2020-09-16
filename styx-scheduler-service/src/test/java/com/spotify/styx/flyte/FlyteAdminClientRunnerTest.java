@@ -20,7 +20,7 @@
 
 package com.spotify.styx.flyte;
 
-import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE;
+import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE_PREFIX;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
@@ -33,6 +33,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -65,7 +67,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
@@ -143,7 +144,7 @@ public class FlyteAdminClientRunnerTest {
       throws FlyteRunner.CreateExecutionException {
     flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF);
 
-    verify(flyteAdminClient).createExecution(any(), any(), any(), any(), Mockito.eq(flyteExecMode));
+    verify(flyteAdminClient).createExecution(any(), any(), any(), any(), eq(flyteExecMode));
   }
 
   private static Object[] styxTriggerToFlyteExecMode() {
@@ -191,7 +192,10 @@ public class FlyteAdminClientRunnerTest {
     flyteRunner.terminateExecution(RUN_STATE, FLYTE_EXECUTION_ID);
 
     verify(flyteAdminClient).terminateExecution(
-        FLYTE_EXECUTION_ID.project(), FLYTE_EXECUTION_ID.domain(), FLYTE_EXECUTION_ID.name(), TERMINATE_CAUSE);
+        eq(FLYTE_EXECUTION_ID.project()),
+        eq(FLYTE_EXECUTION_ID.domain()),
+        eq(FLYTE_EXECUTION_ID.name()),
+        contains(TERMINATE_CAUSE_PREFIX));
   }
 
   @Test
