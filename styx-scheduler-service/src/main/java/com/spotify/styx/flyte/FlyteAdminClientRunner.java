@@ -99,6 +99,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     requireNonNull(runState, "runState");
     requireNonNull(flyteExecutionId, "flyteExecutionId");
     try {
+      // Flyte admin tolerates terminate request over an already terminated workflow execution
+      // so no need to check that workflow execution hasn't been terminated yet
       flyteAdminClient.terminateExecution(
           flyteExecutionId.project(),
           flyteExecutionId.domain(),
@@ -140,8 +142,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState)
       throws IsClosedException {
     final List<Event> events = translate(execution, runState);
-    for (int i = 0; i < events.size(); ++i) {
-      stateManager.receive(events.get(i));
+    for (Event event : events) {
+      stateManager.receive(event);
     }
   }
 
