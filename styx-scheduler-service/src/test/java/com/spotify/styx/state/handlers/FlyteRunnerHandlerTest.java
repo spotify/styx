@@ -44,6 +44,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.IsClosedException;
+import java.util.List;
 import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -192,8 +193,9 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldTerminateExecutionsOnErrorState() {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.ERROR, StateData.newBuilder()
+  @Parameters({"FAILED", "ERROR"})
+  public void shouldTerminateExecutionsOnFailedAndErrorState(State state) {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
         .build());
@@ -206,8 +208,8 @@ public class FlyteRunnerHandlerTest {
 
   @Test
   @Parameters(method = "stateDataWithNoFlyteConfiguration")
-  public void shouldDoNothingOnErrorStateWithNoFlyteRuntimeConfiguration(StateData stateData) {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.ERROR, stateData);
+  public void shouldDoNothingOnFailedAndErrorStateWithNoFlyteRuntimeConfiguration(StateData stateData, State state) {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, stateData);
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
@@ -215,8 +217,8 @@ public class FlyteRunnerHandlerTest {
     verifyNoInteractions(eventRouter);
   }
 
-  private static StateData[] stateDataWithNoFlyteConfiguration() {
-    return new StateData[] {
+  private static Object[] stateDataWithNoFlyteConfiguration() {
+    var stateData = List.of(
         StateData.newBuilder().build(),
         StateData.newBuilder()
             .executionId(EXECUTION_ID)
@@ -225,7 +227,12 @@ public class FlyteRunnerHandlerTest {
             .executionId(EXECUTION_ID)
             .executionDescription(EXECUTION_DESCRIPTION) //docker
             .build()
-    };
+    );
+    var states = List.of(State.FAILED, State.ERROR);
+    //cartesian product
+    return stateData.stream()
+        .flatMap(data -> states.stream().map(state -> new Object[]{ data, state }))
+        .toArray();
   }
 
   private static FlyteExecutionId getFlyteExecutionId(ExecutionDescription executionDescription, String executionId) {

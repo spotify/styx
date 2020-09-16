@@ -32,8 +32,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * An abstract {@link OutputHandler} that verify that {@link RunState} contains {@code executionId} and
- * {@code executionDescription} for the {@link RunState#state()} {@link RunState.State#SUBMITTING},
- * {@link RunState.State#SUBMITTED} and {@link RunState.State#RUNNING}, before delegating transitioning to sub-classes.
+ * {@code executionDescription} for the {@link RunState#state()}s: {@link RunState.State#SUBMITTING},
+ * {@link RunState.State#SUBMITTED}, {@link RunState.State#RUNNING}, {@link RunState.State#FAILED}
+ * and {@link RunState.State#ERROR}, before delegating transitioning to sub-classes.
  */
 abstract class AbstractRunnerHandler implements OutputHandler {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractRunnerHandler.class);
@@ -70,6 +71,7 @@ abstract class AbstractRunnerHandler implements OutputHandler {
         safeTransitionInto(state, eventRouter);
         break;
 
+      case FAILED:
       case ERROR:
         if (maybeExecutionId.isEmpty()
             || maybeExecutionDescription.isEmpty()
@@ -81,7 +83,8 @@ abstract class AbstractRunnerHandler implements OutputHandler {
         break;
 
       default:
-        // Any other state we just return as RunnerHandlers only care about SUBMITTING, SUBMITTED, RUNNING and ERROR
+        // Any other state we just return as RunnerHandlers only care about:
+        // SUBMITTING, SUBMITTED, RUNNING, FAILED and ERROR
     }
   }
 
@@ -89,7 +92,7 @@ abstract class AbstractRunnerHandler implements OutputHandler {
    * Same as {@link #transitionInto(RunState, EventRouter)} but subclasses can trust that {@link RunState}'s
    * {@link StateData#executionId()} and {@link StateData#executionDescription()} are both present when
    * {@link RunState#state()} is {@link RunState.State#SUBMITTING}, {@link RunState.State#SUBMITTED},
-   * {@link RunState.State#RUNNING} or {@link RunState.State#ERROR}.
+   * {@link RunState.State#RUNNING}, {@link RunState.State#FAILED} or {@link RunState.State#ERROR}.
    */
   protected abstract void safeTransitionInto(RunState state, EventRouter eventRouter);
 }
