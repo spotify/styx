@@ -107,9 +107,6 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
   private void pollingExecution(RunState state, EventRouter eventRouter) {
     LOG.info("Entered state" + state.state().toString() + " for: " + state.workflowInstance());
-    final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
-    final String executionId = state.data().executionId().orElseThrow();
-    final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
 
     try {
       flyteRunner.poll(getExecutionId(state), state);
