@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 public class FlyteAdminClientRunner implements FlyteRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
-  @VisibleForTesting static final String TERMINATE_CAUSE = "Styx halt";
+  @VisibleForTesting static final String TERMINATE_CAUSE_PREFIX = "Styx workflow instance execution reached state: ";
 
   private final String runnerId;
   private final FlyteAdminClient flyteAdminClient;
@@ -105,7 +105,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           flyteExecutionId.project(),
           flyteExecutionId.domain(),
           flyteExecutionId.name(),
-          TERMINATE_CAUSE);
+          getCause(runState));
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
         LOG.warn("Trying to terminate non existent flyte execution: {}", flyteExecutionId);
@@ -115,6 +115,10 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Exception e) {
       LOG.warn("Couldn't terminate flyte execution: {}", flyteExecutionId, e);
     }
+  }
+
+  private String getCause(RunState runState) {
+    return TERMINATE_CAUSE_PREFIX + runState.state();
   }
 
   @Override
