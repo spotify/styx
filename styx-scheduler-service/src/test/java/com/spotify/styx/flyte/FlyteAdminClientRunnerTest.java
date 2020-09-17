@@ -29,6 +29,8 @@ import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 import static flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,6 +65,7 @@ import io.grpc.StatusRuntimeException;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -152,9 +155,22 @@ public class FlyteAdminClientRunnerTest {
         new Object[] { Trigger.adhoc("id"), ExecutionMode.MANUAL },
         new Object[] { Trigger.backfill("id"), ExecutionMode.MANUAL },
         new Object[] { Trigger.natural(), SCHEDULED },
-        new Object[] { Trigger.unknown("id"), ExecutionMode.UNRECOGNIZED },
-        new Object[] { null, ExecutionMode.UNRECOGNIZED }
     };
+  }
+
+  @Test
+  @Parameters(method = "invalidsStyxTriggerToFlyteExecMode")
+  public void testCreateExecutionThrowsExceptionForInvalidExecutionMode(Trigger styxTrigger) {
+    var exception = assertThrows(
+        FlyteRunner.CreateExecutionException.class,
+        () -> flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF)
+    );
+
+    assertThat(exception.getMessage(), containsString("Missing trigger or unknown in StateData"));
+  }
+
+  private static Trigger[] invalidsStyxTriggerToFlyteExecMode() {
+    return new Trigger[] { /* no trigger */ null, Trigger.unknown("id") };
   }
 
   @Test
@@ -422,7 +438,7 @@ public class FlyteAdminClientRunnerTest {
     return WorkflowInstance.create(workflow.id(), "2016-03-14");
   }
 
-  private static WorkflowConfiguration configuration(String... args) {
+  private static WorkflowConfiguration configuration() {
     return WorkflowConfiguration.builder()
         .id("styx.TestEndpoint")
         .schedule(HOURS)
