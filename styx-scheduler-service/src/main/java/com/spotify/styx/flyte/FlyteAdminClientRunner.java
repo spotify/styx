@@ -67,7 +67,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     final var launchPlanIdentifier = flyteExecConf.referenceId();
     final var execMode = runState.data().trigger()
         .map(this::toFlyteExecutionMode)
-        .orElse(ExecutionMode.UNRECOGNIZED);
+        .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
+        .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
     // TODO: verify if the execution already exist
     try {
