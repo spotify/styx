@@ -70,7 +70,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
         .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
-    // TODO: verify if the execution already exist
     try {
       flyteAdminClient.createExecution(
           launchPlanIdentifier.project(),
@@ -86,9 +85,15 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           execMode);
       return runnerId;
     } catch (StatusRuntimeException e) {
-      if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
-        throw new LaunchPlanNotFound(flyteExecConf, e);
-      } // TODO: Consider other status codes that could be interesting
+      switch (e.getStatus().getCode()) {
+        case ALREADY_EXISTS:
+          // TODO: 🤔 How do we make sure that we tell apart between low probabilities of collisions
+          //  on hashing of styx-run-id --> flyte exec and repetitions of same styx-id execution.
+          //  For now we always assume the later.
+          return runnerId;
+        case NOT_FOUND:
+          throw new LaunchPlanNotFound(flyteExecConf, e);
+      }
       throw new CreateExecutionException(flyteExecConf, e);
     } catch (Exception e) {
       throw new CreateExecutionException(flyteExecConf, e);

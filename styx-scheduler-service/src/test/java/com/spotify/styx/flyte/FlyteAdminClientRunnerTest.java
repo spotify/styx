@@ -29,7 +29,6 @@ import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 import static flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -65,7 +64,6 @@ import io.grpc.StatusRuntimeException;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
-import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -181,6 +179,19 @@ public class FlyteAdminClientRunnerTest {
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
+  }
+
+  @Test
+  public void testCreateExecutionForAlreadyExistsException() throws FlyteRunner.CreateExecutionException {
+    doThrow(new StatusRuntimeException(Status.ALREADY_EXISTS))
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(),any());
+
+    var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF);
+
+    assertThat(runnerId, is(RUNNER_ID));
+    verify(flyteAdminClient).createExecution(
+        LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), "exec",
+        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED);
   }
 
   @Test
