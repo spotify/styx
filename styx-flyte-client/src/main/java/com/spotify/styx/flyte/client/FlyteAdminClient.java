@@ -25,6 +25,7 @@ import static com.google.common.base.Verify.verifyNotNull;
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
+import flyteidl.core.Literals;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
 import java.util.Objects;
@@ -60,7 +61,8 @@ public class FlyteAdminClient {
       String domain,
       String name,
       IdentifierOuterClass.Identifier launchPlanId,
-      ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
+      ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
+      Literals.LiteralMap inputs) {
     log.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
@@ -83,7 +85,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                // TODO: Pass inputs
+                .setInputs(inputs)
                 .build());
 
     verifyNotNull(

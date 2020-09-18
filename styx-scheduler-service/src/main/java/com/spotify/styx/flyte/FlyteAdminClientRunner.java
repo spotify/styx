@@ -35,9 +35,12 @@ import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.IdentifierOuterClass;
+import flyteidl.core.Literals;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +85,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
               .setVersion(launchPlanIdentifier.version())
               .build(),
-          execMode);
+          execMode,
+          inputsToLiteral(flyteExecConf.inputFields()));
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {
@@ -98,6 +102,28 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Exception e) {
       throw new CreateExecutionException(flyteExecConf, e);
     }
+  }
+
+  private Literals.LiteralMap inputsToLiteral(Map<String, String> inputs) {
+    return Literals.LiteralMap
+        .newBuilder()
+        .putAllLiterals(inputs.entrySet()
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry ->  toLiteral(entry.getValue())))
+        ).build();
+  }
+
+  private Literals.Literal toLiteral(String value) {
+    return Literals.Literal
+        .newBuilder()
+        .setScalar(Literals.Scalar
+            .newBuilder()
+            .setPrimitive(Literals.Primitive
+                .newBuilder()
+                .setStringValue(value)
+                .build())
+            .build())
+        .build();
   }
 
   @Override

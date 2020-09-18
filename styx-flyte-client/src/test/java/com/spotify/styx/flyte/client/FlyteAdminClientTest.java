@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
+import flyteidl.core.Literals;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
@@ -79,7 +80,7 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NAME, LP_IDENTIFIER,
-            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
+            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED, Literals.LiteralMap.getDefaultInstance());
     assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
     assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
     assertThat(NAME, equalTo(workflowExecution.getId().getName()));
