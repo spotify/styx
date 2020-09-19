@@ -32,11 +32,11 @@ import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.internal.matchers.ThrowableMessageMatcher.hasMessage;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,6 +67,7 @@ import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.data.EventInfo;
 import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.serialization.Json;
+import io.grpc.Context;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -642,6 +643,20 @@ public class StyxOkHttpClientTest {
     assertThat(request.url().toString(), is(API_URL + "/workflows/f%5B%20%5Do-cmp/bar-w%5Bf%5D/state"));
     assertThat(Json.deserialize(bytesOfRequestBody(request), WorkflowState.class), is(workflowState));
     assertThat(request.method(), is("PATCH"));
+  }
+
+  @Test
+  public void testTokenFromContext() throws Exception {
+    when(auth.getToken(any())).thenReturn(Optional.empty());
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
+    var r = Context.current().withValue(Constant.AUTHORIZATION_KEY, "foobar")
+        .call(() ->
+            styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture());
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    var request = requestCaptor.getValue();
+    assertThat(request.header("Authorization"), is("Bearer foobar"));
   }
 
   @Test

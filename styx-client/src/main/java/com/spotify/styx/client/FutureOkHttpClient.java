@@ -23,7 +23,6 @@ package com.spotify.styx.client;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.spotify.styx.serialization.Json;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -47,9 +46,6 @@ class FutureOkHttpClient implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(FutureOkHttpClient.class);
 
-  private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
-  private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
-  private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(90);
   @SuppressWarnings("FieldMissingNullable")
   private static final MediaType APPLICATION_JSON =
       Objects.requireNonNull(MediaType.parse("application/json"));
@@ -58,16 +54,6 @@ class FutureOkHttpClient implements AutoCloseable {
 
   static FutureOkHttpClient create(OkHttpClient client) {
     return new FutureOkHttpClient(client);
-  }
-
-  static FutureOkHttpClient createDefault() {
-    return FutureOkHttpClient.create(
-        new OkHttpClient.Builder()
-            .connectTimeout(DEFAULT_CONNECT_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-            .readTimeout(DEFAULT_READ_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-            .writeTimeout(DEFAULT_WRITE_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
-            .build()
-    );
   }
 
   private FutureOkHttpClient(OkHttpClient client) {

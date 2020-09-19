@@ -21,6 +21,7 @@
 package com.spotify.styx.client;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import okhttp3.OkHttpClient;
 
 /**
  * Factory to get a StyxClient implementation.
@@ -49,6 +50,18 @@ public class StyxClientFactory {
 
   public static StyxClient create(String apiHost, GoogleCredentials credentials) {
     return StyxOkHttpClient.create(apiHost, credentials);
+  }
+
+  public static StyxClient create(String apiHost, OkHttpClient okHttpClient) {
+    return StyxOkHttpClient.create(apiHost, okHttpClient);
+  }
+
+  public static StyxClient create(String apiHost, OkHttpClient okHttpClient, GoogleCredentials credentials) {
+    return StyxOkHttpClient.create(apiHost, okHttpClient, credentials);
+  }
+
+  public static OkHttpClient defaultOkHttpClient() {
+    return StyxOkHttpClient.defaultOkHttpClient();
   }
 
   public static StyxStatusClient createStatusClient(String apiHost) {
