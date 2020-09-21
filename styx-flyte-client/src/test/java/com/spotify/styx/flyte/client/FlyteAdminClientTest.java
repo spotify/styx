@@ -86,18 +86,18 @@ public class FlyteAdminClientTest {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NAME, LP_IDENTIFIER,
             ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
-    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(NAME, equalTo(workflowExecution.getId().getName()));
+    assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
+    assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
+    assertThat(workflowExecution.getId().getName(), equalTo(NAME));
   }
 
   @Test
   public void shouldPropagateGetExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.getExecution(PROJECT, DOMAIN, NAME);
-    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
-    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(NAME, equalTo(workflowExecution.getId().getName()));
+    assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
+    assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
+    assertThat(workflowExecution.getId().getName(), equalTo(NAME));
   }
 
   @Test
@@ -114,8 +114,8 @@ public class FlyteAdminClientTest {
 
     listExecutions.getExecutionsList().forEach(
         e -> {
-          assertThat(PROJECT, equalTo(e.getId().getProject()));
-          assertThat(DOMAIN, equalTo(e.getId().getDomain()));
+          assertThat(e.getId().getProject(), equalTo(PROJECT));
+          assertThat(e.getId().getDomain(), equalTo(DOMAIN));
         }
     );
     assertThat(2, equalTo(listExecutions.getExecutionsCount()));
