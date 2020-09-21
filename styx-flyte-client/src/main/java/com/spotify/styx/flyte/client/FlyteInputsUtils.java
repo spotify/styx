@@ -20,7 +20,7 @@
 
 package com.spotify.styx.flyte.client;
 
-import static flyteidl.core.Types.SimpleType.DATETIME_VALUE;
+import static flyteidl.core.Types.SimpleType.DATETIME;
 
 import com.google.protobuf.Timestamp;
 import com.spotify.styx.util.ParameterUtil;
@@ -52,10 +52,7 @@ public class FlyteInputsUtils {
         .forEach(
             (key, value) -> {
               if (key.toLowerCase().equals(PARAMETER_NAME)) {
-                if (!value.getDefault().hasScalar()
-                    || !value.getDefault().getScalar().hasPrimitive()
-                    || value.getDefault().getScalar().getPrimitive().getValueCase().getNumber()
-                       != DATETIME_VALUE) {
+                if (value.getVar().getType().getSimple() != DATETIME) {
                   literalMapBuilder.putLiterals(key, value.getDefault());
                 } else {
                   literalMapBuilder.putLiterals(key, buildLiteralForPartition(parameter));
