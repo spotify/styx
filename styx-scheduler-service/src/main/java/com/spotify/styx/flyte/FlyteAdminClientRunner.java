@@ -73,6 +73,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
         .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
+    final var parameter = runState.workflowInstance().parameter();
+
     try {
       flyteAdminClient.createExecution(
           launchPlanIdentifier.project(),
@@ -86,7 +88,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setVersion(launchPlanIdentifier.version())
               .build(),
           execMode,
-          annotations);
+          annotations,
+          parameter);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {

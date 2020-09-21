@@ -54,6 +54,10 @@
       <artifactId>styx-test</artifactId>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>com.spotify</groupId>
+          <artifactId>styx-common</artifactId>
+      </dependency>
   </dependencies>
   <build>
     <plugins>
