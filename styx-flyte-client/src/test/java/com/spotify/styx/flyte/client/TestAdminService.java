@@ -25,6 +25,7 @@ import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.stub.StreamObserver;
@@ -99,6 +100,22 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .addAllExecutions(executions)
         .build();
     responseObserver.onNext(response);
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void listProjects(ProjectOuterClass.ProjectListRequest request,
+                           StreamObserver<ProjectOuterClass.Projects> responseObserver) {
+    final var projects = ProjectOuterClass.Projects.newBuilder()
+        .addProjects(ProjectOuterClass.Project.newBuilder()
+            .setId(PROJECT)
+            .setDescription("")
+            .addDomains(ProjectOuterClass.Domain.newBuilder()
+                .setId(DOMAIN)
+                .build())
+            .build())
+        .build();
+    responseObserver.onNext(projects);
     responseObserver.onCompleted();
   }
 }

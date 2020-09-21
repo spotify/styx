@@ -22,6 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 
 import flyteidl.admin.ExecutionOuterClass;
@@ -43,7 +44,6 @@ public class FlyteAdminClientTest {
   static final String LP_NAME = "launch_plan_1";
   static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
-  private TestAdminService testAdminService;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
   private static final IdentifierOuterClass.Identifier LP_IDENTIFIER =
@@ -56,7 +56,7 @@ public class FlyteAdminClientTest {
 
   @Before
   public void setUp() throws IOException {
-    testAdminService = new TestAdminService();
+    final TestAdminService testAdminService = new TestAdminService();
     var serverName = InProcessServerBuilder.generateName();
     var server = InProcessServerBuilder
         .forName(serverName)
@@ -113,5 +113,15 @@ public class FlyteAdminClientTest {
         }
     );
     assertThat(2, equalTo(listExecutions.getExecutionsCount()));
+  }
+
+  @Test
+  public void shouldPropagateListProjectsToStub() {
+    var listProjectsResponse =
+        flyteAdminClient.listProjects();
+
+    assertThat(listProjectsResponse.getProjectsList(), hasSize(1));
+    assertThat(listProjectsResponse.getProjectsList().get(0).getId(), equalTo(PROJECT));
+    assertThat(listProjectsResponse.getProjectsList().get(0).getDomains(0).getId(), equalTo(DOMAIN));
   }
 }
