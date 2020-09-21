@@ -20,6 +20,7 @@
 
 package com.spotify.styx.client;
 
+import static com.spotify.styx.client.GrpcContextKey.AUTHORIZATION_KEY;
 import static com.spotify.styx.client.FutureOkHttpClient.forUri;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,6 +54,7 @@ import com.spotify.styx.util.EventUtil;
 import java.io.IOException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -60,6 +62,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import okhttp3.HttpUrl;
@@ -78,6 +81,10 @@ import org.slf4j.LoggerFactory;
 class StyxOkHttpClient implements StyxClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxOkHttpClient.class);
+
+  private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+  private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(90);
+  private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(90);
 
   static final String STYX_API_VERSION = "v3";
 
@@ -98,12 +105,20 @@ class StyxOkHttpClient implements StyxClient {
     this.auth = Objects.requireNonNull(auth, "auth");
   }
 
+  static OkHttpClient defaultOkHttpClient() {
+    return new OkHttpClient.Builder()
+        .connectTimeout(DEFAULT_CONNECT_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
+        .readTimeout(DEFAULT_READ_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
+        .writeTimeout(DEFAULT_WRITE_TIMEOUT.getSeconds(), TimeUnit.SECONDS)
+        .build();
+  }
+
   public static StyxClient create(String apiHost) {
-    return create(apiHost, FutureOkHttpClient.createDefault(), GoogleIdTokenAuth.ofDefaultCredential());
+    return create(apiHost, FutureOkHttpClient.create(defaultOkHttpClient()), GoogleIdTokenAuth.ofDefaultCredential());
   }
 
   public static StyxClient create(String apiHost, GoogleCredentials credentials) {
-    return create(apiHost, FutureOkHttpClient.createDefault(), GoogleIdTokenAuth.of(credentials));
+    return create(apiHost, FutureOkHttpClient.create(defaultOkHttpClient()), GoogleIdTokenAuth.of(credentials));
   }
 
   public static StyxClient create(String apiHost, OkHttpClient client) {
@@ -395,13 +410,16 @@ class StyxOkHttpClient implements StyxClient {
   }
 
   private CompletionStage<Response> execute(Request request) {
-    final Optional<String> authToken;
-    try {
-      authToken = auth.getToken(apiHost.toString());
-    } catch (IOException | GeneralSecurityException e) {
-      // Credential probably invalid, configured wrongly or the token request failed.
-      throw new ClientErrorException("Authentication failure: " + e.getMessage(), e);
-    }
+    var authToken = Optional
+        .ofNullable(AUTHORIZATION_KEY.get())
+        .or(() -> {
+          try {
+            return auth.getToken(apiHost.toString());
+          } catch (IOException | GeneralSecurityException e) {
+            // Credential probably invalid, configured wrongly or the token request failed.
+            throw new ClientErrorException("Authentication failure: " + e.getMessage(), e);
+          }
+        });
     final String requestId = UUID.randomUUID().toString().replace("-", "");  // UUID with no dashes, easier to deal with
     return client.send(decorateRequest(request, requestId, authToken)).handle((response, e) -> {
       if (e != null) {
