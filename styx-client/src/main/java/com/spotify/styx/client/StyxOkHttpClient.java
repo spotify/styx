@@ -20,7 +20,7 @@
 
 package com.spotify.styx.client;
 
-import static com.spotify.styx.client.Constant.AUTHORIZATION_KEY;
+import static com.spotify.styx.client.GrpcContextKey.AUTHORIZATION_KEY;
 import static com.spotify.styx.client.FutureOkHttpClient.forUri;
 
 import com.fasterxml.jackson.databind.JsonNode;

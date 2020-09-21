@@ -650,7 +650,7 @@ public class StyxOkHttpClientTest {
     when(auth.getToken(any())).thenReturn(Optional.empty());
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK)));
-    var r = Context.current().withValue(Constant.AUTHORIZATION_KEY, "foobar")
+    var r = Context.current().withValue(GrpcContextKey.AUTHORIZATION_KEY, "foobar")
         .call(() ->
             styx.triggerWorkflowInstance("foo", "bar", "baz").toCompletableFuture());
     verify(client, timeout(30_000)).send(requestCaptor.capture());

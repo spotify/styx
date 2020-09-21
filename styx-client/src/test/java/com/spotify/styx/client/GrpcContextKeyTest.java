@@ -28,21 +28,21 @@ import com.spotify.styx.util.ClassEnforcer;
 import io.grpc.Context;
 import org.junit.Test;
 
-public class ConstantTest {
+public class GrpcContextKeyTest {
 
   @Test
   public void testAuthorizationKeyDefaultValue() {
-    assertThat(Constant.AUTHORIZATION_KEY.get(), nullValue());
+    assertThat(GrpcContextKey.AUTHORIZATION_KEY.get(), nullValue());
   }
 
   @Test
   public void testAuthorizationKey() {
-    Context.current().withValue(Constant.AUTHORIZATION_KEY, "foo")
-        .run(() -> assertThat(Constant.AUTHORIZATION_KEY.get(), is("foo")));
+    Context.current().withValue(GrpcContextKey.AUTHORIZATION_KEY, "foo")
+        .run(() -> assertThat(GrpcContextKey.AUTHORIZATION_KEY.get(), is("foo")));
   }
   
   @Test
   public void testConstructor() throws ReflectiveOperationException {
-    ClassEnforcer.assertNotInstantiable(Constant.class);
+    ClassEnforcer.assertNotInstantiable(GrpcContextKey.class);
   }
 }

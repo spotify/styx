@@ -22,11 +22,11 @@ package com.spotify.styx.client;
 
 import io.grpc.Context;
 
-public final class Constant {
+public final class GrpcContextKey {
 
   public static final Context.Key<String> AUTHORIZATION_KEY = Context.key("authorization");
 
-  private Constant() {
+  private GrpcContextKey() {
     throw new UnsupportedOperationException();
   }
 }
