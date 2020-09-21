@@ -69,6 +69,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
@@ -115,7 +116,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testCreateExecution() throws FlyteRunner.CreateExecutionException {
     final var execName = "test-create-execution";
-    when(flyteAdminClient.createExecution(any(), any(), any(), any(),any(),any())).thenReturn(
+    when(flyteAdminClient.createExecution(any(), any(), any(), any(), any(), any(), any())).thenReturn(
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -131,7 +132,7 @@ public class FlyteAdminClientRunnerTest {
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), execName,
-        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS);
+        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS, RUN_STATE.workflowInstance().parameter());
   }
 
   private IdentifierOuterClass.Identifier toProto(FlyteIdentifier identifier) {
@@ -148,9 +149,10 @@ public class FlyteAdminClientRunnerTest {
   @Parameters(method = "styxTriggerToFlyteExecMode")
   public void testStyxTriggerTranslateToFlyteExecutionMode(Trigger styxTrigger, ExecutionMode flyteExecMode)
       throws FlyteRunner.CreateExecutionException {
-    flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF, ANNOTATIONS);
-
-    verify(flyteAdminClient).createExecution(any(), any(), any(), any(), eq(flyteExecMode), any());
+    final RunState runState = runState(styxTrigger);
+    flyteRunner.createExecution(runState, "test-create-execution", FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteAdminClient).createExecution(any(), any(), any(), any(), Mockito.eq(flyteExecMode),
+        any(), any());
   }
 
   private static Object[] styxTriggerToFlyteExecMode() {
@@ -179,8 +181,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testThrowsFlyteLaunchPlanNotFound() {
     doThrow(new StatusRuntimeException(Status.NOT_FOUND))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any());
-
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS));
@@ -189,20 +190,20 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testCreateExecutionForAlreadyExistsException() throws FlyteRunner.CreateExecutionException {
     doThrow(new StatusRuntimeException(Status.ALREADY_EXISTS))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
 
     var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), "exec",
-        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS);
+        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS, RUN_STATE.workflowInstance().parameter());
   }
 
   @Test
   public void testThrowsCreateExecutionExceptionForOtherCode() {
     doThrow(new StatusRuntimeException(Status.INTERNAL))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
@@ -212,7 +213,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testThrowsCreateExecutionExceptionForUnknownException() {
     doThrow(new IllegalStateException("test"))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,

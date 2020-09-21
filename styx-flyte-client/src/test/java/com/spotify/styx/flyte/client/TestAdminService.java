@@ -28,7 +28,11 @@ import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.Execution;
 import flyteidl.admin.ProjectOuterClass;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
+
+import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.core.IdentifierOuterClass;
+import flyteidl.core.Interface;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -71,6 +75,24 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .setDomain(request.getDomain())
             .setProject(request.getProject())
             .setName(request.getName())
+            .build())
+        .build());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void getLaunchPlan(final flyteidl.admin.Common.ObjectGetRequest request,
+                            final StreamObserver<LaunchPlanOuterClass.LaunchPlan> responseObserver) {
+    responseObserver.onNext(LaunchPlanOuterClass.LaunchPlan
+        .newBuilder()
+        .setId(request.getId())
+        .setSpec(LaunchPlanOuterClass.LaunchPlanSpec
+            .newBuilder()
+            .setDefaultInputs(Interface.ParameterMap.newBuilder()
+                .putParameters("parameter", Interface.Parameter.newBuilder()
+                    .setDefault(buildLiteralForPartition("2020-09-21"))
+                    .build())
+                .build())
             .build())
         .build());
     responseObserver.onCompleted();

@@ -22,6 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Verify.verifyNotNull;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillingParameterInInputs;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 public class FlyteAdminClient {
 
-  private static final Logger log = LoggerFactory.getLogger(FlyteAdminClient.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClient.class);
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
 
@@ -64,8 +65,9 @@ public class FlyteAdminClient {
       String name,
       IdentifierOuterClass.Identifier launchPlanId,
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
-      Map<String, String> annotations) {
-    log.debug("createExecution {} {} {}", project, domain, launchPlanId);
+      Map<String, String> annotations,
+      String parameter) {
+    LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
         ExecutionOuterClass.ExecutionMetadata.newBuilder()
@@ -73,6 +75,14 @@ public class FlyteAdminClient {
             .setPrincipal(TRIGGERING_PRINCIPAL)
             .setNesting(USER_TRIGGERED_EXECUTION_NESTING)
             .build();
+
+    var launchPlan =
+        stub.getLaunchPlan(
+            Common.ObjectGetRequest.newBuilder().
+                setId(launchPlanId).
+                build());
+
+    var inputs = launchPlan.getSpec().getDefaultInputs();
 
     var spec =
         ExecutionOuterClass.ExecutionSpec.newBuilder()
@@ -90,7 +100,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                // TODO: Pass inputs
+                .setInputs(fillingParameterInInputs(inputs, parameter))
                 .build());
 
     verifyNotNull(
@@ -105,35 +115,31 @@ public class FlyteAdminClient {
   }
 
   public ExecutionOuterClass.Execution getExecution(String project, String domain, String name) {
-    log.debug("getExecution {} {} {}", project, domain, name);
-    var request = ExecutionOuterClass.WorkflowExecutionGetRequest
-        .newBuilder()
-        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-            .newBuilder()
-            .setProject(project)
-            .setDomain(domain)
-            .setName(name)
-            .build())
-        .build();
+    LOG.debug("getExecution {} {} {}", project, domain, name);
+    var request =
+        ExecutionOuterClass.WorkflowExecutionGetRequest.newBuilder()
+            .setId(
+                IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
+                    .setProject(project)
+                    .setDomain(domain)
+                    .setName(name)
+                    .build())
+            .build();
     return stub.getExecution(request);
   }
 
   public ExecutionOuterClass.ExecutionTerminateResponse terminateExecution(
-      String project,
-      String domain,
-      String name,
-      String cause) {
-    log.debug("terminateExecution {} {} {}", project, domain, name);
+      String project, String domain, String name, String cause) {
+    LOG.debug("terminateExecution {} {} {}", project, domain, name);
 
     final var request =
-        ExecutionOuterClass.ExecutionTerminateRequest
-            .newBuilder()
-            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-                .newBuilder()
-                .setProject(project)
-                .setDomain(domain)
-                .setName(name)
-                .build())
+        ExecutionOuterClass.ExecutionTerminateRequest.newBuilder()
+            .setId(
+                IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
+                    .setProject(project)
+                    .setDomain(domain)
+                    .setName(name)
+                    .build())
             .setCause(cause)
             .build();
 
@@ -146,7 +152,7 @@ public class FlyteAdminClient {
       int limit,
       String token,
       String filters) {
-    log.debug("listExecutions {} {} {} {}", project, domain, limit, token);
+    LOG.debug("listExecutions {} {} {} {}", project, domain, limit, token);
 
     final var request = Common.ResourceListRequest
         .newBuilder()
@@ -165,7 +171,7 @@ public class FlyteAdminClient {
   }
 
   public ProjectOuterClass.Projects listProjects() {
-    log.debug("listProjects");
+    LOG.debug("listProjects");
 
     return stub.listProjects(ProjectOuterClass.ProjectListRequest.getDefaultInstance());
   }

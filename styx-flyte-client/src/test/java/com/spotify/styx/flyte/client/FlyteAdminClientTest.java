@@ -38,6 +38,7 @@ import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.time.Instant;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -49,6 +50,7 @@ public class FlyteAdminClientTest {
   static final String EXISTING_NAME = EXEC_NAME_PREFIX + 1;
   static final String NON_EXISTING_NAME = EXEC_NAME_PREFIX + 8;
   static final String LP_VERSION = "launch_plan_version_1";
+  static final String PARAMETER = Instant.now().toString();
   private FlyteAdminClient flyteAdminClient;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
@@ -78,7 +80,7 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, Map.of());
+            ExecutionMode.SCHEDULED, Map.of(), PARAMETER);
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
@@ -92,7 +94,7 @@ public class FlyteAdminClientTest {
     );
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, annotations);
+            ExecutionMode.SCHEDULED, annotations, PARAMETER);
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);
