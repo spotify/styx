@@ -24,6 +24,7 @@ import static com.google.common.base.Verify.verifyNotNull;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
@@ -155,6 +156,12 @@ public class FlyteAdminClient {
         .build();
 
     return stub.listExecutions(request);
+  }
+
+  public ProjectOuterClass.Projects listProjects() {
+    log.debug("listProjects");
+
+    return stub.listProjects(ProjectOuterClass.ProjectListRequest.getDefaultInstance());
   }
 
 }
