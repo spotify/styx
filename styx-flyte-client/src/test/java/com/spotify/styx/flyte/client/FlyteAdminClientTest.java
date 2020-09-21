@@ -24,7 +24,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.Assert.assertFalse;
 
+import com.google.protobuf.Message;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
@@ -44,6 +46,7 @@ public class FlyteAdminClientTest {
   static final String LP_NAME = "launch_plan_1";
   static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
+  private TestAdminService testAdminService;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
   private static final IdentifierOuterClass.Identifier LP_IDENTIFIER =
@@ -56,7 +59,7 @@ public class FlyteAdminClientTest {
 
   @Before
   public void setUp() throws IOException {
-    final TestAdminService testAdminService = new TestAdminService();
+    testAdminService = new TestAdminService();
     var serverName = InProcessServerBuilder.generateName();
     var server = InProcessServerBuilder
         .forName(serverName)
@@ -116,6 +119,15 @@ public class FlyteAdminClientTest {
   }
 
   @Test
+  public void shouldSupportOptionalTokenAndFilterInListExecutions() {
+    flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, null, null);
+
+    final var lastExecutionRequest = testAdminService.getLastExecutionRequest();
+    assertThatDoesntContainField(lastExecutionRequest, "token");
+    assertThatDoesntContainField(lastExecutionRequest, "filters");
+  }
+
+  @Test
   public void shouldPropagateListProjectsToStub() {
     var listProjectsResponse =
         flyteAdminClient.listProjects();
@@ -123,5 +135,10 @@ public class FlyteAdminClientTest {
     assertThat(listProjectsResponse.getProjectsList(), hasSize(1));
     assertThat(listProjectsResponse.getProjectsList().get(0).getId(), equalTo(PROJECT));
     assertThat(listProjectsResponse.getProjectsList().get(0).getDomains(0).getId(), equalTo(DOMAIN));
+  }
+
+  private void assertThatDoesntContainField(Message message, String field) {
+    final var fieldDesc = message.getDescriptorForType().findFieldByName(field);
+    assertFalse("proto contains field: " + field, message.hasField(fieldDesc));
   }
 }

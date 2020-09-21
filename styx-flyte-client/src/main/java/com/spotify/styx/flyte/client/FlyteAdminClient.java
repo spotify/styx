@@ -150,12 +150,16 @@ public class FlyteAdminClient {
             .setDomain(domain)
             .build())
         .setLimit(limit)
-        .setToken(token)
-        .setFilters(filters)
+        .setToken(emptyIfNull(token))
+        .setFilters(emptyIfNull(filters))
         // TODO: .setSortBy()
         .build();
 
     return stub.listExecutions(request);
+  }
+
+  private String emptyIfNull(String str) {
+    return (str == null) ? "" : str;
   }
 
   public ProjectOuterClass.Projects listProjects() {
@@ -163,5 +167,4 @@ public class FlyteAdminClient {
 
     return stub.listProjects(ProjectOuterClass.ProjectListRequest.getDefaultInstance());
   }
-
 }

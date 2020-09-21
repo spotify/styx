@@ -35,6 +35,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
   private static final String EXEC_NAME_1 = "exec_name_1";
   private static final String EXEC_NAME_2 = "exec_name_2";
+  private Common.ResourceListRequest lastExecutionRequest;
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
@@ -76,6 +77,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   @Override
   public void listExecutions(final Common.ResourceListRequest request,
                              final StreamObserver<ExecutionOuterClass.ExecutionList> responseObserver) {
+    lastExecutionRequest = request;
     final var executions = List.of(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -117,5 +119,9 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .build();
     responseObserver.onNext(projects);
     responseObserver.onCompleted();
+  }
+
+  Common.ResourceListRequest getLastExecutionRequest() {
+    return lastExecutionRequest;
   }
 }
