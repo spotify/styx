@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.equalTo;
 
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
+import flyteidl.core.Types;
 import java.time.Instant;
 import org.junit.Test;
 
@@ -40,6 +41,11 @@ public class FlyteInputsUtilsTest {
   public void shouldFillingParameterToInputs() {
     var parameterMap = Interface.ParameterMap.newBuilder()
         .putParameters("parameter", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
             .setDefault(buildLiteralForPartition("2020-09-15"))
             .build())
         .build();
