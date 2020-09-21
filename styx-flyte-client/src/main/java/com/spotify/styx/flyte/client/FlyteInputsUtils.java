@@ -31,7 +31,7 @@ import java.time.format.DateTimeParseException;
 
 
 public class FlyteInputsUtils {
-  private static final String PARAMETER_NAME = "parameter";
+  static final String PARAMETER_NAME = "styx_parameter";
 
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
@@ -51,14 +51,14 @@ public class FlyteInputsUtils {
         .getParametersMap()
         .forEach(
             (key, value) -> {
-              if (key.toLowerCase().equals(PARAMETER_NAME)) {
-                if (value.getVar().getType().getSimple() != DATETIME) {
-                  literalMapBuilder.putLiterals(key, value.getDefault());
-                } else {
-                  literalMapBuilder.putLiterals(key, buildLiteralForPartition(parameter));
-                }
-              } else {
+              if (!key.toLowerCase().equals(PARAMETER_NAME)) {
                 literalMapBuilder.putLiterals(key, value.getDefault());
+                return;
+              }
+              if (value.getVar().getType().getSimple() != DATETIME) {
+                literalMapBuilder.putLiterals(key, value.getDefault());
+              } else {
+                literalMapBuilder.putLiterals(key, buildLiteralForPartition(parameter));
               }
             });
 

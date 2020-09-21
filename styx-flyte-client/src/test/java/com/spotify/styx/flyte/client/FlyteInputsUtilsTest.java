@@ -20,8 +20,10 @@
 
 package com.spotify.styx.flyte.client;
 
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillingParameterInInputs;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -40,7 +42,7 @@ public class FlyteInputsUtilsTest {
   @Test
   public void shouldFillingParameterToInputs() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters("parameter", Interface.Parameter.newBuilder()
+        .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
                     setSimple(Types.SimpleType.DATETIME)
@@ -53,7 +55,32 @@ public class FlyteInputsUtilsTest {
     var inputs = fillingParameterInInputs(parameterMap, PARAMETER);
 
     assertThat(INSTANT.getEpochSecond(), equalTo(inputs.getLiteralsMap()
-        .get("parameter")
+        .get(PARAMETER_NAME)
+        .getScalar()
+        .getPrimitive()
+        .getDatetime().getSeconds()));
+  }
+
+  @Test
+  public void shouldOnlyFillingParameterToInputs() {
+    var inputName = "xxx";
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters(inputName, Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
+            .setDefault(buildLiteralForPartition(PARAMETER))
+            .build())
+        .build();
+
+    var inputs = fillingParameterInInputs(parameterMap, PARAMETER);
+
+    assertNull(inputs.getLiteralsMap()
+        .get(PARAMETER_NAME));
+    assertThat(INSTANT.getEpochSecond(), equalTo(inputs.getLiteralsMap()
+        .get(inputName)
         .getScalar()
         .getPrimitive()
         .getDatetime().getSeconds()));
