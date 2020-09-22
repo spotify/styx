@@ -191,7 +191,6 @@ public class FlyteAdminClientRunnerTest {
   public void testCreateExecutionForAlreadyExistsException() throws FlyteRunner.CreateExecutionException {
     doThrow(new StatusRuntimeException(Status.ALREADY_EXISTS))
         .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
-
     var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS);
 
     assertThat(runnerId, is(RUNNER_ID));
@@ -204,7 +203,6 @@ public class FlyteAdminClientRunnerTest {
   public void testThrowsCreateExecutionExceptionForOtherCode() {
     doThrow(new StatusRuntimeException(Status.INTERNAL))
         .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
-
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS));

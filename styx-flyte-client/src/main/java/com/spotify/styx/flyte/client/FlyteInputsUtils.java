@@ -39,13 +39,14 @@ public class FlyteInputsUtils {
 
   static Literals.Literal buildLiteralForPartition(String value) {
 
-    var primitiveBuilderForString = Literals.Primitive.newBuilder().setDatetime(toTimestamp(value));
+    var primitive =
+        Literals.Primitive.newBuilder().setDatetime(toTimestamp(value)).build();
     return Literals.Literal.newBuilder()
-        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitiveBuilderForString.build()).build())
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
         .build();
   }
 
-  static Literals.LiteralMap fillingParameterInInputs(Interface.ParameterMap parameterMap, String parameter) {
+  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, String parameter) {
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
     parameterMap
         .getParametersMap()
