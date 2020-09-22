@@ -22,47 +22,47 @@ package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.DOMAIN;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
+import static java.util.stream.Collectors.toUnmodifiableList;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ExecutionOuterClass.Execution;
 import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
   static final String EXEC_NAME_PREFIX = "exec_name_";
   static final int PAGE_SIZE = 2;
 
-  private static final List<ExecutionOuterClass.Execution> ALL_EXECUTIONS =
-      List.of(
+  private final List<Execution> allExecutions =
+      new ArrayList<>(List.of(
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 1),
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 2),
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 3),
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 4),
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 5),
           execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 6)
-      );
-  private static final List<List<ExecutionOuterClass.Execution>> PAGED_EXECUTIONS =
-      List.of(
-          List.of(ALL_EXECUTIONS.get(0), ALL_EXECUTIONS.get(1)),
-          List.of(ALL_EXECUTIONS.get(2), ALL_EXECUTIONS.get(3)),
-          List.of(ALL_EXECUTIONS.get(4), ALL_EXECUTIONS.get(5))
-      );
-  private static final List<ExecutionOuterClass.Execution> FILTERED_EXECUTIONS =
-      List.of(ALL_EXECUTIONS.get(0), ALL_EXECUTIONS.get(2), ALL_EXECUTIONS.get(4));
-  private static final List<List<ExecutionOuterClass.Execution>> PAGED_FILTERED_EXECUTIONS =
-      List.of(
-          List.of(FILTERED_EXECUTIONS.get(0), FILTERED_EXECUTIONS.get(1)),
-          List.of(FILTERED_EXECUTIONS.get(2))
-      );
+      ));
+  private static final Predicate<Execution> NO_FILTER = __ -> true;
+  private static final Predicate<Execution> ONLY_ODDS = ex -> {
+    var execNumber = ex.getId().getName().substring(EXEC_NAME_PREFIX.length());
+    return Integer.parseInt(execNumber) % 2 == 1;
+  };
 
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
                               final StreamObserver<ExecutionOuterClass.ExecutionCreateResponse> responseObserver) {
+    allExecutions.add(execution(request.getProject(), request.getDomain(), request.getName()));
     responseObserver.onNext(ExecutionOuterClass.ExecutionCreateResponse
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -77,33 +77,51 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
   @Override
   public void getExecution(final ExecutionOuterClass.WorkflowExecutionGetRequest request,
-                           final StreamObserver<ExecutionOuterClass.Execution> responseObserver) {
-    responseObserver.onNext(
-        execution(request.getId().getProject(), request.getId().getDomain(), request.getId().getName())
+                           final StreamObserver<Execution> responseObserver) {
+    findAnyExecution(request.getId()).ifPresentOrElse(
+        ex -> {
+          responseObserver.onNext(ex);
+          responseObserver.onCompleted();
+        },
+        () -> responseObserver.onError(new StatusRuntimeException(Status.NOT_FOUND))
     );
-    responseObserver.onCompleted();
   }
 
   @Override
   public void terminateExecution(final ExecutionOuterClass.ExecutionTerminateRequest request,
                                  final StreamObserver<ExecutionOuterClass.ExecutionTerminateResponse> responseObserver) {
-    responseObserver.onNext(ExecutionOuterClass.ExecutionTerminateResponse.getDefaultInstance());
-    responseObserver.onCompleted();
+    findAnyExecution(request.getId()).ifPresentOrElse(
+        ex -> {
+          allExecutions.remove(ex);
+          responseObserver.onNext(ExecutionOuterClass.ExecutionTerminateResponse.getDefaultInstance());
+          responseObserver.onCompleted();
+        },
+        () -> responseObserver.onError(new StatusRuntimeException(Status.NOT_FOUND))
+    );
   }
 
   @Override
   public void listExecutions(final Common.ResourceListRequest request,
                              final StreamObserver<ExecutionOuterClass.ExecutionList> responseObserver) {
     //not a real filter but it will work for detecting if we pass a filter or not
-    final var pagedExecutions = request.getFilters().isEmpty()
-                                     ? PAGED_EXECUTIONS
-                                     : PAGED_FILTERED_EXECUTIONS;
+    final var filter = request.getFilters().isEmpty()
+                                     ? NO_FILTER
+                                     : ONLY_ODDS;
+
 
     final var token = request.getToken();
     final var page = token.isEmpty() ? 0 : Integer.parseInt(token);
-    final var lastPage = pagedExecutions.size();
+
+    final var filteredExecutions = allExecutions.stream()
+        .filter(filter)
+        .collect(toUnmodifiableList());
+
+    final var lastPage = filteredExecutions.size() / PAGE_SIZE;
     final var newToken = (page == lastPage) ? "" : Integer.toString(page + 1);
-    final var executions = pagedExecutions.get(page);
+    final var executions = filteredExecutions.stream()
+        .skip(page * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+        .collect(toUnmodifiableList());
 
     final ExecutionOuterClass.ExecutionList response = ExecutionOuterClass.ExecutionList.newBuilder()
         .addAllExecutions(executions)
@@ -111,18 +129,6 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .build();
     responseObserver.onNext(response);
     responseObserver.onCompleted();
-  }
-
-  private static ExecutionOuterClass.Execution execution(String project, String domain, String execName1) {
-    return ExecutionOuterClass.Execution
-        .newBuilder()
-        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-            .newBuilder()
-            .setProject(project)
-            .setDomain(domain)
-            .setName(execName1)
-            .build())
-        .build();
   }
 
   @Override
@@ -139,5 +145,23 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .build();
     responseObserver.onNext(projects);
     responseObserver.onCompleted();
+  }
+
+  private static Execution execution(String project, String domain, String execName) {
+    return Execution
+        .newBuilder()
+        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+            .newBuilder()
+            .setProject(project)
+            .setDomain(domain)
+            .setName(execName)
+            .build())
+        .build();
+  }
+
+  public Optional<Execution> findAnyExecution(IdentifierOuterClass.WorkflowExecutionIdentifier searchId) {
+    return allExecutions.stream()
+        .filter(ex -> searchId.equals(ex.getId()))
+        .findAny();
   }
 }
