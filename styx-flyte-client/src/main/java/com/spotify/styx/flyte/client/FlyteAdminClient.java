@@ -27,6 +27,7 @@ import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInpu
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ProjectOuterClass;
+import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
@@ -76,11 +77,7 @@ public class FlyteAdminClient {
             .setNesting(USER_TRIGGERED_EXECUTION_NESTING)
             .build();
 
-    var launchPlan =
-        stub.getLaunchPlan(
-            Common.ObjectGetRequest.newBuilder().
-                setId(launchPlanId).
-                build());
+    var launchPlan = getLaunchPlan(launchPlanId);
 
     var inputs = launchPlan.getSpec().getDefaultInputs();
 
@@ -112,6 +109,14 @@ public class FlyteAdminClient {
         launchPlanId);
 
     return response;
+  }
+
+  LaunchPlanOuterClass.LaunchPlan getLaunchPlan(IdentifierOuterClass.Identifier launchPlanId) {
+    LOG.debug("getLaunchPlan {}", launchPlanId);
+    var request = Common.ObjectGetRequest.newBuilder()
+        .setId(launchPlanId)
+        .build();
+    return stub.getLaunchPlan(request);
   }
 
   public ExecutionOuterClass.Execution getExecution(String project, String domain, String name) {

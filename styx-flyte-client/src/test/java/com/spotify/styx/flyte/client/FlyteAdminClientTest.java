@@ -49,11 +49,21 @@ public class FlyteAdminClientTest {
   static final String DOMAIN = "testing";
   static final String EXISTING_NAME = EXEC_NAME_PREFIX + 1;
   static final String NON_EXISTING_NAME = EXEC_NAME_PREFIX + 8;
+  static final String LP_NAME = "launch_plan_name";
   static final String LP_VERSION = "launch_plan_version_1";
+  static final IdentifierOuterClass.ResourceType LP_RESOURCE_TYPE = IdentifierOuterClass.ResourceType.LAUNCH_PLAN;
   static final String PARAMETER = Instant.now().toString();
   private FlyteAdminClient flyteAdminClient;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+
+  private static final IdentifierOuterClass.Identifier LP_IDENTIFIER =
+      IdentifierOuterClass.Identifier.newBuilder()
+          .setResourceType(LP_RESOURCE_TYPE)
+          .setDomain(DOMAIN)
+          .setProject(PROJECT)
+          .setName(LP_NAME)
+          .setVersion(LP_VERSION).build();
 
   @Before
   public void setUp() throws IOException {
@@ -107,6 +117,17 @@ public class FlyteAdminClientTest {
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(EXISTING_NAME));
+  }
+
+  @Test
+  public void shouldPropagateGetLaunchPlanToStub() {
+    var launchPlan =
+        flyteAdminClient.getLaunchPlan(LP_IDENTIFIER);
+    assertThat(LP_RESOURCE_TYPE, equalTo(launchPlan.getId().getResourceType()));
+    assertThat(PROJECT, equalTo(launchPlan.getId().getProject()));
+    assertThat(DOMAIN, equalTo(launchPlan.getId().getDomain()));
+    assertThat(LP_NAME, equalTo(launchPlan.getId().getName()));
+    assertThat(LP_VERSION, equalTo(launchPlan.getId().getVersion()));
   }
 
   @Test
