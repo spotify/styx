@@ -152,4 +152,14 @@ public class FlyteAdminClientTest {
         .collect(Collectors.toUnmodifiableList());
     assertThat(executionNames, hasItems(EXEC_NAME_PREFIX + 1, EXEC_NAME_PREFIX + 3));
   }
+
+  @Test
+  public void shouldPropagateListProjectsToStub() {
+    var listProjectsResponse =
+        flyteAdminClient.listProjects();
+
+    assertThat(listProjectsResponse.getProjectsList(), hasSize(1));
+    assertThat(listProjectsResponse.getProjectsList().get(0).getId(), equalTo(PROJECT));
+    assertThat(listProjectsResponse.getProjectsList().get(0).getDomains(0).getId(), equalTo(DOMAIN));
+  }
 }
