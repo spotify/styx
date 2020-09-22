@@ -36,6 +36,7 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Rule;
@@ -76,10 +77,26 @@ public class FlyteAdminClientTest {
   @Test
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
-        flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME), ExecutionMode.SCHEDULED);
+        flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
+            ExecutionMode.SCHEDULED, Map.of());
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
+  }
+
+  @Test
+  public void shouldPropagateAnnotationsOnCreateExecutionToStub() {
+    final Map<String, String> annotations = Map.of(
+        "Frodo", "Baggins",
+        "Sam", "Gamgee"
+    );
+    var workflowExecution =
+        flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
+            ExecutionMode.SCHEDULED, annotations);
+    assertThat(workflowExecution, notNullValue());
+
+    var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);
+    assertThat(retrievedExecution.getSpec().getAnnotations().getValuesMap(), equalTo(annotations));
   }
 
   @Test

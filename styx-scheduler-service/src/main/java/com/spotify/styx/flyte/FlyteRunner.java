@@ -22,6 +22,7 @@ package com.spotify.styx.flyte;
 
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
+import java.util.Map;
 import java.util.function.Function;
 
 public interface FlyteRunner {
@@ -29,7 +30,7 @@ public interface FlyteRunner {
     return true;
   }
 
-  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
+  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf, Map<String, String> annotations)
       throws CreateExecutionException;
 
   void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId);

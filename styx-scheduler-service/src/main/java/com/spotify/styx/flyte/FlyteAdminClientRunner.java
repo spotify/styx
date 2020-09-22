@@ -38,6 +38,7 @@ import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,11 +60,13 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @Override
-  public String createExecution(RunState runState, final String execName, final FlyteExecConf flyteExecConf)
+  public String createExecution(final RunState runState, final String execName, final FlyteExecConf flyteExecConf,
+                                final Map<String, String> annotations)
       throws CreateExecutionException {
     requireNonNull(runState, "runState");
     requireNonNull(execName, "name");
     requireNonNull(flyteExecConf, "flyteExecConf");
+    requireNonNull(annotations, "annotations");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
     final var execMode = runState.data().trigger()
         .map(this::toFlyteExecutionMode)
@@ -82,7 +85,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
               .setVersion(launchPlanIdentifier.version())
               .build(),
-          execMode);
+          execMode,
+          annotations);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {

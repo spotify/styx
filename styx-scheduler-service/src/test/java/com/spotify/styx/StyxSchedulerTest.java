@@ -280,7 +280,7 @@ public class StyxSchedulerTest {
 
     assertThat(flyteRunner, notNullValue());
     assertThat(flyteRunner.isEnabled(), is(false));
-    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null, null));
+    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null, null, null));
     assertThrows(FlyteRunner.PollingException.class, () -> flyteRunner.poll(FlyteExecutionId.create("flyte-test","testing","test"), null));
   }
 
