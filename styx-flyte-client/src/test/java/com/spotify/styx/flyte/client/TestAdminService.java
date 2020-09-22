@@ -113,11 +113,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
     responseObserver.onCompleted();
   }
 
-  private boolean isEvenExecId(String execName) {
-    return Integer.parseInt(execName.substring(EXEC_NAME_PREFIX.length())) % 2 == 0;
-  }
-
-  public static ExecutionOuterClass.Execution execution(String project, String domain, String execName1) {
+  private static ExecutionOuterClass.Execution execution(String project, String domain, String execName1) {
     return ExecutionOuterClass.Execution
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
