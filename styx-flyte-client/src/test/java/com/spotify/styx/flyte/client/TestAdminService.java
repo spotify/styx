@@ -33,9 +33,32 @@ import java.util.List;
 
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
-  private static final String EXEC_NAME_1 = "exec_name_1";
-  private static final String EXEC_NAME_2 = "exec_name_2";
-  private Common.ResourceListRequest lastExecutionRequest;
+  static final String EXEC_NAME_PREFIX = "exec_name_";
+  static final int PAGE_SIZE = 2;
+
+  private static final List<ExecutionOuterClass.Execution> ALL_EXECUTIONS =
+      List.of(
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 1),
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 2),
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 3),
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 4),
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 5),
+          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 6)
+      );
+  private static final List<List<ExecutionOuterClass.Execution>> PAGED_EXECUTIONS =
+      List.of(
+          List.of(ALL_EXECUTIONS.get(0), ALL_EXECUTIONS.get(1)),
+          List.of(ALL_EXECUTIONS.get(2), ALL_EXECUTIONS.get(3)),
+          List.of(ALL_EXECUTIONS.get(4), ALL_EXECUTIONS.get(5))
+      );
+  private static final List<ExecutionOuterClass.Execution> FILTERED_EXECUTIONS =
+      List.of(ALL_EXECUTIONS.get(0), ALL_EXECUTIONS.get(2), ALL_EXECUTIONS.get(4));
+  private static final List<List<ExecutionOuterClass.Execution>> PAGED_FILTERED_EXECUTIONS =
+      List.of(
+          List.of(FILTERED_EXECUTIONS.get(0), FILTERED_EXECUTIONS.get(1)),
+          List.of(FILTERED_EXECUTIONS.get(2))
+      );
+
 
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
@@ -55,15 +78,9 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   @Override
   public void getExecution(final ExecutionOuterClass.WorkflowExecutionGetRequest request,
                            final StreamObserver<ExecutionOuterClass.Execution> responseObserver) {
-    responseObserver.onNext(ExecutionOuterClass.Execution
-        .newBuilder()
-        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-            .newBuilder()
-            .setProject(request.getId().getProject())
-            .setDomain(request.getId().getDomain())
-            .setName(request.getId().getName())
-            .build())
-        .build());
+    responseObserver.onNext(
+        execution(request.getId().getProject(), request.getId().getDomain(), request.getId().getName())
+    );
     responseObserver.onCompleted();
   }
 
@@ -77,32 +94,39 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   @Override
   public void listExecutions(final Common.ResourceListRequest request,
                              final StreamObserver<ExecutionOuterClass.ExecutionList> responseObserver) {
-    lastExecutionRequest = request;
-    final var executions = List.of(
-        ExecutionOuterClass.Execution
-            .newBuilder()
-            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-                .newBuilder()
-                .setProject(PROJECT)
-                .setDomain(DOMAIN)
-                .setName(EXEC_NAME_1)
-                .build())
-            .build(),
-        ExecutionOuterClass.Execution
-            .newBuilder()
-            .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
-                .newBuilder()
-                .setProject(PROJECT)
-                .setDomain(DOMAIN)
-                .setName(EXEC_NAME_2))
-            .build()
-    );
+    //not a real filter but it will work for detecting if we pass a filter or not
+    final var pagedExecutions = request.getFilters().isEmpty()
+                                     ? PAGED_EXECUTIONS
+                                     : PAGED_FILTERED_EXECUTIONS;
+
+    final var token = request.getToken();
+    final var page = token.isEmpty() ? 0 : Integer.parseInt(token);
+    final var lastPage = pagedExecutions.size();
+    final var newToken = (page == lastPage) ? "" : Integer.toString(page + 1);
+    final var executions = pagedExecutions.get(page);
 
     final ExecutionOuterClass.ExecutionList response = ExecutionOuterClass.ExecutionList.newBuilder()
         .addAllExecutions(executions)
+        .setToken(newToken)
         .build();
     responseObserver.onNext(response);
     responseObserver.onCompleted();
+  }
+
+  private boolean isEvenExecId(String execName) {
+    return Integer.parseInt(execName.substring(EXEC_NAME_PREFIX.length())) % 2 == 0;
+  }
+
+  public static ExecutionOuterClass.Execution execution(String project, String domain, String execName1) {
+    return ExecutionOuterClass.Execution
+        .newBuilder()
+        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
+            .newBuilder()
+            .setProject(project)
+            .setDomain(domain)
+            .setName(execName1)
+            .build())
+        .build();
   }
 
   @Override
@@ -119,9 +143,5 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .build();
     responseObserver.onNext(projects);
     responseObserver.onCompleted();
-  }
-
-  Common.ResourceListRequest getLastExecutionRequest() {
-    return lastExecutionRequest;
   }
 }

@@ -20,13 +20,15 @@
 
 package com.spotify.styx.flyte.client;
 
+import static com.spotify.styx.flyte.client.TestAdminService.EXEC_NAME_PREFIX;
+import static com.spotify.styx.flyte.client.TestAdminService.PAGE_SIZE;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertFalse;
 
-import com.google.protobuf.Message;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
@@ -34,6 +36,7 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -107,7 +110,7 @@ public class FlyteAdminClientTest {
   @Test
   public void shouldPropagateListExecutionToStub() {
     var listExecutions =
-        flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, "token", "filters");
+        flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, null, null);
 
     listExecutions.getExecutionsList().forEach(
         e -> {
@@ -119,26 +122,34 @@ public class FlyteAdminClientTest {
   }
 
   @Test
-  public void shouldSupportOptionalTokenAndFilterInListExecutions() {
-    flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, null, null);
+  public void shouldReturnFirstPageWhenTokenIsNullOnListExecutions() {
+    final var response = flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, null, null);
 
-    final var lastExecutionRequest = testAdminService.getLastExecutionRequest();
-    assertThatDoesntContainField(lastExecutionRequest, "token");
-    assertThatDoesntContainField(lastExecutionRequest, "filters");
+    final var executionNames = response.getExecutionsList().stream()
+        .map(exec -> exec.getId().getName())
+        .collect(Collectors.toUnmodifiableList());
+    assertThat(executionNames, hasSize(PAGE_SIZE));
+    assertThat(executionNames, hasItems(EXEC_NAME_PREFIX + 1, EXEC_NAME_PREFIX + 2));
   }
 
   @Test
-  public void shouldPropagateListProjectsToStub() {
-    var listProjectsResponse =
-        flyteAdminClient.listProjects();
+  public void shouldNotReturnTheFirstPageWhenTokenIsNotNullOnListExecutions() {
+    final var response = flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, "1", null);
 
-    assertThat(listProjectsResponse.getProjectsList(), hasSize(1));
-    assertThat(listProjectsResponse.getProjectsList().get(0).getId(), equalTo(PROJECT));
-    assertThat(listProjectsResponse.getProjectsList().get(0).getDomains(0).getId(), equalTo(DOMAIN));
+    final var executionNames = response.getExecutionsList().stream()
+        .map(exec -> exec.getId().getName())
+        .collect(Collectors.toUnmodifiableList());
+    assertThat(executionNames, hasSize(PAGE_SIZE));
+    assertThat(executionNames, not(hasItems(EXEC_NAME_PREFIX + 1, EXEC_NAME_PREFIX + 2)));
   }
 
-  private void assertThatDoesntContainField(Message message, String field) {
-    final var fieldDesc = message.getDescriptorForType().findFieldByName(field);
-    assertFalse("proto contains field: " + field, message.hasField(fieldDesc));
+  @Test
+  public void shouldReturnPageWithFilteredExecutionsWhenFilterIsNotNullOnListExecutions() {
+    final var response = flyteAdminClient.listExecutions(PROJECT, DOMAIN, 100, null, "remove-ods");
+
+    final var executionNames = response.getExecutionsList().stream()
+        .map(exec -> exec.getId().getName())
+        .collect(Collectors.toUnmodifiableList());
+    assertThat(executionNames, hasItems(EXEC_NAME_PREFIX + 1, EXEC_NAME_PREFIX + 3));
   }
 }
