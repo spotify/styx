@@ -20,6 +20,7 @@
 
 package com.spotify.styx.flyte.client;
 
+import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Verify.verifyNotNull;
 
 import flyteidl.admin.Common;
@@ -150,16 +151,12 @@ public class FlyteAdminClient {
             .setDomain(domain)
             .build())
         .setLimit(limit)
-        .setToken(emptyIfNull(token))
-        .setFilters(emptyIfNull(filters))
+        .setToken(nullToEmpty(token))
+        .setFilters(nullToEmpty(filters))
         // TODO: .setSortBy()
         .build();
 
     return stub.listExecutions(request);
-  }
-
-  private String emptyIfNull(String str) {
-    return (str == null) ? "" : str;
   }
 
   public ProjectOuterClass.Projects listProjects() {
