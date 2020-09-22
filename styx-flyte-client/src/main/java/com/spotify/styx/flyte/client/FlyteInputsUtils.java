@@ -56,7 +56,16 @@ public class FlyteInputsUtils {
         .forEach(
             (key, value) -> {
               if (!key.toLowerCase().equals(PARAMETER_NAME)) {
-                literalMapBuilder.putLiterals(key, value.getDefault());
+                if (value.hasDefault()) {
+                  literalMapBuilder.putLiterals(key, value.getDefault());
+                  return;
+                }
+                if (value.getRequired()) {
+                  var message = "LP inputs must have default values. Missing default value for key:" + key;
+                  LOG.error(message);
+                  throw new UnsupportedOperationException(message);
+                }
+                LOG.debug("Ignore key: {}", key);
                 return;
               }
               if (value.getVar().getType().getSimple() != DATETIME) {

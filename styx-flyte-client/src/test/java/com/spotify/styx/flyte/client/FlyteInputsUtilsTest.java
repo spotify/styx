@@ -92,6 +92,68 @@ public class FlyteInputsUtilsTest {
   }
 
   @Test
+  public void shouldThrowExceptionIfInputIsRequired() {
+    var key = "name";
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters(key, Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .setRequired(true)
+            .build())
+        .build();
+
+    var exception = assertThrows(
+        UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, PARAMETER)
+    );
+
+    var msg = "LP inputs must have default values. Missing default value for key:" + key;
+    assertThat(exception.getMessage(), equalTo(msg));
+  }
+
+  @Test
+  public void shouldIgnoreIfInputIsNotRequired() {
+    var key = "name";
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters(key, Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .setRequired(false)
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
+
+    assertNull(inputs.getLiteralsMap()
+        .get(key));
+  }
+
+  @Test
+  public void shouldIgnoreIfInputHasNoDefault() {
+    var key = "name";
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters(key, Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
+
+    assertNull(inputs.getLiteralsMap()
+        .get(key));
+  }
+
+  @Test
   public void shouldThrowExceptionIfParameterHasWrongType() {
     var parameterMap = Interface.ParameterMap.newBuilder()
         .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
