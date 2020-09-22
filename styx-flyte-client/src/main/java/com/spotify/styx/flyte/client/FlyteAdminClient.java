@@ -22,7 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Verify.verifyNotNull;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillingParameterInInputs;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
@@ -100,7 +100,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillingParameterInInputs(inputs, parameter))
+                .setInputs(fillParameterInInputs(inputs, parameter))
                 .build());
 
     verifyNotNull(

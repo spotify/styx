@@ -22,7 +22,7 @@ package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillingParameterInInputs;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -40,7 +40,7 @@ public class FlyteInputsUtilsTest {
   static final String PARAMETER = INSTANT.toString();
 
   @Test
-  public void shouldFillingParameterToInputs() {
+  public void shouldFillParameterInInputs() {
     var parameterMap = Interface.ParameterMap.newBuilder()
         .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
@@ -52,7 +52,7 @@ public class FlyteInputsUtilsTest {
             .build())
         .build();
 
-    var inputs = fillingParameterInInputs(parameterMap, PARAMETER);
+    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
 
     assertThat(INSTANT.getEpochSecond(), equalTo(inputs.getLiteralsMap()
         .get(PARAMETER_NAME)
@@ -62,28 +62,33 @@ public class FlyteInputsUtilsTest {
   }
 
   @Test
-  public void shouldOnlyFillingParameterToInputs() {
-    var inputName = "xxx";
+  public void shouldOnlyFillParameterInInputs() {
+    var inputName = "key";
+    var inputValue = "value";
     var parameterMap = Interface.ParameterMap.newBuilder()
         .putParameters(inputName, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.DATETIME)
+                    setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
-            .setDefault(buildLiteralForPartition(PARAMETER))
+            .setDefault(Literals.Literal.newBuilder()
+                .setScalar(Literals.Scalar.newBuilder()
+                    .setPrimitive(Literals.Primitive.newBuilder().setStringValue(inputValue)
+                        .build()).build())
+                .build())
             .build())
         .build();
 
-    var inputs = fillingParameterInInputs(parameterMap, PARAMETER);
+    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
 
     assertNull(inputs.getLiteralsMap()
         .get(PARAMETER_NAME));
-    assertThat(INSTANT.getEpochSecond(), equalTo(inputs.getLiteralsMap()
+    assertThat(inputValue, equalTo(inputs.getLiteralsMap()
         .get(inputName)
         .getScalar()
         .getPrimitive()
-        .getDatetime().getSeconds()));
+        .getStringValue()));
   }
 
   @Test

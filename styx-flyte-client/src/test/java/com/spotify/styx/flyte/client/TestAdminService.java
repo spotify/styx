@@ -23,12 +23,12 @@ package com.spotify.styx.flyte.client;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.DOMAIN;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
 import static java.util.stream.Collectors.toUnmodifiableList;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.Execution;
 import flyteidl.admin.ProjectOuterClass;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
 
 import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.core.IdentifierOuterClass;
@@ -89,8 +89,8 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .setSpec(LaunchPlanOuterClass.LaunchPlanSpec
             .newBuilder()
             .setDefaultInputs(Interface.ParameterMap.newBuilder()
-                .putParameters("parameter", Interface.Parameter.newBuilder()
-                    .setDefault(buildLiteralForPartition("2020-09-21"))
+                .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+                    .setRequired(true)
                     .build())
                 .build())
             .build())
