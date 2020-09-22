@@ -28,10 +28,13 @@ import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class FlyteInputsUtils {
   static final String PARAMETER_NAME = "styx_parameter";
+  private static final Logger LOG = LoggerFactory.getLogger(FlyteInputsUtils.class);
 
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
@@ -57,7 +60,9 @@ public class FlyteInputsUtils {
                 return;
               }
               if (value.getVar().getType().getSimple() != DATETIME) {
-                literalMapBuilder.putLiterals(key, value.getDefault());
+                var message = PARAMETER_NAME + " should be of type DATETIME";
+                LOG.error(message);
+                throw new IllegalArgumentException(message);
               } else {
                 literalMapBuilder.putLiterals(key, buildLiteralForPartition(parameter));
               }

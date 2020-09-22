@@ -24,6 +24,7 @@ import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -33,7 +34,6 @@ import flyteidl.core.Literals;
 import flyteidl.core.Types;
 import java.time.Instant;
 import org.junit.Test;
-
 
 public class FlyteInputsUtilsTest {
   static final Instant INSTANT = Instant.now();
@@ -89,6 +89,32 @@ public class FlyteInputsUtilsTest {
         .getScalar()
         .getPrimitive()
         .getStringValue()));
+  }
+
+  @Test
+  public void shouldThrowExceptionIfParameterHasWrongType() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .setDefault(Literals.Literal.newBuilder()
+                .setScalar(Literals.Scalar.newBuilder()
+                    .setPrimitive(Literals.Primitive.newBuilder()
+                        .setStringValue("2020-09-15").build())
+                    .build())
+                .build())
+            .build())
+        .build();
+
+    var exception = assertThrows(
+        IllegalArgumentException.class,
+        () -> fillParameterInInputs(parameterMap, PARAMETER)
+    );
+
+    assertThat(exception.getMessage(), equalTo(PARAMETER_NAME + " should be of type DATETIME"));
   }
 
   @Test
