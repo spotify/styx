@@ -29,7 +29,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 
-import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -45,24 +45,16 @@ public class FlyteAdminClientTest {
 
   static final String PROJECT = "styx_flyte_test";
   static final String DOMAIN = "testing";
-  static final String NAME = "execution_name";
-  static final String LP_NAME = "launch_plan_1";
+  static final String EXISTING_NAME = EXEC_NAME_PREFIX + 1;
+  static final String NON_EXISTING_NAME = EXEC_NAME_PREFIX + 8;
   static final String LP_VERSION = "launch_plan_version_1";
   private FlyteAdminClient flyteAdminClient;
-  private TestAdminService testAdminService;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
-  private static final IdentifierOuterClass.Identifier LP_IDENTIFIER =
-      IdentifierOuterClass.Identifier.newBuilder()
-          .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
-          .setDomain(DOMAIN)
-          .setProject(PROJECT)
-          .setName(LP_NAME)
-          .setVersion(LP_VERSION).build();
 
   @Before
   public void setUp() throws IOException {
-    testAdminService = new TestAdminService();
+    var testAdminService = new TestAdminService();
     var serverName = InProcessServerBuilder.generateName();
     var server = InProcessServerBuilder
         .forName(serverName)
@@ -84,26 +76,24 @@ public class FlyteAdminClientTest {
   @Test
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
-        flyteAdminClient.createExecution(PROJECT, DOMAIN, NAME, LP_IDENTIFIER,
-            ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED);
-    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
-    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(NAME, equalTo(workflowExecution.getId().getName()));
+        flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME), ExecutionMode.SCHEDULED);
+    assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
+    assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
+    assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
   }
 
   @Test
   public void shouldPropagateGetExecutionToStub() {
-    var workflowExecution =
-        flyteAdminClient.getExecution(PROJECT, DOMAIN, NAME);
-    assertThat(PROJECT, equalTo(workflowExecution.getId().getProject()));
-    assertThat(DOMAIN, equalTo(workflowExecution.getId().getDomain()));
-    assertThat(NAME, equalTo(workflowExecution.getId().getName()));
+    var workflowExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, EXISTING_NAME);
+    assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
+    assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
+    assertThat(workflowExecution.getId().getName(), equalTo(EXISTING_NAME));
   }
 
   @Test
   public void shouldPropagateTerminateExecutionToStub() {
     var terminationResponse =
-        flyteAdminClient.terminateExecution(PROJECT, DOMAIN, LP_NAME, "Cause of termination");
+        flyteAdminClient.terminateExecution(PROJECT, DOMAIN, EXISTING_NAME, "Cause of termination");
     assertThat(terminationResponse, notNullValue());
   }
 
@@ -114,8 +104,8 @@ public class FlyteAdminClientTest {
 
     listExecutions.getExecutionsList().forEach(
         e -> {
-          assertThat(PROJECT, equalTo(e.getId().getProject()));
-          assertThat(DOMAIN, equalTo(e.getId().getDomain()));
+          assertThat(e.getId().getProject(), equalTo(PROJECT));
+          assertThat(e.getId().getDomain(), equalTo(DOMAIN));
         }
     );
     assertThat(2, equalTo(listExecutions.getExecutionsCount()));
@@ -161,5 +151,14 @@ public class FlyteAdminClientTest {
     assertThat(listProjectsResponse.getProjectsList(), hasSize(1));
     assertThat(listProjectsResponse.getProjectsList().get(0).getId(), equalTo(PROJECT));
     assertThat(listProjectsResponse.getProjectsList().get(0).getDomains(0).getId(), equalTo(DOMAIN));
+  }
+
+  private static IdentifierOuterClass.Identifier identifier(String name) {
+    return IdentifierOuterClass.Identifier.newBuilder()
+        .setResourceType(IdentifierOuterClass.ResourceType.LAUNCH_PLAN)
+        .setDomain(DOMAIN)
+        .setProject(PROJECT)
+        .setName(name)
+        .setVersion(LP_VERSION).build();
   }
 }
