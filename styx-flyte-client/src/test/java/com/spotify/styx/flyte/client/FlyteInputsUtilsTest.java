@@ -23,7 +23,6 @@ package com.spotify.styx.flyte.client;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -34,12 +33,8 @@ import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 import java.time.Instant;
-import junitparams.JUnitParamsRunner;
-import junitparams.Parameters;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
-@RunWith(JUnitParamsRunner.class)
 public class FlyteInputsUtilsTest {
   static final Instant INSTANT = Instant.now();
   static final String PARAMETER = INSTANT.toString();
@@ -191,20 +186,5 @@ public class FlyteInputsUtilsTest {
     assertTrue(parameter.getScalar().hasPrimitive());
     assertTrue(parameter.getScalar().getPrimitive().getValueCase() == Literals.Primitive.ValueCase.DATETIME);
     assertThat(INSTANT.getEpochSecond(), equalTo(parameter.getScalar().getPrimitive().getDatetime().getSeconds()));
-  }
-
-  @Test
-  @Parameters({
-      "2016-01-19, 2016-01-19T00:00:00Z",
-      "2016-01-19T09, 2016-01-19T09:00:00Z",
-      "2016-01, 2016-01-01T00:00:00Z",
-      "2016, 2016-01-01T00:00:00Z",
-      "2016-01-19T09:11:00Z, 2016-01-19T09:11:00Z",
-      "2016-01-19T09:11:01Z, 2016-01-19T09:11:01Z",
-  })
-  public void shouldConvertStringToTimeStamp(String string, String timestamp) {
-    long expected = Instant.parse(timestamp).getEpochSecond();
-    long result = FlyteInputsUtils.toTimestamp(string).getSeconds();
-    assertEquals(result, expected);
   }
 }

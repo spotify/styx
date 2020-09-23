@@ -58,10 +58,6 @@
           <groupId>com.spotify</groupId>
           <artifactId>styx-common</artifactId>
       </dependency>
-      <dependency>
-          <groupId>pl.pragmatists</groupId>
-          <artifactId>JUnitParams</artifactId>
-      </dependency>
   </dependencies>
   <build>
     <plugins>

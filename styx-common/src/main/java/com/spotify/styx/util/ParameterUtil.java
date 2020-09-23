@@ -27,7 +27,9 @@ import static java.time.ZoneOffset.UTC;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
 
+import com.google.protobuf.Timestamp;
 import com.spotify.styx.model.Schedule;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,8 +41,12 @@ import java.time.format.ResolverStyle;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helpers for working with {@link com.spotify.styx.model.Workflow} parameter handling.
@@ -49,6 +55,7 @@ public final class ParameterUtil {
 
   private static final Pattern YEAR_PATTERN = Pattern.compile("(\\d{4})(-\\d{2})?");
   private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("(\\d{4})-(\\d{2})");
+  private static final Logger LOG = LoggerFactory.getLogger(ParameterUtil.class);
 
   private static final int MIN_YEAR_WIDTH = 4;
   private static final int MAX_YEAR_WIDTH = 10;
@@ -110,15 +117,11 @@ public final class ParameterUtil {
   }
 
   public static Instant parseDateMonth(String dateMonth) {
-    return Instant.from(LocalDate.from(
-        DateTimeFormatter.ISO_LOCAL_DATE.parse(dateMonth + "-01"))
-        .atStartOfDay(UTC));
+    return parseDate(dateMonth + "-01");
   }
 
   public static Instant parseDateYear(String dateYear) {
-    return Instant.from(LocalDate.from(
-        DateTimeFormatter.ISO_LOCAL_DATE.parse(dateYear + "-01-01"))
-        .atStartOfDay(UTC));
+    return parseDate(dateYear + "-01-01");
   }
 
   public static String toParameter(Schedule schedule, Instant instant) {
@@ -136,6 +139,25 @@ public final class ParameterUtil {
       default:
         return formatDateTime(instant);
     }
+  }
+
+ public static Timestamp parseBest(String value) {
+    List<Function<String, Instant>> functions = List.of(
+        ParameterUtil::parseDate,
+        ParameterUtil::parseDateHour,
+        ParameterUtil::parseDateMonth,
+        ParameterUtil::parseDateYear,
+        Instant::parse
+    );
+    for (Function<String, Instant> function : functions) {
+      try {
+        Instant instant = function.apply(value);
+        return Timestamp.newBuilder().setSeconds(instant.getEpochSecond()).build();
+      } catch (DateTimeParseException e) {}
+    }
+    var msg = "Could not parse: " + value;
+    LOG.error(msg);
+    throw new DateTimeException(msg);
   }
 
   public static Instant parseAlignedInstant(String dateHour, Schedule schedule) {
