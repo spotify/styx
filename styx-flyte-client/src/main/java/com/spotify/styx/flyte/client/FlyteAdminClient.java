@@ -29,6 +29,7 @@ import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;
+import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,8 @@ public class FlyteAdminClient {
       String domain,
       String name,
       IdentifierOuterClass.Identifier launchPlanId,
-      ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode) {
+      ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
+      Map<String, String> annotations) {
     log.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
@@ -76,6 +78,9 @@ public class FlyteAdminClient {
         ExecutionOuterClass.ExecutionSpec.newBuilder()
             .setLaunchPlan(launchPlanId)
             .setMetadata(metadata)
+            .setAnnotations(Common.Annotations.newBuilder()
+                .putAllValues(annotations)
+                .build())
             .build();
 
     var response =

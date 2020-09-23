@@ -35,6 +35,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -45,12 +46,12 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
   private final List<Execution> allExecutions =
       new ArrayList<>(List.of(
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 1),
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 2),
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 3),
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 4),
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 5),
-          execution(PROJECT, DOMAIN, EXEC_NAME_PREFIX + 6)
+          execution(EXEC_NAME_PREFIX + 1),
+          execution(EXEC_NAME_PREFIX + 2),
+          execution(EXEC_NAME_PREFIX + 3),
+          execution(EXEC_NAME_PREFIX + 4),
+          execution(EXEC_NAME_PREFIX + 5),
+          execution(EXEC_NAME_PREFIX + 6)
       ));
   private static final Predicate<Execution> NO_FILTER = __ -> true;
   private static final Predicate<Execution> ONLY_ODDS = ex -> {
@@ -62,7 +63,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   @Override
   public void createExecution(final ExecutionOuterClass.ExecutionCreateRequest request,
                               final StreamObserver<ExecutionOuterClass.ExecutionCreateResponse> responseObserver) {
-    allExecutions.add(execution(request.getProject(), request.getDomain(), request.getName()));
+    allExecutions.add(execution(request));
     responseObserver.onNext(ExecutionOuterClass.ExecutionCreateResponse
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -147,7 +148,16 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
     responseObserver.onCompleted();
   }
 
-  private static Execution execution(String project, String domain, String execName) {
+  private Execution execution(ExecutionOuterClass.ExecutionCreateRequest request) {
+    return execution(request.getProject(), request.getDomain(), request.getName(),
+        request.getSpec().getAnnotations().getValuesMap());
+  }
+
+  private static Execution execution(String execName) {
+    return execution(FlyteAdminClientTest.PROJECT, FlyteAdminClientTest.DOMAIN, execName, Map.of());
+  }
+
+  private static Execution execution(String project, String domain, String execName, Map<String, String> annotations) {
     return Execution
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -155,6 +165,11 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .setProject(project)
             .setDomain(domain)
             .setName(execName)
+            .build())
+        .setSpec(ExecutionOuterClass.ExecutionSpec.newBuilder()
+            .setAnnotations(Common.Annotations.newBuilder()
+                .putAllValues(annotations)
+                .build())
             .build())
         .build();
   }

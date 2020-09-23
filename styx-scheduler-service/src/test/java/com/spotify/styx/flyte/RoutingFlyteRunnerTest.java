@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.spotify.styx.docker.AbstractRoutingRunnerTest;
 import com.spotify.styx.model.FlyteExecConf;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,6 +37,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunner> {
 
   private static final String EXEC_NAME = "exec-name";
+  private static final Map<String, String> ANNOTATIONS = Map.of("foo", "bar");
 
   @Mock private FlyteExecutionId executionId;
   @Mock private FlyteExecConf execConf;
@@ -50,10 +52,10 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
 
   @Test
   public void shouldCreateRunnerOnCreateExecution() throws FlyteRunner.CreateExecutionException {
-    flyteRunner.createExecution(runState, EXEC_NAME, execConf);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
 
     assertThatCreateCountersContains("default");
-    verify(createdRunners.get("default")).createExecution(runState, EXEC_NAME, execConf);
+    verify(createdRunners.get("default")).createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
   }
 
   @Test
@@ -74,8 +76,8 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
 
   @Test
   public void testCreatesOnlyOneRunnerPerRunnerId() throws Exception {
-    flyteRunner.createExecution(runState, EXEC_NAME, execConf);
-    flyteRunner.createExecution(runState, EXEC_NAME, execConf);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
 
     assertThatCreateCountersContains("default");
   }
@@ -84,8 +86,8 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
   public void testSwitchesRunners() throws Exception {
     when(runnerId.apply(runState)).thenReturn("id-1", "id-2");
 
-    flyteRunner.createExecution(runState, EXEC_NAME, execConf);
-    flyteRunner.createExecution(runState, EXEC_NAME, execConf);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
 
     assertThatCreateCountersContains("id-1", "id-2");
   }
