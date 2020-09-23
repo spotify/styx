@@ -43,6 +43,8 @@ import org.junit.runner.RunWith;
 public class FlyteInputsUtilsTest {
   static final Instant INSTANT = Instant.now();
   static final String PARAMETER = INSTANT.toString();
+  private static final String KEY = "name";
+  private static final String EXCEPTION_MESSAGE = "LP inputs must have default values. Missing default value for key:" + KEY;
 
   @Test
   public void shouldFillParameterInInputs() {
@@ -98,9 +100,8 @@ public class FlyteInputsUtilsTest {
 
   @Test
   public void shouldThrowExceptionIfInputIsRequired() {
-    var key = "name";
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(key, Interface.Parameter.newBuilder()
+        .putParameters(KEY, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
                     setSimple(Types.SimpleType.STRING)
@@ -114,16 +115,13 @@ public class FlyteInputsUtilsTest {
         UnsupportedOperationException.class,
         () -> fillParameterInInputs(parameterMap, PARAMETER)
     );
-
-    var msg = "LP inputs must have default values. Missing default value for key:" + key;
-    assertThat(exception.getMessage(), equalTo(msg));
+    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
   }
 
   @Test
-  public void shouldIgnoreIfInputIsNotRequired() {
-    var key = "name";
+  public void shouldThrowExceptionIfInputIsNotRequired() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(key, Interface.Parameter.newBuilder()
+        .putParameters(KEY, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
                     setSimple(Types.SimpleType.STRING)
@@ -133,17 +131,17 @@ public class FlyteInputsUtilsTest {
             .build())
         .build();
 
-    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
-
-    assertNull(inputs.getLiteralsMap()
-        .get(key));
+    var exception = assertThrows(
+        UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, PARAMETER)
+    );
+    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
   }
 
   @Test
-  public void shouldIgnoreIfInputHasNoDefault() {
-    var key = "name";
+  public void shouldThrowExceptionIfInputHasNoDefault() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(key, Interface.Parameter.newBuilder()
+        .putParameters(KEY, Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
                     setSimple(Types.SimpleType.STRING)
@@ -152,10 +150,12 @@ public class FlyteInputsUtilsTest {
             .build())
         .build();
 
-    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
+    var exception = assertThrows(
+        UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, PARAMETER)
+    );
 
-    assertNull(inputs.getLiteralsMap()
-        .get(key));
+    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
   }
 
   @Test
