@@ -33,6 +33,7 @@ import flyteidl.admin.ProjectOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.core.Interface;
+import flyteidl.core.Types;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -90,6 +91,10 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .newBuilder()
             .setDefaultInputs(Interface.ParameterMap.newBuilder()
                 .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+                    .setVar(Interface.Variable.newBuilder()
+                        .setType(Types.LiteralType.newBuilder().
+                            setSimple(Types.SimpleType.DATETIME).build())
+                        .build())
                     .setRequired(true)
                     .build())
                 .build())
