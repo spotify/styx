@@ -109,6 +109,18 @@ public final class ParameterUtil {
         ISO_LOCAL_DATE_HOUR.parse(dateHour)).atOffset(UTC));
   }
 
+  public static Instant parseDateMonth(String dateMonth) {
+    return Instant.from(LocalDate.from(
+        DateTimeFormatter.ISO_LOCAL_DATE.parse(dateMonth + "-01"))
+        .atStartOfDay(UTC));
+  }
+
+  public static Instant parseDateYear(String dateYear) {
+    return Instant.from(LocalDate.from(
+        DateTimeFormatter.ISO_LOCAL_DATE.parse(dateYear + "-01-01"))
+        .atStartOfDay(UTC));
+  }
+
   public static String toParameter(Schedule schedule, Instant instant) {
     switch (schedule.wellKnown()) {
       case DAILY:
