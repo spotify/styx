@@ -130,6 +130,20 @@ public class ParameterUtilTest {
   }
 
   @Test
+  public void shouldParseDateMonth() {
+    final Instant instant = ParameterUtil.parseDateMonth("2016-01");
+
+    assertThat(instant, is(parse("2016-01-01T00:00:00.000Z")));
+  }
+
+  @Test
+  public void shouldParseDateYear() {
+    final Instant instant = ParameterUtil.parseDateYear("2016");
+
+    assertThat(instant, is(parse("2016-01-01T00:00:00.000Z")));
+  }
+
+  @Test
   public void shouldParseDate() {
     final Instant instant = ParameterUtil.parseDate("2016-01-19");
 

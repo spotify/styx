@@ -26,8 +26,11 @@ import com.google.protobuf.Timestamp;
 import com.spotify.styx.util.ParameterUtil;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,24 +76,30 @@ public class FlyteInputsUtils {
                 LOG.error(message);
                 throw new IllegalArgumentException(message);
               } else {
-                literalMapBuilder.putLiterals(key, buildLiteralForPartition(parameter));
+                var literal = buildLiteralForPartition(parameter);
+                literalMapBuilder.putLiterals(key, literal);
               }
             });
 
     return literalMapBuilder.build();
   }
 
-  private static Timestamp toTimestamp(String value) {
-    Instant instant;
-    try {
-      instant = ParameterUtil.parseDate(value);
-    } catch (DateTimeParseException ignored1) {
+  static Timestamp toTimestamp(String value) {
+    List<Function<String, Instant>> functions = List.of(
+        ParameterUtil::parseDate,
+        ParameterUtil::parseDateHour,
+        ParameterUtil::parseDateMonth,
+        ParameterUtil::parseDateYear,
+        Instant::parse
+    );
+    for (Function<String, Instant> function : functions) {
       try {
-        instant = ParameterUtil.parseDateHour(value);
-      } catch (DateTimeParseException ignored2) {
-        instant = Instant.parse(value);
-      }
+        Instant instant = function.apply(value);
+        return Timestamp.newBuilder().setSeconds(instant.getEpochSecond()).build();
+      } catch (DateTimeParseException e) {}
     }
-    return Timestamp.newBuilder().setSeconds(instant.getEpochSecond()).build();
+    var msg = "Could not parse: " + value;
+    LOG.error(msg);
+    throw new DateTimeException(msg);
   }
 }
