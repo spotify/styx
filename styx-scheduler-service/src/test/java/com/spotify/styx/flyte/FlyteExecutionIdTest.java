@@ -34,8 +34,8 @@ import org.junit.rules.ExpectedException;
 public class FlyteExecutionIdTest {
 
   @Test
-  public void testFromProto() {
-    final ExecutionOuterClass.ExecutionCreateResponse response =
+  public void testFromProtoResponse() {
+    var response =
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -45,7 +45,22 @@ public class FlyteExecutionIdTest {
                 .setName("test-from-proto-creation")
                 .build())
             .build();
-    final FlyteExecutionId flyteExecutionId = FlyteExecutionId.fromProto(response);
+    var flyteExecutionId = FlyteExecutionId.fromProto(response);
+    assertThat(flyteExecutionId.project(), is("flyte-test"));
+    assertThat(flyteExecutionId.domain(), is("testing"));
+    assertThat(flyteExecutionId.name(), is("test-from-proto-creation"));
+    assertThat(flyteExecutionId.toUrn(), is("ex:flyte-test:testing:test-from-proto-creation"));
+  }
+
+  @Test
+  public void testFromProtoIdentifier() {
+    var identifier = IdentifierOuterClass.WorkflowExecutionIdentifier
+        .newBuilder()
+        .setProject("flyte-test")
+        .setDomain("testing")
+        .setName("test-from-proto-creation")
+        .build();
+    var flyteExecutionId = FlyteExecutionId.fromProto(identifier);
     assertThat(flyteExecutionId.project(), is("flyte-test"));
     assertThat(flyteExecutionId.domain(), is("testing"));
     assertThat(flyteExecutionId.name(), is("test-from-proto-creation"));

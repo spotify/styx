@@ -20,13 +20,22 @@
 
 package com.spotify.styx.flyte;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.flyte.FlyteEventTranslator.translate;
+import static com.spotify.styx.util.CloserUtil.register;
+import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
+import static com.spotify.styx.util.GuardedRunnable.guard;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.CompletableFuture.runAsync;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.Closer;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
@@ -34,11 +43,23 @@ import com.spotify.styx.state.TriggerVisitor;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
+import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.norberg.automatter.AutoMatter;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +67,53 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
   @VisibleForTesting static final String TERMINATE_CAUSE_PREFIX = "Styx workflow instance execution reached state: ";
+  @VisibleForTesting static final String TERMINATE_CAUSE = "Styx workflow instance execution is not active";
+  @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
+  @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
+  private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
+  private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
+  private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
+      .setDaemon(true)
+      .setNameFormat("flyte-scheduler-thread-%d")
+      .build();
 
   private final String runnerId;
   private final FlyteAdminClient flyteAdminClient;
   private final StateManager stateManager;
+  private final Duration terminateDanglingFlyteExecInterval;
+  private final ScheduledExecutorService scheduledExecutor;
+  private final Closer closer = Closer.create();
+  private final ExecutorService executor;
 
-  public FlyteAdminClientRunner(final String runnerId,
-                                final FlyteAdminClient flyteAdminClient,
-                                final StateManager stateManager) {
-    this.runnerId = requireNonNull(runnerId);
-    this.flyteAdminClient = requireNonNull(flyteAdminClient);
-    this.stateManager = requireNonNull(stateManager);
+  @VisibleForTesting
+  FlyteAdminClientRunner(final String runnerId,
+                         final FlyteAdminClient flyteAdminClient,
+                         final StateManager stateManager,
+                         final Duration terminateDanglingFlyteExecInterval,
+                         final ScheduledExecutorService scheduledExecutor) {
+    this.runnerId = requireNonNull(runnerId, "runnerId");
+    this.flyteAdminClient = requireNonNull(flyteAdminClient, "flyteAdminClient");
+    this.stateManager = requireNonNull(stateManager, "stateManager");
+    this.terminateDanglingFlyteExecInterval = requireNonNull(terminateDanglingFlyteExecInterval, "terminateFlyteExecInterval");
+    this.scheduledExecutor = register(closer, requireNonNull(
+        scheduledExecutor, "flyte-scheduled-executor"),
+        "flyte-scheduled-executor"
+    );
+
+    checkArgument(
+        terminateDanglingFlyteExecInterval.compareTo(Duration.ZERO) > 0,
+        "terminateFlyteExecInterval must be greater than zero:" + terminateDanglingFlyteExecInterval);
+
+    this.executor = currentContextExecutorService(
+        register(closer, new ForkJoinPool(FLYTE_TERMINATING_THREADS), "flyte-terminating-executor"));
+  }
+
+  FlyteAdminClientRunner(final String runnerId,
+                         final FlyteAdminClient flyteAdminClient,
+                         final StateManager stateManager) {
+    this(runnerId, flyteAdminClient, stateManager, 
+        DEFAULT_TERMINATE_EXEC_INTERVAL,
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
   @Override
@@ -152,7 +209,95 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Exception e) {
       throw new PollingException(flyteExecutionId, e);
     }
+  }
 
+  void init() {
+    scheduleWithJitter(this::terminateDanglingFlyteExecutions, scheduledExecutor, terminateDanglingFlyteExecInterval);
+  }
+
+  @VisibleForTesting
+  void terminateDanglingFlyteExecutions() {
+    try {
+      // TODO: add tracing
+      tryTerminateDanglingFlyteExecutions();
+    } catch (Throwable t) {
+      LOG.warn("Error while terminating dangling flyte executions", t);
+    }
+
+  }
+
+  private void tryTerminateDanglingFlyteExecutions() {
+    var projects = flyteAdminClient.listProjects();
+
+    var allFutures = new ArrayList<CompletableFuture<Void>>();
+    for (var project : projects.getProjectsList()) {
+      for (var domain : project.getDomainsList()) {
+        String paginationToken = null;
+        do {
+          var executions =
+              flyteAdminClient.listExecutions(project.getId(), domain.getId(), 100, paginationToken, "");
+          executions.getExecutionsList().stream()
+              .filter(exec -> exec.getClosure().getPhase() == Execution.WorkflowExecution.Phase.RUNNING)
+              .map(exec -> AnnotatedFlyteExecutionId.create(
+                  FlyteExecutionId.fromProto(exec.getId()),
+                  exec.getSpec().getAnnotations().getValuesMap())
+              )
+              .filter(this::isFlyteExecutionTriggeredByStyx)
+              .map(annotatedId -> runAsync(guard(() -> tryTerminateDanglingFlyteExecution(annotatedId)), executor))
+              .forEach(allFutures::add);
+          paginationToken = executions.getToken();
+        } while (!"".equals(paginationToken));
+      }
+    }
+    allFutures.forEach(CompletableFuture::join);
+  }
+
+  private void tryTerminateDanglingFlyteExecution(AnnotatedFlyteExecutionId annotatedId) {
+    var workflowInstance = getWorkflowInstance(annotatedId);
+    var runState = stateManager.getActiveState(workflowInstance);
+
+    var shouldTerminate = runState.isEmpty() // state reached terminal state and aren't  active anymore
+                          || !isFlyteExecRelatedToRunState(annotatedId, runState.orElseThrow());
+    if (shouldTerminate) {
+      var id = annotatedId.identifier();
+      flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
+    }
+  }
+
+  private boolean isFlyteExecutionTriggeredByStyx(AnnotatedFlyteExecutionId annotatedId) {
+    final var annotations = annotatedId.annotation();
+    return annotations != null && annotations.containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION);
+  }
+
+  private WorkflowInstance getWorkflowInstance(AnnotatedFlyteExecutionId annotatedId) {
+    checkArgument(isFlyteExecutionTriggeredByStyx(annotatedId));
+
+    return WorkflowInstance.parseKey(
+        annotatedId.annotation().get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
+  }
+
+  private boolean isFlyteExecRelatedToRunState(AnnotatedFlyteExecutionId annotatedId, RunState runState) {
+    final var annotations = annotatedId.annotation();
+    if (!annotations.containsKey(STYX_EXECUTION_ID_ANNOTATION)) {
+      LOG.info("Flyte execution without styx execution id annotation {}", annotatedId.identifier());
+      return false;
+    }
+    final var styxExecIdOnFlyte = annotations.get(STYX_EXECUTION_ID_ANNOTATION);
+
+    final Optional<String> styxExecIdOpt = runState.data().executionId();
+    if (styxExecIdOpt.isEmpty()) {
+      LOG.debug("Flyte execution state with no current executionId: {}", styxExecIdOnFlyte);
+      return false;
+    }
+
+    final String styxExecId = styxExecIdOpt.get();
+    if (!styxExecIdOnFlyte.equals(styxExecId)) {
+      LOG.debug("Flyte execution not matching current exec id, current:{} != flyte:{}",
+          styxExecId, styxExecIdOnFlyte);
+      return false;
+    }
+
+    return true;
   }
 
   @VisibleForTesting
@@ -169,8 +314,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @Override
-  public void close() {
-    // Nothing to close... yet
+  public void close() throws IOException {
+    //TODO: Make FlyteAdminClient closable or use apollo modules to close its channel
+    closer.close();
   }
 
   private static class TriggerToExecutionModeVisitor implements TriggerVisitor<ExecutionMode> {
@@ -195,6 +341,19 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     @Override
     public ExecutionMode unknown(String triggerId) {
       return ExecutionMode.UNRECOGNIZED;
+    }
+  }
+
+  @AutoMatter
+  interface AnnotatedFlyteExecutionId {
+    FlyteExecutionId identifier();
+    Map<String, String> annotation();
+
+    static AnnotatedFlyteExecutionId create(FlyteExecutionId identifier, Map<String, String> annotations) {
+      ;return new AnnotatedFlyteExecutionIdBuilder()
+          .identifier(identifier)
+          .annotation(annotations)
+          .build();
     }
   }
 }
