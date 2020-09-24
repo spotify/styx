@@ -22,10 +22,11 @@ package com.spotify.styx.flyte;
 
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
+import java.io.Closeable;
 import java.util.Map;
 import java.util.function.Function;
 
-public interface FlyteRunner {
+public interface FlyteRunner extends Closeable {
   default boolean isEnabled() {
     return true;
   }

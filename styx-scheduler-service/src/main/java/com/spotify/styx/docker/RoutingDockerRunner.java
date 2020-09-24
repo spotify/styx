@@ -20,7 +20,6 @@
 
 package com.spotify.styx.docker;
 
-import com.google.common.io.Closer;
 import com.spotify.styx.state.RunState;
 import java.io.IOException;
 import java.util.function.Function;
@@ -53,12 +52,5 @@ class RoutingDockerRunner extends AbstractRoutingRunner<DockerRunner>
     for (var v: runners.values()) {
       v.cleanup();
     }
-  }
-
-  @Override
-  public void close() throws IOException {
-    final Closer closer = Closer.create();
-    runners.values().forEach(closer::register);
-    closer.close();
   }
 }

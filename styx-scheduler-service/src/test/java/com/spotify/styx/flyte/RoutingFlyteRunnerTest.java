@@ -92,6 +92,20 @@ public class RoutingFlyteRunnerTest extends AbstractRoutingRunnerTest<FlyteRunne
     assertThatCreateCountersContains("id-1", "id-2");
   }
 
+  @Test
+  public void testCreatedRunnersAreClosed() throws Exception {
+    when(runnerId.apply(runState)).thenReturn("id-1", "id-2");
+
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
+    flyteRunner.createExecution(runState, EXEC_NAME, execConf, ANNOTATIONS);
+    flyteRunner.close();
+
+    assertThatCreateCountersContains("id-1", "id-2");
+    for (var runner : createdRunners.values()) {
+      verify(runner).close();
+    }
+  }
+
   @Override
   protected FlyteRunner mockRunner() {
     return mock(FlyteRunner.class);

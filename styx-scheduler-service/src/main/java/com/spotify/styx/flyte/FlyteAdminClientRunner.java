@@ -168,6 +168,11 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     return trigger.accept(TriggerToExecutionModeVisitor.INSTANCE);
   }
 
+  @Override
+  public void close() {
+    // Nothing to close... yet
+  }
+
   private static class TriggerToExecutionModeVisitor implements TriggerVisitor<ExecutionMode> {
     private static final TriggerToExecutionModeVisitor INSTANCE = new TriggerToExecutionModeVisitor();
 

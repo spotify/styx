@@ -20,13 +20,16 @@
 
 package com.spotify.styx.docker;
 
+import com.google.common.io.Closer;
 import com.spotify.styx.state.RunState;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 
-public class AbstractRoutingRunner<T> {
+public abstract class AbstractRoutingRunner<T extends Closeable> implements Closeable {
 
   protected final Function<String, T> runnerFactory;
   protected final Function<RunState, String> runnerId;
@@ -40,5 +43,13 @@ public class AbstractRoutingRunner<T> {
   protected T runner(RunState runState) {
     var id = runnerId.apply(runState);
     return runners.computeIfAbsent(id, runnerFactory);
+  }
+
+
+  @Override
+  public final void close() throws IOException {
+    final var closer = Closer.create();
+    runners.values().forEach(closer::register);
+    closer.close();
   }
 }
