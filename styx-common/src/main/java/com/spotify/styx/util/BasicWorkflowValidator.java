@@ -52,6 +52,7 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   private static final Pattern VALID_EMAIL_ADDRESS_REGEX =
       Pattern.compile("^[_A-Za-z0-9-+]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$",
           Pattern.CASE_INSENSITIVE);
+  private static final String RESOURCE_TYPE_LAUNCH_PLAN = "LAUNCH_PLAN";
 
   private static final Duration MIN_RUNNING_TIMEOUT = Duration.ofMinutes(1);
   private final DockerImageValidator dockerImageValidator;
@@ -173,8 +174,10 @@ public class BasicWorkflowValidator implements WorkflowValidator {
       var flyteIdentifier = flyteExecConf.referenceId();
 
       var resourceType = flyteIdentifier.resourceType();
-      if (!"lp".equals(resourceType)) {
-        errors.add("only launch plans (\"lp\") are supported: " + resourceType);
+      if (!RESOURCE_TYPE_LAUNCH_PLAN.equals(resourceType)) {
+        errors.add(
+            "only launch plans (\"" + RESOURCE_TYPE_LAUNCH_PLAN + "\") are supported as resource type, but received: "
+            + resourceType);
       }
 
       empty(errors, "domain", flyteIdentifier.domain());

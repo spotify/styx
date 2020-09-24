@@ -153,7 +153,7 @@ public final class TestData {
 
   public static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
       .referenceId(FlyteIdentifier.builder()
-          .resourceType("lp")
+          .resourceType("LAUNCH_PLAN")
           .project("flyte-test")
           .domain("production")
           .name("test-workflow")
