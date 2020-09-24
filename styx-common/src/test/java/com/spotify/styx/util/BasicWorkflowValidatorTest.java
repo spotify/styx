@@ -321,7 +321,8 @@ public class BasicWorkflowValidatorTest {
     @SuppressWarnings("unused")
     public static Object[] provideNotALaunchPlanResource() {
         return new Object[] {
-            flyteConf(builder -> builder.resourceType("wf")), "only launch plans (\"lp\") are supported: wf"
+            flyteConf(builder -> builder.resourceType("wf")),
+            "only launch plans (\"LAUNCH_PLAN\") are supported as resource type, but received: wf"
         };
     }
 
