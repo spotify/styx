@@ -20,8 +20,10 @@
 
 package com.spotify.styx.flyte;
 
+import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateManager;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.function.Function;
@@ -41,6 +43,12 @@ public interface FlyteRunner extends Closeable {
 
   static FlyteRunner noop() {
     return new NoopFlyteRunner();
+  }
+
+  static FlyteRunner flyteAdmin(final String runnerId,
+                                final FlyteAdminClient flyteAdminClient,
+                                final StateManager stateManager) {
+    return new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
   }
 
   /**

@@ -639,7 +639,7 @@ public class StyxScheduler implements AppInit {
     }
 
     var flyteAdminClient = getFlyteAdminClient(config, runnerId);
-    return new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
+    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
   }
 
   private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId) {
