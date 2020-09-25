@@ -371,6 +371,11 @@ public class StyxSchedulerServiceFixture {
       public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
         // do nothing
       }
+
+      @Override
+      public void close() {
+        // do nothing
+      }
     };
   }
 

@@ -26,8 +26,8 @@ import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInpu
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
-import flyteidl.admin.ProjectOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
+import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
 import io.grpc.ManagedChannelBuilder;

@@ -51,4 +51,9 @@ class NoopFlyteRunner implements FlyteRunner {
       throws PollingException {
     throw new PollingException("Cannot poll for execution: " + flyteExecutionId.toUrn());
   }
+
+  @Override
+  public void close() {
+    // nothing to close
+  }
 }

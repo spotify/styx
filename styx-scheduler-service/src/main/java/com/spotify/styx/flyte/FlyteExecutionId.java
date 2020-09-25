@@ -22,6 +22,7 @@ package com.spotify.styx.flyte;
 
 import com.google.common.base.Preconditions;
 import flyteidl.admin.ExecutionOuterClass;
+import flyteidl.core.IdentifierOuterClass;
 import io.norberg.automatter.AutoMatter;
 
 @AutoMatter
@@ -40,10 +41,14 @@ public interface FlyteExecutionId {
   }
 
   static FlyteExecutionId fromProto(ExecutionOuterClass.ExecutionCreateResponse response) {
+    return fromProto(response.getId());
+  }
+
+  static FlyteExecutionId fromProto(IdentifierOuterClass.WorkflowExecutionIdentifier identifier) {
     return newBuilder()
-        .project(response.getId().getProject())
-        .domain(response.getId().getDomain())
-        .name(response.getId().getName())
+        .project(identifier.getProject())
+        .domain(identifier.getDomain())
+        .name(identifier.getName())
         .build();
   }
 

@@ -68,4 +68,9 @@ public class NoopFlyteRunnerTest {
         () -> runner.poll(FLYTE_EXECUTION_ID, null)
     );
   }
+
+  @Test
+  public void testCloseDoesNotThrowsExeption() {
+    runner.close();
+  }
 }

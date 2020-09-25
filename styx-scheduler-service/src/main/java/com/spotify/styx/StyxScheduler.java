@@ -57,9 +57,8 @@ import com.spotify.styx.api.SchedulerResource;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
-import com.spotify.styx.docker.RunnerId;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
-import com.spotify.styx.flyte.FlyteAdminClientRunner;
+import com.spotify.styx.docker.RunnerId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
@@ -106,13 +105,10 @@ import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.typesafe.config.Config;
-import flyteidl.service.AdminServiceGrpc;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.fabric8.kubernetes.client.utils.HttpClientUtils;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -639,7 +635,7 @@ public class StyxScheduler implements AppInit {
     }
 
     var flyteAdminClient = getFlyteAdminClient(config, runnerId);
-    return new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
+    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
   }
 
   private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId) {
@@ -649,15 +645,9 @@ public class StyxScheduler implements AppInit {
     }
 
     var config = flyteAdminRootConfig.getConfig(runnerId);
-    var builder =
-        ManagedChannelBuilder.forAddress(config.getString(FLYTEADMIN_HOST), config.getInt(FLYTEADMIN_PORT));
-    if (config.getBoolean(FLYTEADMIN_INSECURE)) {
-      builder.usePlaintext();
-    }
-    final ManagedChannel channel = builder.build();
-
-    var stub = AdminServiceGrpc.newBlockingStub(channel);
-    return new FlyteAdminClient(stub);
+    final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
+    final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
+    return FlyteAdminClient.create(target, insecure);
   }
 
   @VisibleForTesting
