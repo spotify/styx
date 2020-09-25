@@ -221,7 +221,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       // TODO: add tracing
       tryTerminateDanglingFlyteExecutions();
     } catch (Throwable t) {
-      LOG.warn("Error while terminating dangling flyte executions", t);
+      LOG.error("Error while terminating dangling flyte executions", t);
     }
 
   }
@@ -234,6 +234,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       for (var domain : project.getDomainsList()) {
         String paginationToken = null;
         do {
+          //TODO: explore using filters for listing only running executions
+          // or at least listing only the ones newer than some threshold
           var executions =
               flyteAdminClient.listExecutions(project.getId(), domain.getId(), 100, paginationToken, "");
           executions.getExecutionsList().stream()
