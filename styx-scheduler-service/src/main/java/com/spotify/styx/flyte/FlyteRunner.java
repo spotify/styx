@@ -48,7 +48,9 @@ public interface FlyteRunner extends Closeable {
   static FlyteRunner flyteAdmin(final String runnerId,
                                 final FlyteAdminClient flyteAdminClient,
                                 final StateManager stateManager) {
-    return new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
+    final var runner = new FlyteAdminClientRunner(runnerId, flyteAdminClient, stateManager);
+    runner.init();
+    return runner;
   }
 
   /**

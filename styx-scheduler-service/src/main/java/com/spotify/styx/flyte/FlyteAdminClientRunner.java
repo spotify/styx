@@ -212,6 +212,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   void init() {
+    LOG.info("Scheduling terminate dangling flyte execution thread");
     scheduleWithJitter(this::terminateDanglingFlyteExecutions, scheduledExecutor, terminateDanglingFlyteExecInterval);
   }
 
