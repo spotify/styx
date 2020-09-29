@@ -23,6 +23,7 @@ package com.spotify.styx.flyte;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_EXECUTION_ID_ANNOTATION;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE;
+import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATION_GRACE_PERIOD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.Timestamp;
 import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.WorkflowId;
@@ -39,6 +41,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.util.Time;
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.Execution;
@@ -47,6 +50,7 @@ import flyteidl.core.Execution.WorkflowExecution.Phase;
 import flyteidl.core.IdentifierOuterClass;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -80,25 +84,31 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   private static final String NON_STYX_2 = "non-styx-2";
   private static final String NA_DANGLING_1 = "na-dangling-1";
   private static final String NA_DANGLING_2 = "na-dangling-2";
+  private static final String NA_DANGLING_YOUNG_1 = "na-dangling-young-1";
+  private static final String NA_DANGLING_YOUNG_2 = "na-dangling-young-2";
   private static final String NIA_DANGLING_1 = "nia-dangling-1";
   private static final String NIA_DANGLING_2 = "nia-dangling-2";
   private static final String NIS_DANGLING_1 = "nis-dangling-1";
   private static final String NIS_DANGLING_2 = "nis-dangling-2";
   private static final String OA_DANGLING_1 = "oa-dangling-1";
   private static final String OA_DANGLING_2 = "oa-dangling-2";
+  private static final Duration BACK_ENOUGH_TO_MAKE_EXECUTIONS_YOUNG = TERMINATION_GRACE_PERIOD.dividedBy(-2);
+  private static final Duration BACK_ENOUGH_TO_MAKE_EXECUTIONS_OLD = TERMINATION_GRACE_PERIOD.multipliedBy(-2);
 
   @Mock private StateManager stateManager;
   @Mock private FlyteAdminClient adminClient;
 
   private final QuietDeterministicScheduler executor = spy(new QuietDeterministicScheduler());
   private final Set<WorkflowInstance> activeInstances = new LinkedHashSet<>();
+  private final SettableTime time = new SettableTime();
 
   private FlyteAdminClientRunner runner;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    runner = new FlyteAdminClientRunner("runnerId", adminClient, stateManager, TERMINATE_DANGLING_INTERVAL, executor);
+    runner = new FlyteAdminClientRunner(
+        "runnerId", adminClient, stateManager, TERMINATE_DANGLING_INTERVAL, executor, time);
     when(adminClient.listProjects())
         .thenReturn(ProjectOuterClass.Projects.newBuilder()
             .addProjects(ProjectOuterClass.Project.newBuilder()
@@ -109,6 +119,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
                 .build())
             .build());
 
+    time.setOffset(BACK_ENOUGH_TO_MAKE_EXECUTIONS_OLD);
     var nonActiveDangling = executions(this::nonActiveDanglingExecution, NA_DANGLING_1, NA_DANGLING_2);
     var noIdInStateDangling = executions(this::noIdInStateDanglingExecution, NIS_DANGLING_1, NIS_DANGLING_2);
     var noIdInAnnotationDangling = executions(this::noIdInAnnotationDanglingExecution, NIA_DANGLING_1, NIA_DANGLING_2);
@@ -116,13 +127,26 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
     var running = executions(this::runningExecution, RUNNING_1, RUNNING_2);
     var nonStyx = executions(this::runningNonStyxExecution, NON_STYX_1, NON_STYX_2);
     var nonRunning = executions(this::nonRunningExecutions, NON_RUNNING_1, NON_RUNNING_2);
-    stubListExecutions(nonActiveDangling, noIdInStateDangling, noIdInAnnotationDangling, oldIdInAnnotationDangling,
-        running, nonStyx, nonRunning);
+
+    time.setOffset(BACK_ENOUGH_TO_MAKE_EXECUTIONS_YOUNG);
+    var nonActiveYoungDangling = executions(this::nonActiveDanglingExecution, NA_DANGLING_YOUNG_1, NA_DANGLING_YOUNG_2);
+    stubListExecutions(nonActiveYoungDangling, nonActiveDangling, noIdInStateDangling, noIdInAnnotationDangling,
+        oldIdInAnnotationDangling, running, nonStyx, nonRunning);
+
+    time.reset();
   }
 
   @After
   public void tearDown() throws Exception {
     runner.close();
+  }
+
+  @Test
+  public void shouldTerminateDanglingFlyteExecutionsWhenStateNotActiveAnymoreAndExecutionIsYoung() {
+    runner.terminateDanglingFlyteExecutions();
+
+    verifyTerminateExecution(never(), NA_DANGLING_YOUNG_1);
+    verifyTerminateExecution(never(), NA_DANGLING_YOUNG_2);
   }
 
   @Test
@@ -260,18 +284,30 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   }
 
   private Execution execution(String name, Common.Annotations annotations, Phase phase) {
+    var timestamp = nowTimestamp();
+    var identifier = IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
+        .setProject(PROJECT)
+        .setDomain(DOMAIN)
+        .setName(name)
+        .build();
     return Execution.newBuilder()
-        .setId(IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
-            .setProject(PROJECT)
-            .setDomain(DOMAIN)
-            .setName(name)
-            .build())
+        .setId(identifier)
         .setSpec(ExecutionOuterClass.ExecutionSpec.newBuilder()
             .setAnnotations(annotations)
             .build())
         .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
             .setPhase(phase)
+            .setCreatedAt(timestamp)
+            .setStartedAt(timestamp)
             .build())
+        .build();
+  }
+
+  private Timestamp nowTimestamp() {
+    var now = time.get();
+    return Timestamp.newBuilder()
+        .setSeconds(now.getEpochSecond())
+        .setNanos(now.getNano())
         .build();
   }
 
@@ -304,5 +340,29 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
         WorkflowId.create("component", name),
         "2020-10-24"
     );
+  }
+
+  private static class SettableTime implements Time {
+
+    private final Instant base;
+
+    private Duration offset = Duration.ZERO;
+
+    private SettableTime() {
+      this.base = Instant.now();
+    }
+
+    @Override
+    public Instant get() {
+      return base.plus(offset);
+    }
+
+    private void setOffset(Duration offset) {
+      this.offset = offset;
+    }
+
+    private void reset() {
+      this.offset = Duration.ZERO;
+    }
   }
 }

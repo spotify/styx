@@ -41,6 +41,7 @@ import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.TriggerVisitor;
 import com.spotify.styx.util.IsClosedException;
+import com.spotify.styx.util.Time;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.Execution;
@@ -50,6 +51,7 @@ import io.grpc.StatusRuntimeException;
 import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting static final String TERMINATE_CAUSE = "Styx workflow instance execution is not active";
   @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
+  @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(3);
   private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
   private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -82,6 +85,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   private final StateManager stateManager;
   private final Duration terminateDanglingFlyteExecInterval;
   private final ScheduledExecutorService scheduledExecutor;
+  private final Time time;
   private final Closer closer = Closer.create();
   private final ExecutorService executor;
 
@@ -90,7 +94,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                          final FlyteAdminClient flyteAdminClient,
                          final StateManager stateManager,
                          final Duration terminateDanglingFlyteExecInterval,
-                         final ScheduledExecutorService scheduledExecutor) {
+                         final ScheduledExecutorService scheduledExecutor,
+                         final Time time) {
     this.runnerId = requireNonNull(runnerId, "runnerId");
     this.flyteAdminClient = requireNonNull(flyteAdminClient, "flyteAdminClient");
     this.stateManager = requireNonNull(stateManager, "stateManager");
@@ -99,6 +104,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         scheduledExecutor, "flyte-scheduled-executor"),
         "flyte-scheduled-executor"
     );
+    this.time = requireNonNull(time, "time");
 
     checkArgument(
         terminateDanglingFlyteExecInterval.compareTo(Duration.ZERO) > 0,
@@ -113,7 +119,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                          final StateManager stateManager) {
     this(runnerId, flyteAdminClient, stateManager, 
         DEFAULT_TERMINATE_EXEC_INTERVAL,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY),
+        Instant::now);
   }
 
   @Override
@@ -240,7 +247,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           var executions =
               flyteAdminClient.listExecutions(project.getId(), domain.getId(), 100, paginationToken, "");
           executions.getExecutionsList().stream()
-              .filter(exec -> exec.getClosure().getPhase() == Execution.WorkflowExecution.Phase.RUNNING)
+              .filter(this::haveBeenRunningForAWhile)
               .map(exec -> AnnotatedFlyteExecutionId.create(
                   FlyteExecutionId.fromProto(exec.getId()),
                   exec.getSpec().getAnnotations().getValuesMap())
@@ -253,6 +260,23 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       }
     }
     allFutures.forEach(CompletableFuture::join);
+  }
+
+  private boolean haveBeenRunningForAWhile(ExecutionOuterClass.Execution exec) {
+    var isRunning = exec.getClosure().getPhase() == Execution.WorkflowExecution.Phase.RUNNING;
+    if (!isRunning) {
+      return false;
+    }
+
+    var startedAt = exec.getClosure().getStartedAt();
+    var startedAtInstant = Instant.ofEpochSecond(startedAt.getSeconds(), startedAt.getNanos());
+    var age = Duration.between(startedAtInstant, time.get());
+    if (age.compareTo(TERMINATION_GRACE_PERIOD) < 0) {
+      LOG.info("Skipping termination on young running Flyte execution: ex:{}::{}:{} ({})",
+          exec.getId().getProject(), exec.getId().getDomain(), exec.getId().getName(), age);
+      return false;
+    }
+    return true;
   }
 
   private void tryTerminateDanglingFlyteExecution(AnnotatedFlyteExecutionId annotatedId) {
