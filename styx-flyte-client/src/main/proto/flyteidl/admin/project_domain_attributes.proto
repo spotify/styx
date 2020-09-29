@@ -12,7 +12,7 @@ message ProjectDomainAttributes {
     // Unique domain id for which this set of attributes will be applied.
     string domain                  = 2;
 
-    MatchingAttributes matching_attributes = 3; 
+    MatchingAttributes matching_attributes = 3;
 }
 
 // Sets custom attributes for a project-domain combination.

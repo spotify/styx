@@ -35,7 +35,7 @@ message TaskResourceSpec {
 
   string memory = 3;
 
-  string storage = 4;  
+  string storage = 4;
 }
 
 message TaskResourceAttributes {
@@ -53,7 +53,7 @@ message ClusterResourceAttributes {
 
 message ExecutionQueueAttributes {
   // Tags used for assigning execution queues for tasks defined within this project.
-  repeated string tags           = 1; 
+  repeated string tags           = 1;
 }
 
 message ExecutionClusterLabel {
@@ -77,7 +77,7 @@ message PluginOverride {
     // Uses the system-configured default implementation.
     USE_DEFAULT = 1;
   }
-  
+
   // Defines the behavior when no plugin from the plugin_id list is not found.
   MissingPluginBehavior missing_plugin_behavior = 4;
 }
@@ -90,9 +90,9 @@ message PluginOverrides {
 // Generic container for encapsulating all types of the above attributes messages.
 message MatchingAttributes {
   oneof target {
-    TaskResourceAttributes task_resource_attributes = 1; 
+    TaskResourceAttributes task_resource_attributes = 1;
 
-    ClusterResourceAttributes cluster_resource_attributes = 2; 
+    ClusterResourceAttributes cluster_resource_attributes = 2;
 
     ExecutionQueueAttributes execution_queue_attributes = 3;
 

@@ -15,7 +15,7 @@ import "google/protobuf/duration.proto";
 message NodeExecutionGetRequest {
 
    // Uniquely identifies an individual node execution.
-   core.NodeExecutionIdentifier id  = 1;  
+   core.NodeExecutionIdentifier id  = 1;
 }
 
 // Represents a request structure to retrieve a list of node execution entities.
@@ -169,6 +169,6 @@ message NodeExecutionGetDataResponse {
     // Optional, full_inputs will only be populated if they are under a configured size threshold.
     core.LiteralMap full_inputs                = 3;
 
-    // Optional, full_outputs will only be populated if they are under a configured size threshold. 
+    // Optional, full_outputs will only be populated if they are under a configured size threshold.
     core.LiteralMap full_outputs               = 4;
 }

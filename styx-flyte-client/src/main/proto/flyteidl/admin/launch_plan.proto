@@ -113,7 +113,7 @@ message LaunchPlanClosure {
 
     // Time at which the launch plan was created.
     google.protobuf.Timestamp created_at = 4;
-    
+
     // Time at which the launch plan was last updated.
     google.protobuf.Timestamp updated_at = 5;
 }

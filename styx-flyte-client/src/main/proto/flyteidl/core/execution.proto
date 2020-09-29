@@ -69,7 +69,7 @@ message ExecutionError {
         USER = 1;
         SYSTEM = 2;
     }
-    ErrorKind kind = 4; 
+    ErrorKind kind = 4;
 }
 
 // Log information for the task that is specific to a log sink
@@ -84,7 +84,7 @@ message TaskLog {
 
     string uri = 1;
     string name = 2;
-    MessageFormat message_format = 3; 
+    MessageFormat message_format = 3;
     google.protobuf.Duration ttl = 4;
 }
 

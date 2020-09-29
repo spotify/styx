@@ -12,10 +12,10 @@ import "google/protobuf/timestamp.proto";
 
 // Request to launch an execution with the given project, domain and optionally name.
 message ExecutionCreateRequest {
-    // Name of the project the execution belongs to. 
+    // Name of the project the execution belongs to.
     string project    = 1;
 
-    // Name of the domain the execution belongs to. 
+    // Name of the domain the execution belongs to.
     // A domain can be considered as a subset within a specific project.
     string domain     = 2;
 
@@ -65,7 +65,7 @@ message Execution {
     // User-provided configuration and inputs for launching the execution.
     ExecutionSpec spec                                = 2;
 
-    // Execution results. 
+    // Execution results.
     ExecutionClosure closure                          = 3;
 }
 
@@ -105,7 +105,7 @@ message ExecutionClosure {
         // A map of outputs in the case of a successful execution.
         LiteralMapBlob outputs	= 1;
 
-        // Error information in the case of a failed execution. 
+        // Error information in the case of a failed execution.
         core.ExecutionError error		= 2;
 
         // In the case of a user-specified abort, this will pass along the user-supplied cause.
@@ -223,7 +223,7 @@ message ExecutionSpec {
         // When this list is not empty it is used rather than any notifications defined in the referenced launch plan.
         // When this list is empty, the notifications defined for the launch plan will be applied.
         NotificationList notifications = 5;
-        
+
         // This should be set to true if all notifications are intended to be disabled for this execution.
         bool disable_all = 6;
     }
@@ -237,7 +237,7 @@ message ExecutionSpec {
     // Optional: auth override to apply this execution.
     AuthRole auth_role        = 16;
 
-    // Indicates the runtime priority of the execution. 
+    // Indicates the runtime priority of the execution.
     core.QualityOfService quality_of_service   = 17;
 }
 
@@ -247,7 +247,7 @@ message ExecutionSpec {
 // If the request succeeds the phase "ABORTED" will be recorded for the termination
 // with the optional cause added to the output_result.
 message ExecutionTerminateRequest {
-    // Uniquely identifies the individual workflow execution to be terminated. 
+    // Uniquely identifies the individual workflow execution to be terminated.
     core.WorkflowExecutionIdentifier id  = 1;
 
     // Optional reason for aborting.

@@ -130,7 +130,7 @@ message Node {
 // This is workflow layer metadata. These settings are only applicable to the workflow as a whole, and do not
 // percolate down to child entities (like tasks) launched by the workflow.
 message WorkflowMetadata {
-    // Indicates the runtime priority of workflow executions. 
+    // Indicates the runtime priority of workflow executions.
     QualityOfService quality_of_service = 1;
 
     // Failure Handling Strategy
