@@ -273,7 +273,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   private WorkflowInstance getWorkflowInstance(AnnotatedFlyteExecutionId annotatedId) {
-    checkArgument(isFlyteExecutionTriggeredByStyx(annotatedId));
+    checkArgument(isFlyteExecutionTriggeredByStyx(annotatedId),
+        "Flyte execution is not triggered by styx. annotatedId: " + annotatedId);
 
     return WorkflowInstance.parseKey(
         annotatedId.annotation().get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
