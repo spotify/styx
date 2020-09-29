@@ -273,7 +273,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   private WorkflowInstance getWorkflowInstance(AnnotatedFlyteExecutionId annotatedId) {
-    checkArgument(isFlyteExecutionTriggeredByStyx(annotatedId));
+    checkArgument(isFlyteExecutionTriggeredByStyx(annotatedId),
+        "Flyte execution is not triggered by styx. annotatedId: " + annotatedId);
 
     return WorkflowInstance.parseKey(
         annotatedId.annotation().get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
@@ -289,13 +290,13 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
     final Optional<String> styxExecIdOpt = runState.data().executionId();
     if (styxExecIdOpt.isEmpty()) {
-      LOG.debug("Flyte execution state with no current executionId: {}", styxExecIdOnFlyte);
+      LOG.info("Flyte execution state with no current executionId: {}", styxExecIdOnFlyte);
       return false;
     }
 
     final String styxExecId = styxExecIdOpt.get();
     if (!styxExecIdOnFlyte.equals(styxExecId)) {
-      LOG.debug("Flyte execution not matching current exec id, current:{} != flyte:{}",
+      LOG.info("Flyte execution not matching current exec id, current:{} != flyte:{}",
           styxExecId, styxExecIdOnFlyte);
       return false;
     }
