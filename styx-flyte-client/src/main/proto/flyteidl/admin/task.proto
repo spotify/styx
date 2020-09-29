@@ -12,7 +12,7 @@ import "google/protobuf/timestamp.proto";
 message TaskCreateRequest {
     // id represents the unique identifier of the task.
     core.Identifier id           = 1;
-
+    
     // Represents the specification for task.
     TaskSpec spec                = 2;
 }
@@ -24,7 +24,7 @@ message TaskCreateResponse {
 
 // Flyte workflows are composed of many ordered tasks. That is small, reusable, self-contained logical blocks
 // arranged to process workflow inputs and produce a deterministic set of outputs.
-// Tasks can come in many varieties tuned for specialized behavior.
+// Tasks can come in many varieties tuned for specialized behavior. 
 message Task {
     // id represents the unique identifier of the task.
     core.Identifier id       = 1;
@@ -55,7 +55,7 @@ message TaskSpec {
 message TaskClosure {
     // Represents the compiled representation of the task from the specification provided.
     core.CompiledTask compiled_task = 1;
-
+        
     // Time at which the task was created.
     google.protobuf.Timestamp created_at = 2;
 }

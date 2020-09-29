@@ -12,10 +12,10 @@ import "google/protobuf/timestamp.proto";
 
 // Request to launch an execution with the given project, domain and optionally name.
 message ExecutionCreateRequest {
-    // Name of the project the execution belongs to.
+    // Name of the project the execution belongs to. 
     string project    = 1;
 
-    // Name of the domain the execution belongs to.
+    // Name of the domain the execution belongs to. 
     // A domain can be considered as a subset within a specific project.
     string domain     = 2;
 
@@ -65,7 +65,7 @@ message Execution {
     // User-provided configuration and inputs for launching the execution.
     ExecutionSpec spec                                = 2;
 
-    // Execution results.
+    // Execution results. 
     ExecutionClosure closure                          = 3;
 }
 
@@ -105,7 +105,7 @@ message ExecutionClosure {
         // A map of outputs in the case of a successful execution.
         LiteralMapBlob outputs	= 1;
 
-        // Error information in the case of a failed execution.
+        // Error information in the case of a failed execution. 
         core.ExecutionError error		= 2;
 
         // In the case of a user-specified abort, this will pass along the user-supplied cause.
@@ -141,6 +141,13 @@ message ExecutionClosure {
 
     // Identifies the workflow definition for this execution.
     core.Identifier workflow_id                       = 11;
+}
+
+// Represents system rather than user-facing metadata about an execution.
+message SystemMetadata {
+
+    // Which execution cluster this execution ran on.
+    string execution_cluster = 1;
 }
 
 // Represents attributes about an execution which are not required to launch the execution but are useful to record.
@@ -187,6 +194,9 @@ message ExecutionMetadata {
     // In the case of a relaunch, this references the original workflow execution.
     core.WorkflowExecutionIdentifier reference_execution = 16;
 
+    // Optional, platform-specific metadata about the execution.
+    // In this the future this may be gated behind an ACL or some sort of authorization.
+    SystemMetadata system_metadata = 17;
 }
 
 message NotificationList {
@@ -213,7 +223,7 @@ message ExecutionSpec {
         // When this list is not empty it is used rather than any notifications defined in the referenced launch plan.
         // When this list is empty, the notifications defined for the launch plan will be applied.
         NotificationList notifications = 5;
-
+        
         // This should be set to true if all notifications are intended to be disabled for this execution.
         bool disable_all = 6;
     }
@@ -224,6 +234,11 @@ message ExecutionSpec {
     // Annotations to apply to the execution resource.
     Annotations annotations   = 8;
 
+    // Optional: auth override to apply this execution.
+    AuthRole auth_role        = 16;
+
+    // Indicates the runtime priority of the execution. 
+    core.QualityOfService quality_of_service   = 17;
 }
 
 // Request to terminate an in-progress execution.  This action is irreversible.
@@ -232,7 +247,7 @@ message ExecutionSpec {
 // If the request succeeds the phase "ABORTED" will be recorded for the termination
 // with the optional cause added to the output_result.
 message ExecutionTerminateRequest {
-    // Uniquely identifies the individual workflow execution to be terminated.
+    // Uniquely identifies the individual workflow execution to be terminated. 
     core.WorkflowExecutionIdentifier id  = 1;
 
     // Optional reason for aborting.
@@ -255,4 +270,10 @@ message WorkflowExecutionGetDataResponse {
     UrlBlob outputs                            = 1;
     // Signed url to fetch a core.LiteralMap of execution inputs.
     UrlBlob inputs                             = 2;
+
+    // Optional, full_inputs will only be populated if they are under a configured size threshold.
+    core.LiteralMap full_inputs                = 3;
+
+    // Optional, full_outputs will only be populated if they are under a configured size threshold.
+    core.LiteralMap full_outputs               = 4;
 }

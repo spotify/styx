@@ -6,6 +6,7 @@ option go_package = "github.com/lyft/flyteidl/gen/pb-go/flyteidl/event";
 
 import "flyteidl/core/execution.proto";
 import "flyteidl/core/identifier.proto";
+import "flyteidl/core/catalog.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
@@ -60,10 +61,24 @@ message NodeExecutionEvent {
     // on the node type
     oneof target_metadata {
         WorkflowNodeMetadata workflow_node_metadata = 8;
+        TaskNodeMetadata task_node_metadata = 14;
     }
 
-    // Specifies which task (if any) launched this node.
+    // [To be deprecated] Specifies which task (if any) launched this node.
     ParentTaskExecutionMetadata parent_task_metadata         = 9;
+
+    // Specifies the parent node of the current node execution. Node executions at level zero will not have a parent node.
+    ParentNodeExecutionMetadata parent_node_metadata	= 10;
+
+    // Retry group to indicate grouping of nodes by retries
+    string retry_group = 11;
+
+    // Identifier of the node in the original workflow/graph
+    // This maps to value of WorkflowTemplate.nodes[X].id
+    string spec_node_id = 12;
+
+    // Friendly readable name for the node
+    string node_name = 13;
 }
 
 // For Workflow Nodes we need to send information about the workflow that's launched
@@ -71,8 +86,22 @@ message WorkflowNodeMetadata {
     core.WorkflowExecutionIdentifier execution_id = 1;
 }
 
+message TaskNodeMetadata {
+    // Captures the status of caching for this execution.
+    core.CatalogCacheStatus cache_status = 1;
+    // This structure carries the catalog artifact information
+    core.CatalogMetadata catalog_key = 2;
+}
+
+
 message ParentTaskExecutionMetadata {
     core.TaskExecutionIdentifier id = 1;
+}
+
+message ParentNodeExecutionMetadata {
+    // Unique identifier of the parent node id within the execution
+    // This is value of core.NodeExecutionIdentifier.node_id of the parent node 
+    string node_id = 1;
 }
 
 // Plugin specific execution event information. For tasks like Python, Hive, Spark, DynamicJob.
@@ -120,5 +149,5 @@ message TaskExecutionEvent {
     // Some phases, like RUNNING, can send multiple events with changed metadata (new logs, additional custom_info, etc)
     // that should be recorded regardless of the lack of phase change.
     // The version field should be incremented when metadata changes across the duration of an individual phase.
-    uint32 phase_version                  = 12;
+    uint32 phase_version                  = 12;    
 }
