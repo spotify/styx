@@ -142,7 +142,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   }
 
   @Test
-  public void shouldTerminateDanglingFlyteExecutionsWhenStateNotActiveAnymoreAndExecutionIsYoung() {
+  public void shouldNotTerminateDanglingFlyteExecutionsWhenStateNotActiveAnymoreAndExecutionIsYoung() {
     runner.terminateDanglingFlyteExecutions();
 
     verifyTerminateExecution(never(), NA_DANGLING_YOUNG_1);
