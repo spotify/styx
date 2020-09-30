@@ -3,6 +3,7 @@ syntax = "proto3";
 package flyteidl.admin;
 option go_package = "github.com/lyft/flyteidl/gen/pb-go/flyteidl/admin";
 
+import "flyteidl/core/execution.proto";
 import "flyteidl/core/literals.proto";
 import "flyteidl/core/identifier.proto";
 import "flyteidl/core/interface.proto";
@@ -63,7 +64,6 @@ message Auth {
   }
 }
 
-
 // User-provided launch plan definition and configuration values.
 message LaunchPlanSpec {
     // Reference to the Workflow template that the launch plan references
@@ -88,7 +88,14 @@ message LaunchPlanSpec {
     Annotations annotations               = 7;
 
     // Indicates the permission associated with workflow executions triggered with this launch plan.
-    Auth auth                             = 8;
+    Auth auth                             = 8 [deprecated=true];
+
+    AuthRole auth_role                    = 9;
+
+    // Indicates the runtime priority of the execution.
+    core.QualityOfService quality_of_service   = 16;
+
+    RawOutputDataConfig raw_output_data_config = 17;
 }
 
 // Values computed by the flyte platform after launch plan registration.

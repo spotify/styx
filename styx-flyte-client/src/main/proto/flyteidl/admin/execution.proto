@@ -143,6 +143,13 @@ message ExecutionClosure {
     core.Identifier workflow_id                       = 11;
 }
 
+// Represents system rather than user-facing metadata about an execution.
+message SystemMetadata {
+
+    // Which execution cluster this execution ran on.
+    string execution_cluster = 1;
+}
+
 // Represents attributes about an execution which are not required to launch the execution but are useful to record.
 // These attributes are assigned at launch time and do not change.
 message ExecutionMetadata {
@@ -187,6 +194,9 @@ message ExecutionMetadata {
     // In the case of a relaunch, this references the original workflow execution.
     core.WorkflowExecutionIdentifier reference_execution = 16;
 
+    // Optional, platform-specific metadata about the execution.
+    // In this the future this may be gated behind an ACL or some sort of authorization.
+    SystemMetadata system_metadata = 17;
 }
 
 message NotificationList {
@@ -224,6 +234,11 @@ message ExecutionSpec {
     // Annotations to apply to the execution resource.
     Annotations annotations   = 8;
 
+    // Optional: auth override to apply this execution.
+    AuthRole auth_role        = 16;
+
+    // Indicates the runtime priority of the execution.
+    core.QualityOfService quality_of_service   = 17;
 }
 
 // Request to terminate an in-progress execution.  This action is irreversible.
@@ -255,4 +270,10 @@ message WorkflowExecutionGetDataResponse {
     UrlBlob outputs                            = 1;
     // Signed url to fetch a core.LiteralMap of execution inputs.
     UrlBlob inputs                             = 2;
+
+    // Optional, full_inputs will only be populated if they are under a configured size threshold.
+    core.LiteralMap full_inputs                = 3;
+
+    // Optional, full_outputs will only be populated if they are under a configured size threshold.
+    core.LiteralMap full_outputs               = 4;
 }

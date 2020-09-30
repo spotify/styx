@@ -21,10 +21,26 @@ message NamedEntityIdentifier {
     string name                  = 3;
 }
 
+// The status of the named entity is used to control its visibility in the UI.
+enum NamedEntityState {
+    // By default, all named entities are considered active and under development.
+    NAMED_ENTITY_ACTIVE = 0;
+
+    // Archived named entities are no longer visible in the UI.
+    NAMED_ENTITY_ARCHIVED = 1;
+
+    // System generated entities that aren't explicitly created or managed by a user.
+    SYSTEM_GENERATED = 2;
+}
+
 message NamedEntityMetadata {
     // Common description across all versions of the entity
     // +optional
     string description = 1;
+
+    // Shared state across all version of the entity
+    // At this point in time, only workflow entities can have their state archived.
+    NamedEntityState state = 2;
 }
 
 // Describes information common to a NamedEntity, identified by a project /
@@ -66,6 +82,10 @@ message NamedEntityIdentifierListRequest {
     // Sort ordering.
     // +optional
     Sort sort_by      = 5;
+
+    // Indicates a list of filters passed as string.
+    // +optional
+    string filters    = 6;
 }
 
 // Represents a request structure to list NamedEntity objects
@@ -85,6 +105,11 @@ message NamedEntityListRequest {
     // Sort ordering.
     // +optional
     Sort sort_by                             = 6;
+
+    // Indicates a list of filters passed as string.
+    // +optional
+    string filters                           = 7;
+
 }
 
 // Represents a list of NamedEntityIdentifiers.
@@ -212,3 +237,18 @@ message Annotations {
     map<string, string> values          = 1;
 }
 
+// Defines permissions associated with executions.
+message AuthRole {
+  oneof method {
+    string assumable_iam_role         = 1;
+    string kubernetes_service_account = 2;
+  }
+}
+
+// Encapsulates user settings pertaining to offloaded data (i.e. Blobs, Schema, query data, etc.).
+// See https://github.com/lyft/flyte/issues/211 for more background information.
+message RawOutputDataConfig {
+    // Prefix for where offloaded data from user workflows will be written
+    // e.g. s3://bucket/key or s3://bucket/
+    string output_location_prefix            = 1;
+}

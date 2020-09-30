@@ -97,6 +97,11 @@ service AdminService {
   rpc RegisterProject (flyteidl.admin.ProjectRegisterRequest) returns (flyteidl.admin.ProjectRegisterResponse) {
   }
 
+  // flyteidl.admin.Project should be passed but the domains property should be empty;
+  // it will be ignored in the handler as domains cannot be updated via this API.
+  rpc UpdateProject (flyteidl.admin.Project) returns (flyteidl.admin.ProjectUpdateResponse) {
+  }
+
   rpc ListProjects (flyteidl.admin.ProjectListRequest) returns (flyteidl.admin.Projects) {
   }
 

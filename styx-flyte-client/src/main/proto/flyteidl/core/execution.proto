@@ -46,6 +46,10 @@ message TaskExecution{
         SUCCEEDED = 3;
         ABORTED = 4;
         FAILED = 5;
+        // To indicate cases where task is initializing, like: ErrImagePull, ContainerCreating, PodInitializing
+        INITIALIZING = 6;
+        // To address cases, where underlying resource is not available: Backoff error, Resource quota exceeded
+        WAITING_FOR_RESOURCES = 7;
     }
 }
 
@@ -82,4 +86,28 @@ message TaskLog {
     string name = 2;
     MessageFormat message_format = 3;
     google.protobuf.Duration ttl = 4;
+}
+
+// Represents customized execution run-time attributes.
+message QualityOfServiceSpec {
+  // Indicates how much queueing delay an execution can tolerate.
+  google.protobuf.Duration queueing_budget = 1;
+
+  // Add future, user-configurable options here
+}
+
+// Indicates the priority of an execution.
+message QualityOfService {
+  enum Tier {
+    // Default: no quality of service specified.
+    UNDEFINED = 0;
+    HIGH = 1;
+    MEDIUM = 2;
+    LOW = 3;
+  }
+
+  oneof designation {
+    Tier tier = 1;
+    QualityOfServiceSpec spec = 2;
+  }
 }

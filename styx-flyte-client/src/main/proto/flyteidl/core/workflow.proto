@@ -5,12 +5,12 @@ package flyteidl.core;
 option go_package = "github.com/lyft/flyteidl/gen/pb-go/flyteidl/core";
 
 import "flyteidl/core/condition.proto";
+import "flyteidl/core/execution.proto";
 import "flyteidl/core/identifier.proto";
 import "flyteidl/core/interface.proto";
 import "flyteidl/core/literals.proto";
 import "flyteidl/core/types.proto";
 import "google/protobuf/duration.proto";
-
 
 // Defines a condition and the execution unit that should be executed if the condition is satisfied.
 message IfBlock {
@@ -78,6 +78,7 @@ message NodeMetadata {
     oneof interruptible_value {
         bool interruptible = 6;
     };
+
 }
 
 // Links a variable to an alias.
@@ -126,17 +127,38 @@ message Node {
     }
 }
 
-// Metadata for the entire workflow.
-// To be used in the future.
+// This is workflow layer metadata. These settings are only applicable to the workflow as a whole, and do not
+// percolate down to child entities (like tasks) launched by the workflow.
 message WorkflowMetadata {
-    // Default Workflow Metadata for the entire workflow.
+    // Indicates the runtime priority of workflow executions.
+    QualityOfService quality_of_service = 1;
+
+    // Failure Handling Strategy
+    enum OnFailurePolicy {
+        // FAIL_IMMEDIATELY instructs the system to fail as soon as a node fails in the workflow. It'll automatically
+        // abort all currently running nodes and clean up resources before finally marking the workflow executions as
+        // failed.
+        FAIL_IMMEDIATELY = 0;
+
+        // FAIL_AFTER_EXECUTABLE_NODES_COMPLETE instructs the system to make as much progress as it can. The system will
+        // not alter the dependencies of the execution graph so any node that depend on the failed node will not be run.
+        // Other nodes that will be executed to completion before cleaning up resources and marking the workflow
+        // execution as failed.
+        FAIL_AFTER_EXECUTABLE_NODES_COMPLETE = 1;
+    }
+
+    // Defines how the system should behave when a failure is detected in the workflow execution.
+    OnFailurePolicy on_failure = 2;
 }
 
-// Default Workflow Metadata for the entire workflow.
+// The difference between these settings and the WorkflowMetadata ones is that these are meant to be passed down to
+// a workflow's underlying entities (like tasks). For instance, 'interruptible' has no meaning at the workflow layer, it
+// is only relevant when a task executes. The settings here are the defaults that are passed to all nodes
+// unless explicitly overridden at the node layer.
+// If you are adding a setting that applies to both the Workflow itself, and everything underneath it, it should be
+// added to both this object and the WorkflowMetadata object above.
 message WorkflowMetadataDefaults {
-    // Identify whether workflow is interruptible.
-    // The value set at the workflow level will be the defualt value used for nodes
-    // unless explicitly set at the node level.
+    // Whether child nodes of the workflow are interruptible.
     bool interruptible = 1;
 }
 
@@ -172,6 +194,5 @@ message WorkflowTemplate {
     // workflow defaults
     WorkflowMetadataDefaults metadata_defaults = 7;
 }
-
 
 
