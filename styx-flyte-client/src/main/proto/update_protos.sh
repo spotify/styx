@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-FLYTEIDL_VERSION="0.18.6"
+FLYTEIDL_VERSION="0.18.8"
 
 
 curl -L "https://github.com/lyft/flyteidl/archive/v${FLYTEIDL_VERSION}.tar.gz" | \
