@@ -552,7 +552,7 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iam)
+    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder()
         .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
         .setServiceAccountUser(gsuiteUserEmail)
         .setServiceAccountScopes(Set.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))

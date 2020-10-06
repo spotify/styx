@@ -20,11 +20,12 @@
 
 package com.spotify.styx.client;
 
+import static com.google.api.gax.rpc.StatusCode.Code.PERMISSION_DENIED;
+
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.auth.oauth2.RefreshTokenRequest;
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpHeaders;
@@ -33,14 +34,8 @@ import com.google.api.client.http.UriTemplate;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.webtoken.JsonWebSignature;
 import com.google.api.client.json.webtoken.JsonWebSignature.Header;
-import com.google.api.client.json.webtoken.JsonWebToken;
 import com.google.api.client.json.webtoken.JsonWebToken.Payload;
-import com.google.api.client.util.Base64;
-import com.google.api.client.util.StringUtils;
-import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.IamScopes;
-import com.google.api.services.iam.v1.model.SignBlobRequest;
-import com.google.api.services.iam.v1.model.SignBlobResponse;
+import com.google.api.gax.rpc.ApiException;
 import com.google.api.services.oauth2.Oauth2;
 import com.google.api.services.oauth2.model.Tokeninfo;
 import com.google.auth.http.HttpCredentialsAdapter;
@@ -51,13 +46,12 @@ import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.auth.oauth2.UserCredentials;
 import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
+import com.google.cloud.iam.credentials.v1.IamCredentialsSettings;
 import com.google.cloud.iam.credentials.v1.ServiceAccountName;
-import com.google.cloud.iam.credentials.v1.SignJwtResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -128,14 +122,6 @@ class GoogleIdTokenAuth {
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerUri()),
         "urn:ietf:params:oauth:grant-type:jwt-bearer");
-    try (IamCredentialsClient iamCredentialsClient = IamCredentialsClient.create()) {
-      ServiceAccountName name = ServiceAccountName.of("[PROJECT]", "[SERVICE_ACCOUNT]");
-      List<String> delegates = new ArrayList<>();
-      String payload = "";
-      SignJwtResponse response = iamCredentialsClient.signJwt(name, delegates, payload);
-    }
-
-
     final Header header = jwtHeader();
     final Payload payload = jwtPayload(
         targetAudience, credential.getAccount(), credential.getTokenServerUri().toString());
@@ -172,37 +158,21 @@ class GoogleIdTokenAuth {
   private String getServiceAccountIdTokenUsingAccessToken(GoogleCredentials credentials,
                                                           String serviceAccount, String targetAudience)
       throws IOException {
-    final String tokenServerUrl = "https://oauth2.googleapis.com/token";
-    final Header header = jwtHeader();
-    final JsonWebToken.Payload payload = jwtPayload(
-        targetAudience, serviceAccount, tokenServerUrl);
-    final Iam iam = new Iam.Builder(httpTransport, JSON_FACTORY,
-        new HttpCredentialsAdapter(withScopes(credentials, IamScopes.all()))).build();
-    final String content = Base64.encodeBase64URLSafeString(JSON_FACTORY.toByteArray(header)) + "."
-                           + Base64.encodeBase64URLSafeString(JSON_FACTORY.toByteArray(payload));
-    byte[] contentBytes = StringUtils.getBytesUtf8(content);
-    final SignBlobResponse signResponse;
-    try {
-      signResponse = iam.projects().serviceAccounts()
-          .signBlob("projects/-/serviceAccounts/" + serviceAccount, new SignBlobRequest()
-              .encodeBytesToSign(contentBytes))
-          .execute();
-    } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 403) {
+    try (IamCredentialsClient iamCredentialsClient =
+             IamCredentialsClient
+                 .create(IamCredentialsSettings.newBuilder().setCredentialsProvider(() -> credentials).build())) {
+      var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
+      var idTokenResponse = iamCredentialsClient.generateIdToken(serviceAccountName, List.of(),
+          targetAudience, true);
+      return idTokenResponse.getToken();
+    } catch (ApiException e) {
+      if (e.getStatusCode().getCode() == PERMISSION_DENIED) {
         throw new IOException(
-            "Unable to sign request for id token, missing Service Account Token Creator role for self on "
-            + serviceAccount + " or IAM api not enabled?", e);
+            "Unable to get ID token, missing Service Account Token Creator role for self on "
+            + serviceAccount + " or IAM Service Account Credentials API not enabled?", e);
       }
       throw e;
     }
-    final String assertion = content + "." + signResponse.getSignature();
-    final TokenRequest request = new TokenRequest(
-        httpTransport, JSON_FACTORY,
-        new GenericUrl(tokenServerUrl),
-        "urn:ietf:params:oauth:grant-type:jwt-bearer");
-    request.put("assertion", assertion);
-    final TokenResponse tokenResponse = request.execute();
-    return (String) tokenResponse.get("id_token");
   }
 
   private static Payload jwtPayload(String targetAudience, String serviceAccountId, String tokenServerUrl) {

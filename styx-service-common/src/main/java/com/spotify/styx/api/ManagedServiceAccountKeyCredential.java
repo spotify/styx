@@ -20,17 +20,21 @@
 
 package com.spotify.styx.api;
 
+import static com.google.api.gax.rpc.StatusCode.Code.PERMISSION_DENIED;
+
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.json.webtoken.JsonWebToken;
-import com.google.api.client.util.Joiner;
-import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.model.SignJwtRequest;
+import com.google.api.gax.rpc.ApiException;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
+import com.google.cloud.iam.credentials.v1.ServiceAccountName;
+import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.security.PrivateKey;
+import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,14 +55,11 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   private static final Logger log = LoggerFactory.getLogger(ManagedServiceAccountKeyCredential.class);
 
-  private final Iam iam;
-
   private ManagedServiceAccountKeyCredential(Builder builder) {
     super(builder);
     Objects.requireNonNull(getServiceAccountId(), "serviceAccountId");
     Objects.requireNonNull(getServiceAccountUser(), "serviceAccountUser");
     Objects.requireNonNull(getServiceAccountScopes(), "serviceAccountScopes");
-    this.iam = Objects.requireNonNull(builder.iam, "iam");
   }
 
   @Override
@@ -94,13 +95,19 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
   }
 
   private String signJwt(String serviceAccount, JsonWebToken.Payload payload) throws IOException {
-    var fullServiceAccountName = "projects/-/serviceAccounts/" + serviceAccount;
-    var request = new SignJwtRequest()
-        .setPayload(Utils.getDefaultJsonFactory().toString(payload));
-    return iam.projects().serviceAccounts()
-        .signJwt(fullServiceAccountName, request)
-        .execute()
-        .getSignedJwt();
+    try (IamCredentialsClient iamCredentialsClient = IamCredentialsClient.create()) {
+      var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
+      var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
+          Utils.getDefaultJsonFactory().toString(payload));
+      return signJwtResponse.getSignedJwt();
+    } catch (ApiException e) {
+      if (e.getStatusCode().getCode() == PERMISSION_DENIED) {
+        throw new IOException(
+            "Unable to sign request for id token, missing Service Account Token Creator role for self on "
+            + serviceAccount + " or IAM Service Account Credentials API not enabled?", e);
+      }
+      throw e;
+    }
   }
 
   private TokenResponse requestToken(String signedJwt) throws IOException {
@@ -112,10 +119,7 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   static class Builder extends GoogleCredential.Builder {
 
-    private final Iam iam;
-
-    Builder(Iam iam) {
-      this.iam = Objects.requireNonNull(iam, "iam");
+    Builder() {
       setServiceAccountPrivateKey(DummyKey.INSTANCE);
     }
 
