@@ -50,11 +50,16 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.auth.oauth2.UserCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
+import com.google.cloud.iam.credentials.v1.ServiceAccountName;
+import com.google.cloud.iam.credentials.v1.SignJwtResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -123,6 +128,14 @@ class GoogleIdTokenAuth {
         this.httpTransport, JSON_FACTORY,
         new GenericUrl(credential.getTokenServerUri()),
         "urn:ietf:params:oauth:grant-type:jwt-bearer");
+    try (IamCredentialsClient iamCredentialsClient = IamCredentialsClient.create()) {
+      ServiceAccountName name = ServiceAccountName.of("[PROJECT]", "[SERVICE_ACCOUNT]");
+      List<String> delegates = new ArrayList<>();
+      String payload = "";
+      SignJwtResponse response = iamCredentialsClient.signJwt(name, delegates, payload);
+    }
+
+
     final Header header = jwtHeader();
     final Payload payload = jwtPayload(
         targetAudience, credential.getAccount(), credential.getTokenServerUri().toString());
