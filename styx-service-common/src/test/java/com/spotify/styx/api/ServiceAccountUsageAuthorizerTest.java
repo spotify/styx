@@ -56,8 +56,9 @@ import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.common.base.Throwables;
+import com.google.common.io.Closer;
+import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AuthorizationPolicy;
@@ -129,12 +130,12 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
-  @Mock private IamCredentialsClient iamCredentialsClient;
   @Mock private CloudResourceManager.Projects.GetIamPolicy getIamPolicy;
   @Mock private Directory directory;
   @Mock private Directory.Members members;
   @Mock private Directory.Members.HasMember isMember;
   @Mock private Directory.Members.HasMember isNotMember;
+  @Mock private Environment environment;
 
   private GoogleCredentials credential;
 
@@ -182,7 +183,7 @@ public class ServiceAccountUsageAuthorizerTest {
         .setPrivateKey(privateKey)
         .setClientEmail("styx@bar.iam.gserviceaccount.com")
         .build();
-    sut = new ServiceAccountUsageAuthorizer.Impl(iam, iamCredentialsClient, crm, directory, SERVICE_ACCOUNT_USER_ROLE,
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE,
         authorizationPolicy, WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
   }
 
@@ -494,17 +495,19 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testCreate() {
+    when(environment.closer()).thenReturn(Closer.create());
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
-        SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS,
+        environment, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS,
         BLACKLIST);
     assertThat(sut, is(notNullValue()));
   }
 
   @Test
   public void createShouldFailIfCredentialIsNotAServiceAccount() {
+    when(environment.closer()).thenReturn(Closer.create());
     credential = GoogleCredentials.newBuilder().build();
     try {
-      ServiceAccountUsageAuthorizer.create(SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential,
+      ServiceAccountUsageAuthorizer.create(environment, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential,
           GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
       fail();
     } catch (IllegalArgumentException e) {
@@ -541,14 +544,18 @@ public class ServiceAccountUsageAuthorizerTest {
         AUTHORIZATION_MESSAGE_CONFIG, MESSAGE,
         AUTHORIZATION_ADMINISTRATORS_CONFIG, ADMINISTRATORS,
         AUTHORIZATION_BLACKLIST_CONFIG, BLACKLIST));
-    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
+    when(environment.config()).thenReturn(config);
+    when(environment.closer()).thenReturn(Closer.create());
+    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(environment, "foo", credential);
     assertThat(authorizer, is(instanceOf(ServiceAccountUsageAuthorizer.Impl.class)));
   }
 
   @Test
   public void shouldCreateNopServiceAccountUsageAuthorizer() {
     final Config config = ConfigFactory.parseMap(Map.of());
-    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(config, "foo", credential);
+    when(environment.config()).thenReturn(config);
+    final ServiceAccountUsageAuthorizer authorizer = ServiceAccountUsageAuthorizer.create(environment,
+        "foo", credential);
     assertThat(authorizer, is(ServiceAccountUsageAuthorizer.nop()));
   }
 

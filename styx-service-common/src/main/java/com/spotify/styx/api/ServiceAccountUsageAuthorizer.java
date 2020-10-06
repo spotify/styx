@@ -60,11 +60,11 @@ import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
+import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
-import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
@@ -96,7 +96,7 @@ import org.slf4j.LoggerFactory;
  * <li> GSuite: {@code https://www.googleapis.com/auth/admin.directory.group.member.readonly}
  * </ul></p>
  */
-public interface ServiceAccountUsageAuthorizer extends Closeable {
+public interface ServiceAccountUsageAuthorizer {
 
   Logger LOG = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
 
@@ -137,7 +137,6 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
     private static final String CACHE_HIT = "hit";
     private static final String CACHE_MISS = "miss";
 
-    private final IamCredentialsClient iamCredentialsClient;
     private final Iam iam;
     private final CloudResourceManager crm;
     private final Directory directory;
@@ -158,12 +157,12 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
             .maximumSize(10_000)
             .build();
 
-    Impl(Iam iam, IamCredentialsClient iamCredentialsClient, CloudResourceManager crm,
+    Impl(Iam iam, CloudResourceManager crm,
          Directory directory, String serviceAccountUserRole,
-         AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy, StopStrategy retryStopStrategy,
+         AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy,
+         StopStrategy retryStopStrategy,
          String message, List<String> administrators, List<String> blacklist) {
       this.iam = Objects.requireNonNull(iam, "iam");
-      this.iamCredentialsClient = Objects.requireNonNull(iamCredentialsClient, "iamCredentialsClient");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
@@ -487,11 +486,6 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
     private static <T> List<T> emptyListIfNull(List<T> list) {
       return Objects.requireNonNullElse(list, List.of());
     }
-
-    @Override
-    public void close() throws IOException {
-      iamCredentialsClient.close();
-    }
   }
 
   class Nop implements ServiceAccountUsageAuthorizer {
@@ -508,14 +502,11 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
         String serviceAccount, String principal) {
       return ServiceAccountUsageAuthorizationResult.builder().authorized(true).build();
     }
-
-    @Override
-    public void close() throws IOException {
-      // nop
-    }
   }
 
-  static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredentials credential) {
+  static ServiceAccountUsageAuthorizer create(Environment environment, String serviceName,
+                                              GoogleCredentials credential) {
+    final Config config = environment.config();
     return get(config, config::getString, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
         .map(role -> {
           final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
@@ -525,7 +516,7 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
               .orElse(Collections.emptyList());
           final List<String> blacklist = get(config, config::getStringList, AUTHORIZATION_BLACKLIST_CONFIG)
               .orElse(Collections.emptyList());
-          return ServiceAccountUsageAuthorizer.create(
+          return ServiceAccountUsageAuthorizer.create(environment,
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators, blacklist);
         })
         .orElseGet(() -> {
@@ -535,11 +526,12 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
         });
   }
 
-  static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
-    return create(config, serviceName, defaultCredentials());
+  static ServiceAccountUsageAuthorizer create(Environment environment, String serviceName) {
+    return create(environment, serviceName, defaultCredentials());
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
+  static ServiceAccountUsageAuthorizer create(Environment environment,
+                                              String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
                                               GoogleCredentials credentials,
                                               String gsuiteUserEmail,
@@ -573,6 +565,7 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    environment.closer().register(iamCredentialsClient::close);
 
     final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
@@ -584,7 +577,7 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
         .setApplicationName(serviceName)
         .build();
 
-    return new Impl(iam, iamCredentialsClient, crm, directory, serviceAccountUserRole,
+    return new Impl(iam, crm, directory, serviceAccountUserRole,
         authorizationPolicy,
         Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
@@ -688,7 +681,7 @@ public interface ServiceAccountUsageAuthorizer extends Closeable {
     }
   }
 
-  interface Factory extends BiFunction<Config, String, ServiceAccountUsageAuthorizer> {
+  interface Factory extends BiFunction<Environment, String, ServiceAccountUsageAuthorizer> {
 
     Factory DEFAULT = ServiceAccountUsageAuthorizer::create;
   }

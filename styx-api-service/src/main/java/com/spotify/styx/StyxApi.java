@@ -191,8 +191,7 @@ public class StyxApi implements AppInit {
     // in later Apollo version.
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
-        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
-    environment.closer().register(serviceAccountUsageAuthorizer);
+        serviceAccountUsageAuthorizerFactory.apply(environment, serviceName);
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
