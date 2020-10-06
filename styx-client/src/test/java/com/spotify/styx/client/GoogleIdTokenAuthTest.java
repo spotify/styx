@@ -165,9 +165,10 @@ public class GoogleIdTokenAuthTest {
       idTokenAuth.getToken("http://styx.foo.bar");
       fail();
     } catch (IOException e) {
-      assertThat(e.getMessage(), is("Unable to sign request for id token, "
+      assertThat(e.getMessage(), is("Unable to get ID token, "
                                     + "missing Service Account Token Creator role for self on "
-                                    + serviceAccount + " or IAM api not enabled?"));
+                                    + serviceAccount + " or IAM Service Account Credentials API "
+                                    + "not enabled?"));
     }
   }
 
