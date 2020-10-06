@@ -5,6 +5,9 @@ jobs:
     working_directory: ~/styx
     docker:
       - image: maven:3.6.0-jdk-11
+        auth:
+          username: spotifyci
+          password: $DOCKERHUB_TOKEN
     steps:
       - checkout
       - restore_cache:
