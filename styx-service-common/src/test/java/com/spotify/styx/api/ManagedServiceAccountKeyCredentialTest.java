@@ -26,6 +26,7 @@ import static org.junit.Assert.assertThat;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +40,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ManagedServiceAccountKeyCredentialTest {
 
   private static final String SERVICE_ACCOUNT = "styx-test-user@styx-oss-test.iam.gserviceaccount.com";
+  private IamCredentialsClient iamCredentialsClient;
 
   @Before
   public void setUp() throws Exception {
@@ -54,11 +56,13 @@ public class ManagedServiceAccountKeyCredentialTest {
       // Do not run this test if we do not have permission to impersonate the test user.
       Assume.assumeNoException(e);
     }
+
+    iamCredentialsClient = IamCredentialsClient.create();
   }
 
   @Test
   public void testRefreshToken() throws IOException {
-    var credentials = new ManagedServiceAccountKeyCredential.Builder()
+    var credentials = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(SERVICE_ACCOUNT)
         .setServiceAccountUser(SERVICE_ACCOUNT)
         .setServiceAccountScopes(Set.of("https://www.googleapis.com/auth/cloud-platform"))

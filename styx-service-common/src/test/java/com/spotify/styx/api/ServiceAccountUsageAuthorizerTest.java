@@ -56,6 +56,7 @@ import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.common.base.Throwables;
 import com.spotify.apollo.Response;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer.AllAuthorizationPolicy;
@@ -128,6 +129,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Mock private GoogleIdToken.Payload idTokenPayload;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private CloudResourceManager crm;
   @Mock(answer = Answers.RETURNS_DEEP_STUBS) private Iam iam;
+  @Mock private IamCredentialsClient iamCredentialsClient;
   @Mock private CloudResourceManager.Projects.GetIamPolicy getIamPolicy;
   @Mock private Directory directory;
   @Mock private Directory.Members members;
@@ -180,8 +182,8 @@ public class ServiceAccountUsageAuthorizerTest {
         .setPrivateKey(privateKey)
         .setClientEmail("styx@bar.iam.gserviceaccount.com")
         .build();
-    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
-        WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, iamCredentialsClient, crm, directory, SERVICE_ACCOUNT_USER_ROLE,
+        authorizationPolicy, WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
   }
 
   @Test

@@ -45,8 +45,8 @@ import org.slf4j.LoggerFactory;
  * Note that the service account must be granted the "Service Account Token Creator" role for itself.
  * <p>
  * The fundamental difference between this class and the regular {@link GoogleCredential} implementation is that
- * it calls the GCP IAM {@code projects.serviceAccounts.signJwt} method in order to sign the access token request
- * assertion instead of using a local service account key to sign it.
+ * it calls the GCP IAM Service Account Credentials API {@code projects.serviceAccounts.signJwt} method in order to sign the access
+ * token request assertion instead of using a local service account key to sign it.
  * <p>
  * As opposed to the {@link com.google.auth.oauth2.ImpersonatedCredentials}, this implementation allows specifying a
  * domain user to impersonate when accessing e.g. G Suite APIs.
@@ -55,11 +55,15 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   private static final Logger log = LoggerFactory.getLogger(ManagedServiceAccountKeyCredential.class);
 
+  private final IamCredentialsClient iamCredentialsClient;
+
   private ManagedServiceAccountKeyCredential(Builder builder) {
     super(builder);
     Objects.requireNonNull(getServiceAccountId(), "serviceAccountId");
     Objects.requireNonNull(getServiceAccountUser(), "serviceAccountUser");
     Objects.requireNonNull(getServiceAccountScopes(), "serviceAccountScopes");
+    iamCredentialsClient = Objects.requireNonNull(builder.iamCredentialsClient,
+        "iamCredentialsClient");
   }
 
   @Override
@@ -95,7 +99,7 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
   }
 
   private String signJwt(String serviceAccount, JsonWebToken.Payload payload) throws IOException {
-    try (IamCredentialsClient iamCredentialsClient = IamCredentialsClient.create()) {
+    try {
       var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
       var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
           Utils.getDefaultJsonFactory().toString(payload));
@@ -119,7 +123,9 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   static class Builder extends GoogleCredential.Builder {
 
-    Builder() {
+    private final IamCredentialsClient iamCredentialsClient;
+    Builder(final IamCredentialsClient iamCredentialsClient) {
+      this.iamCredentialsClient = Objects.requireNonNull(iamCredentialsClient, "iamCredentialsClient");
       setServiceAccountPrivateKey(DummyKey.INSTANCE);
     }
 

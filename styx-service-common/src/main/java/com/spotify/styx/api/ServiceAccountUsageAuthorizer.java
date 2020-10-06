@@ -54,6 +54,7 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -63,6 +64,7 @@ import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
@@ -94,7 +96,7 @@ import org.slf4j.LoggerFactory;
  * <li> GSuite: {@code https://www.googleapis.com/auth/admin.directory.group.member.readonly}
  * </ul></p>
  */
-public interface ServiceAccountUsageAuthorizer {
+public interface ServiceAccountUsageAuthorizer extends Closeable {
 
   Logger LOG = LoggerFactory.getLogger(ServiceAccountUsageAuthorizer.class);
 
@@ -135,6 +137,7 @@ public interface ServiceAccountUsageAuthorizer {
     private static final String CACHE_HIT = "hit";
     private static final String CACHE_MISS = "miss";
 
+    private final IamCredentialsClient iamCredentialsClient;
     private final Iam iam;
     private final CloudResourceManager crm;
     private final Directory directory;
@@ -155,10 +158,12 @@ public interface ServiceAccountUsageAuthorizer {
             .maximumSize(10_000)
             .build();
 
-    Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
+    Impl(Iam iam, IamCredentialsClient iamCredentialsClient, CloudResourceManager crm,
+         Directory directory, String serviceAccountUserRole,
          AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy, StopStrategy retryStopStrategy,
          String message, List<String> administrators, List<String> blacklist) {
       this.iam = Objects.requireNonNull(iam, "iam");
+      this.iamCredentialsClient = Objects.requireNonNull(iamCredentialsClient, "iamCredentialsClient");
       this.crm = Objects.requireNonNull(crm, "crm");
       this.directory = Objects.requireNonNull(directory, "directory");
       this.serviceAccountUserRole = Objects.requireNonNull(serviceAccountUserRole, "serviceAccountUserRole");
@@ -482,6 +487,11 @@ public interface ServiceAccountUsageAuthorizer {
     private static <T> List<T> emptyListIfNull(List<T> list) {
       return Objects.requireNonNullElse(list, List.of());
     }
+
+    @Override
+    public void close() throws IOException {
+      iamCredentialsClient.close();
+    }
   }
 
   class Nop implements ServiceAccountUsageAuthorizer {
@@ -497,6 +507,11 @@ public interface ServiceAccountUsageAuthorizer {
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(
         String serviceAccount, String principal) {
       return ServiceAccountUsageAuthorizationResult.builder().authorized(true).build();
+    }
+
+    @Override
+    public void close() throws IOException {
+      // nop
     }
   }
 
@@ -552,7 +567,14 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder()
+    final IamCredentialsClient iamCredentialsClient;
+    try {
+      iamCredentialsClient = IamCredentialsClient.create();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
         .setServiceAccountUser(gsuiteUserEmail)
         .setServiceAccountScopes(Set.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))
@@ -562,7 +584,8 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
+    return new Impl(iam, iamCredentialsClient, crm, directory, serviceAccountUserRole,
+        authorizationPolicy,
         Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 

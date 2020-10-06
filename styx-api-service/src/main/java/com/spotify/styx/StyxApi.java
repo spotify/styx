@@ -192,6 +192,7 @@ public class StyxApi implements AppInit {
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
         serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    environment.closer().register(serviceAccountUsageAuthorizer);
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 

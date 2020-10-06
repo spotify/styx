@@ -458,6 +458,7 @@ public class StyxScheduler implements AppInit {
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
         serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+    environment.closer().register(serviceAccountUsageAuthorizer);
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
     final SchedulerResource schedulerResource =
