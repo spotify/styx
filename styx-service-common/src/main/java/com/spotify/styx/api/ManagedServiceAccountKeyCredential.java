@@ -99,19 +99,10 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
   }
 
   private String signJwt(String serviceAccount, JsonWebToken.Payload payload) throws IOException {
-    try {
-      var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
-      var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
-          Utils.getDefaultJsonFactory().toString(payload));
-      return signJwtResponse.getSignedJwt();
-    } catch (ApiException e) {
-      if (e.getStatusCode().getCode() == PERMISSION_DENIED) {
-        throw new IOException(
-            "Unable to sign request for id token, missing Service Account Token Creator role for self on "
-            + serviceAccount + " or IAM Service Account Credentials API not enabled?", e);
-      }
-      throw e;
-    }
+    var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
+    var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
+        Utils.getDefaultJsonFactory().toString(payload));
+    return signJwtResponse.getSignedJwt();
   }
 
   private TokenResponse requestToken(String signedJwt) throws IOException {
