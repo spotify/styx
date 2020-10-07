@@ -20,8 +20,6 @@
 
 package com.spotify.styx.api;
 
-import static com.google.api.gax.rpc.StatusCode.Code.PERMISSION_DENIED;
-
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
