@@ -20,18 +20,15 @@
 
 package com.spotify.styx.api;
 
-import static com.google.api.gax.rpc.StatusCode.Code.PERMISSION_DENIED;
-
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.json.webtoken.JsonWebToken;
-import com.google.api.gax.rpc.ApiException;
+import com.google.api.client.util.Joiner;
 import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.cloud.iam.credentials.v1.ServiceAccountName;
-import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.security.PrivateKey;
 import java.util.List;
@@ -99,19 +96,10 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
   }
 
   private String signJwt(String serviceAccount, JsonWebToken.Payload payload) throws IOException {
-    try {
-      var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
-      var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
-          Utils.getDefaultJsonFactory().toString(payload));
-      return signJwtResponse.getSignedJwt();
-    } catch (ApiException e) {
-      if (e.getStatusCode().getCode() == PERMISSION_DENIED) {
-        throw new IOException(
-            "Unable to sign request for id token, missing Service Account Token Creator role for self on "
-            + serviceAccount + " or IAM Service Account Credentials API not enabled?", e);
-      }
-      throw e;
-    }
+    var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
+    var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
+        Utils.getDefaultJsonFactory().toString(payload));
+    return signJwtResponse.getSignedJwt();
   }
 
   private TokenResponse requestToken(String signedJwt) throws IOException {
