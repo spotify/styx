@@ -28,6 +28,7 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.json.webtoken.JsonWebToken;
 import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.cloud.iam.credentials.v1.ServiceAccountName;
+import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.security.PrivateKey;
 import java.util.List;
