@@ -183,8 +183,8 @@ public class ServiceAccountUsageAuthorizerTest {
         .setPrivateKey(privateKey)
         .setClientEmail("styx@bar.iam.gserviceaccount.com")
         .build();
-    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE,
-        authorizationPolicy, WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
+    sut = new ServiceAccountUsageAuthorizer.Impl(iam, crm, directory, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
+        WaitStrategies.noWait(), StopStrategies.stopAfterAttempt(RETRY_ATTEMPTS), MESSAGE, ADMINISTRATORS, BLACKLIST);
   }
 
   @Test
@@ -495,20 +495,18 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void testCreate() {
-    when(environment.closer()).thenReturn(Closer.create());
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.create(
-        environment, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS,
-        BLACKLIST);
+        Closer.create(), SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential, GSUITE_USER_EMAIL,
+        "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
     assertThat(sut, is(notNullValue()));
   }
 
   @Test
   public void createShouldFailIfCredentialIsNotAServiceAccount() {
-    when(environment.closer()).thenReturn(Closer.create());
     credential = GoogleCredentials.newBuilder().build();
     try {
-      ServiceAccountUsageAuthorizer.create(environment, SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy, credential,
-          GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
+      ServiceAccountUsageAuthorizer.create(Closer.create(), SERVICE_ACCOUNT_USER_ROLE, authorizationPolicy,
+          credential, GSUITE_USER_EMAIL, "foo", MESSAGE, ADMINISTRATORS, BLACKLIST);
       fail();
     } catch (IllegalArgumentException e) {
       assertThat(e.getMessage(), is("Credential is not a service account"));

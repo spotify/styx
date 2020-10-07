@@ -40,6 +40,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ManagedServiceAccountKeyCredentialTest {
 
   private static final String SERVICE_ACCOUNT = "styx-test-user@styx-oss-test.iam.gserviceaccount.com";
+
   private IamCredentialsClient iamCredentialsClient;
 
   @Before

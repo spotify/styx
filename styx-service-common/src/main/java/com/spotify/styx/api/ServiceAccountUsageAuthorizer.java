@@ -60,6 +60,7 @@ import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Closer;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
@@ -157,8 +158,7 @@ public interface ServiceAccountUsageAuthorizer {
             .maximumSize(10_000)
             .build();
 
-    Impl(Iam iam, CloudResourceManager crm,
-         Directory directory, String serviceAccountUserRole,
+    Impl(Iam iam, CloudResourceManager crm, Directory directory, String serviceAccountUserRole,
          AuthorizationPolicy authorizationPolicy, WaitStrategy waitStrategy,
          StopStrategy retryStopStrategy,
          String message, List<String> administrators, List<String> blacklist) {
@@ -516,7 +516,7 @@ public interface ServiceAccountUsageAuthorizer {
               .orElse(Collections.emptyList());
           final List<String> blacklist = get(config, config::getStringList, AUTHORIZATION_BLACKLIST_CONFIG)
               .orElse(Collections.emptyList());
-          return ServiceAccountUsageAuthorizer.create(environment,
+          return ServiceAccountUsageAuthorizer.create(environment.closer(),
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators, blacklist);
         })
         .orElseGet(() -> {
@@ -530,7 +530,7 @@ public interface ServiceAccountUsageAuthorizer {
     return create(environment, serviceName, defaultCredentials());
   }
 
-  static ServiceAccountUsageAuthorizer create(Environment environment,
+  static ServiceAccountUsageAuthorizer create(Closer closer,
                                               String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
                                               GoogleCredentials credentials,
@@ -565,7 +565,7 @@ public interface ServiceAccountUsageAuthorizer {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    environment.closer().register(iamCredentialsClient::close);
+    closer.register(iamCredentialsClient::close);
 
     final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
@@ -577,8 +577,7 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    return new Impl(iam, crm, directory, serviceAccountUserRole,
-        authorizationPolicy,
+    return new Impl(iam, crm, directory, serviceAccountUserRole, authorizationPolicy,
         Impl.DEFAULT_WAIT_STRATEGY, Impl.DEFAULT_RETRY_STOP_STRATEGY, message, administrators, blacklist);
   }
 
