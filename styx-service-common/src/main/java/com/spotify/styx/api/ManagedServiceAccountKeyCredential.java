@@ -113,7 +113,7 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
     private final IamCredentialsClient iamCredentialsClient;
 
-    Builder(final IamCredentialsClient iamCredentialsClient) {
+    Builder(IamCredentialsClient iamCredentialsClient) {
       this.iamCredentialsClient = Objects.requireNonNull(iamCredentialsClient, "iamCredentialsClient");
       setServiceAccountPrivateKey(DummyKey.INSTANCE);
     }
