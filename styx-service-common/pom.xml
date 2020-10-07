@@ -68,6 +68,10 @@
       <artifactId>google-api-services-iam</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-iamcredentials</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-admin-directory</artifactId>
     </dependency>

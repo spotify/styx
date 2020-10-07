@@ -457,7 +457,7 @@ public class StyxScheduler implements AppInit {
     setupMetrics(queuedStateManager, workflowCache, storage, dequeueRateLimiter, stats, time);
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
-        serviceAccountUsageAuthorizerFactory.apply(config, serviceName);
+        serviceAccountUsageAuthorizerFactory.apply(environment, serviceName);
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
     final SchedulerResource schedulerResource =

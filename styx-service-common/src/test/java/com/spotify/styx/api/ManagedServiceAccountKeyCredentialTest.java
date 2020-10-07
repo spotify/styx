@@ -24,12 +24,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 
-import com.google.api.client.googleapis.util.Utils;
-import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.IamScopes;
-import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +41,7 @@ public class ManagedServiceAccountKeyCredentialTest {
 
   private static final String SERVICE_ACCOUNT = "styx-test-user@styx-oss-test.iam.gserviceaccount.com";
 
-  private Iam iam;
+  private IamCredentialsClient iamCredentialsClient;
 
   @Before
   public void setUp() throws Exception {
@@ -61,16 +58,12 @@ public class ManagedServiceAccountKeyCredentialTest {
       Assume.assumeNoException(e);
     }
 
-    iam = new Iam.Builder(
-        Utils.getDefaultTransport(), Utils.getDefaultJsonFactory(),
-        new HttpCredentialsAdapter(serviceCredentials.createScoped(IamScopes.all())))
-        .setApplicationName("styx-test")
-        .build();
+    iamCredentialsClient = IamCredentialsClient.create();
   }
 
   @Test
   public void testRefreshToken() throws IOException {
-    var credentials = new ManagedServiceAccountKeyCredential.Builder(iam)
+    var credentials = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(SERVICE_ACCOUNT)
         .setServiceAccountUser(SERVICE_ACCOUNT)
         .setServiceAccountScopes(Set.of("https://www.googleapis.com/auth/cloud-platform"))

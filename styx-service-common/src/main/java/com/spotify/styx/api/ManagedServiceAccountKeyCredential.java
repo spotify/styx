@@ -27,10 +27,11 @@ import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.json.webtoken.JsonWebToken;
 import com.google.api.client.util.Joiner;
-import com.google.api.services.iam.v1.Iam;
-import com.google.api.services.iam.v1.model.SignJwtRequest;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
+import com.google.cloud.iam.credentials.v1.ServiceAccountName;
 import java.io.IOException;
 import java.security.PrivateKey;
+import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +42,8 @@ import org.slf4j.LoggerFactory;
  * Note that the service account must be granted the "Service Account Token Creator" role for itself.
  * <p>
  * The fundamental difference between this class and the regular {@link GoogleCredential} implementation is that
- * it calls the GCP IAM {@code projects.serviceAccounts.signJwt} method in order to sign the access token request
- * assertion instead of using a local service account key to sign it.
+ * it calls the GCP IAM Service Account Credentials API {@code projects.serviceAccounts.signJwt} method in order to sign the access
+ * token request assertion instead of using a local service account key to sign it.
  * <p>
  * As opposed to the {@link com.google.auth.oauth2.ImpersonatedCredentials}, this implementation allows specifying a
  * domain user to impersonate when accessing e.g. G Suite APIs.
@@ -51,14 +52,15 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   private static final Logger log = LoggerFactory.getLogger(ManagedServiceAccountKeyCredential.class);
 
-  private final Iam iam;
+  private final IamCredentialsClient iamCredentialsClient;
 
   private ManagedServiceAccountKeyCredential(Builder builder) {
     super(builder);
     Objects.requireNonNull(getServiceAccountId(), "serviceAccountId");
     Objects.requireNonNull(getServiceAccountUser(), "serviceAccountUser");
     Objects.requireNonNull(getServiceAccountScopes(), "serviceAccountScopes");
-    this.iam = Objects.requireNonNull(builder.iam, "iam");
+    iamCredentialsClient = Objects.requireNonNull(builder.iamCredentialsClient,
+        "iamCredentialsClient");
   }
 
   @Override
@@ -94,13 +96,10 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
   }
 
   private String signJwt(String serviceAccount, JsonWebToken.Payload payload) throws IOException {
-    var fullServiceAccountName = "projects/-/serviceAccounts/" + serviceAccount;
-    var request = new SignJwtRequest()
-        .setPayload(Utils.getDefaultJsonFactory().toString(payload));
-    return iam.projects().serviceAccounts()
-        .signJwt(fullServiceAccountName, request)
-        .execute()
-        .getSignedJwt();
+    var serviceAccountName = ServiceAccountName.of("-", serviceAccount);
+    var signJwtResponse = iamCredentialsClient.signJwt(serviceAccountName, List.of(),
+        Utils.getDefaultJsonFactory().toString(payload));
+    return signJwtResponse.getSignedJwt();
   }
 
   private TokenResponse requestToken(String signedJwt) throws IOException {
@@ -112,10 +111,10 @@ class ManagedServiceAccountKeyCredential extends GoogleCredential {
 
   static class Builder extends GoogleCredential.Builder {
 
-    private final Iam iam;
+    private final IamCredentialsClient iamCredentialsClient;
 
-    Builder(Iam iam) {
-      this.iam = Objects.requireNonNull(iam, "iam");
+    Builder(IamCredentialsClient iamCredentialsClient) {
+      this.iamCredentialsClient = Objects.requireNonNull(iamCredentialsClient, "iamCredentialsClient");
       setServiceAccountPrivateKey(DummyKey.INSTANCE);
     }
 

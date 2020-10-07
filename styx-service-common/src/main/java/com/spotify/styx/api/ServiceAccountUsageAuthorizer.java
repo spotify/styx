@@ -54,11 +54,14 @@ import com.google.api.services.iam.v1.IamScopes;
 import com.google.api.services.iam.v1.model.ServiceAccount;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.iam.credentials.v1.IamCredentialsClient;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Closer;
+import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
 import com.spotify.styx.model.WorkflowId;
 import com.typesafe.config.Config;
@@ -500,7 +503,9 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  static ServiceAccountUsageAuthorizer create(Config config, String serviceName, GoogleCredentials credential) {
+  static ServiceAccountUsageAuthorizer create(Environment environment, String serviceName,
+                                              GoogleCredentials credential) {
+    final Config config = environment.config();
     return get(config, config::getString, AUTHORIZATION_SERVICE_ACCOUNT_USER_ROLE_CONFIG)
         .map(role -> {
           final AuthorizationPolicy authorizationPolicy = AuthorizationPolicy.fromConfig(config);
@@ -510,7 +515,7 @@ public interface ServiceAccountUsageAuthorizer {
               .orElse(Collections.emptyList());
           final List<String> blacklist = get(config, config::getStringList, AUTHORIZATION_BLACKLIST_CONFIG)
               .orElse(Collections.emptyList());
-          return ServiceAccountUsageAuthorizer.create(
+          return ServiceAccountUsageAuthorizer.create(environment.closer(),
               role, authorizationPolicy, credential, gsuiteUserEmail, serviceName, message, administrators, blacklist);
         })
         .orElseGet(() -> {
@@ -520,11 +525,12 @@ public interface ServiceAccountUsageAuthorizer {
         });
   }
 
-  static ServiceAccountUsageAuthorizer create(Config config, String serviceName) {
-    return create(config, serviceName, defaultCredentials());
+  static ServiceAccountUsageAuthorizer create(Environment environment, String serviceName) {
+    return create(environment, serviceName, defaultCredentials());
   }
 
-  static ServiceAccountUsageAuthorizer create(String serviceAccountUserRole,
+  static ServiceAccountUsageAuthorizer create(Closer closer,
+                                              String serviceAccountUserRole,
                                               AuthorizationPolicy authorizationPolicy,
                                               GoogleCredentials credentials,
                                               String gsuiteUserEmail,
@@ -552,7 +558,15 @@ public interface ServiceAccountUsageAuthorizer {
         .setApplicationName(serviceName)
         .build();
 
-    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iam)
+    final IamCredentialsClient iamCredentialsClient;
+    try {
+      iamCredentialsClient = IamCredentialsClient.create();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    closer.register(iamCredentialsClient::close);
+
+    final GoogleCredential directoryCredential = new ManagedServiceAccountKeyCredential.Builder(iamCredentialsClient)
         .setServiceAccountId(ServiceAccounts.serviceAccountEmail(credentials))
         .setServiceAccountUser(gsuiteUserEmail)
         .setServiceAccountScopes(Set.of(ADMIN_DIRECTORY_GROUP_MEMBER_READONLY))
@@ -665,7 +679,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
   }
 
-  interface Factory extends BiFunction<Config, String, ServiceAccountUsageAuthorizer> {
+  interface Factory extends BiFunction<Environment, String, ServiceAccountUsageAuthorizer> {
 
     Factory DEFAULT = ServiceAccountUsageAuthorizer::create;
   }
