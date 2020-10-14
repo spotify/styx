@@ -88,7 +88,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -222,9 +221,10 @@ public class KubernetesDockerRunnerTest {
 
     podWatcher = watcherCaptor.getValue();
 
-    Map<String, String> annotations = new HashMap<>();
-    annotations.put(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey());
-    createdPod.getMetadata().setAnnotations(annotations);
+    createdPod.getMetadata().setAnnotations(
+        Map.of(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, WORKFLOW_INSTANCE.toKey()));
+    createdPod.getMetadata().setLabels(
+        Map.of(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, WORKFLOW_INSTANCE.toKey()));
     createdPod.getMetadata().setName(POD_NAME);
     createdPod.getMetadata().setResourceVersion("1001");
 

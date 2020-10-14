@@ -108,7 +108,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private static final Tracer tracer = Tracing.getTracer();
 
-  static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
+  static final String STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL = "styx-workflow-instance";
   static final String DOCKER_TERMINATION_LOGGING_ANNOTATION = "styx-docker-termination-logging";
   static final String COMPONENT_ID = "STYX_COMPONENT_ID";
   static final String WORKFLOW_ID = "STYX_WORKFLOW_ID";
@@ -311,9 +311,10 @@ class KubernetesDockerRunner implements DockerRunner {
     final PodBuilder podBuilder = new PodBuilder()
         .withNewMetadata()
         .withName(executionId)
-        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+        .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
+        .addToLabels(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, workflowInstance.toKey())
         .endMetadata();
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
@@ -598,13 +599,13 @@ class KubernetesDockerRunner implements DockerRunner {
   private static Optional<WorkflowInstance> readPodWorkflowInstance(Pod pod) {
     final Map<String, String> annotations = pod.getMetadata().getAnnotations();
     final String podName = pod.getMetadata().getName();
-    if (annotations == null || !annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION)) {
+    if (annotations == null || !annotations.containsKey(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL)) {
       LOG.warn("[AUDIT] Got pod without workflow instance annotation {}", podName);
       return Optional.empty();
     }
 
     final WorkflowInstance workflowInstance = WorkflowInstance.parseKey(
-        annotations.get(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION));
+        annotations.get(KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL));
 
     return Optional.of(workflowInstance);
   }
@@ -669,7 +670,7 @@ class KubernetesDockerRunner implements DockerRunner {
                         boolean polled) {
     final String podName = pod.getMetadata().getName();
     final String workflowInstance = Optional.ofNullable(pod.getMetadata().getAnnotations())
-        .map(annotations -> annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION))
+        .map(annotations -> annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL))
         .orElse("N/A");
     final String status = readStatus(pod);
 

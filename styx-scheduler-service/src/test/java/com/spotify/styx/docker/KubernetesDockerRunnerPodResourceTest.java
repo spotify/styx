@@ -31,17 +31,17 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.LOGGING;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
-import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
+import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowConfiguration;
@@ -118,10 +118,24 @@ public class KubernetesDockerRunnerPodResourceTest {
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
-    assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
+    assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, WORKFLOW_INSTANCE.toKey()));
 
     WorkflowInstance workflowInstance =
-        WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
+        WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL));
+    assertThat(workflowInstance, is(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldAddWorkflowInstanceLabel() {
+    Pod pod = createPod(
+        WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+
+    var labels = pod.getMetadata().getLabels();
+    assertThat(labels, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL, WORKFLOW_INSTANCE.toKey()));
+
+    var workflowInstance =
+        WorkflowInstance.parseKey(labels.get(STYX_WORKFLOW_INSTANCE_ANNOTATION_LABEL));
     assertThat(workflowInstance, is(WORKFLOW_INSTANCE));
   }
 
