@@ -37,7 +37,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
-import static com.spotify.styx.util.LabelValue.normalize;
+import static com.spotify.styx.docker.LabelValue.normalize;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;

@@ -1,6 +1,6 @@
 /*-
  * -\-\-
- * Spotify Styx Common
+ * Spotify Styx Scheduler Service
  * --
  * Copyright (C) 2016 - 2020 Spotify AB
  * --
@@ -18,24 +18,24 @@
  * -/-/-
  */
 
-package com.spotify.styx.util;
+package com.spotify.styx.docker;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Locale;
+import java.util.regex.Pattern;
 
-public final class LabelValue {
+final class LabelValue {
 
-  @VisibleForTesting
-  static final int GCP_LABEL_MAX_LENGTH = 63;
-  @VisibleForTesting
-  static final int DIGEST_SUFFIX_LENGTH = 7;
-  @VisibleForTesting
-  static final int PREFIX_MAX_LENGTH = GCP_LABEL_MAX_LENGTH - DIGEST_SUFFIX_LENGTH;
+  private static final int KUBERNETES_LABEL_MAX_LENGTH = 63;
+  private static final int DIGEST_SUFFIX_LENGTH = 7;
+  private static final int PREFIX_MAX_LENGTH = KUBERNETES_LABEL_MAX_LENGTH - DIGEST_SUFFIX_LENGTH;
 
-  // Part of `bytesToHex` implementation.
+  private static final Pattern VALID =
+      Pattern.compile(String.format("^(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]{0,%s}[a-zA-Z0-9])$",
+          KUBERNETES_LABEL_MAX_LENGTH - 2));
+  private static final Pattern INVALID = Pattern.compile("[^a-zA-Z0-9._-]");
+
   private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
 
   // https://stackoverflow.com/a/9855338
@@ -50,18 +50,15 @@ public final class LabelValue {
   }
 
   /**
-   * Cleanup the label value to comply with GCP restrictions.
-   *
-   * <p>Function returns original value in case it does not need any cleanup. If original value
-   * needs cleanup (lowercase, replacing not allowed characters, truncating, etc), then SHA256 HEX
-   * encoded value (first 7 characters) is suffixed to the cleaned value.
+   * Cleanup the label value to comply with Kubernetes restrictions as described by:
+   * https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
    *
    * @param value value of the label to store.
    *
    * @return normalized value, might contain less information than input.
    */
   public static String normalize(String value) {
-    if (value.matches("^[a-z0-9_-]{1," + GCP_LABEL_MAX_LENGTH + "}$")) {
+    if (value.isEmpty() || VALID.matcher(value).matches()) {
       return value;
     }
 
@@ -73,13 +70,12 @@ public final class LabelValue {
       throw new RuntimeException(e);
     }
 
-    byte[] digest = sha256.digest(value.getBytes(StandardCharsets.UTF_8));
-    String hexDigest = bytesToHex(digest);
-    String suffix = hexDigest.substring(0, DIGEST_SUFFIX_LENGTH);
+    var digest = sha256.digest(value.getBytes(StandardCharsets.UTF_8));
+    var hexDigest = bytesToHex(digest);
+    var suffix = hexDigest.substring(0, DIGEST_SUFFIX_LENGTH);
 
-    String lowerPrefix = value.toLowerCase(Locale.ROOT);
-    String validPrefix = lowerPrefix.replaceAll("[^a-z0-9_-]", "");
-    String prefix = validPrefix.substring(0, Math.min(PREFIX_MAX_LENGTH, validPrefix.length()));
+    var validPrefix = INVALID.matcher(value).replaceAll("");
+    var prefix = validPrefix.substring(0, Math.min(PREFIX_MAX_LENGTH, validPrefix.length()));
 
     return prefix + suffix;
   }

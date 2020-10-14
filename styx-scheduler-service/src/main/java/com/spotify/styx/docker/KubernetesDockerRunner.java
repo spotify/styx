@@ -24,11 +24,11 @@ import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.imageError;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.isTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static com.spotify.styx.docker.LabelValue.normalize;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
 import static com.spotify.styx.util.GuardedRunnable.guard;
-import static com.spotify.styx.util.LabelValue.normalize;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static java.util.stream.Collectors.toList;
 
