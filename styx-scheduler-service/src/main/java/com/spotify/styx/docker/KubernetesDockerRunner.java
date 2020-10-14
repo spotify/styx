@@ -28,6 +28,7 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
 import static com.spotify.styx.util.GuardedRunnable.guard;
+import static com.spotify.styx.util.LabelValue.normalize;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static java.util.stream.Collectors.toList;
 
@@ -314,6 +315,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
+        .addToLabels(buildLabel(workflowInstance, runSpec, styxEnvironment))
         .endMetadata();
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
@@ -417,6 +419,18 @@ class KubernetesDockerRunner implements DockerRunner {
     return env.entrySet().stream()
         .map(entry -> envVar(entry.getKey(), entry.getValue()))
         .collect(toList());
+  }
+
+  private static Map<String, String> buildLabel(WorkflowInstance workflowInstance,
+                                                RunSpec runSpec,
+                                                String styxEnvironment) {
+    final Map<String, String> labels = new HashMap<>();
+    labels.put(COMPONENT_ID, normalize(workflowInstance.workflowId().componentId()));
+    labels.put(WORKFLOW_ID, normalize(workflowInstance.workflowId().id()));
+    labels.put(PARAMETER, normalize(workflowInstance.parameter()));
+    runSpec.trigger().ifPresent(trigger -> labels.put(TRIGGER_TYPE, TriggerUtil.triggerType(trigger)));
+    labels.put(ENVIRONMENT, styxEnvironment);
+    return labels;
   }
 
   @VisibleForTesting

@@ -37,17 +37,19 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_TYPE;
 import static com.spotify.styx.docker.KubernetesDockerRunner.WORKFLOW_ID;
 import static com.spotify.styx.docker.KubernetesDockerRunner.envVar;
+import static com.spotify.styx.util.LabelValue.normalize;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
+import com.spotify.styx.util.TriggerUtil;
 import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -123,6 +125,21 @@ public class KubernetesDockerRunnerPodResourceTest {
     WorkflowInstance workflowInstance =
         WorkflowInstance.parseKey(annotations.get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
     assertThat(workflowInstance, is(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldAddLabels() {
+    var pod = createPod(
+        WORKFLOW_INSTANCE,
+        DockerRunner.RunSpec.builder().executionId("eid").imageName("busybox").trigger(Trigger.natural()).build(),
+        EMPTY_SECRET_SPEC);
+
+    var labels = pod.getMetadata().getLabels();
+    assertThat(labels, hasEntry(COMPONENT_ID, normalize(WORKFLOW_INSTANCE.workflowId().componentId())));
+    assertThat(labels, hasEntry(WORKFLOW_ID, normalize(WORKFLOW_INSTANCE.workflowId().id())));
+    assertThat(labels, hasEntry(PARAMETER, normalize(WORKFLOW_INSTANCE.parameter())));
+    assertThat(labels, hasEntry(TRIGGER_TYPE, TriggerUtil.triggerType(Trigger.natural())));
+    assertThat(labels, hasEntry(ENVIRONMENT, STYX_ENVIRONMENT));
   }
 
   @Test
