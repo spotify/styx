@@ -55,9 +55,9 @@ public class LabelValueTest {
 
   @Test
   public void shouldPadInvalidFirstChar() {
-    var input = "-spotify#com";
+    var input = "-spotify";
     var output = LabelValue.normalize(input);
-    var expected = "p-spotifycom21392dd";
+    var expected = "p-spotifye6181c8";
     assertThat(output, is(expected));
   }
 

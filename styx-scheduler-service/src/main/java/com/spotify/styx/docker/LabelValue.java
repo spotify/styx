@@ -24,8 +24,8 @@ import com.google.common.io.BaseEncoding;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 final class LabelValue {
@@ -38,7 +38,7 @@ final class LabelValue {
       Pattern.compile(String.format("^(?:[a-z0-9]|[a-z0-9][a-z0-9_-]{0,%s}[a-z0-9])$",
           KUBERNETES_LABEL_MAX_LENGTH - 2));
   private static final Pattern INVALID = Pattern.compile("[^a-z0-9_-]");
-  private static final List<Character> NON_ALPHANUMERICS = List.of('_', '-');
+  private static final Set<Character> NON_ALPHANUMERICS = Set.of('_', '-');
 
   private static final BaseEncoding BASE16_ENCODING_LOWER_CASE = BaseEncoding.base16().lowerCase();
 
