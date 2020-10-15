@@ -24,6 +24,7 @@ import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.imageError;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.isTerminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static com.spotify.styx.docker.LabelValue.normalize;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
@@ -100,6 +101,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javaslang.control.Try;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -314,6 +316,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
+        .addToLabels(tryBuildLabels(workflowInstance, runSpec, styxEnvironment))
         .endMetadata();
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
@@ -417,6 +420,23 @@ class KubernetesDockerRunner implements DockerRunner {
     return env.entrySet().stream()
         .map(entry -> envVar(entry.getKey(), entry.getValue()))
         .collect(toList());
+  }
+
+  private static Map<String, String> tryBuildLabels(WorkflowInstance workflowInstance,
+                                                    RunSpec runSpec,
+                                                    String styxEnvironment) {
+    return Try.of(() -> buildLabels(workflowInstance, runSpec, styxEnvironment)).getOrElse(Map::of);
+  }
+
+  private static Map<String, String> buildLabels(WorkflowInstance workflowInstance, RunSpec runSpec,
+                                                 String styxEnvironment) {
+    final Map<String, String> labels = new HashMap<>();
+    labels.put(COMPONENT_ID, normalize(workflowInstance.workflowId().componentId()));
+    labels.put(WORKFLOW_ID, normalize(workflowInstance.workflowId().id()));
+    labels.put(PARAMETER, normalize(workflowInstance.parameter()));
+    runSpec.trigger().ifPresent(trigger -> labels.put(TRIGGER_TYPE, TriggerUtil.triggerType(trigger)));
+    labels.put(ENVIRONMENT, styxEnvironment);
+    return labels;
   }
 
   @VisibleForTesting
