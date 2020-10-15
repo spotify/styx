@@ -95,10 +95,12 @@ public interface AuthenticatorFactory extends Function<AuthenticatorConfiguratio
 
       final Authenticator validator =
           new Authenticator(googleIdTokenVerifier, cloudResourceManager, iam, configuration);
-      try {
-        validator.cacheResources();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+      if (!configuration.disableResourceIdCacheWarmup()) {
+        try {
+          validator.cacheResources();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
       }
       return validator;
     }

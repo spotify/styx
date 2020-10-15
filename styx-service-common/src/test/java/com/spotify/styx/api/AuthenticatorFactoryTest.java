@@ -20,12 +20,13 @@
 
 package com.spotify.styx.api;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.isA;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -105,6 +106,17 @@ public class AuthenticatorFactoryTest {
     final AuthenticatorConfiguration configuration = AuthenticatorConfiguration.builder().service("test").build();
     assertThat(authenticatorFactory.apply(configuration), is(notNullValue()));
     verify(projectsList).execute();
+  }
+
+  @Test
+  public void shouldCreateAuthenticatorWithoutEarlyCaching() throws IOException {
+    final AuthenticatorConfiguration configuration =
+        AuthenticatorConfiguration.builder()
+            .service("test")
+            .disableResourceIdCacheWarmup(true)
+            .build();
+    assertThat(authenticatorFactory.apply(configuration), is(notNullValue()));
+    verify(projectsList, never()).execute();
   }
   
   @Test

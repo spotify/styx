@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 @AutoMatter
 public interface AuthenticatorConfiguration {
 
+  boolean disableResourceIdCacheWarmup();
   Set<String> domainWhitelist();
   Set<ResourceId> resourceWhitelist();
   String service();
@@ -43,12 +44,15 @@ public interface AuthenticatorConfiguration {
 
   static AuthenticatorConfiguration fromConfig(Config config, String serviceName) {
 
+    final String disableResourceIdCacheWarmupKey = "styx.authentication.disable-resource-id-cache-warmup";
     final String domainWhitelistKey = "styx.authentication.domain-whitelist";
     final String resourceWhitelistKey = "styx.authentication.resource-whitelist";
     final String allowedAudiencesKey = "styx.authentication.allowed-audiences";
 
     final AuthenticatorConfigurationBuilder builder = AuthenticatorConfiguration.builder()
         .service(serviceName);
+
+    get(config, config::getBoolean, disableResourceIdCacheWarmupKey).ifPresent(builder::disableResourceIdCacheWarmup);
 
     get(config, config::getStringList, domainWhitelistKey).ifPresent(builder::domainWhitelist);
 
