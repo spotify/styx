@@ -316,7 +316,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
-        .addToLabels(buildLabels(workflowInstance, runSpec, styxEnvironment))
+        .addToLabels(tryBuildLabels(workflowInstance, runSpec, styxEnvironment))
         .endMetadata();
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
@@ -422,14 +422,14 @@ class KubernetesDockerRunner implements DockerRunner {
         .collect(toList());
   }
 
-  private static Map<String, String> buildLabels(WorkflowInstance workflowInstance,
-                                                 RunSpec runSpec,
-                                                 String styxEnvironment) {
-    return Try.of(() -> buildLabels0(workflowInstance, runSpec, styxEnvironment)).getOrElse(Map::of);
+  private static Map<String, String> tryBuildLabels(WorkflowInstance workflowInstance,
+                                                    RunSpec runSpec,
+                                                    String styxEnvironment) {
+    return Try.of(() -> buildLabels(workflowInstance, runSpec, styxEnvironment)).getOrElse(Map::of);
   }
 
-  private static Map<String, String> buildLabels0(WorkflowInstance workflowInstance, RunSpec runSpec,
-                                                  String styxEnvironment) {
+  private static Map<String, String> buildLabels(WorkflowInstance workflowInstance, RunSpec runSpec,
+                                                 String styxEnvironment) {
     final Map<String, String> labels = new HashMap<>();
     labels.put(COMPONENT_ID, normalize(workflowInstance.workflowId().componentId()));
     labels.put(WORKFLOW_ID, normalize(workflowInstance.workflowId().id()));
