@@ -78,7 +78,7 @@ public class LabelValueTest {
   }
 
   @Test
-  public void shouldProperlyHandleMultiByteValue() {
+  public void shouldRemoveMultiByteValueAndSuffix() {
     var input = "M\u0101rti\u0146\u0161";
     var output = LabelValue.normalize(input);
     var expected = "mrticd76e17";
@@ -86,7 +86,7 @@ public class LabelValueTest {
   }
 
   @Test
-  public void shouldProperlyHandleMultiByteLongValue() {
+  public void shouldRemoveMultiByteValueTruncateAndSuffix() {
     var input = repeat("\u0410", KUBERNETES_LABEL_MAX_LENGTH + 1);
     var output = LabelValue.normalize(input);
     var expected = "fc135e7";
