@@ -39,7 +39,7 @@ public class LabelValueTest {
   @Parameters({
       "",
       "a",
-      "Test-value_including.0-and-9",
+      "test-value_including-0-and-9",
   })
   public void shouldHandleSimpleCases(String input) {
     var output = LabelValue.normalize(input);
@@ -51,6 +51,14 @@ public class LabelValueTest {
     var input = repeat("0", KUBERNETES_LABEL_MAX_LENGTH);
     var output = LabelValue.normalize(input);
     assertThat(output, is(input));
+  }
+
+  @Test
+  public void shouldPadInvalidFirstChar() {
+    var input = "-spotify#com";
+    var output = LabelValue.normalize(input);
+    var expected = "p-spotifycom21392dd";
+    assertThat(output, is(expected));
   }
 
   @Test
@@ -73,7 +81,7 @@ public class LabelValueTest {
   public void shouldProperlyHandleMultiByteValue() {
     var input = "M\u0101rti\u0146\u0161";
     var output = LabelValue.normalize(input);
-    var expected = "Mrticd76e17";
+    var expected = "mrticd76e17";
     assertThat(output, is(expected));
   }
 

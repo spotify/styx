@@ -20,9 +20,12 @@
 
 package com.spotify.styx.docker;
 
+import com.google.common.io.BaseEncoding;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 final class LabelValue {
@@ -32,26 +35,18 @@ final class LabelValue {
   private static final int PREFIX_MAX_LENGTH = KUBERNETES_LABEL_MAX_LENGTH - DIGEST_SUFFIX_LENGTH;
 
   private static final Pattern VALID =
-      Pattern.compile(String.format("^(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]{0,%s}[a-zA-Z0-9])$",
+      Pattern.compile(String.format("^(?:[a-z0-9]|[a-z0-9][a-z0-9_-]{0,%s}[a-z0-9])$",
           KUBERNETES_LABEL_MAX_LENGTH - 2));
-  private static final Pattern INVALID = Pattern.compile("[^a-zA-Z0-9._-]");
+  private static final Pattern INVALID = Pattern.compile("[^a-z0-9_-]");
+  private static final List<Character> NON_ALPHANUMERICS = List.of('_', '-');
 
-  private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
-
-  // https://stackoverflow.com/a/9855338
-  private static String bytesToHex(byte[] bytes) {
-    char[] hexChars = new char[bytes.length * 2];
-    for (int i = 0; i < bytes.length; i++) {
-      int v = bytes[i] & 0xFF;
-      hexChars[i * 2] = HEX_ARRAY[v >>> 4];
-      hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
-    }
-    return new String(hexChars);
-  }
+  private static final BaseEncoding BASE16_ENCODING_LOWER_CASE = BaseEncoding.base16().lowerCase();
 
   /**
    * Cleanup the label value to comply with Kubernetes restrictions as described by:
    * https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+   * 
+   * Note that this normalizer implements a subset of the restriction, e.g. lower case only, no `.`.
    *
    * @param value value of the label to store.
    *
@@ -62,6 +57,8 @@ final class LabelValue {
       return value;
     }
 
+    var paddedValue = padIfInvalidFirstChar(value);
+
     // MessageDigest is not thread safe: https://stackoverflow.com/a/17555580
     final MessageDigest sha256;
     try {
@@ -70,14 +67,22 @@ final class LabelValue {
       throw new RuntimeException(e);
     }
 
-    var digest = sha256.digest(value.getBytes(StandardCharsets.UTF_8));
-    var hexDigest = bytesToHex(digest);
+    var digest = sha256.digest(paddedValue.getBytes(StandardCharsets.UTF_8));
+    var hexDigest = BASE16_ENCODING_LOWER_CASE.encode(digest);
     var suffix = hexDigest.substring(0, DIGEST_SUFFIX_LENGTH);
 
-    var validPrefix = INVALID.matcher(value).replaceAll("");
+    var lowerPrefix = paddedValue.toLowerCase(Locale.ROOT);
+    var validPrefix = INVALID.matcher(lowerPrefix).replaceAll("");
     var prefix = validPrefix.substring(0, Math.min(PREFIX_MAX_LENGTH, validPrefix.length()));
 
     return prefix + suffix;
+  }
+
+  private static String padIfInvalidFirstChar(String value) {
+    if (NON_ALPHANUMERICS.contains(value.charAt(0))) {
+      return "p" + value;
+    }
+    return value;
   }
 
   private LabelValue() {

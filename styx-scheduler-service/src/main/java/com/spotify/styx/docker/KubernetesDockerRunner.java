@@ -101,6 +101,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javaslang.control.Try;
 
 /**
  * A {@link DockerRunner} implementation that submits container executions to a Kubernetes cluster.
@@ -315,7 +316,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
                           String.valueOf(runSpec.terminationLogging()))
-        .addToLabels(buildLabel(workflowInstance, runSpec, styxEnvironment))
+        .addToLabels(buildLabels(workflowInstance, runSpec, styxEnvironment))
         .endMetadata();
 
     final PodSpecBuilder specBuilder = new PodSpecBuilder()
@@ -421,9 +422,14 @@ class KubernetesDockerRunner implements DockerRunner {
         .collect(toList());
   }
 
-  private static Map<String, String> buildLabel(WorkflowInstance workflowInstance,
-                                                RunSpec runSpec,
-                                                String styxEnvironment) {
+  private static Map<String, String> buildLabels(WorkflowInstance workflowInstance,
+                                                 RunSpec runSpec,
+                                                 String styxEnvironment) {
+    return Try.of(() -> buildLabels0(workflowInstance, runSpec, styxEnvironment)).getOrElse(Map::of);
+  }
+
+  private static Map<String, String> buildLabels0(WorkflowInstance workflowInstance, RunSpec runSpec,
+                                                  String styxEnvironment) {
     final Map<String, String> labels = new HashMap<>();
     labels.put(COMPONENT_ID, normalize(workflowInstance.workflowId().componentId()));
     labels.put(WORKFLOW_ID, normalize(workflowInstance.workflowId().id()));
