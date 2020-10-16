@@ -21,8 +21,8 @@
 package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Authenticator.resourceId;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +37,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class AuthenticatorConfigurationTest {
 
+  private static final String DISABLE_RESOURCE_ID_CACHE_WARMUP_KEY =
+      "styx.authentication.disable-resource-id-cache-warmup";
   private static final String DOMAIN_WHITELIST_KEY = "styx.authentication.domain-whitelist";
   private static final String RESOURCE_WHITELIST_KEY = "styx.authentication.resource-whitelist";
 
@@ -57,15 +59,18 @@ public class AuthenticatorConfigurationTest {
     final List<? extends Config> resourceWhitelist = List.of(resourceConfig1,
         resourceConfig2);
     
+    when(config.hasPath(DISABLE_RESOURCE_ID_CACHE_WARMUP_KEY)).thenReturn(true);
     when(config.hasPath(DOMAIN_WHITELIST_KEY)).thenReturn(true);
     when(config.hasPath(RESOURCE_WHITELIST_KEY)).thenReturn(true);
-    
+
+    when(config.getBoolean(DISABLE_RESOURCE_ID_CACHE_WARMUP_KEY)).thenReturn(true);
     when(config.getStringList(DOMAIN_WHITELIST_KEY)).thenReturn(domainWhitelist);
     doReturn(resourceWhitelist).when(config).getConfigList(RESOURCE_WHITELIST_KEY);
 
     final AuthenticatorConfiguration configuration =
         AuthenticatorConfiguration.fromConfig(config, "foo");
 
+    assertThat(configuration.disableResourceIdCacheWarmup(), is(true));
     assertThat(configuration.domainWhitelist(), is(ImmutableSet.copyOf(domainWhitelist)));
     assertThat(configuration.resourceWhitelist(), is(ImmutableSet
         .of(resourceId(resourceConfig1.getString("type"), resourceConfig1.getString("id")),
@@ -78,6 +83,7 @@ public class AuthenticatorConfigurationTest {
     final AuthenticatorConfiguration configuration =
         AuthenticatorConfiguration.fromConfig(config, "foo");
 
+    assertThat(configuration.disableResourceIdCacheWarmup(), is(false));
     assertThat(configuration.domainWhitelist(), is(ImmutableSet.of()));
     assertThat(configuration.resourceWhitelist(), is(ImmutableSet.of()));
     assertThat(configuration.service(), is("foo"));
