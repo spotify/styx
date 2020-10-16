@@ -192,6 +192,26 @@
         <version>${project.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>com.spotify</groupId>
+        <artifactId>apollo-test</artifactId>
+        <version>${apollo.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
       <!-- general utility libs -->
       <dependency>
         <groupId>com.google.guava</groupId>
@@ -299,8 +319,12 @@
         <version>${semantic-metrics.version}</version>
         <exclusions>
           <exclusion>
-          <groupId>com.codahale.metrics</groupId>
-          <artifactId>*</artifactId>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -471,7 +495,7 @@
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
-        <version>4.13</version>
+        <version>4.13.1</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
