@@ -188,7 +188,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
-  private final PodMutator podMutator;
+  private final PodMutatorFactory podMutatorFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -198,6 +198,7 @@ public class StyxScheduler implements AppInit {
   // === Type aliases for dependency injectors ====================================================
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, EventConsumer> { }
+  public interface PodMutatorFactory extends Function<Environment, PodMutator> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -240,7 +241,7 @@ public class StyxScheduler implements AppInit {
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
-    private PodMutator podMutator = PodMutator.NOOP;
+    private PodMutatorFactory podMutatorFactory = (env) -> PodMutator.NOOP;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -303,8 +304,8 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
-    public Builder setPodMutator(PodMutator podMutator) {
-      this.podMutator = podMutator;
+    public Builder setPodMutatorFactory(PodMutatorFactory podMutatorFactory) {
+      this.podMutatorFactory = podMutatorFactory;
       return this;
     }
 
@@ -343,7 +344,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
-    this.podMutator = requireNonNull(builder.podMutator);
+    this.podMutatorFactory = requireNonNull(builder.podMutatorFactory);
   }
 
   @Override
@@ -396,10 +397,11 @@ public class StyxScheduler implements AppInit {
     var workflowValidator = new ExtendedWorkflowValidator(
         new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
 
+    var podMutator = podMutatorFactory.apply(environment);
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, podMutator,
-            time),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist,
+            podMutator, time),
         dockerRunnerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
