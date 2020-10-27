@@ -23,9 +23,9 @@ package com.spotify.styx.docker;
 import static com.spotify.styx.docker.KubernetesDockerRunner.KEEPALIVE_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesPodEventTranslator.translate;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
@@ -63,7 +63,7 @@ public class KubernetesPodEventTranslatorTest {
 
   private static final String STYX_ENVIRONMENT = "testing";
 
-  private Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT);
+  private final Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT, PodMutator.NOOP);
 
   @Test
   public void terminateOnSuccessfulTermination() {
@@ -426,6 +426,7 @@ public class KubernetesPodEventTranslatorTest {
             .imageName("busybox")
             .terminationLogging(true).build(),
         SECRET_SPEC,
-        STYX_ENVIRONMENT);
+        STYX_ENVIRONMENT,
+        PodMutator.NOOP);
   }
 }

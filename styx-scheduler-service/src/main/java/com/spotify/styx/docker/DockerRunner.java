@@ -111,12 +111,13 @@ public interface DockerRunner extends Closeable {
                                  ServiceAccountKeyManager serviceAccountKeyManager,
                                  Debug debug,
                                  String styxEnvironment,
-                                 Set<String> secretWhitelist) {
+                                 Set<String> secretWhitelist,
+                                 PodMutator podMutator) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager, stats);
     final KubernetesDockerRunner dockerRunner =
         new KubernetesDockerRunner(id, kubernetesClient, stateManager, stats,
-            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist);
+            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist, podMutator);
 
     dockerRunner.init();
 

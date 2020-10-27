@@ -267,10 +267,10 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(envVars, hasItem(envVar(LOGGING, "structured")));
   }
 
-  private static Pod createPod(WorkflowInstance workflowInstance,
+  private Pod createPod(WorkflowInstance workflowInstance,
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
   }
 }

@@ -24,8 +24,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
@@ -100,7 +100,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.listPods()).thenReturn(podList);
 
     kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, Set.of());
+        debug, STYX_ENVIRONMENT, Set.of(), PodMutator.NOOP);
   }
 
   @Test
@@ -141,7 +141,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
   }
 
   @Test
@@ -233,6 +233,6 @@ public class KubernetesDockerRunnerPodPollerTest {
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
   }
 }

@@ -22,11 +22,12 @@ package com.spotify.styx.docker;
 
 import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -76,9 +77,7 @@ import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -87,8 +86,6 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnitParamsRunner.class)
 public class KubernetesGCPServiceAccountSecretManagerTest {
-
-  @Rule public ExpectedException exception = ExpectedException.none();
 
   private static final String SERVICE_ACCOUNT = "sa@example.com";
 
@@ -405,12 +402,11 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     doThrow(permissionDenied).when(serviceAccountKeyManager).createJsonKey(any());
     doThrow(permissionDenied).when(serviceAccountKeyManager).createP12Key(any());
 
-    exception.expect(InvalidExecutionException.class);
-    exception.expectMessage(String.format(
+    assertThrows(String.format(
         "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
-        SERVICE_ACCOUNT));
-
-    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+        SERVICE_ACCOUNT), InvalidExecutionException.class,
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(),
+            SERVICE_ACCOUNT));
   }
 
   @Test
@@ -424,12 +420,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createJsonKey(any());
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
 
-    exception.expect(InvalidExecutionException.class);
-    exception.expectMessage(String.format(
-        "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
-        SERVICE_ACCOUNT));
-
-    sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(), SERVICE_ACCOUNT);
+    assertThrows("Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+        InvalidExecutionException.class,
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(),
+            SERVICE_ACCOUNT));
   }
 
   @Test
@@ -459,10 +453,9 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   public void shouldFailIfServiceAccountDoesNotExist() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(false);
 
-    exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Referenced service account " + SERVICE_ACCOUNT + " was not found");
-
-    sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
+    assertThrows("Referenced service account " + SERVICE_ACCOUNT + " was not found",
+        InvalidExecutionException.class,
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT));
   }
 
   @Test
@@ -533,7 +526,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
       }
     }
     final IntSummaryStatistics stats = IntStream.of(rotationsPerHour).summaryStatistics();
-    final double expectedMeanRotationsPerHour = n / hours;
+    final double expectedMeanRotationsPerHour = n / (float) hours;
     assertThat(stats.getAverage(), is(closeTo(expectedMeanRotationsPerHour, expectedMeanRotationsPerHour / 2)));
     assertThat((double) stats.getMax(), is(lessThan(expectedMeanRotationsPerHour * 2)));
   }
@@ -573,6 +566,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
   }
 }

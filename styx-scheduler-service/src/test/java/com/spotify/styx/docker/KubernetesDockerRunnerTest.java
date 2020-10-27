@@ -28,10 +28,11 @@ import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setTermin
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.setWaiting;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminated;
 import static com.spotify.styx.docker.KubernetesPodEventTranslatorTest.terminatedContainerState;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -42,8 +43,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.QuietDeterministicScheduler;
@@ -100,9 +101,7 @@ import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -179,15 +178,13 @@ public class KubernetesDockerRunnerTest {
   @Captor private ArgumentCaptor<Watcher<Pod>> watcherCaptor;
   @Captor private ArgumentCaptor<Pod> podCaptor;
 
-  @Rule public ExpectedException exception = ExpectedException.none();
-
-  private Pod createdPod = createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
-  private Stats stats = mock(Stats.class);
+  private final Pod createdPod = createPod(WORKFLOW_INSTANCE, RUN_SPEC, EMPTY_SECRET_SPEC);
+  private final Stats stats = mock(Stats.class);
 
   private KubernetesDockerRunner kdr;
   private Watcher<Pod> podWatcher;
-  private QuietDeterministicScheduler executor = new QuietDeterministicScheduler();
-  private ContainerStatus keepaliveContainerStatus = new ContainerStatusBuilder()
+  private final QuietDeterministicScheduler executor = new QuietDeterministicScheduler();
+  private final ContainerStatus keepaliveContainerStatus = new ContainerStatusBuilder()
       .withName(KEEPALIVE_CONTAINER_NAME)
       .withNewState().withNewRunning().endRunning().endState()
       .build();
@@ -214,8 +211,8 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
-        executor);
+        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
+        POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
 
     verify(k8sClient).watchPods(any());
@@ -258,8 +255,8 @@ public class KubernetesDockerRunnerTest {
     var spiedExecutor = spy(executor);
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
     var kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, POD_CLEANUP_INTERVAL_SECONDS, POD_DELETION_DELAY_SECONDS, time,
-        spiedExecutor);
+        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
+        POD_DELETION_DELAY_SECONDS, time, spiedExecutor);
     kdr.init();
     verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
     kdr.close();
@@ -273,17 +270,17 @@ public class KubernetesDockerRunnerTest {
         new KubernetesClientException("Already created", 409,
             new StatusBuilder().withReason("AlreadyExists").build()));
     assertThat(kdr.start(RUN_STATE, RUN_SPEC), is(RUNNER_ID));
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
   }
 
   @Test
-  public void shouldThrowIOException() throws IOException {
+  public void shouldThrowIOException() {
     Mockito.reset(k8sClient);
     when(k8sClient.createPod(any(Pod.class))).thenThrow(
         new KubernetesClientException("foobar", 500,
             new StatusBuilder().withReason("foobar").build()));
-    exception.expectMessage("Failed to create Kubernetes pod");
-    kdr.start(RUN_STATE, RUN_SPEC);
+    assertThrows("Failed to create Kubernetes pod", IOException.class,
+        () -> kdr.start(RUN_STATE, RUN_SPEC));
   }
 
   @Test
@@ -292,7 +289,7 @@ public class KubernetesDockerRunnerTest {
     kdr.start(RUN_STATE, RUN_SPEC);
     verify(k8sClient).getPod(RUN_SPEC.executionId());
     verifyNoMoreInteractions(k8sClient);
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
   }
 
   @Test
@@ -598,9 +595,9 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfUsingNonWhitelistedSecret() throws IOException {
-    exception.expectMessage("Referenced secret 'secret-1' is not whitelisted");
-    kdr.start(RUN_STATE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET);
+  public void shouldNotRunIfUsingNonWhitelistedSecret() {
+    assertThrows("Referenced secret 'secret-1' is not whitelisted", InvalidExecutionException.class,
+        () -> kdr.start(RUN_STATE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET));
   }
 
   @Test
@@ -633,14 +630,13 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldNotRunIfServiceAccountSecretEnsureFails() throws IOException {
+  public void shouldNotRunIfServiceAccountSecretEnsureFails() {
     final InvalidExecutionException error = new InvalidExecutionException("SA not found");
     when(serviceAccountSecretManager.ensureServiceAccountKeySecret(
         WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT)).thenThrow(error);
 
-    exception.expect(is(error));
-
-    kdr.start(RUN_STATE, RUN_SPEC_WITH_SA);
+    var exception = assertThrows(InvalidExecutionException.class, () -> kdr.start(RUN_STATE, RUN_SPEC_WITH_SA));
+    assertThat(exception, is(error));
   }
 
   @Test
@@ -648,13 +644,13 @@ public class KubernetesDockerRunnerTest {
       IOException {
     final String secret = "styx-wf-sa-keys-foo";
 
-    exception.expect(InvalidExecutionException.class);
-    exception.expectMessage("Referenced secret '" + secret + "' has the managed service account key secret name prefix");
-    kdr.start(RUN_STATE, RunSpec.builder()
-        .executionId("eid")
-        .imageName("busybox")
-        .secret(WorkflowConfiguration.Secret.create(secret, "/foo/bar"))
-        .build());
+    assertThrows("Referenced secret '" + secret + "' has the managed service account key secret name prefix",
+        InvalidExecutionException.class,
+        () -> kdr.start(RUN_STATE, RunSpec.builder()
+            .executionId("eid")
+            .imageName("busybox")
+            .secret(WorkflowConfiguration.Secret.create(secret, "/foo/bar"))
+            .build()));
 
     verify(k8sClient, never()).createPod(any(Pod.class));
   }
@@ -840,7 +836,7 @@ public class KubernetesDockerRunnerTest {
     doThrow(new StateTransitionConflictException("foo!"))
         .when(stateManager).receive(any(), anyLong());
 
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
 
     // Poll for execution status
     var stateData = StateData.newBuilder().executionId(POD_NAME).build();
@@ -861,7 +857,7 @@ public class KubernetesDockerRunnerTest {
     doThrow(new CounterCapacityException("foo!"))
         .when(stateManager).receive(any(), anyLong());
 
-    verifyZeroInteractions(stateManager);
+    verifyNoInteractions(stateManager);
 
     // Poll for execution status
     var stateData = StateData.newBuilder().executionId(POD_NAME).build();
@@ -916,6 +912,6 @@ public class KubernetesDockerRunnerTest {
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
   }
 }

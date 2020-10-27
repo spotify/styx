@@ -58,6 +58,7 @@ import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
 import com.spotify.styx.api.WorkflowActionAuthorizer;
 import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
+import com.spotify.styx.docker.PodMutator;
 import com.spotify.styx.docker.RunnerId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
@@ -187,6 +188,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
+  private final PodMutator podMutator;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -206,6 +208,7 @@ public class StyxScheduler implements AppInit {
         Stats stats,
         Debug debug,
         Set<String> secretWhitelist,
+        PodMutator podMutator,
         Time time);
   }
 
@@ -237,6 +240,7 @@ public class StyxScheduler implements AppInit {
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
+    private PodMutator podMutator = PodMutator.NOOP;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -299,6 +303,11 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setPodMutator(PodMutator podMutator) {
+      this.podMutator = podMutator;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -334,6 +343,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
+    this.podMutator = requireNonNull(builder.podMutator);
   }
 
   @Override
@@ -388,7 +398,8 @@ public class StyxScheduler implements AppInit {
 
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, time),
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist, podMutator,
+            time),
         dockerRunnerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
@@ -615,6 +626,7 @@ public class StyxScheduler implements AppInit {
       Stats stats,
       Debug debug,
       Set<String> secretWhitelist,
+      PodMutator podMutator,
       Time time) {
     final Config config = environment.config();
     final Closer closer = environment.closer();
@@ -626,7 +638,7 @@ public class StyxScheduler implements AppInit {
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(id, fabric8Client, stateManager, stats,
-        serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist));
+        serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist, podMutator));
   }
 
   static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager) {
