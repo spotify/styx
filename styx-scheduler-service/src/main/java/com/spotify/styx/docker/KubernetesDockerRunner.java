@@ -155,6 +155,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Debug debug;
   private final String styxEnvironment;
   private final Set<String> secretWhitelist;
+  private final PodMutator podMutator;
   private final Duration cleanupPodsInterval;
   private final Duration podDeletionDelay;
   private final Time time;
@@ -166,9 +167,11 @@ class KubernetesDockerRunner implements DockerRunner {
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
                          Set<String> secretWhitelist,
+                         PodMutator podMutator,
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
-                         Time time, ScheduledExecutorService scheduledExecutor) {
+                         Time time,
+                         ScheduledExecutorService scheduledExecutor) {
     this.id = Objects.requireNonNull(id, "id");
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
@@ -177,6 +180,7 @@ class KubernetesDockerRunner implements DockerRunner {
     this.debug = Objects.requireNonNull(debug);
     this.styxEnvironment = Objects.requireNonNull(styxEnvironment);
     this.secretWhitelist = Objects.requireNonNull(secretWhitelist);
+    this.podMutator = Objects.requireNonNull(podMutator, "podMutator");
     this.cleanupPodsInterval = Duration.ofSeconds(cleanupPodsIntervalSeconds);
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
     this.time = Objects.requireNonNull(time);
@@ -188,9 +192,10 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment, Set<String> secretWhitelist) {
+                         Debug debug, String styxEnvironment, Set<String> secretWhitelist,
+                         PodMutator podMutator) {
     this(id, client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
-        DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
+        podMutator, DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
 
@@ -211,7 +216,7 @@ class KubernetesDockerRunner implements DockerRunner {
     // Create pod. This might fail with 409 Conflict if the pod already exists as despite the existence
     // check above it might have been concurrently created. That is fine.
     try {
-      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment);
+      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator);
       LOG.info("Creating pod: {}: {}", workflowInstance, pod);
       var createdPod = client.createPod(pod);
       stats.recordSubmission(runSpec.executionId());
@@ -304,7 +309,8 @@ class KubernetesDockerRunner implements DockerRunner {
   static Pod createPod(WorkflowInstance workflowInstance,
                        RunSpec runSpec,
                        KubernetesSecretSpec secretSpec,
-                       String styxEnvironment) {
+                       String styxEnvironment,
+                       PodMutator podMutator) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -375,7 +381,7 @@ class KubernetesDockerRunner implements DockerRunner {
     specBuilder.addToContainers(keepaliveContainer());
     podBuilder.withSpec(specBuilder.build());
 
-    return podBuilder.build();
+    return podMutator.mutate(workflowInstance, runSpec, styxEnvironment, podBuilder.build());
   }
 
   private static Container keepaliveContainer() {
