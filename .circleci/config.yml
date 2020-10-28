@@ -26,8 +26,13 @@ jobs:
               tar xzf google-cloud-sdk-*.tar.gz
               google-cloud-sdk/install.sh -q
               google-cloud-sdk/bin/gcloud components install beta cloud-datastore-emulator -q
-              google-cloud-sdk/bin/gcloud config set project testing
             fi
+      - run:
+          name: "Install kubectl "
+          command: |
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x ./kubectl
+            mv ./kubectl /usr/local/bin/kubectl
       - save_cache:
           key: v4-deps-{{ checksum "pom.xml" }}-{{ checksum "gcloud-sdk-url.txt" }}
           paths:
@@ -38,6 +43,14 @@ jobs:
           command: |
             echo "$GCLOUD_SERVICE_KEY" > credentials.json
             echo "export GOOGLE_APPLICATION_CREDENTIALS=\"$(realpath credentials.json)\"" >> $BASH_ENV
+            google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=credentials.json
+      - run:
+          name: "Set up k8s cluster"
+          command: |
+            kubectl version --client
+            google-cloud-sdk/bin/gcloud config set project styx-oss-test
+            google-cloud-sdk/bin/gcloud container clusters get-credentials styx-e2e-test --zone europe-west4-c
+            # google-cloud-sdk/bin/gcloud config set project testing
       # Run tests without static analysis
       - run:
           name: Tests
@@ -47,6 +60,10 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: |
+            kubectl -n flyte port-forward deployment/flyteadmin 8088:8088 &
+            # it takes some time for the portforwarding to be ready
+            sleep 5
+            curl 127.0.0.1:8088/api/v1/openapi
             source google-cloud-sdk/path.bash.inc
             mvn -B verify -P disable-static-analysis
       - run:
