@@ -47,6 +47,14 @@ jobs:
             google-cloud-sdk/bin/gcloud container clusters get-credentials styx-e2e-test --zone europe-west4-c --project styx-oss-test
       # Run tests without static analysis
       - run:
+          name: "Install grpc_health_probe"
+          command: |
+            mkdir grpc_health
+            curl --silent --fail --show-error --location --output grpc_health/grpc_health_probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.2/grpc_health_probe-linux-amd64"
+            chmod +x grpc_health/grpc_health_probe
+            echo 'dc5c8cd7b33ef503f49eb639af6017f33d340884  grpc_health/grpc_health_probe' > .grpc_checksum
+            sha1sum -c .grpc_checksum
+      - run:
           name: Tests
           environment:
             # Configure datastore emulator heap size
@@ -56,7 +64,15 @@ jobs:
           command: |
             google-cloud-sdk/bin/kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 &
             # it takes some time for the portforwarding to be ready
-            sleep 5
+            max_retry=10
+            counter=0
+            until ./grpc_health/grpc_health_probe -addr 127.0.0.1:8089
+            do
+            	sleep 1
+            	[[ counter -eq $max_retry ]] && echo "Failed!" && exit 1
+            	 echo "Trying again. Try #$counter"
+            	((counter++))
+            done
             source google-cloud-sdk/path.bash.inc
             mvn -B verify -P disable-static-analysis
       - run:
