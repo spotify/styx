@@ -60,10 +60,10 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: |
-            kubectl -n flyte port-forward deployment/flyteadmin 8088:8088 &
+            kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 &
             # it takes some time for the portforwarding to be ready
             sleep 5
-            curl 127.0.0.1:8088/api/v1/openapi
+            # make sure we can access flyteadmin
             source google-cloud-sdk/path.bash.inc
             mvn -B verify -P disable-static-analysis
       - run:
