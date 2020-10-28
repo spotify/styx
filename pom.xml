@@ -317,6 +317,12 @@
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-core</artifactId>
         <version>${semantic-metrics.version}</version>
+        <exclusions>	
+          <exclusion>	
+            <groupId>com.codahale.metrics</groupId>	
+            <artifactId>*</artifactId>	
+          </exclusion>	
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.spotify.metrics</groupId>
