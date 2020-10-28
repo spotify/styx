@@ -27,6 +27,7 @@ jobs:
               google-cloud-sdk/install.sh -q
               google-cloud-sdk/bin/gcloud components install beta cloud-datastore-emulator -q
               google-cloud-sdk/bin/gcloud components install kubectl -q
+              google-cloud-sdk/bin/gcloud config set project testing
             fi
       - save_cache:
           key: v4-deps-{{ checksum "pom.xml" }}-{{ checksum "gcloud-sdk-url.txt" }}
