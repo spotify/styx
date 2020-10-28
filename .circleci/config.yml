@@ -54,7 +54,6 @@ jobs:
             chmod +x grpc_health/grpc_health_probe
             echo 'dc5c8cd7b33ef503f49eb639af6017f33d340884  grpc_health/grpc_health_probe' > .grpc_checksum
             sha1sum -c .grpc_checksum
-            nohup google-cloud-sdk/bin/kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 &
       - run:
           name: Tests
           environment:
@@ -63,6 +62,8 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: |
+            google-cloud-sdk/bin/kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 &
+            # it takes some time for the portforwarding to be ready
             grpc_health/grpc_health_probe -addr 127.0.0.1:8089  -connect-timeout 8s
             source google-cloud-sdk/path.bash.inc
             mvn -B verify -P disable-static-analysis
