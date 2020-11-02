@@ -440,6 +440,7 @@ class KubernetesDockerRunner implements DockerRunner {
     labels.put(COMPONENT_ID, normalize(workflowInstance.workflowId().componentId()));
     labels.put(WORKFLOW_ID, normalize(workflowInstance.workflowId().id()));
     labels.put(PARAMETER, normalize(workflowInstance.parameter()));
+    labels.put(EXECUTION_ID, runSpec.executionId());
     runSpec.trigger().ifPresent(trigger -> labels.put(TRIGGER_TYPE, TriggerUtil.triggerType(trigger)));
     labels.put(ENVIRONMENT, styxEnvironment);
     return labels;
