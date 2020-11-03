@@ -129,15 +129,18 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   @Test
   public void shouldAddLabels() {
+    DockerRunner.RunSpec spec =
+        DockerRunner.RunSpec.builder().executionId("eid").imageName("busybox").trigger(Trigger.natural()).build();
     var pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.builder().executionId("eid").imageName("busybox").trigger(Trigger.natural()).build(),
+        spec,
         EMPTY_SECRET_SPEC);
 
     var labels = pod.getMetadata().getLabels();
     assertThat(labels, hasEntry(COMPONENT_ID, normalize(WORKFLOW_INSTANCE.workflowId().componentId())));
     assertThat(labels, hasEntry(WORKFLOW_ID, normalize(WORKFLOW_INSTANCE.workflowId().id())));
     assertThat(labels, hasEntry(PARAMETER, normalize(WORKFLOW_INSTANCE.parameter())));
+    assertThat(labels, hasEntry(EXECUTION_ID, spec.executionId()));
     assertThat(labels, hasEntry(TRIGGER_TYPE, TriggerUtil.triggerType(Trigger.natural())));
     assertThat(labels, hasEntry(ENVIRONMENT, STYX_ENVIRONMENT));
   }
