@@ -1,3 +1,10 @@
+---
+**Note**
+
+Everything has been deployed to flyte already. We only need to update the workflow unless it is really
+ necessary. Then you should follow the steps here.
+---
+
 #### Setup
 Install `flytekit` which will install: pyflyte, flyte-cli and flytekit_build_image.sh 
 ```
@@ -19,7 +26,7 @@ To only build, do,
 $ flytekit_build_image.sh .
 ```
 
-#### Deploy to flyte
+#### Deploy to flyte 
 Deploys workflows, tasks, launch plans and image to flyte.
 
 You need to go to gcloud console to change the flyte admin service deployment to use LoadBalancer and get the IP of `$FLYTE_ADMIN_ADDRESS` 
@@ -28,7 +35,7 @@ docker run --network host -e FLYTE_PLATFORM_URL='$FLYTE_ADMIN_ADDRESS' "eu.gcr.i
 :$(git log --format='%H' -n 1)" pyflyte -p flytesnacks -d development -c sandbox.config register workflows
 ```
 
-####Test the workflow
+#### Test the workflow
 Try to execute the lp of workflow once to make sure it work
 ```
 flyte-cli -h $FLYTE_ADMIN_ADDRESS -i -p flytesnacks -d development execute-launch-plan -r aa \                                       
