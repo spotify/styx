@@ -26,10 +26,15 @@ To only build, do,
 $ flytekit_build_image.sh .
 ```
 
+#### Port forwarding to flyteadmin in the test cluster
+Access to flyteadmin is needed to deploy the workflow. You can create port forwarding to flyteadmin with this command
+```
+kubectl port-forward -n flyte port-forward deployment/flyteadmin 8089:8089
+```
+
 #### Deploy to flyte 
 Deploys workflows, tasks, launch plans and image to flyte.
 
-Or you can use `kubectl port-forward -n flyte port-forward deployment/flyteadmin 8089:8089` 
 ```
 docker run --network host -e FLYTE_PLATFORM_URL='host.docker.internal:8089' "eu.gcr.io/styx-oss-test/flyte-test-workflow
 :$(git log --format='%H' -n 1)" pyflyte -p flytesnacks -d development -c sandbox.config register workflows
