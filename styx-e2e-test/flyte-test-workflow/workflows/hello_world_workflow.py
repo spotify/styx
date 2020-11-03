@@ -7,4 +7,4 @@ class WorkflowHelloWorld:
     hello = print_hello_world()
 
 
-WorkflowHelloWorld.create_launch_plan(kubernetes_service_account="e2e-test-sa")
+lp = WorkflowHelloWorld.create_launch_plan(kubernetes_service_account="e2e-test-sa")
