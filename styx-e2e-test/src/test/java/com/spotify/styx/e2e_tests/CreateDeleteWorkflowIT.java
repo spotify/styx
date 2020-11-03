@@ -20,16 +20,17 @@
 
 package com.spotify.styx.e2e_tests;
 
+import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import com.google.auto.service.AutoService;
+import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.serialization.Json;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +41,6 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
 
   @Test
   public void testCreateDeleteWorkflow() throws Exception {
-
     var workflowConfiguration = WorkflowConfiguration.builder()
         .id(workflowId1)
         .schedule(Schedule.DAYS)
@@ -48,8 +48,23 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .dockerArgs(List.of("echo", "hello world"))
         .serviceAccount(workflowServiceAccount.getEmail())
         .build();
+    testCreateDeleteWorkflow(workflowConfiguration);
+  }
+
+  @Test
+  public void testCreateDeleteFlyteWorkflow() throws Exception {
+    var workflowConfiguration = WorkflowConfiguration.builder()
+        .id(workflowId1)
+        .schedule(Schedule.DAYS)
+        .flyteExecConf(
+            OBJECT_MAPPER.readValue(OBJECT_MAPPER.writeValueAsBytes(FLYTE_EXEC_CONF_MAP), FlyteExecConf.class))
+        .build();
+    testCreateDeleteWorkflow(workflowConfiguration);
+  }
+
+  private void testCreateDeleteWorkflow(WorkflowConfiguration workflowConfiguration) throws Exception {
     var workflow = Workflow.create(component1, workflowConfiguration);
-    var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(workflowConfiguration);
+    var workflowJson = OBJECT_MAPPER.writeValueAsString(workflowConfiguration);
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
