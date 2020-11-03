@@ -9,9 +9,6 @@ ENV PYTHONPATH /app
 # Install Python3 and other basics
 RUN apt-get update && apt-get install -y python3.6 python3.6-venv make build-essential libssl-dev python3-venv python3-pip curl
 
-# opencv support
-RUN apt-get update && apt-get install -y libsm6 libxext6 libxrender-dev
-
 # Run this before dealing with our own virtualenv. The AWS CLI uses its own virtual environment
 RUN pip3 install awscli
 
