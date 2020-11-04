@@ -67,7 +67,6 @@ public class ScheduledTriggeringFlyteIT extends EndToEndTestBase {
         "schedule", "* * * * *",
         "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
     var workflowJsonFile = temporaryFolder.newFile().toPath();
-    log.info("wolkflow" + workflowJson);
 
     Files.writeString(workflowJsonFile, workflowJson);
 
