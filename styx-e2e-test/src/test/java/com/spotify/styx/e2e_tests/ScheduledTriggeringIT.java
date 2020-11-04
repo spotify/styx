@@ -47,15 +47,12 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
                 "id", workflowId1,
                 "schedule", "* * * * *",
                 "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
-    var workflowJsonFile = temporaryFolder.newFile().toPath();
 
-    Files.writeString(workflowJsonFile, workflowJson);
-    scheduledTriggering(workflowJsonFile.toString());
+    scheduledTriggering(workflowJson);
   }
 
   @Test
   public void testScheduledTriggering() throws Exception {
-
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,
@@ -63,17 +60,19 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
         "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "{}")));
+
+    scheduledTriggering(workflowJson);
+  }
+
+  private void scheduledTriggering(String workflowJson) throws Exception {
+
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
-    scheduledTriggering(workflowJsonFile.toString());
-  }
-
-  private void scheduledTriggering(String workflowJsonFilePath) throws Exception {
     // Create workflow
     log.info("Creating workflow: {} {}", component1, workflowId1);
     var workflowCreateResult = cliJson(String.class,
-        "workflow", "create", "-f", workflowJsonFilePath, component1);
+        "workflow", "create", "-f", workflowJsonFile.toString(), component1);
     assertThat(workflowCreateResult, is("Workflow " + workflowId1 + " in component " + component1 + " created."));
 
     // Enable workflow scheduled execution
