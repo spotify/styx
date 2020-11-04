@@ -40,7 +40,6 @@ public class ScheduledTriggeringFlyteIT extends EndToEndTestBase {
 
   @Test
   public void testScheduledTriggering() throws Exception {
-
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,
