@@ -55,18 +55,21 @@ import io.norberg.automatter.AutoMatter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javaslang.control.Try;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -78,7 +81,7 @@ public class EndToEndTestBase {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  static final Logger log = LoggerFactory.getLogger(EndToEndTestBase.class);
+  protected static final Logger log = LoggerFactory.getLogger(EndToEndTestBase.class);
 
   static final String SCHEDULER_SERVICE_NAME = "styx-e2e-test-scheduler";
   private static final String API_SERVICE_NAME = "styx-e2e-test-api";
@@ -96,11 +99,31 @@ public class EndToEndTestBase {
       TestNamespaces.testNamespaceTimeTimestamp(testNamespace),
       TestNamespaces.testNamespaceRandom(testNamespace));
 
-  final String component1 = testNamespace + "-c-1";
-  final String workflowId1 = testNamespace + "-wf-1";
+  protected final String component1 = testNamespace + "-c-1";
+  protected final String workflowId1 = testNamespace + "-wf-1";
 
-  private CompletableFuture<Service.Instance> styxSchedulerInstance = new CompletableFuture<>();
-  private CompletableFuture<Service.Instance> styxApiInstance = new CompletableFuture<>();
+  private static final String FLYTE_PROJECT = "flytesnacks";
+
+  private static final String FLYTE_DOMAIN = "development";
+  private static final String FLYTE_LAUNCH_PLAN_NAME = "workflows.hello_world_workflow.lp";
+  private static final String FLYTE_LAUNCH_PLAN_VERSION = "b495f8671b8fc2da9e51acd5803a26d52e18795a";
+  private static final String RESOURCE_TYPE = "LAUNCH_PLAN";
+  private static final Map<String, String> REFERENCE_ID =
+      Map.of(
+          "project", FLYTE_PROJECT,
+          "domain", FLYTE_DOMAIN,
+          "name", FLYTE_LAUNCH_PLAN_NAME,
+          "version", FLYTE_LAUNCH_PLAN_VERSION,
+          "resource_type", RESOURCE_TYPE
+      );
+
+  protected static final Map<String, Object> FLYTE_EXEC_CONF_MAP = Map.of(
+      "reference_id", REFERENCE_ID,
+      "input_fields", Map.of()
+  );
+
+  private final CompletableFuture<Service.Instance> styxSchedulerInstance = new CompletableFuture<>();
+  private final CompletableFuture<Service.Instance> styxApiInstance = new CompletableFuture<>();
 
   private Future<Object> styxSchedulerThread;
   private Future<Object> styxApiThread;
@@ -129,6 +152,8 @@ public class EndToEndTestBase {
   @Before
   public void setUp() throws Exception {
     log.info("Setting up styx e2e test: {}", testNamespace);
+
+    Awaitility.setDefaultPollInterval(Duration.ofSeconds(5));
 
     setUpServiceAccounts();
     setUpConfig();
@@ -301,7 +326,7 @@ public class EndToEndTestBase {
 
     var spawner = Subprocesses.process().main(CliMain.class)
         .jvmArgs(
-            "-Xmx128m", "-Xms128m",
+            "-Xmx192m", "-Xms192m",
             "-Xverify:none", "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1")
         .args(args)
         .redirectStderr(INHERIT)
