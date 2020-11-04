@@ -2,7 +2,7 @@
  * -\-\-
  * Spotify End-to-End Integration Tests
  * --
- * Copyright (C) 2016 - 2019 Spotify AB
+ * Copyright (C) 2016 - 2020 Spotify AB
  * --
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package com.spotify.styx.e2e_tests;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.auto.service.AutoService;
