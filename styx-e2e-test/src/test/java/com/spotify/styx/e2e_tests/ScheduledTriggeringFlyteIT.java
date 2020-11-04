@@ -37,26 +37,6 @@ import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
 public class ScheduledTriggeringFlyteIT extends EndToEndTestBase {
-  private static final String FLYTE_PROJECT = "flytesnacks";
-
-  public static final String FLYTE_DOMAIN = "development";
-  public static final String FLYTE_LAUNCH_PLAN_NAME = "workflows.hello_world_workflow.lp";
-  public static final String FLYTE_LAUNCH_PLAN_VERSION = "b495f8671b8fc2da9e51acd5803a26d52e18795a";
-  public static final String RESOURCE_TYPE = "LAUNCH_PLAN";
-  private static Map<String, String> REFERENCE_ID =
-    Map.of(
-      "project", FLYTE_PROJECT,
-      "domain", FLYTE_DOMAIN,
-      "name", FLYTE_LAUNCH_PLAN_NAME,
-      "version", FLYTE_LAUNCH_PLAN_VERSION,
-      "resource_type", RESOURCE_TYPE
-    );
-
-  private static Map<String, Object> FLYTE_EXEC_CONF_MAP =
-      Map.of(
-      "reference_id", REFERENCE_ID,
-      "input_fields", Map.of()
-    );
 
   @Test
   public void testScheduledTriggering() throws Exception {
