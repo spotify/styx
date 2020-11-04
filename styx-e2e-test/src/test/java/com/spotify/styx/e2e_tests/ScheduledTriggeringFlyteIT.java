@@ -37,7 +37,6 @@ import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
 public class ScheduledTriggeringFlyteIT extends EndToEndTestBase {
-
   private static final String FLYTE_PROJECT = "flytesnacks";
 
   public static final String FLYTE_DOMAIN = "development";
@@ -46,21 +45,21 @@ public class ScheduledTriggeringFlyteIT extends EndToEndTestBase {
   public static final String RESOURCE_TYPE = "LAUNCH_PLAN";
   private static Map<String, String> REFERENCE_ID =
     Map.of(
-        "project", FLYTE_PROJECT,
-        "domain", FLYTE_DOMAIN,
-        "name", FLYTE_LAUNCH_PLAN_NAME,
-        "version", FLYTE_LAUNCH_PLAN_VERSION,
-        "resource_type", RESOURCE_TYPE
+      "project", FLYTE_PROJECT,
+      "domain", FLYTE_DOMAIN,
+      "name", FLYTE_LAUNCH_PLAN_NAME,
+      "version", FLYTE_LAUNCH_PLAN_VERSION,
+      "resource_type", RESOURCE_TYPE
     );
 
-  private static Map<String, Object> FLYTE_EXEC_CONF_MAP = Map.of(
+  private static Map<String, Object> FLYTE_EXEC_CONF_MAP =
+      Map.of(
       "reference_id", REFERENCE_ID,
       "input_fields", Map.of()
     );
 
   @Test
   public void testScheduledTriggering() throws Exception {
-
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
         "id", workflowId1,

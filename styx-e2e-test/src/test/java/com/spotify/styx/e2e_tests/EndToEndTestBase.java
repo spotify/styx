@@ -55,6 +55,7 @@ import io.norberg.automatter.AutoMatter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -67,6 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javaslang.control.Try;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -129,6 +131,8 @@ public class EndToEndTestBase {
   @Before
   public void setUp() throws Exception {
     log.info("Setting up styx e2e test: {}", testNamespace);
+
+    Awaitility.setDefaultPollInterval(Duration.ofSeconds(5));
 
     setUpServiceAccounts();
     setUpConfig();
@@ -301,7 +305,7 @@ public class EndToEndTestBase {
 
     var spawner = Subprocesses.process().main(CliMain.class)
         .jvmArgs(
-            "-Xmx128m", "-Xms128m",
+            "-Xmx192m", "-Xms192m",
             "-Xverify:none", "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1")
         .args(args)
         .redirectStderr(INHERIT)
