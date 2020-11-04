@@ -39,6 +39,21 @@ import org.junit.Test;
 public class ScheduledTriggeringIT extends EndToEndTestBase {
 
   @Test
+  public void testScheduledTriggeringFlyteWorkflow() throws Exception {
+    // Generate workflow configuration
+    var workflowJson =
+        Json.OBJECT_MAPPER.writeValueAsString(
+            Map.of(
+                "id", workflowId1,
+                "schedule", "* * * * *",
+                "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
+    var workflowJsonFile = temporaryFolder.newFile().toPath();
+
+    Files.writeString(workflowJsonFile, workflowJson);
+    scheduledTriggering(workflowJsonFile.toString());
+  }
+
+  @Test
   public void testScheduledTriggering() throws Exception {
 
     // Generate workflow configuration
@@ -51,10 +66,14 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
+    scheduledTriggering(workflowJsonFile.toString());
+  }
+
+  private void scheduledTriggering(String workflowJsonFilePath) throws Exception {
     // Create workflow
     log.info("Creating workflow: {} {}", component1, workflowId1);
     var workflowCreateResult = cliJson(String.class,
-        "workflow", "create", "-f", workflowJsonFile.toString(), component1);
+        "workflow", "create", "-f", workflowJsonFilePath, component1);
     assertThat(workflowCreateResult, is("Workflow " + workflowId1 + " in component " + component1 + " created."));
 
     // Enable workflow scheduled execution
