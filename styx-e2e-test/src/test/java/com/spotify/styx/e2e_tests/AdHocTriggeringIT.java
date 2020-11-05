@@ -22,8 +22,8 @@ package com.spotify.styx.e2e_tests;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.auto.service.AutoService;
@@ -38,6 +38,17 @@ import org.junit.Test;
 public class AdHocTriggeringIT extends EndToEndTestBase {
 
   @Test
+  public void testAdhocTriggeringFlyteWorkflow() throws Exception {
+    // Generate workflow configuration
+    var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
+        "id", workflowId1,
+        "schedule", "daily",
+        "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
+
+    testAdhocTriggering(workflowJson);
+  }
+
+  @Test
   public void testAdHocTriggering() throws Exception {
 
     // Generate workflow configuration
@@ -47,6 +58,11 @@ public class AdHocTriggeringIT extends EndToEndTestBase {
         "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "hello world")));
+
+    testAdhocTriggering(workflowJson);
+  }
+
+  private void testAdhocTriggering(String workflowJson) throws Exception {
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
