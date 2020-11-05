@@ -221,6 +221,7 @@ public class EndToEndTestBase {
     System.setProperty("styx.test.namespace", testNamespace);
     System.setProperty("styx.api.port", String.valueOf(styxApiPort));
     System.setProperty("styx.scheduler.port", String.valueOf(styxSchedulerPort));
+    ConfigFactory.invalidateCaches();
     schedulerConfig = ConfigFactory.load(SCHEDULER_SERVICE_NAME);
     apiConfig = ConfigFactory.load(API_SERVICE_NAME);
   }
