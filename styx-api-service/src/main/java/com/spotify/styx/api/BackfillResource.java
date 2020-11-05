@@ -294,7 +294,7 @@ public final class BackfillResource implements Closeable {
                                     BackfillInput input,
                                     Workflow workflow) {
     if (workflow.configuration().dockerImage().isEmpty() && workflow.configuration().flyteExecConf().isEmpty()) {
-      return Optional.of("Workflow is missing docker image or flyte execution config");
+      return Optional.of("Workflow is missing docker image and flyte execution config");
     }
 
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
