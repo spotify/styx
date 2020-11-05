@@ -293,8 +293,8 @@ public final class BackfillResource implements Closeable {
   private Optional<String> validate(RequestContext rc,
                                     BackfillInput input,
                                     Workflow workflow) {
-    if (workflow.configuration().dockerImage().isEmpty()) {
-      return Optional.of("Workflow is missing docker image");
+    if (workflow.configuration().dockerImage().isEmpty() && workflow.configuration().flyteExecConf().isEmpty()) {
+      return Optional.of("Workflow is missing docker image or flyte execution config");
     }
 
     final Collection<String> errors = workflowValidator.validateWorkflow(workflow);
@@ -352,9 +352,6 @@ public final class BackfillResource implements Closeable {
 
     var activeWorkflowInstances = storage.readActiveStates(input.component()).keySet();
 
-    if (workflow.configuration().flyteExecConf().isPresent()) {
-      return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Cannot run backfill for flyte workflow"));
-    }
     // Validate backfill & workflow
     var validationError = validate(rc, input, workflow);
     if (validationError.isPresent()) {

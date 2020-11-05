@@ -607,7 +607,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFailPostBackfillForFlyteWorkflow() throws Exception {
+  public void shouldBackfillForFlyteWorkflow() throws Exception {
     reset(storage);
 
     storage.storeWorkflow(Workflow.create(
@@ -623,8 +623,7 @@ public class BackfillResourceTest extends VersionedApiTest {
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
 
-    assertThat(response.status(),
-        is(Status.BAD_REQUEST.withReasonPhrase("Cannot run backfill for flyte workflow")));
+    assertThat(response.status(), is(Status.OK));
 
     verify(storage, never()).storeBackfill(any());
   }
@@ -1091,7 +1090,8 @@ public class BackfillResourceTest extends VersionedApiTest {
         serviceHelper.request("POST", path(""), ByteString.encodeUtf8(json)));
 
     assertThat(response.status(),
-        is(Status.BAD_REQUEST.withReasonPhrase("Workflow is missing docker image")));
+        is(Status.BAD_REQUEST
+            .withReasonPhrase("Workflow is missing docker image or flyte execution config")));
   }
 
   @Test
