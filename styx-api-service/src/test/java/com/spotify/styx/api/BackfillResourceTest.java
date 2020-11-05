@@ -1091,7 +1091,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response.status(),
         is(Status.BAD_REQUEST
-            .withReasonPhrase("Workflow is missing docker image or flyte execution config")));
+            .withReasonPhrase("Workflow is missing docker image and flyte execution config")));
   }
 
   @Test
