@@ -20,8 +20,8 @@
 
 package com.spotify.styx.e2e_tests;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.util.ClassEnforcer;
 import org.junit.Test;

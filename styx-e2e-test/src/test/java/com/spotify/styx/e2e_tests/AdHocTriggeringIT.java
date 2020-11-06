@@ -45,7 +45,7 @@ public class AdHocTriggeringIT extends EndToEndTestBase {
         "schedule", "daily",
         "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
 
-    testAdhocTriggering(workflowJson);
+    doTestAdhocTriggering(workflowJson);
   }
 
   @Test
@@ -59,10 +59,10 @@ public class AdHocTriggeringIT extends EndToEndTestBase {
         "docker_image", "busybox",
         "docker_args", List.of("echo", "hello world")));
 
-    testAdhocTriggering(workflowJson);
+    doTestAdhocTriggering(workflowJson);
   }
 
-  private void testAdhocTriggering(String workflowJson) throws Exception {
+  private void doTestAdhocTriggering(String workflowJson) throws Exception {
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
