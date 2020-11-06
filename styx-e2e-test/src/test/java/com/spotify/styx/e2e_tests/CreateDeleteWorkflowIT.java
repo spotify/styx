@@ -48,7 +48,7 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .dockerArgs(List.of("echo", "hello world"))
         .serviceAccount(workflowServiceAccount.getEmail())
         .build();
-    testCreateDeleteWorkflow(workflowConfiguration);
+    doTestCreateDeleteWorkflow(workflowConfiguration);
   }
 
   @Test
@@ -59,10 +59,10 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .flyteExecConf(
             OBJECT_MAPPER.readValue(OBJECT_MAPPER.writeValueAsBytes(FLYTE_EXEC_CONF_MAP), FlyteExecConf.class))
         .build();
-    testCreateDeleteWorkflow(workflowConfiguration);
+    doTestCreateDeleteWorkflow(workflowConfiguration);
   }
 
-  private void testCreateDeleteWorkflow(WorkflowConfiguration workflowConfiguration) throws Exception {
+  private void doTestCreateDeleteWorkflow(WorkflowConfiguration workflowConfiguration) throws Exception {
     var workflow = Workflow.create(component1, workflowConfiguration);
     var workflowJson = OBJECT_MAPPER.writeValueAsString(workflowConfiguration);
     var workflowJsonFile = temporaryFolder.newFile().toPath();

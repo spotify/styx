@@ -51,7 +51,7 @@ public class BackfillIT extends EndToEndTestBase {
         "service_account", workflowServiceAccount.getEmail(),
         "docker_image", "busybox",
         "docker_args", List.of("echo", "{}")));
-    testBackfill(workflowJson);
+    doTestBackfill(workflowJson);
   }
 
   @Test
@@ -61,10 +61,10 @@ public class BackfillIT extends EndToEndTestBase {
         "id", workflowId1,
         "schedule", "daily",
         "flyte_exec_conf", FLYTE_EXEC_CONF_MAP));
-    testBackfill(workflowJson);
+    doTestBackfill(workflowJson);
   }
 
-  private void testBackfill(String workflowJson) throws Exception {
+  private void doTestBackfill(String workflowJson) throws Exception {
     var workflowJsonFile = temporaryFolder.newFile().toPath();
     Files.writeString(workflowJsonFile, workflowJson);
 
