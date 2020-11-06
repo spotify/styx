@@ -673,7 +673,7 @@ class KubernetesDockerRunner implements DockerRunner {
         stats.recordPullImageError();
       }
       if (EventUtil.name(event).equals("started")) {
-        runState.data().executionId().ifPresent(stats::recordRunning);
+        runState.data().executionId().ifPresent(executionId -> stats.recordRunning(executionId, pod.getSpec().getNodeName()));
       }
 
       try {

@@ -786,7 +786,7 @@ public class KubernetesDockerRunnerTest {
     receiveAndProcessEvent(Watcher.Action.MODIFIED, createdPod);
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
-    verify(stats).recordRunning(POD_NAME);
+    verify(stats).recordRunning(POD_NAME, createdPod.getSpec().getNodeName());
   }
 
   @Test
