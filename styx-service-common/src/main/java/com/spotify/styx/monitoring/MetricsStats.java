@@ -306,8 +306,9 @@ public final class MetricsStats implements Stats {
     if (submissionNanos != null) {
       final long runningNanos = time.nanoTime();
       submissionTimestamps.invalidate(executionId);
-      LOG.info("submit to running duration: {},{},{}", executionId, nodeName, runningNanos);
-      submitToRunning.update(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos));
+      var duration = TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos);
+      LOG.info("submit to running duration: {},{},{}", executionId, nodeName, duration);
+      submitToRunning.update(duration);
     }
   }
 
