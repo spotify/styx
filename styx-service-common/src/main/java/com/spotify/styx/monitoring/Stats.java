@@ -45,7 +45,7 @@ public interface Stats {
 
   void recordSubmission(String executionId);
 
-  void recordRunning(String executionId);
+  void recordRunning(String executionId, String nodeName);
 
   void recordExitCode(int exitCode);
 

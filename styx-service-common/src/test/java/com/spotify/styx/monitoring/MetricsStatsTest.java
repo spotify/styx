@@ -172,7 +172,7 @@ public class MetricsStatsTest {
   public void shouldRecordSubmitToRunningTime() {
     when(time.nanoTime()).thenReturn(SECONDS.toNanos(17L)).thenReturn(SECONDS.toNanos(4711L));
     stats.recordSubmission("foo");
-    stats.recordRunning("foo");
+    stats.recordRunning("foo", "node-1");
     verify(histogram).update(4711L - 17L);
   }
 

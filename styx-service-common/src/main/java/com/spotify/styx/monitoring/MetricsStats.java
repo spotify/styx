@@ -41,8 +41,12 @@ import java.util.concurrent.TimeUnit;
 import javaslang.Tuple;
 import javaslang.Tuple2;
 import javaslang.Tuple3;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class MetricsStats implements Stats {
+
+  private static final Logger LOG = LoggerFactory.getLogger(MetricsStats.class);
 
   /**
    * A variant of {@link SemanticMetricBuilder#HISTOGRAMS} that uses {@link SlidingTimeWindowArrayReservoir}
@@ -297,11 +301,12 @@ public final class MetricsStats implements Stats {
   }
 
   @Override
-  public void recordRunning(String executionId) {
+  public void recordRunning(String executionId, String nodeName) {
     final Long submissionNanos = submissionTimestamps.getIfPresent(executionId);
     if (submissionNanos != null) {
       final long runningNanos = time.nanoTime();
       submissionTimestamps.invalidate(executionId);
+      LOG.info("submit to running duration: {},{},{}", executionId, nodeName, runningNanos);
       submitToRunning.update(TimeUnit.NANOSECONDS.toSeconds(runningNanos - submissionNanos));
     }
   }

@@ -63,7 +63,7 @@ final class NoopStats implements Stats {
   }
 
   @Override
-  public void recordRunning(String executionId) {
+  public void recordRunning(String executionId, String nodeName) {
     // nop
   }
 
