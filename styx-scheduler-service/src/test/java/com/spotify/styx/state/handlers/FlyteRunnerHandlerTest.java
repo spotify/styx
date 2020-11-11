@@ -25,6 +25,7 @@ import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STYX_WORKFLOW_I
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
+import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_NAME;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,9 +65,8 @@ public class FlyteRunnerHandlerTest {
   @Mock EventRouter eventRouter;
   @Mock FlyteRunner flyteRunner;
 
-  private static final String EXECUTION_NAME = EXECUTION_ID;
   private static final FlyteExecutionId FLYTE_EXECUTION_ID = getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
-      EXECUTION_NAME);
+      FLYTE_EXECUTION_NAME);
   private static final Map<String, String> ANNOTATIONS = Map.of(
       STYX_EXECUTION_ID_ANNOTATION, EXECUTION_ID,
       STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey());
@@ -87,7 +87,7 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
-    verify(flyteRunner).createExecution(runState, EXECUTION_NAME, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, FLYTE_EXECUTION_NAME, FLYTE_EXEC_CONF, ANNOTATIONS);
     verify(eventRouter,  timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, "runnerId"),
         runState.counter());
   }
@@ -118,7 +118,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).createExecution(runState, EXECUTION_NAME, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, FLYTE_EXECUTION_NAME, FLYTE_EXEC_CONF, ANNOTATIONS);
     verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
         runState.counter());
   }
@@ -173,7 +173,7 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
-        EXECUTION_NAME), runState);
+        FLYTE_EXECUTION_NAME), runState);
   }
 
   @Test

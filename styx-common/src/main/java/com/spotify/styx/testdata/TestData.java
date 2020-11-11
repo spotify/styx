@@ -46,7 +46,7 @@ public final class TestData {
   public static final String INVALID_SHA = "XXXXXef508c1cb905e360590ce3e7e9193f6b370";
   public static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
   public static final String EXECUTION_ID = "test";
-  public static final String FLYTE_EXECUTION_NAME = "test";
+  public static final String FLYTE_EXECUTION_NAME = "abc";
 
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");
