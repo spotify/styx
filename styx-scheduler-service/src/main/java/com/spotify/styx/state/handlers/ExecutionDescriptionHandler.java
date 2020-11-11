@@ -142,16 +142,12 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .orElse(Collections.emptyList());
     final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
     final Optional<FlyteExecConf> flyteExecConf = workflow.configuration().flyteExecConf();
-    Optional<String> flyteExecutionId = Optional.empty();
 
     if (workflow.configuration().flyteExecConf().isEmpty() && dockerImage.isEmpty()) {
       throw new MissingRequiredPropertyException(format("%s has no execution configuration, "
                                                         + "halting %s", workflowId, workflowInstance));
     }
 
-    if (workflow.configuration().flyteExecConf().isPresent()) {
-      flyteExecutionId = Optional.of(styxExecIdToFlyteNameMapper.apply(executionId));;
-    }
     // Create flyte execution id here??
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
@@ -164,7 +160,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .runningTimeout(workflow.configuration().runningTimeout())
         .retryCondition(workflow.configuration().retryCondition())
         .flyteExecConf(flyteExecConf)
-        .flyteExecutionId(flyteExecutionId)
+        .flyteExecutionId(Optional.of(styxExecIdToFlyteNameMapper.apply(executionId)))
         .build();
   }
 

@@ -24,7 +24,7 @@ import static com.spotify.styx.serialization.Json.deserializeEvent;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
-import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_NAME;
+import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_ID;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -119,7 +119,7 @@ public class PersistentEventTest {
                                                + "\"execution_id\": \"" + POD_NAME + "\"")),
         is(Event.submit(INSTANCE1, EXECUTION_DESCRIPTION, POD_NAME)));
     assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
-                                               + "\"flyte_execution_id\":\"" + FLYTE_EXECUTION_NAME + "\","
+                                               + "\"flyte_execution_id\":\"" + FLYTE_EXECUTION_ID + "\","
                                                + "\"flyte_exec_conf\":{"
                                                + "\"reference_id\":{"
                                                + "\"resource_type\":\"LAUNCH_PLAN\","
@@ -131,15 +131,15 @@ public class PersistentEventTest {
                                                + "\"input_fields\":{\"foo\": \"bar\"}}}")),
         is(Event.submit(INSTANCE1, FLYTE_EXECUTION_DESCRIPTION, null)));
     assertThat(deserializeEvent(json("submit", "\"execution_description\":{"
-                                               + "\"flyte_execution_id\":\"" + FLYTE_EXECUTION_NAME + "\","
+                                               + "\"flyte_execution_id\":\"" + FLYTE_EXECUTION_ID + "\","
                                                + "\"flyte_exec_conf\":{"
-                                                 + "\"reference_id\":{"
-                                                 + "\"resource_type\":\"LAUNCH_PLAN\","
-                                                 + "\"project\":\"flyte-test\","
-                                                 + "\"domain\":\"production\","
-                                                 + "\"name\":\"test-workflow\","
-                                                 + "\"version\":1.0"
-                                                 + "},"
+                                               + "\"reference_id\":{"
+                                               + "\"resource_type\":\"LAUNCH_PLAN\","
+                                               + "\"project\":\"flyte-test\","
+                                               + "\"domain\":\"production\","
+                                               + "\"name\":\"test-workflow\","
+                                               + "\"version\":1.0"
+                                               + "},"
                                                + "\"input_fields\":{\"foo\": \"bar\"}}},"
                                                + "\"execution_id\": \"" + EXECUTION_ID + "\"")),
         is(Event.submit(INSTANCE1, FLYTE_EXECUTION_DESCRIPTION, EXECUTION_ID)));

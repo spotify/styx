@@ -46,13 +46,13 @@ public abstract class Execution {
   public abstract Optional<FlyteExecConf> flyteExecConf();
 
   @JsonProperty
+  public abstract Optional<String> flyteExecutionId();
+
+  @JsonProperty
   public abstract Optional<String> runnerId();
 
   @JsonProperty
   public abstract List<ExecStatus> statuses();
-
-  @JsonProperty
-  public abstract Optional<String> flyteExecutionId();
 
   @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
   @JsonCreator
@@ -70,7 +70,8 @@ public abstract class Execution {
           + executionId.orElse("unknown")
       );
     }
-    return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, runnerId, statuses, flyteExecutionId);
+    return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, flyteExecutionId, runnerId,
+        statuses);
   }
 
   @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
