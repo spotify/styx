@@ -148,7 +148,6 @@ public class ExecutionDescriptionHandler implements OutputHandler {
                                                         + "halting %s", workflowId, workflowInstance));
     }
 
-    // Create flyte execution id here??
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .dockerArgs(command)
