@@ -47,7 +47,8 @@ public class ExecutionTest {
       Optional.of("abc"),
       Optional.empty(),
       Optional.of("1"),
-      STATUS_LIST
+      STATUS_LIST,
+      Optional.empty()
   );
   private static final FlyteExecConf FLYTE_EXEC_CONF = FlyteExecConf.builder()
       .referenceId(FlyteIdentifier.builder()
@@ -64,7 +65,8 @@ public class ExecutionTest {
       Optional.empty(),
       Optional.of(FLYTE_EXEC_CONF),
       Optional.of("1"),
-      STATUS_LIST
+      STATUS_LIST,
+      Optional.of("123")
   );
 
   @Test
@@ -97,6 +99,7 @@ public class ExecutionTest {
                   + "\"input_fields\":{}"
                   + "},"
                   + "\"runner_id\":\"1\","
+                  + "\"flyte_execution_id\":\"123\","
                   + "\"statuses\":[{\"timestamp\":\"2020-08-20T00:00:00.0Z\",\"status\":\"0\",\"message\":\"ok\"}]}";
     var expectedExecution = Execution.create(
         Optional.of("123"),
@@ -104,7 +107,8 @@ public class ExecutionTest {
         Optional.empty(),
         Optional.of(FLYTE_EXEC_CONF),
         Optional.of("1"),
-        STATUS_LIST
+        STATUS_LIST,
+        Optional.of("123")
     );
 
     var actualExecution = Json.deserialize(ByteString.encodeUtf8(json), Execution.class);
@@ -121,7 +125,8 @@ public class ExecutionTest {
             Optional.of("1"),
             Optional.of(FLYTE_EXEC_CONF),
             Optional.of("1"),
-            STATUS_LIST
+            STATUS_LIST,
+            Optional.of("123")
         )
     );
 

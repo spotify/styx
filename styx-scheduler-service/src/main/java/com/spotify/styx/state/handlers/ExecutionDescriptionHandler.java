@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,11 +59,20 @@ public class ExecutionDescriptionHandler implements OutputHandler {
   private final Storage storage;
   private final WorkflowValidator validator;
 
+  private final Function<String, String> styxExecIdToFlyteNameMapper;
+
   public ExecutionDescriptionHandler(
       Storage storage,
       WorkflowValidator validator) {
+    this(storage, validator, new StyxIdToFlyteExecNameMapper());
+  }
+
+  ExecutionDescriptionHandler(Storage storage,
+                              WorkflowValidator validator,
+                              Function<String, String> styxExecIdToFlyteNameMapper) {
     this.storage = requireNonNull(storage);
     this.validator = requireNonNull(validator);
+    this.styxExecIdToFlyteNameMapper = styxExecIdToFlyteNameMapper;
   }
 
   @Override
@@ -72,8 +82,9 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     switch (state.state()) {
       case PREPARE:
         try {
+          final String executionId = createExecutionId();
           final Event submitEvent = Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance, state.data()), createExecutionId());
+              state.workflowInstance(), getExecDescription(workflowInstance, state.data(), executionId), executionId);
           try {
             eventRouter.receive(submitEvent, state.counter());
           } catch (IsClosedException isClosedException) {
@@ -100,7 +111,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     }
   }
 
-  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data)
+  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data, String executionId)
       throws IOException, MissingRequiredPropertyException {
     var workflowId = workflowInstance.workflowId();
 
@@ -131,11 +142,17 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .orElse(Collections.emptyList());
     final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
     final Optional<FlyteExecConf> flyteExecConf = workflow.configuration().flyteExecConf();
+    Optional<String> flyteExecutionId = Optional.empty();
 
     if (workflow.configuration().flyteExecConf().isEmpty() && dockerImage.isEmpty()) {
       throw new MissingRequiredPropertyException(format("%s has no execution configuration, "
                                                         + "halting %s", workflowId, workflowInstance));
     }
+
+    if (workflow.configuration().flyteExecConf().isPresent()) {
+      flyteExecutionId = Optional.of(styxExecIdToFlyteNameMapper.apply(executionId));;
+    }
+    // Create flyte execution id here??
     return ExecutionDescription.builder()
         .dockerImage(dockerImage)
         .dockerArgs(command)
@@ -147,6 +164,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .runningTimeout(workflow.configuration().runningTimeout())
         .retryCondition(workflow.configuration().retryCondition())
         .flyteExecConf(flyteExecConf)
+        .flyteExecutionId(flyteExecutionId)
         .build();
   }
 

@@ -51,6 +51,9 @@ public abstract class Execution {
   @JsonProperty
   public abstract List<ExecStatus> statuses();
 
+  @JsonProperty
+  public abstract Optional<String> flyteExecutionId();
+
   @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
   @JsonCreator
   public static Execution create(
@@ -59,14 +62,15 @@ public abstract class Execution {
       @JsonProperty("commit_sha") Optional<String> commitSha,
       @JsonProperty("flyte_exec_conf") Optional<FlyteExecConf> flyteExecConf,
       @JsonProperty("runner_id") Optional<String> runnerId,
-      @JsonProperty("statuses") List<ExecStatus> statuses) {
+      @JsonProperty("statuses") List<ExecStatus> statuses,
+      @JsonProperty("flyte_execution_id") Optional<String> flyteExecutionId) {
     if (dockerImage.isPresent() && flyteExecConf.isPresent()) {
       throw new IllegalArgumentException(
           "Conflicting configuration: Both docker image and flyte conf specified for exec id: "
           + executionId.orElse("unknown")
       );
     }
-    return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, runnerId, statuses);
+    return new AutoValue_Execution(executionId, dockerImage, commitSha, flyteExecConf, runnerId, statuses, flyteExecutionId);
   }
 
   @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -76,7 +80,7 @@ public abstract class Execution {
       Optional<String> commitSha,
       Optional<String> runnerId,
       List<ExecStatus> statuses) {
-    return create(executionId, dockerImage, commitSha, Optional.empty(), runnerId, statuses);
+    return create(executionId, dockerImage, commitSha, Optional.empty(), runnerId, statuses, Optional.empty());
   }
 
 
@@ -85,7 +89,8 @@ public abstract class Execution {
       Optional<String> executionId,
       Optional<FlyteExecConf> flyteExecConf,
       Optional<String> runnerId,
-      List<ExecStatus> statuses) {
-    return create(executionId, Optional.empty(), Optional.empty(), flyteExecConf, runnerId, statuses);
+      List<ExecStatus> statuses,
+      Optional<String> flyteExecutionId) {
+    return create(executionId, Optional.empty(), Optional.empty(), flyteExecConf, runnerId, statuses, flyteExecutionId);
   }
 }

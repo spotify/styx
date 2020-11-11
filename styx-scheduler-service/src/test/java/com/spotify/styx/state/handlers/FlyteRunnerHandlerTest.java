@@ -48,7 +48,6 @@ import com.spotify.styx.state.StateData;
 import com.spotify.styx.util.IsClosedException;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
@@ -65,9 +64,7 @@ public class FlyteRunnerHandlerTest {
   @Mock EventRouter eventRouter;
   @Mock FlyteRunner flyteRunner;
 
-  private static final Function<String, String> REVERSE =
-      (id) -> new StringBuilder(id).reverse().toString();
-  private static final String EXECUTION_NAME = REVERSE.apply(EXECUTION_ID);
+  private static final String EXECUTION_NAME = EXECUTION_ID;
   private static final FlyteExecutionId FLYTE_EXECUTION_ID = getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
       EXECUTION_NAME);
   private static final Map<String, String> ANNOTATIONS = Map.of(
@@ -78,7 +75,7 @@ public class FlyteRunnerHandlerTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     when(flyteRunner.isEnabled()).thenReturn(true);
-    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner, REVERSE);
+    flyteRunnerHandler = new FlyteRunnerHandler(flyteRunner);
   }
 
   @Test

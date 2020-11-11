@@ -22,7 +22,6 @@ package com.spotify.styx.state.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import androidx.annotation.VisibleForTesting;
 import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.model.Event;
@@ -32,7 +31,6 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
 import java.util.Map;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +44,10 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
   static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
 
   private final FlyteRunner flyteRunner;
-  private final Function<String, String> styxExecIdToFlyteNameMapper;
 
   public FlyteRunnerHandler(FlyteRunner flyteRunner) {
-    this(flyteRunner, new StyxIdToFlyteExecNameMapper());
-  }
-
-  @VisibleForTesting
-  FlyteRunnerHandler(FlyteRunner flyteRunner, Function<String, String> styxExecIdToFlyteNameMapper) {
     super(desc -> desc.flyteExecConf().isPresent());
     this.flyteRunner = requireNonNull(flyteRunner);
-    this.styxExecIdToFlyteNameMapper = requireNonNull(styxExecIdToFlyteNameMapper);
   }
 
   @Override
@@ -89,7 +80,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
     final String executionId = state.data().executionId().orElseThrow();
-    final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
+    final String execName = state.data().executionDescription().orElseThrow().flyteExecutionId().orElseThrow();
     var annotations = Map.of(
         STYX_WORKFLOW_INSTANCE_ANNOTATION, state.workflowInstance().toString(),
         STYX_EXECUTION_ID_ANNOTATION, state.data().executionId().orElseThrow());
@@ -133,7 +124,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
   private FlyteExecutionId getExecutionId(RunState state) {
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
     final String executionId = state.data().executionId().orElseThrow();
-    final String execName = styxExecIdToFlyteNameMapper.apply(executionId);
+    final String execName = state.data().executionDescription().orElseThrow().flyteExecutionId().orElseThrow();
     return getFlyteExecutionId(flyteExecConf, execName);
   }
 
