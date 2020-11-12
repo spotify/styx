@@ -54,6 +54,7 @@ class WFIExecutionBuilder {
   @Nullable private String currCommitSha;
   @Nullable private FlyteExecConf currFlyteExecConf;
   @Nullable private String currRunnerId;
+  @Nullable private String currFlyteExecutionId;
 
   private boolean completed;
 
@@ -79,7 +80,8 @@ class WFIExecutionBuilder {
         Optional.ofNullable(currCommitSha),
         Optional.ofNullable(currFlyteExecConf),
         Optional.ofNullable(currRunnerId),
-        executionStatusList);
+        executionStatusList,
+        Optional.ofNullable(currFlyteExecutionId));
     executionList.add(execution);
 
     executionStatusList = new ArrayList<>();
@@ -87,6 +89,7 @@ class WFIExecutionBuilder {
     currDockerImg = null;
     currCommitSha = null;
     currFlyteExecConf = null;
+    currFlyteExecutionId = null;
   }
 
   private void closeTrigger() {
@@ -145,6 +148,7 @@ class WFIExecutionBuilder {
       // Created event are deprecated and we only keep them for reading historic events
       // Flyte support was added later that the deprecated events
       currFlyteExecConf = null;
+      currFlyteExecutionId = null;
 
       executionStatusList.add(ExecStatus.create(eventTs, Status.SUBMITTED.toString(),
           Optional.empty()));
@@ -158,6 +162,7 @@ class WFIExecutionBuilder {
       executionDescription.dockerImage().ifPresent(image -> currDockerImg = image);
       executionDescription.commitSha().ifPresent(sha -> currCommitSha = sha);
       executionDescription.flyteExecConf().ifPresent(conf -> currFlyteExecConf = conf);
+      executionDescription.flyteExecutionId().ifPresent(id -> currFlyteExecutionId = id);
       currExecutionId = executionId;
 
       return null;

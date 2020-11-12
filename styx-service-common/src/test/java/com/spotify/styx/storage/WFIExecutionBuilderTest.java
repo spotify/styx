@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import static com.spotify.styx.WorkflowInstanceEventFactory.TEST_FLYTE_EXECUTION_ID;
 import static com.spotify.styx.WorkflowInstanceEventFactory.TEST_RUNNER_ID;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -73,6 +74,7 @@ public class WFIExecutionBuilderTest {
   private ExecutionDescription flyteDesc(String name, String version) {
     return ExecutionDescription.builder()
         .flyteExecConf(flyteConf(name, version))
+        .flyteExecutionId(TEST_FLYTE_EXECUTION_ID)
         .build();
   }
 
@@ -331,7 +333,8 @@ public class WFIExecutionBuilderTest {
                                 ExecStatus.create(time("07:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("07:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("07:58"), "MISSING_DEPS", Optional.empty())
-                            )
+                            ),
+                            Optional.of(TEST_FLYTE_EXECUTION_ID)
                         ),
                         Execution.create(
                             Optional.of("exec-id-01"),
@@ -341,7 +344,8 @@ public class WFIExecutionBuilderTest {
                                 ExecStatus.create(time("08:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("08:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("08:58"), "SUCCESS", Optional.empty())
-                            )
+                            ),
+                            Optional.of(TEST_FLYTE_EXECUTION_ID)
                         )
                     )
                 ),
@@ -359,7 +363,8 @@ public class WFIExecutionBuilderTest {
                                 ExecStatus.create(time("09:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("09:57"), "STARTED", Optional.empty()),
                                 ExecStatus.create(time("09:58"), "FAILED", Optional.of("Exit code: 1"))
-                            )
+                            ),
+                            Optional.of(TEST_FLYTE_EXECUTION_ID)
                         ),
                         Execution.create(
                             Optional.of("exec-id-11"),
@@ -368,7 +373,8 @@ public class WFIExecutionBuilderTest {
                             List.of(
                                 ExecStatus.create(time("10:56"), "SUBMITTED", Optional.empty()),
                                 ExecStatus.create(time("10:57"), "STARTED", Optional.empty())
-                            )
+                            ),
+                            Optional.of(TEST_FLYTE_EXECUTION_ID)
                         )
                     )
                 )

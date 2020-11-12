@@ -39,6 +39,7 @@ public interface ExecutionDescription {
   Optional<Duration> runningTimeout();
   Optional<String> retryCondition();
   Optional<FlyteExecConf> flyteExecConf();
+  Optional<String> flyteExecutionId();
 
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();

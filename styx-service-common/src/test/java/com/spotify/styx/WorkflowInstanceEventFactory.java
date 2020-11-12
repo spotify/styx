@@ -33,6 +33,8 @@ public class WorkflowInstanceEventFactory {
 
   public static final String TEST_RUNNER_ID = "test";
 
+  public static final String TEST_FLYTE_EXECUTION_ID = "test";
+
   private final WorkflowInstance workflowInstance;
 
   public WorkflowInstanceEventFactory(WorkflowInstance workflowInstance) {
