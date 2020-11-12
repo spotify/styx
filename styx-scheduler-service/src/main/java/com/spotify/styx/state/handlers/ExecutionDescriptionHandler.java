@@ -83,8 +83,11 @@ public class ExecutionDescriptionHandler implements OutputHandler {
       case PREPARE:
         try {
           final String executionId = createExecutionId();
+          final String flyteExecutionId = styxExecIdToFlyteNameMapper.apply(executionId);
           final Event submitEvent = Event.submit(
-              state.workflowInstance(), getExecDescription(workflowInstance, state.data(), executionId), executionId);
+              state.workflowInstance(),
+              getExecDescription(workflowInstance, state.data(), flyteExecutionId),
+              executionId);
           try {
             eventRouter.receive(submitEvent, state.counter());
           } catch (IsClosedException isClosedException) {
@@ -111,7 +114,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     }
   }
 
-  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data, String executionId)
+  private ExecutionDescription getExecDescription(WorkflowInstance workflowInstance, StateData data, String flyteExecutionId)
       throws IOException, MissingRequiredPropertyException {
     var workflowId = workflowInstance.workflowId();
 
@@ -159,7 +162,7 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .runningTimeout(workflow.configuration().runningTimeout())
         .retryCondition(workflow.configuration().retryCondition())
         .flyteExecConf(flyteExecConf)
-        .flyteExecutionId(Optional.of(styxExecIdToFlyteNameMapper.apply(executionId)))
+        .flyteExecutionId(Optional.of(flyteExecutionId))
         .build();
   }
 
