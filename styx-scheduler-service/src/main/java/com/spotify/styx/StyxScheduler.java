@@ -459,7 +459,7 @@ public class StyxScheduler implements AppInit {
         .orElse(DEFAULT_STATE_MANAGER_TICK_INTERVAL);
 
     // TODO: is the shutdown timeout of 1 second here sane?
-    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    final ScheduledExecutorService tickExecutor = executorFactory.create(6, tickTf);
     closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
 
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
