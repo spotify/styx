@@ -364,7 +364,6 @@ public class StyxScheduler implements AppInit {
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
-
     var stateProcessingExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_STATE_PROCESSING_THREADS).orElse(DEFAULT_STYX_STATE_PROCESSING_THREADS));
     closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(1)));
