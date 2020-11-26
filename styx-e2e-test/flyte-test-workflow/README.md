@@ -2,10 +2,10 @@
 **Note**
 
 Everything has been deployed to flyte already under b495f8671b8fc2da9e51acd5803a26d52e18795a.
-We only need to update the workflow unless it is really necessary. Then you should follow the steps here.
+We only need to update the workflow unless it is really necessary. Then you should follow the update steps below.
 ---
 
-#### Redeploy
+### Redeploy
 
 In case the already deployed resources got wiped out, run these commands to redeploy:
 
@@ -17,6 +17,8 @@ docker run --network host \
 "eu.gcr.io/styx-oss-test/flyte-test-workflow:b495f8671b8fc2da9e51acd5803a26d52e18795a" \
 pyflyte -p flytesnacks -d development -c sandbox.config register workflows
 ```
+
+### Upate
 
 #### Setup
 Install `flytekit` which will install: pyflyte, flyte-cli and flytekit_build_image.sh 
