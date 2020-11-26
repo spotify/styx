@@ -17,7 +17,7 @@ $ pip install -r requirements.txt
 Build and push image,
 
 ```
-$ TAG=$(git log --format='%H' -n 1) REGISTRY=eu.gcr.io/styx-oss-test \
+$ TAG=b495f8671b8fc2da9e51acd5803a26d52e18795a REGISTRY=eu.gcr.io/styx-oss-test \
  flytekit_build_image.sh .
 ```
 
@@ -38,7 +38,7 @@ Deploys workflows, tasks, launch plans and image to flyte.
 ```
 docker run --network host \
 -e FLYTE_PLATFORM_URL='host.docker.internal:8089' \
-"eu.gcr.io/styx-oss-test/flyte-test-workflow:$(git log --format='%H' -n 1)" \
+"eu.gcr.io/styx-oss-test/flyte-test-workflow:b495f8671b8fc2da9e51acd5803a26d52e18795a" \
 pyflyte -p flytesnacks -d development -c sandbox.config register workflows
 ```
 
@@ -47,7 +47,7 @@ Try to execute the lp of workflow once to make sure it work
 ```
 flyte-cli -h 127.0.0.1:8089 -i \
 -p flytesnacks -d development execute-launch-plan -r aa \
- -u "lp:flytesnacks:development:workflows.hello_world_launch_plan.lp:$(git log --format='%H' -n 1)"
+ -u "lp:flytesnacks:development:workflows.hello_world_launch_plan.lp:b495f8671b8fc2da9e51acd5803a26d52e18795a"
 ```
 
 To check if the execution worked
