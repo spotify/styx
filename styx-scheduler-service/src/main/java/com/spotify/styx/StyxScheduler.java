@@ -364,9 +364,6 @@ public class StyxScheduler implements AppInit {
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
-    // TODO: is the shutdown timeout of 1 second here sane?
-    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
-    closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
     var stateProcessingExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_STATE_PROCESSING_THREADS).orElse(DEFAULT_STYX_STATE_PROCESSING_THREADS));
     closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(1)));
@@ -459,6 +456,12 @@ public class StyxScheduler implements AppInit {
 
     final Duration stateManagerTickInterval = get(config, config::getDuration, STYX_STATE_MANAGER_TICK_INTERVAL)
         .orElse(DEFAULT_STATE_MANAGER_TICK_INTERVAL);
+
+    // TODO: is the shutdown timeout of 1 second here sane?
+    final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    // Closer is a stack (LIFO) for closing resources and we need to make sure that we close the
+    // tickExecutor first so that these threads do not try and use other closed resources
+    closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
 
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
     startBackfillTriggerManager(backfillTriggerManager, tickExecutor, triggerTickInterval);
