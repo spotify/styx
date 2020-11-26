@@ -459,6 +459,8 @@ public class StyxScheduler implements AppInit {
 
     // TODO: is the shutdown timeout of 1 second here sane?
     final ScheduledExecutorService tickExecutor = executorFactory.create(3, tickTf);
+    // Closer is a stack (LIFO) for closing resources and we need to make sure that we close the
+    // tickExecutor first so that these threads do not try and use other closed resources
     closer.register(closeable(tickExecutor, "tick-executor", Duration.ofSeconds(1)));
 
     startTriggerManager(triggerManager, tickExecutor, triggerTickInterval);
