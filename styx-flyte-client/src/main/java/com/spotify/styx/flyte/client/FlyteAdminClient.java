@@ -54,7 +54,8 @@ public class FlyteAdminClient {
     if (insecure) {
       builder.usePlaintext();
     }
-
+    // Enable transparent retries:
+    // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
     var channel = builder.enableRetry().maxRetryAttempts(0).build();
 
     return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
