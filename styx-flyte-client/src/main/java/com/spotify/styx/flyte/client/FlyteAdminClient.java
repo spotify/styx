@@ -55,7 +55,7 @@ public class FlyteAdminClient {
       builder.usePlaintext();
     }
 
-    var channel = builder.build();
+    var channel = builder.enableRetry().maxRetryAttempts(0).build();
 
     return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
   }
