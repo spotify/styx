@@ -273,7 +273,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)), -1);
   }
 
   @Test
@@ -291,7 +291,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)), -1);
   }
 
   @Test
@@ -310,9 +310,8 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager, timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
-
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
+    verify(stateManager, timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)), 0);
   }
 
   @Test
@@ -325,7 +324,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
   }
 
   @Test
@@ -338,8 +337,9 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager, timeout(60_000))
+        .receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)), 0);
   }
 
   @Test
@@ -410,7 +410,7 @@ public class FlyteAdminClientRunnerTest {
         ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
             Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE);
 
-    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)), -1);
   }
 
   private Object[] parametersForTestEmitFlyteEvents() {

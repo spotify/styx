@@ -334,9 +334,10 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting
   void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
     final List<Event> events = translate(execution, runState);
-    for (Event event : events) {
+    for (int i = 0; i < events.size(); ++i) {
+      final Event event = events.get(i);
       try {
-        stateManager.receive(event);
+        stateManager.receive(event, runState.counter() + i);
       } catch (StateTransitionConflictException e) {
         LOG.debug("State transition conflict on flyte event: {}", event, e);
         return;

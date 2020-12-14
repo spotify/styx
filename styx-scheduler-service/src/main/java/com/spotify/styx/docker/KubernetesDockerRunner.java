@@ -677,8 +677,6 @@ class KubernetesDockerRunner implements DockerRunner {
       }
 
       try {
-        // TODO: spoofing counter values like this can give unexpected results, e.g. if we emit two events here the
-        // first one might be discarded and the second one accepted.
         stateManager.receive(event, runState.counter() + i);
       } catch (StateTransitionConflictException e) {
         LOG.debug("State transition conflict on kubernetes pod event: {}", event, e);
