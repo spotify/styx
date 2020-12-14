@@ -177,7 +177,7 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldReportRunErrorWhenCatchingExceptionDuringPolling()
+  public void shouldNotReportWhenCatchingExceptionDuringPolling()
       throws FlyteRunner.PollingException, IsClosedException {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
         .executionId(EXECUTION_ID)
@@ -189,10 +189,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    final var errMessage = "Test polling exception";
-
-    verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, errMessage),
-        runState.counter());
+    verifyNoInteractions(eventRouter);
   }
 
   @Test
