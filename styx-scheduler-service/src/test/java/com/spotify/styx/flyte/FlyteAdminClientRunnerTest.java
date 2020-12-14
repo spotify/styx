@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -411,7 +412,8 @@ public class FlyteAdminClientRunnerTest {
             Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE_SUBMITTED);
 
     verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
-    verify(stateManager, never()).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)), 0);
+    verify(stateManager, never())
+        .receive(eq(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE))), anyLong());
   }
 
   private Object[] parametersForTestEmitFlyteEvents() {
