@@ -404,7 +404,7 @@ public class FlyteAdminClientRunnerTest {
   @Parameters(method = "parametersForTestEmitFlyteEvents")
   public void testEmitFlyteEventsIgnoreStateTransitionConflictException(Exception e) throws IsClosedException {
     doThrow(e)
-        .when(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+        .when(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)), -1);
 
     flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
         ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
