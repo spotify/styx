@@ -39,7 +39,7 @@ public interface FlyteRunner extends Closeable {
   void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId);
 
   void poll(FlyteExecutionId flyteExecutionId, RunState runState)
-      throws PollingException;
+      throws ExecutionNotFoundException;
 
   static FlyteRunner noop() {
     return new NoopFlyteRunner();
@@ -87,21 +87,7 @@ public interface FlyteRunner extends Closeable {
     }
   }
 
-  class PollingException extends Exception {
-    public PollingException(FlyteExecutionId id, Throwable cause) {
-      super("Could not poll for execution: " + id.toUrn(), cause);
-    }
-
-    public PollingException(String message) {
-      super(message);
-    }
-
-    public PollingException(String message, Throwable cause) {
-      super(message, cause);
-    }
-  }
-
-  class ExecutionNotFoundException extends PollingException {
+  class ExecutionNotFoundException extends Exception {
     public ExecutionNotFoundException(FlyteExecutionId id, Throwable cause) {
       super("Could not find execution: " + id.toUrn(), cause);
     }
