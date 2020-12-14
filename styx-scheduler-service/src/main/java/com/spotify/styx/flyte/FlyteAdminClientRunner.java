@@ -204,11 +204,11 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
     requireNonNull(flyteExecutionId, "flyteExecutionId");
     requireNonNull(runState, "runState");
+    final ExecutionOuterClass.Execution execution;
     try {
-      final ExecutionOuterClass.Execution execution =
+      execution =
           flyteAdminClient.getExecution(flyteExecutionId.project(),
               flyteExecutionId.domain(), flyteExecutionId.name());
-      emitFlyteEvents(execution, runState);
     } catch (StatusRuntimeException e) {
       LOG.warn("Failed to poll flyte execution {}", flyteExecutionId, e);
 
@@ -217,7 +217,11 @@ public class FlyteAdminClientRunner implements FlyteRunner {
             Event.runError(runState.workflowInstance(), "Could not find execution: " + flyteExecutionId.toUrn()),
             runState.counter());
       }
+
+      return;
     }
+
+    emitFlyteEvents(execution, runState);
   }
 
   void init() {
