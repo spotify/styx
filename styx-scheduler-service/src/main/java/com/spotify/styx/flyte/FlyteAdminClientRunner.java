@@ -201,8 +201,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @Override
-  public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
-      throws ExecutionNotFoundException {
+  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
     requireNonNull(flyteExecutionId, "flyteExecutionId");
     requireNonNull(runState, "runState");
     try {
@@ -211,11 +210,13 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               flyteExecutionId.domain(), flyteExecutionId.name());
       emitFlyteEvents(execution, runState);
     } catch (StatusRuntimeException e) {
-      if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
-        throw new ExecutionNotFoundException(flyteExecutionId, e);
-      }
-
       LOG.warn("Failed to poll flyte execution {}", flyteExecutionId, e);
+
+      if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
+        stateManager.receiveIgnoreClosed(
+            Event.runError(runState.workflowInstance(), "Could not find execution: " + flyteExecutionId.toUrn()),
+            runState.counter());
+      }
     }
   }
 

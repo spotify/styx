@@ -24,7 +24,6 @@ import static java.util.Objects.requireNonNull;
 
 import com.spotify.styx.flyte.FlyteExecutionId;
 import com.spotify.styx.flyte.FlyteRunner;
-import com.spotify.styx.flyte.FlyteRunner.ExecutionNotFoundException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.EventRouter;
@@ -65,7 +64,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
         break;
       case SUBMITTED:
       case RUNNING:
-        pollingExecution(state, eventRouter);
+        pollingExecution(state);
         break;
       case FAILED:
         cleanUpExecution(state);
@@ -103,15 +102,9 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     eventRouter.receiveIgnoreClosed(submitted, state.counter());
   }
 
-  private void pollingExecution(RunState state, EventRouter eventRouter) {
+  private void pollingExecution(RunState state) {
     LOG.info("Entered state " + state.state().toString() + " for: " + state.workflowInstance());
-
-    try {
-      flyteRunner.poll(getExecutionId(state), state);
-    } catch (ExecutionNotFoundException e) {
-      LOG.error(e.getMessage(), e);
-      eventRouter.receiveIgnoreClosed(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
-    }
+    flyteRunner.poll(getExecutionId(state), state);
   }
 
   private void cleanUpExecution(RunState state) {
