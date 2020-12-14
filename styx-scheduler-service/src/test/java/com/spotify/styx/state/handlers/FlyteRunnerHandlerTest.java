@@ -152,7 +152,7 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldPollInRunning() throws FlyteRunner.PollingException {
+  public void shouldPollInRunning() {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
@@ -164,7 +164,7 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldPollInSubmitted() throws FlyteRunner.PollingException {
+  public void shouldPollInSubmitted() {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.SUBMITTED, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
@@ -177,13 +177,12 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldNotReportWhenCatchingExceptionDuringPolling()
-      throws FlyteRunner.PollingException, IsClosedException {
+  public void shouldNotReportWhenCatchingExceptionDuringPolling() {
     RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
         .build());
-    doThrow(new FlyteRunner.PollingException("Test polling exception"))
+    doThrow(new Exception("Test polling exception"))
         .when(flyteRunner)
         .poll(any(), any());
 

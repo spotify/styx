@@ -64,7 +64,7 @@ public class NoopFlyteRunnerTest {
   @Test
   public void testPollingThrowsException() {
     assertThrows(
-        FlyteRunner.PollingException.class,
+        IllegalStateException.class,
         () -> runner.poll(FLYTE_EXECUTION_ID, null)
     );
   }

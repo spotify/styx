@@ -48,7 +48,7 @@ class NoopFlyteRunner implements FlyteRunner {
 
   @Override
   public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState) {
-    // noop
+    throw new IllegalStateException("Cannot poll execution : " + flyteExecutionId);
   }
 
   @Override
