@@ -215,8 +215,10 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
         throw new ExecutionNotFoundException(flyteExecutionId, e);
       }
+      // TODO: handle gRPC application level retry or do not fail but let ticking thread in PersistentStateManager retry
       throw new PollingException(flyteExecutionId, e);
     } catch (Exception e) {
+      // TODO: do not fail and let ticking thread in PersistentStateManager retry
       throw new PollingException(flyteExecutionId, e);
     }
   }
