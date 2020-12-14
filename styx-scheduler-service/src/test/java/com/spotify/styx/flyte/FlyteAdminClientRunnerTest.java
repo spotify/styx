@@ -53,7 +53,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
@@ -399,15 +401,24 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
-    doThrow(new IsClosedException())
+  @Parameters(method = "parametersForTestEmitFlyteEvents")
+  public void testEmitFlyteEventsIgnoreStateTransitionConflictException(Exception e) throws IsClosedException {
+    doThrow(e)
         .when(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
 
-    assertThrows(
-        IsClosedException.class,
-        () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
-            ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
-                Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE));
+    flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
+        ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
+            Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE);
+
+    verify(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+  }
+
+  private Object[] parametersForTestEmitFlyteEvents() {
+    return new Object[]{
+        new Object[]{ new StateTransitionConflictException("") },
+        new Object[]{ new CounterCapacityException("") },
+        new Object[]{ new IsClosedException() }
+    };
   }
 
   @Test

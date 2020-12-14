@@ -103,7 +103,7 @@ public interface FlyteRunner extends Closeable {
 
   class ExecutionNotFoundException extends PollingException {
     public ExecutionNotFoundException(FlyteExecutionId id, Throwable cause) {
-      super("Could not poll for execution: " + id.toUrn(), cause);
+      super("Could not find execution: " + id.toUrn(), cause);
     }
   }
 }
