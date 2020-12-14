@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,7 +54,9 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
@@ -271,7 +274,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(0)), -1);
   }
 
   @Test
@@ -289,7 +292,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)), -1);
   }
 
   @Test
@@ -308,9 +311,8 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager, timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
-
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)));
+    verify(stateManager, timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(exitCode)), 0);
   }
 
   @Test
@@ -323,7 +325,7 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
   }
 
   @Test
@@ -336,8 +338,9 @@ public class FlyteAdminClientRunnerTest {
             .build());
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE_SUBMITTED);
-    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE));
-    verify(stateManager,  timeout(60_000)).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+    verify(stateManager,  timeout(60_000)).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager, timeout(60_000))
+        .receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)), 0);
   }
 
   @Test
@@ -399,15 +402,26 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testEmitFlyteEventsExceptionHandling() throws IsClosedException {
-    doThrow(new IsClosedException())
-        .when(stateManager).receive(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE)));
+  @Parameters(method = "parametersForTestEmitFlyteEvents")
+  public void testEmitFlyteEventsIgnoreStateTransitionConflictException(Exception e) throws IsClosedException {
+    doThrow(e)
+        .when(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
 
-    assertThrows(
-        IsClosedException.class,
-        () -> flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
-            ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
-                Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE));
+    flyteRunner.emitFlyteEvents(ExecutionOuterClass.Execution.newBuilder().setClosure(
+        ExecutionOuterClass.ExecutionClosure.newBuilder().setPhase(
+            Execution.WorkflowExecution.Phase.SUCCEEDED).build()).build(), RUN_STATE_SUBMITTED);
+
+    verify(stateManager).receive(Event.started(WORKFLOW_INSTANCE), -1);
+    verify(stateManager, never())
+        .receive(eq(Event.terminate(WORKFLOW_INSTANCE, Optional.of(SUCCESS_EXIT_CODE))), anyLong());
+  }
+
+  private Object[] parametersForTestEmitFlyteEvents() {
+    return new Object[]{
+        new Object[]{ new StateTransitionConflictException("") },
+        new Object[]{ new CounterCapacityException("") },
+        new Object[]{ new IsClosedException() }
+    };
   }
 
   @Test

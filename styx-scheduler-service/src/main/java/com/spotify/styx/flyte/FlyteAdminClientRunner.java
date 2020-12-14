@@ -38,8 +38,10 @@ import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
+import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.state.TriggerVisitor;
+import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
 import flyteidl.admin.ExecutionOuterClass;
@@ -209,11 +211,14 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               flyteExecutionId.domain(), flyteExecutionId.name());
       emitFlyteEvents(execution, runState);
     } catch (StatusRuntimeException e) {
+      LOG.warn("Failed to poll flyte execution {}", flyteExecutionId, e);
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
         throw new ExecutionNotFoundException(flyteExecutionId, e);
       }
+      // TODO: handle gRPC application level retry or do not fail but let ticking thread in PersistentStateManager retry
       throw new PollingException(flyteExecutionId, e);
     } catch (Exception e) {
+      // TODO: do not fail and let ticking thread in PersistentStateManager retry
       throw new PollingException(flyteExecutionId, e);
     }
   }
@@ -329,11 +334,21 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @VisibleForTesting
-  void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState)
-      throws IsClosedException {
+  void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
     final List<Event> events = translate(execution, runState);
-    for (Event event : events) {
-      stateManager.receive(event);
+    for (int i = 0; i < events.size(); ++i) {
+      final Event event = events.get(i);
+      try {
+        stateManager.receive(event, runState.counter() + i);
+      } catch (StateTransitionConflictException e) {
+        LOG.debug("State transition conflict on flyte event: {}", event, e);
+        return;
+      } catch (CounterCapacityException e) {
+        LOG.debug("Counter capacity exhausted when processing flyte event: {}", event, e);
+        return;
+      } catch (IsClosedException ignore) {
+        return;
+      }
     }
   }
 

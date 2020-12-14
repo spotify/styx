@@ -105,7 +105,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
   }
 
   private void pollingExecution(RunState state, EventRouter eventRouter) {
-    LOG.info("Entered state" + state.state().toString() + " for: " + state.workflowInstance());
+    LOG.info("Entered state " + state.state().toString() + " for: " + state.workflowInstance());
 
     try {
       flyteRunner.poll(getExecutionId(state), state);
