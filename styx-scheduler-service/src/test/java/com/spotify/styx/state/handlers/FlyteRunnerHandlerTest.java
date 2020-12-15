@@ -88,7 +88,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
     verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
-    verify(eventRouter,  timeout(60_000)).receive(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, "runnerId"),
+    verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, "runnerId"),
         runState.counter());
   }
 
@@ -119,7 +119,7 @@ public class FlyteRunnerHandlerTest {
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
     verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
-    verify(eventRouter,  timeout(60_000)).receive(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
+    verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
         runState.counter());
   }
 
@@ -174,21 +174,6 @@ public class FlyteRunnerHandlerTest {
 
     verify(flyteRunner).poll(getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
         TestData.FLYTE_EXECUTION_ID), runState);
-  }
-
-  @Test
-  public void shouldNotReportWhenCatchingExceptionDuringPolling() {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.RUNNING, StateData.newBuilder()
-        .executionId(EXECUTION_ID)
-        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
-        .build());
-    doThrow(new Exception("Test polling exception"))
-        .when(flyteRunner)
-        .poll(any(), any());
-
-    flyteRunnerHandler.transitionInto(runState, eventRouter);
-
-    verifyNoInteractions(eventRouter);
   }
 
   @Test
