@@ -21,19 +21,17 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Workflow;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,8 +50,7 @@ public class ExtendedWorkflowValidatorTest {
   @Before
   public void setUp() throws Exception {
     when(basicWorkflowValidator.validateWorkflow(any())).thenReturn(List.of());
-    sut = new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(1),
-        Set.of(FULL_WORKFLOW_CONFIGURATION.secret().orElseThrow().name()));
+    sut = new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(1));
   }
 
   @Test
@@ -82,19 +79,9 @@ public class ExtendedWorkflowValidatorTest {
         contains(limit("running timeout is too big", runningTimeout, MAX_RUNNING_TIMEOUT)));
   }
 
-  @Test
-  public void shouldFailUsageOfNonWhitelistedSecret() {
-    var errors = sut.validateWorkflow(
-        Workflow.create("test", WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
-            .secret(WorkflowConfiguration.Secret.create("foo-secret", "/path"))
-            .build()));
-
-    assertThat(errors, contains("secret foo-secret is not whitelisted"));
-  }
-
   @Test(expected = IllegalArgumentException.class)
   public void shouldFailIfInvalidMaxRunningTimeout() {
-    new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(-1), Set.of());
+    new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(-1));
   }
 
   private String limit(String msg, Object value, Object limit) {

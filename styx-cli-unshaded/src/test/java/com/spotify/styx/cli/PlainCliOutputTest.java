@@ -20,9 +20,9 @@
 
 package com.spotify.styx.cli;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.model.Backfill;
@@ -30,7 +30,6 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowState;
 import java.io.ByteArrayOutputStream;
@@ -151,7 +150,6 @@ public class PlainCliOutputTest {
         .dockerImage("foo/bar:baz")
         .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
-        .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")
         .resources("r1", "r2")
         .env("FOO", "foo", "BAR", "bar")
@@ -166,8 +164,7 @@ public class PlainCliOutputTest {
         .build();
     cliOutput.printWorkflow(workflow, state);
     assertThat(outContent.toString(), is(
-        "foo1 bar1 DAYS 6h foo/bar:baz [foo, the, bar] true secret-foo:/foo-secret foo@bar.baz [r1, r2] {BAR=bar, "
+        "foo1 bar1 DAYS 6h foo/bar:baz [foo, the, bar] true foo@bar.baz [r1, r2] {BAR=bar, "
         + "FOO=foo} PT20H deadbeef #tries<2 true 2018-01-02T03:04:05.000000006Z 2018-01-02T09:04:05.000000006Z\n"));
-
   }
 }

@@ -28,11 +28,11 @@ import static org.junit.Assert.assertThat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
-import com.spotify.styx.api.RunStateDataPayload.RunStateData;import com.spotify.styx.model.Backfill;
+import com.spotify.styx.api.RunStateDataPayload.RunStateData;
+import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -169,7 +169,6 @@ public class JsonCliOutputTest {
         .dockerImage("foo/bar:baz")
         .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
-        .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")
         .resources("r1", "r2")
         .env("FOO", "foo", "BAR", "bar")

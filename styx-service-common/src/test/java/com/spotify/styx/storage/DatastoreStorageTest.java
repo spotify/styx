@@ -90,7 +90,6 @@ import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -202,7 +201,6 @@ public class DatastoreStorageTest {
               .dockerImage("foo/bar:34234")
               .dockerArgs(List.of("foo", "the", "bar", "baz"))
               .dockerTerminationLogging(true)
-              .secret(Secret.create("foobar", "/var/quux/baz"))
               .serviceAccount("foo@bar.baz")
               .commitSha("2d2bfa926b94508de5aab47b5f305659ead2274a")
               .env("foo", "bar")

@@ -48,7 +48,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -100,7 +99,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.listPods()).thenReturn(podList);
 
     kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, Set.of(), PodMutator.NOOP);
+        debug, STYX_ENVIRONMENT, PodMutator.NOOP);
   }
 
   @Test

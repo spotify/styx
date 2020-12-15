@@ -32,7 +32,6 @@ public interface ExecutionDescription {
   Optional<String> dockerImage();
   List<String> dockerArgs();
   boolean dockerTerminationLogging();
-  Optional<WorkflowConfiguration.Secret> secret();
   Optional<String> serviceAccount();
   Optional<String> commitSha();
   Map<String, String> env();

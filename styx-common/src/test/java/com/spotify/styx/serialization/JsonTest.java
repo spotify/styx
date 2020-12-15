@@ -20,8 +20,8 @@
 
 package com.spotify.styx.serialization;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.spotify.styx.model.Event;
@@ -34,6 +34,11 @@ public class JsonTest {
 
   private static final Event EVENT = Event.retry(TestData.WORKFLOW_INSTANCE);
   private static final Trigger TRIGGER = Trigger.adhoc("foobar");
+
+  @Test
+  public void jsonMapperShouldIgnoreUnknownPropertiesWhenReadingRawValue() throws Throwable {
+    assertIgnoresUnknownProperties(EVENT, node -> Json.OBJECT_MAPPER.readValue(node.toString(), Event.class));
+  }
 
   @Test
   public void jsonMapperShouldIgnoreUnknownProperties() throws Throwable {

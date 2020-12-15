@@ -83,7 +83,6 @@ public class StyxApi implements AppInit {
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
-  private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
 
   private final String serviceName;
@@ -176,8 +175,6 @@ public class StyxApi implements AppInit {
     final Duration runningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_TTL_CONFIG)
         .map(Duration::parse)
         .orElse(DEFAULT_STYX_RUNNING_STATE_TTL);
-    var secretWhitelist =
-        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -196,7 +193,7 @@ public class StyxApi implements AppInit {
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
 
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl, secretWhitelist);
+        new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);

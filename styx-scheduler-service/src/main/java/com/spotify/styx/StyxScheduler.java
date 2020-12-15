@@ -150,7 +150,6 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   private static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
-  private static final String STYX_SECRET_WHITELIST = "styx.secret-whitelist";
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
   private static final String FLYTE_ENABLED = "styx.flyte.enabled";
@@ -208,7 +207,6 @@ public class StyxScheduler implements AppInit {
         StateManager stateManager,
         Stats stats,
         Debug debug,
-        Set<String> secretWhitelist,
         PodMutator podMutator,
         Time time);
   }
@@ -389,15 +387,13 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
-    var secretWhitelist =
-        get(config, config::getStringList, STYX_SECRET_WHITELIST).map(Set::copyOf).orElse(Set.of());
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING), secretWhitelist);
+        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING));
 
     var podMutator = podMutatorFactory.apply(environment);
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);
     final DockerRunner routingDockerRunner = DockerRunner.routing(
-        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug, secretWhitelist,
+        id -> dockerRunnerFactory.create(id, environment, stateManager, stats, debug,
             podMutator, time),
         dockerRunnerId);
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
@@ -630,7 +626,6 @@ public class StyxScheduler implements AppInit {
       StateManager stateManager,
       Stats stats,
       Debug debug,
-      Set<String> secretWhitelist,
       PodMutator podMutator,
       Time time) {
     final Config config = environment.config();
@@ -643,7 +638,7 @@ public class StyxScheduler implements AppInit {
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(id, fabric8Client, stateManager, stats,
-        serviceAccountKeyManager, debug, styxEnvironment, secretWhitelist, podMutator));
+        serviceAccountKeyManager, debug, styxEnvironment, podMutator));
   }
 
   static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager) {

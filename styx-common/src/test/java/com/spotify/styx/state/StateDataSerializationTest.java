@@ -30,7 +30,6 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.TriggerUtil;
 import java.util.List;
@@ -47,11 +46,7 @@ public class StateDataSerializationTest {
       + "    \"hello\","
       + "    \"world\""
       + "  ],"
-      + "  \"docker_image\": \"pipeline-core:474339e\","
-      + "  \"secret\": {"
-      + "    \"mount_path\": \"/etc/keys\","
-      + "    \"name\": \"pipeline-core-secret\""
-      + "  }"
+      + "  \"docker_image\": \"pipeline-core:474339e\""
       + "},"
       + "\"execution_id\": \"styx-run-12172683-c62f-4f32-899a-63a9741b73f9\","
       + "\"last_exit\": 20,"
@@ -76,11 +71,7 @@ public class StateDataSerializationTest {
       + "    \"hello\","
       + "    \"world\""
       + "  ],"
-      + "  \"docker_image\": \"pipeline-core:474339e\","
-      + "  \"secret\": {"
-      + "    \"mount_path\": \"/etc/keys\","
-      + "    \"name\": \"pipeline-core-secret\""
-      + "  }"
+      + "  \"docker_image\": \"pipeline-core:474339e\""
       + "},"
       + "\"execution_id\": \"styx-run-12172683-c62f-4f32-899a-63a9741b73f9\","
       + "\"last_exit\": 20,"
@@ -105,7 +96,6 @@ public class StateDataSerializationTest {
       .executionDescription(ExecutionDescription.builder()
           .dockerImage("pipeline-core:474339e")
           .dockerArgs(List.of("echo", "hello", "world"))
-          .secret(WorkflowConfiguration.Secret.create("pipeline-core-secret", "/etc/keys"))
           .commitSha("474339ec18d3d04d5d513856bc8ca1d4f1aed03f")
           .build())
       .addMessage(Message.info("Message 1"))

@@ -45,7 +45,6 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
@@ -207,41 +206,6 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
-  public void shouldConfigureSecretsMount() {
-    WorkflowConfiguration.Secret secret = WorkflowConfiguration.Secret.create("my-secret", "/etc/secrets");
-    KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
-        .customSecret(secret)
-        .build();
-    Pod pod = createPod(
-        WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.builder()
-            .executionId("eid")
-            .imageName("busybox")
-            .secret(secret)
-            .build(),
-        secretSpec);
-
-    List<Volume> volumes = pod.getSpec().getVolumes();
-    List<Container> containers = pod.getSpec().getContainers();
-    assertThat(volumes.size(), is(1));
-    assertThat(containers.size(), is(2));
-    assertThat(containers.get(0).getName(), is(MAIN_CONTAINER_NAME));
-
-    Volume volume = volumes.get(0);
-    assertThat(volume.getName(), is("my-secret"));
-    assertThat(volume.getSecret().getSecretName(), is("my-secret"));
-
-    Container container = containers.get(0);
-    List<VolumeMount> volumeMounts = container.getVolumeMounts();
-    assertThat(volumeMounts.size(), is(1));
-
-    VolumeMount volumeMount = volumeMounts.get(0);
-    assertThat(volumeMount.getName(), is("my-secret"));
-    assertThat(volumeMount.getMountPath(), is("/etc/secrets"));
-    assertThat(volumeMount.getReadOnly(), is(true));
-  }
-
-  @Test
   public void shouldConfigureEnvironmentVariables() {
     final Pod pod = createPod(
         WORKFLOW_INSTANCE,
@@ -271,8 +235,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   private Pod createPod(WorkflowInstance workflowInstance,
-                               DockerRunner.RunSpec runSpec,
-                               KubernetesSecretSpec secretSpec) {
+                        DockerRunner.RunSpec runSpec,
+                        KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
   }

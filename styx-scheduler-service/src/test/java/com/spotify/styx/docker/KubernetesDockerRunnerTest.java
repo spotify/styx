@@ -51,7 +51,6 @@ import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.serialization.Json;
@@ -94,7 +93,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javaslang.control.Try;
 import junitparams.JUnitParamsRunner;
@@ -123,12 +121,10 @@ public class KubernetesDockerRunnerTest {
   private static final RunSpec RUN_SPEC_WITH_SECRET = RunSpec.builder()
       .executionId("eid1")
       .imageName("busybox")
-      .secret(WorkflowConfiguration.Secret.create("foo-secret", "/etc/secret"))
       .build();
   private static final RunSpec RUN_SPEC_WITH_NON_WHITELISTED_SECRET = RunSpec.builder()
       .executionId("eid1")
       .imageName("busybox")
-      .secret(WorkflowConfiguration.Secret.create("secret-1", "/etc/secret"))
       .build();
   private static final RunSpec RUN_SPEC_WITH_SA = RunSpec.builder()
       .executionId("eid3")
@@ -140,17 +136,12 @@ public class KubernetesDockerRunnerTest {
       .serviceAccountSecret(SERVICE_ACCOUNT_SECRET)
       .build();
 
-  private static final KubernetesSecretSpec SECRET_SPEC_WITH_CUSTOM_SECRET = KubernetesSecretSpec.builder()
-      .customSecret(RUN_SPEC_WITH_SECRET.secret())
-      .build();
-
   private static final KubernetesSecretSpec EMPTY_SECRET_SPEC = KubernetesSecretSpec.builder()
       .build();
 
   private static final RunSpec RUN_SPEC_WITH_SECRET_AND_SA = RunSpec.builder()
       .executionId("eid")
       .imageName("busybox")
-      .secret(WorkflowConfiguration.Secret.create("secret1", KubernetesDockerRunner.STYX_WORKFLOW_SA_SECRET_MOUNT_PATH))
       .serviceAccount(SERVICE_ACCOUNT)
       .build();
 
@@ -159,8 +150,6 @@ public class KubernetesDockerRunnerTest {
   private static final Instant FIXED_INSTANT = Instant.parse("2017-09-01T01:00:00Z");
 
   private static final String STYX_ENVIRONMENT = "testing";
-
-  private static final Set<String> SECRET_WHITELIST = Set.of("foo-secret", "bar-secret", "styx-wf-sa-keys-foo");
 
   @Mock private Fabric8KubernetesClient k8sClient;
   @Mock private KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
@@ -211,7 +200,7 @@ public class KubernetesDockerRunnerTest {
     when(time.get()).thenReturn(FIXED_INSTANT);
 
     kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
+        debug, STYX_ENVIRONMENT, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
         POD_DELETION_DELAY_SECONDS, time, executor);
     kdr.init();
 
@@ -255,7 +244,7 @@ public class KubernetesDockerRunnerTest {
     var spiedExecutor = spy(executor);
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
     var kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, SECRET_WHITELIST, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
+        debug, STYX_ENVIRONMENT, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
         POD_DELETION_DELAY_SECONDS, time, spiedExecutor);
     kdr.init();
     verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
@@ -534,29 +523,6 @@ public class KubernetesDockerRunnerTest {
     assertThat(shouldDelete, is(true));
   }
 
-  @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfSecretNotExist() throws IOException {
-    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET);
-  }
-
-  @Test(expected = InvalidExecutionException.class)
-  public void shouldThrowIfMountToReservedPath() throws IOException {
-    kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET_AND_SA);
-  }
-
-  @Test
-  public void shouldMountSecret() {
-    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SECRET,
-        SECRET_SPEC_WITH_CUSTOM_SECRET);
-    assertThat(pod.getSpec().getVolumes().size(), is(1));
-    assertThat(pod.getSpec().getVolumes().get(0).getName(),
-               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().name()));
-    assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getMountPath(),
-               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().mountPath()));
-    assertThat(pod.getSpec().getContainers().get(0).getVolumeMounts().get(0).getName(),
-               is(RUN_SPEC_WITH_SECRET.secret().orElseThrow().name()));
-  }
-
   @Test
   public void shouldMountServiceAccount() {
     final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, SECRET_SPEC_WITH_SA);
@@ -592,12 +558,6 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.getSecret(any())).thenReturn(Optional.of(new SecretBuilder().build()));
     assertThat(kdr.start(RUN_STATE, RUN_SPEC_WITH_SECRET), is(RUNNER_ID));
     verify(k8sClient).createPod(any());
-  }
-
-  @Test
-  public void shouldNotRunIfUsingNonWhitelistedSecret() {
-    assertThrows("Referenced secret 'secret-1' is not whitelisted", InvalidExecutionException.class,
-        () -> kdr.start(RUN_STATE, RUN_SPEC_WITH_NON_WHITELISTED_SECRET));
   }
 
   @Test
@@ -637,22 +597,6 @@ public class KubernetesDockerRunnerTest {
 
     var exception = assertThrows(InvalidExecutionException.class, () -> kdr.start(RUN_STATE, RUN_SPEC_WITH_SA));
     assertThat(exception, is(error));
-  }
-
-  @Test
-  public void shouldNotRunIfSecretHasManagedServiceAccountKeySecretNamePrefix() throws
-      IOException {
-    final String secret = "styx-wf-sa-keys-foo";
-
-    assertThrows("Referenced secret '" + secret + "' has the managed service account key secret name prefix",
-        InvalidExecutionException.class,
-        () -> kdr.start(RUN_STATE, RunSpec.builder()
-            .executionId("eid")
-            .imageName("busybox")
-            .secret(WorkflowConfiguration.Secret.create(secret, "/foo/bar"))
-            .build()));
-
-    verify(k8sClient, never()).createPod(any(Pod.class));
   }
 
   @Parameters({

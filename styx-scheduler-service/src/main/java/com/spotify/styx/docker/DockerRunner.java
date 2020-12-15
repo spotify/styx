@@ -21,7 +21,6 @@
 package com.spotify.styx.docker;
 
 import com.spotify.styx.ServiceAccountKeyManager;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
@@ -33,7 +32,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,8 +75,6 @@ public interface DockerRunner extends Closeable {
 
     boolean terminationLogging();
 
-    Optional<WorkflowConfiguration.Secret> secret();
-
     Optional<String> serviceAccount();
 
     Optional<Trigger> trigger();
@@ -111,13 +107,12 @@ public interface DockerRunner extends Closeable {
                                  ServiceAccountKeyManager serviceAccountKeyManager,
                                  Debug debug,
                                  String styxEnvironment,
-                                 Set<String> secretWhitelist,
                                  PodMutator podMutator) {
     final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager =
         new KubernetesGCPServiceAccountSecretManager(kubernetesClient, serviceAccountKeyManager, stats);
     final KubernetesDockerRunner dockerRunner =
         new KubernetesDockerRunner(id, kubernetesClient, stateManager, stats,
-            serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist, podMutator);
+            serviceAccountSecretManager, debug, styxEnvironment, podMutator);
 
     dockerRunner.init();
 

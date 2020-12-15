@@ -155,7 +155,6 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .dockerImage(dockerImage)
         .dockerArgs(command)
         .dockerTerminationLogging(workflow.configuration().dockerTerminationLogging())
-        .secret(workflow.configuration().secret())
         .serviceAccount(workflow.configuration().serviceAccount())
         .commitSha(workflow.configuration().commitSha())
         .env(env)

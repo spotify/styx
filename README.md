@@ -103,9 +103,6 @@ docker_image: my-workflow:0.1
 docker_args: ['./run.sh', '{}']
 schedule: hourly
 offset: PT1H
-secret:
-  name: my-secret
-  mount_path: /etc/my-keys
 service_account: my-service-account@my-project.iam.gserviceaccount.com
 running_timeout: PT2H
 retry_condition: "(#tries < 2 && #triggerType == 'backfill') || (#triggerType != 'backfill')"
@@ -169,17 +166,6 @@ offset: P1DT2H
 
 At 2017-06-30T02 the execution for 2017-06-29 will be triggered.
 
-#### `secret` **[secret]**
-Secret is used to mount keys stored in [Kubernetes Secrets] into the container.
-
-* `.name` **[string]**
-
-  Name of the secret stored in Kubernetes
-
-* `.mount_path` **[string]**
-
-  Where the keys of the secret will be appearing in the container
-
 #### `service_account` **[email address]**
 The [Service Account] email address belonging to a project in [Google Cloud Platform].
 
@@ -192,10 +178,6 @@ in the container.
 
 Styx injects an environment variable to the container named as `GOOGLE_APPLICATION_CREDENTIALS` pointing
 to the JSON key file.
-
-It is allowed and perfectly fine to have both `secret` and `service_account` configured for a workflow.
-However users need to make sure `secret.mount_path` doesn't point to `/etc/styx-wf-sa-keys/`; otherwise
-Styx will refuse to trigger the workflow.
 
 In order for Styx to be able to create/delete keys for the `service_account` of a workflow,
 the [Service Account] that Styx itself runs as should be granted `Service Account Key Admin`
