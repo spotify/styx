@@ -378,7 +378,7 @@ public class FlyteAdminClientRunnerTest {
 
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
     verify(stateManager).receiveIgnoreClosed(
-        Event.runError(WORKFLOW_INSTANCE, "Could not find execution: " + FLYTE_EXECUTION_ID.toUrn()),-1);
+        Event.runError(WORKFLOW_INSTANCE, "Could not find execution: " + FLYTE_EXECUTION_ID.toUrn()), -1);
   }
 
   @Test
@@ -387,16 +387,6 @@ public class FlyteAdminClientRunnerTest {
         .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
     flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE);
     verifyNoInteractions(stateManager);
-  }
-
-  @Test
-  public void testPollingException() {
-    doThrow(new RuntimeException())
-        .when(flyteAdminClient).getExecution(anyString(), anyString(), anyString());
-
-    assertThrows(
-        RuntimeException.class,
-        () -> flyteRunner.poll(FLYTE_EXECUTION_ID, RUN_STATE));
   }
 
   @Test

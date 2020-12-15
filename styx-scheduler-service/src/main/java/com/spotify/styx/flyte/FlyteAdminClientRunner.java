@@ -221,9 +221,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       return;
     }
 
-    if (execution != null) {
-      emitFlyteEvents(execution, runState);
-    }
+    emitFlyteEvents(execution, runState);
   }
 
   void init() {

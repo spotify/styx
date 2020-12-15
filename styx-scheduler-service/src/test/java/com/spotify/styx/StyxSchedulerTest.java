@@ -24,6 +24,7 @@ import static com.spotify.styx.model.Schedule.DAYS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.theInstance;
@@ -46,6 +47,7 @@ import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
 import com.spotify.styx.flyte.FlyteRunner;
+import com.spotify.styx.flyte.NoopFlyteRunner;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
@@ -277,9 +279,7 @@ public class StyxSchedulerTest {
     var config = ConfigFactory.parseMap(configMap.build());
     final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager);
 
-    assertThat(flyteRunner, notNullValue());
-    assertThat(flyteRunner.isEnabled(), is(false));
-    assertThrows(FlyteRunner.CreateExecutionException.class, () -> flyteRunner.createExecution(null, null, null, null));
+    assertThat(flyteRunner, instanceOf(NoopFlyteRunner.class));
   }
 
   @Test
