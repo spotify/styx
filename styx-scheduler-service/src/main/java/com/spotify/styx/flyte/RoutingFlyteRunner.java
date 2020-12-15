@@ -49,7 +49,7 @@ public class RoutingFlyteRunner extends AbstractRoutingRunner<FlyteRunner>
   }
 
   @Override
-  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) throws PollingException {
+  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
     runner(runState).poll(flyteExecutionId, runState);
   }
 }

@@ -29,7 +29,6 @@ import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
-import com.spotify.styx.util.IsClosedException;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +64,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
         break;
       case SUBMITTED:
       case RUNNING:
-        pollingExecution(state, eventRouter);
+        pollingExecution(state);
         break;
       case FAILED:
         cleanUpExecution(state);
@@ -93,28 +92,19 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     } catch (Exception e) {
       final var errMessage = "Failed to start execution for " + state.workflowInstance();
       LOG.error(errMessage, e);
-      sendEventIgnoreClosed(state, eventRouter, "runError",
-          Event.runError(state.workflowInstance(), e.getMessage()));
+      eventRouter.receiveIgnoreClosed(Event.runError(state.workflowInstance(), e.getMessage()), state.counter());
       return;
     }
 
     // Emit `submitted` _after_ starting execution to ensure that we retry in case of failure.
     final Event submitted = Event.submitted(state.workflowInstance(), executionId, runnerId);
     LOG.info("Issue 'submitted' event for: " + state.workflowInstance());
-    sendEventIgnoreClosed(state, eventRouter, "submitted", submitted);
+    eventRouter.receiveIgnoreClosed(submitted, state.counter());
   }
 
-  private void pollingExecution(RunState state, EventRouter eventRouter) {
+  private void pollingExecution(RunState state) {
     LOG.info("Entered state " + state.state().toString() + " for: " + state.workflowInstance());
-
-    try {
-      flyteRunner.poll(getExecutionId(state), state);
-    } catch (Exception e) {
-      final var errMessage = "Failed to poll execution for " + state.workflowInstance();
-      LOG.error(errMessage, e);
-      sendEventIgnoreClosed(state, eventRouter, "runError",
-          Event.runError(state.workflowInstance(), e.getMessage()));
-    }
+    flyteRunner.poll(getExecutionId(state), state);
   }
 
   private void cleanUpExecution(RunState state) {
@@ -123,7 +113,6 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
   private FlyteExecutionId getExecutionId(RunState state) {
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
-    final String executionId = state.data().executionId().orElseThrow();
     final String execName = state.data().executionDescription().orElseThrow().flyteExecutionId().orElseThrow();
     return getFlyteExecutionId(flyteExecConf, execName);
   }
@@ -133,14 +122,5 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
         flyteExecConf.referenceId().project(),
         flyteExecConf.referenceId().domain(),
         execName);
-  }
-
-  private void sendEventIgnoreClosed(RunState state, EventRouter eventRouter, String eventType, Event event) {
-    try {
-      eventRouter.receive(event, state.counter());
-    } catch (IsClosedException isClosedException) {
-      LOG.warn("Could not emit '" + eventType + "' event for: " + state.workflowInstance(),
-          isClosedException);
-    }
   }
 }

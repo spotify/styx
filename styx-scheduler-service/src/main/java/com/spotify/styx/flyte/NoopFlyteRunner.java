@@ -20,6 +20,7 @@
 
 package com.spotify.styx.flyte;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
 import java.util.Map;
@@ -27,7 +28,8 @@ import java.util.Map;
 /**
  * No-op {@code FlyteRunner} meant to be used when Flyte is disabled or not available.
  */
-class NoopFlyteRunner implements FlyteRunner {
+@VisibleForTesting
+public class NoopFlyteRunner implements FlyteRunner {
 
   @Override
   public boolean isEnabled() {
@@ -47,13 +49,12 @@ class NoopFlyteRunner implements FlyteRunner {
   }
 
   @Override
-  public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState)
-      throws PollingException {
-    throw new PollingException("Cannot poll for execution: " + flyteExecutionId.toUrn());
+  public void poll(final FlyteExecutionId flyteExecutionId, final RunState runState) {
+    // noop
   }
 
   @Override
   public void close() {
-    // nothing to close
+    // noop
   }
 }

@@ -62,14 +62,6 @@ public class NoopFlyteRunnerTest {
   }
 
   @Test
-  public void testPollingThrowsException() {
-    assertThrows(
-        FlyteRunner.PollingException.class,
-        () -> runner.poll(FLYTE_EXECUTION_ID, null)
-    );
-  }
-
-  @Test
   public void testCloseDoesNotThrowsExeption() {
     runner.close();
   }

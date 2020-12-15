@@ -201,26 +201,27 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @Override
-  public void poll(FlyteExecutionId flyteExecutionId, RunState runState)
-      throws PollingException {
+  public void poll(FlyteExecutionId flyteExecutionId, RunState runState) {
     requireNonNull(flyteExecutionId, "flyteExecutionId");
     requireNonNull(runState, "runState");
+    final ExecutionOuterClass.Execution execution;
     try {
-      final ExecutionOuterClass.Execution execution =
+      execution =
           flyteAdminClient.getExecution(flyteExecutionId.project(),
               flyteExecutionId.domain(), flyteExecutionId.name());
-      emitFlyteEvents(execution, runState);
     } catch (StatusRuntimeException e) {
       LOG.warn("Failed to poll flyte execution {}", flyteExecutionId, e);
+
       if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
-        throw new ExecutionNotFoundException(flyteExecutionId, e);
+        stateManager.receiveIgnoreClosed(
+            Event.runError(runState.workflowInstance(), "Could not find execution: " + flyteExecutionId.toUrn()),
+            runState.counter());
       }
-      // TODO: handle gRPC application level retry or do not fail but let ticking thread in PersistentStateManager retry
-      throw new PollingException(flyteExecutionId, e);
-    } catch (Exception e) {
-      // TODO: do not fail and let ticking thread in PersistentStateManager retry
-      throw new PollingException(flyteExecutionId, e);
+
+      return;
     }
+
+    emitFlyteEvents(execution, runState);
   }
 
   void init() {
@@ -236,7 +237,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Throwable t) {
       LOG.error("Error while terminating dangling flyte executions", t);
     }
-
   }
 
   private void tryTerminateDanglingFlyteExecutions() {
