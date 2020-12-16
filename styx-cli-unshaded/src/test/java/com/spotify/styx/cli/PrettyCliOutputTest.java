@@ -27,9 +27,9 @@ import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Color.CYAN;
 import static org.fusesource.jansi.Ansi.Color.GREEN;
 import static org.fusesource.jansi.Ansi.Color.YELLOW;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.RunStateDataPayload;
@@ -39,7 +39,6 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -302,7 +301,6 @@ public class PrettyCliOutputTest {
         .dockerImage("foo/bar:baz")
         .dockerArgs(List.of("foo", "the", "bar"))
         .dockerTerminationLogging(true)
-        .secret(Secret.create("secret-foo", "/foo-secret"))
         .serviceAccount("foo@bar.baz")
         .resources("r1", "r2")
         .env("FOO", "foo", "BAR", "bar")
@@ -324,7 +322,6 @@ public class PrettyCliOutputTest {
             + "Docker Image:          foo/bar:baz\n"
             + "Docker Arguments:      [foo, the, bar]\n"
             + "Termination Logging:   true\n"
-            + "Secret:                secret-foo:/foo-secret\n"
             + "Service Account:       foo@bar.baz\n"
             + "Resources:             [r1, r2]\n"
             + "Environment:           BAR=bar FOO=foo\n"
@@ -334,6 +331,5 @@ public class PrettyCliOutputTest {
             + "Enabled:               true\n"
             + "Next Trigger:          2018-01-02T03:04:05.000000006Z\n"
             + "Next Trigger (offset): 2018-01-02T09:04:05.000000006Z\n"));
-
   }
 }

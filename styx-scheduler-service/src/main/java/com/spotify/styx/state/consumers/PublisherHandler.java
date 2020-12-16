@@ -26,10 +26,10 @@ import static com.spotify.styx.state.RunState.State.RUNNING;
 import static com.spotify.styx.state.RunState.State.SUBMITTED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.cronutils.utils.VisibleForTesting;
 import com.github.rholder.retry.Attempt;
 import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.spotify.styx.model.ExecutionDescription;

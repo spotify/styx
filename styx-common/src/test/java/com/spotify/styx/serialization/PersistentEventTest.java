@@ -32,7 +32,6 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.TriggerParameters;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.Message;
@@ -60,7 +59,6 @@ public class PersistentEventTest {
   private static final ExecutionDescription EXECUTION_DESCRIPTION = ExecutionDescription.builder()
       .dockerImage(DOCKER_IMAGE)
       .dockerArgs(List.of("foo", "bar"))
-      .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
       .commitSha(COMMIT_SHA)
       .build();
   private static final TriggerParameters TRIGGER_PARAMETERS = TriggerParameters.builder()
@@ -106,6 +104,7 @@ public class PersistentEventTest {
     assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
                                                + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
                                                + "\"docker_args\":[\"foo\",\"bar\"],"
+                                               // this is kept for backward compatibility test
                                                + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
                                                + "\"commit_sha\":\"" + COMMIT_SHA
                                                + "\"}")),
@@ -113,7 +112,6 @@ public class PersistentEventTest {
     assertThat(deserializeEvent(json("submit", "\"execution_description\": { "
                                                + "\"docker_image\":\"" + DOCKER_IMAGE + "\","
                                                + "\"docker_args\":[\"foo\",\"bar\"],"
-                                               + "\"secret\":{\"name\":\"secret\",\"mount_path\":\"/dev/null\"},"
                                                + "\"commit_sha\":\"" + COMMIT_SHA
                                                + "\"}, "
                                                + "\"execution_id\": \"" + POD_NAME + "\"")),

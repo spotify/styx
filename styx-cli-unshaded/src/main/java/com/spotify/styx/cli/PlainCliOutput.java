@@ -133,7 +133,6 @@ class PlainCliOutput implements CliOutput {
         wf.configuration().dockerImage().orElse(""),
         wf.configuration().dockerArgs().orElse(Collections.emptyList()),
         wf.configuration().dockerTerminationLogging(),
-        wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""),
         wf.configuration().serviceAccount().map(Object::toString).orElse(""),
         wf.configuration().resources(),
         wf.configuration().env(),

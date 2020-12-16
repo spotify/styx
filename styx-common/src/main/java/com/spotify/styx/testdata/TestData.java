@@ -32,7 +32,6 @@ import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
@@ -147,7 +146,6 @@ public final class TestData {
           .schedule(DAYS)
           .dockerImage("busybox")
           .dockerArgs(List.of("x", "y"))
-          .secret(Secret.create("name", "/path"))
           .serviceAccount("foo@bar.baz.quux")
           .retryCondition("#exitCode == 1 && (#tries < 3 || #consecutiveFailures < 4) && #triggerType == \"natural\"")
           .build();
@@ -195,7 +193,6 @@ public final class TestData {
       ExecutionDescription.builder()
           .dockerImage("busybox:1.1")
           .dockerArgs(List.of("foo", "bar"))
-          .secret(WorkflowConfiguration.Secret.create("secret", "/dev/null"))
           .commitSha(VALID_SHA)
           .build();
 

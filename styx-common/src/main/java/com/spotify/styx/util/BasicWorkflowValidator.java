@@ -43,8 +43,6 @@ public class BasicWorkflowValidator implements WorkflowValidator {
   private static final int MAX_RESOURCES = 5;
   private static final int MAX_RESOURCE_LENGTH = 256;
   private static final int MAX_COMMIT_SHA_LENGTH = 256;
-  private static final int MAX_SECRET_NAME_LENGTH = 253;
-  private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
   private static final int MAX_RETRY_CONDITION_LENGTH = 256;
   private static final int MAX_ENV_VARS = 128;
@@ -85,10 +83,6 @@ public class BasicWorkflowValidator implements WorkflowValidator {
         MAX_ID_LENGTH, "id too long");
     upperLimit(e, cfg.commitSha().map(String::length).orElse(0),
         MAX_COMMIT_SHA_LENGTH, "commitSha too long");
-    upperLimit(e, cfg.secret().map(s -> s.name().length()).orElse(0),
-        MAX_SECRET_NAME_LENGTH, "secret name too long");
-    upperLimit(e, cfg.secret().map(s -> s.mountPath().length()).orElse(0),
-        MAX_SECRET_MOUNT_PATH_LENGTH, "secret mount path too long");
     upperLimit(e, cfg.serviceAccount().map(String::length).orElse(0),
         MAX_SERVICE_ACCOUNT_LENGTH, "service account too long");
     upperLimit(e, cfg.resources().size(),

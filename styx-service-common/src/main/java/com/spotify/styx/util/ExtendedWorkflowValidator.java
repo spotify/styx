@@ -28,7 +28,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Extended workflow validation can only be done on service side.
@@ -37,16 +36,13 @@ public class ExtendedWorkflowValidator implements WorkflowValidator {
 
   private final WorkflowValidator delegate;
   private final Duration maxRunningTimeout;
-  private final Set<String> secretWhitelist;
 
   public ExtendedWorkflowValidator(WorkflowValidator delegate,
-                                   Duration maxRunningTimeout,
-                                   Set<String> secretWhitelist) {
+                                   Duration maxRunningTimeout) {
     Preconditions.checkArgument(maxRunningTimeout != null && !maxRunningTimeout.isNegative(),
         "Max Running timeout should be positive");
     this.delegate = Objects.requireNonNull(delegate);
     this.maxRunningTimeout = maxRunningTimeout;
-    this.secretWhitelist = Objects.requireNonNull(secretWhitelist);
   }
 
   @Override
@@ -57,12 +53,6 @@ public class ExtendedWorkflowValidator implements WorkflowValidator {
 
     cfg.runningTimeout().ifPresent(timeout ->
         upperLimit(e, timeout, maxRunningTimeout, "running timeout is too big"));
-
-    cfg.secret().ifPresent(secret -> {
-      if (!secretWhitelist.contains(secret.name())) {
-        e.add("secret " + secret.name() + " is not whitelisted");
-      }
-    });
 
     return e;
   }

@@ -111,7 +111,6 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
         .imageName(dockerImage)
         .args(command)
         .terminationLogging(executionDescription.dockerTerminationLogging())
-        .secret(executionDescription.secret())
         .serviceAccount(executionDescription.serviceAccount())
         .trigger(state.data().trigger())
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))

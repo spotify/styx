@@ -43,7 +43,6 @@ import com.spotify.styx.model.FlyteIdentifierBuilder;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
-import com.spotify.styx.model.WorkflowConfiguration.Secret;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.testdata.TestData;
 import java.time.Duration;
@@ -69,8 +68,6 @@ public class BasicWorkflowValidatorTest {
   private static final int MAX_RESOURCES = 5;
   private static final int MAX_RESOURCE_LENGTH = 256;
   private static final int MAX_COMMIT_SHA_LENGTH = 256;
-  private static final int MAX_SECRET_NAME_LENGTH = 253;
-  private static final int MAX_SECRET_MOUNT_PATH_LENGTH = 1024;
   private static final int MAX_SERVICE_ACCOUNT_LENGTH = 256;
   private static final int MAX_RETRY_CONDITION_LENGTH = 256;
   private static final int MAX_ENV_VARS = 128;
@@ -82,7 +79,6 @@ public class BasicWorkflowValidatorTest {
       WorkflowConfigurationBuilder.from(FULL_WORKFLOW_CONFIGURATION)
           .dockerImage(NOT_VALID_IMAGE)
           .build();
-
 
   @Mock
   private DockerImageValidator dockerImageValidator;
@@ -137,7 +133,6 @@ public class BasicWorkflowValidatorTest {
     assertThat(errors, containsInAnyOrder("invalid image: error"));
   }
 
-
   @Test
   public void validateInvalidWorkflow() {
     final String id = Strings.repeat("id", 1024);
@@ -145,7 +140,6 @@ public class BasicWorkflowValidatorTest {
     final String offset = Strings.repeat("offset", 1024);
     final String commitSha = Strings.repeat("sha", 1024);
     final List<String> args = IntStream.range(0, 100).mapToObj(i -> "arg-" + i).collect(toList());
-    final Secret secret = Secret.create(Strings.repeat("foo", 1024), Strings.repeat("bar", 4711));
     final String serviceAccount = Strings.repeat("account@abc.com", 1024);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
@@ -161,7 +155,6 @@ public class BasicWorkflowValidatorTest {
         .offset(offset)
         .commitSha(commitSha)
         .dockerArgs(args)
-        .secret(secret)
         .serviceAccount(serviceAccount)
         .resources(resources)
         .serviceAccount(serviceAccount)
@@ -176,8 +169,6 @@ public class BasicWorkflowValidatorTest {
         .add(limit("id too long", id.length(), MAX_ID_LENGTH))
         .add("invalid schedule")
         .add(limit("commitSha too long", commitSha.length(), MAX_COMMIT_SHA_LENGTH))
-        .add(limit("secret name too long", secret.name().length(), MAX_SECRET_NAME_LENGTH))
-        .add(limit("secret mount path too long", secret.mountPath().length(), MAX_SECRET_MOUNT_PATH_LENGTH))
         .add(limit("service account too long", serviceAccount.length(), MAX_SERVICE_ACCOUNT_LENGTH))
         .add(limit("too many resources", resources.size(), MAX_RESOURCES))
         .add(resources.stream().map(r ->

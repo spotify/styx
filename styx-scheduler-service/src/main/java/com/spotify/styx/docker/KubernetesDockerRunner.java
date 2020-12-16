@@ -41,7 +41,6 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.EventVisitor;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.TriggerParameters;
-import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
@@ -154,7 +153,6 @@ class KubernetesDockerRunner implements DockerRunner {
   private final KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager;
   private final Debug debug;
   private final String styxEnvironment;
-  private final Set<String> secretWhitelist;
   private final PodMutator podMutator;
   private final Duration cleanupPodsInterval;
   private final Duration podDeletionDelay;
@@ -166,7 +164,6 @@ class KubernetesDockerRunner implements DockerRunner {
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
-                         Set<String> secretWhitelist,
                          PodMutator podMutator,
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
@@ -179,7 +176,6 @@ class KubernetesDockerRunner implements DockerRunner {
     this.serviceAccountSecretManager = Objects.requireNonNull(serviceAccountSecretManager);
     this.debug = Objects.requireNonNull(debug);
     this.styxEnvironment = Objects.requireNonNull(styxEnvironment);
-    this.secretWhitelist = Objects.requireNonNull(secretWhitelist);
     this.podMutator = Objects.requireNonNull(podMutator, "podMutator");
     this.cleanupPodsInterval = Duration.ofSeconds(cleanupPodsIntervalSeconds);
     this.podDeletionDelay = Duration.ofSeconds(podDeletionDelaySeconds);
@@ -192,9 +188,9 @@ class KubernetesDockerRunner implements DockerRunner {
 
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
-                         Debug debug, String styxEnvironment, Set<String> secretWhitelist,
+                         Debug debug, String styxEnvironment,
                          PodMutator podMutator) {
-    this(id, client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment, secretWhitelist,
+    this(id, client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
         podMutator, DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
   }
@@ -255,54 +251,12 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private KubernetesSecretSpec ensureSecrets(WorkflowInstance workflowInstance, RunSpec runSpec) {
     return KubernetesSecretSpec.builder()
-        .customSecret(ensureCustomSecret(workflowInstance, runSpec))
         .serviceAccountSecret(runSpec.serviceAccount().map(
             serviceAccount ->
                 serviceAccountSecretManager.ensureServiceAccountKeySecret(
                     workflowInstance.workflowId().toString(),
                     serviceAccount)))
         .build();
-  }
-
-  private Optional<WorkflowConfiguration.Secret> ensureCustomSecret(
-      WorkflowInstance workflowInstance, RunSpec runSpec) {
-    return runSpec.secret().map(specSecret -> {
-      if (!secretWhitelist.contains(specSecret.name())) {
-        LOG.warn("[AUDIT] Workflow {} refers to non-whitelisted secret {}, "
-                 + "denying execution", workflowInstance.workflowId(), specSecret.name());
-        throw new InvalidExecutionException(
-            "Referenced secret '" + specSecret.name() + "' is not whitelisted");
-      }
-
-      if (specSecret.name().startsWith(STYX_WORKFLOW_SA_SECRET_NAME)) {
-        LOG.warn("[AUDIT] Workflow {} refers to secret {} with managed service account key secret name prefix, "
-            + "denying execution", workflowInstance.workflowId(), specSecret.name());
-        throw new InvalidExecutionException(
-            "Referenced secret '" + specSecret.name() + "' has the managed service account key secret name prefix");
-      }
-
-      // if it ever happens, that feels more like a hack than pure luck so let's be paranoid
-      if (STYX_WORKFLOW_SA_SECRET_MOUNT_PATH.equals(specSecret.mountPath())) {
-        LOG.warn("[AUDIT] Workflow {} tries to mount secret {} to the reserved path",
-                  workflowInstance.workflowId(), specSecret.name());
-        throw new InvalidExecutionException(
-            "Referenced secret '" + specSecret.name() + "' has the mount path "
-            + STYX_WORKFLOW_SA_SECRET_MOUNT_PATH + " defined that is reserved");
-      }
-
-      var secret = client.getSecret(specSecret.name());
-      if (secret.isEmpty()) {
-        LOG.warn("[AUDIT] Workflow {} refers to a non-existent secret {}",
-                  workflowInstance.workflowId(), specSecret.name());
-        throw new InvalidExecutionException(
-            "Referenced secret '" + specSecret.name() + "' was not found");
-      } else {
-        LOG.info("[AUDIT] Workflow {} refers to secret {}",
-                 workflowInstance.workflowId(), specSecret.name());
-      }
-
-      return specSecret;
-    });
   }
 
   @VisibleForTesting
@@ -357,24 +311,6 @@ class KubernetesDockerRunner implements DockerRunner {
       mainContainerBuilder.addToVolumeMounts(saMount);
       mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
                                        saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
-    });
-
-    secretSpec.customSecret().ifPresent(secret -> {
-      final SecretVolumeSource secretVolumeSource = new SecretVolumeSourceBuilder()
-          .withSecretName(secret.name())
-          .build();
-      final Volume secretVolume = new VolumeBuilder()
-          .withName(secret.name())
-          .withSecret(secretVolumeSource)
-          .build();
-      specBuilder.addToVolumes(secretVolume);
-
-      final VolumeMount secretMount = new VolumeMountBuilder()
-          .withMountPath(secret.mountPath())
-          .withName(secretVolume.getName())
-          .withReadOnly(true)
-          .build();
-      mainContainerBuilder.addToVolumeMounts(secretMount);
     });
 
     specBuilder.addToContainers(mainContainerBuilder.build());
@@ -898,7 +834,6 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @AutoMatter
   interface KubernetesSecretSpec {
-    Optional<WorkflowConfiguration.Secret> customSecret();
     Optional<String> serviceAccountSecret();
 
     static KubernetesSecretSpecBuilder builder() {

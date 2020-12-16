@@ -68,7 +68,6 @@ Resources related to the Workflows registered in Styx.
                 ],
                 "docker_termination_logging": false,
                 "env": {"FOO": "bar"},
-                "secret": null,
                 "resources": []
               }
         }]
@@ -102,7 +101,6 @@ Resources related to the Workflows registered in Styx.
                 ],
                 "docker_termination_logging": false,
                 "env": {"FOO": "bar"},
-                "secret": null,
                 "resources": []
               }
         }]
@@ -127,7 +125,6 @@ or updated. Note that a non-null value is required for docker_image.
           ],
           "docker_termination_logging": false,
           "env": {"FOO": "bar"},
-          "secret": null,
           "service_account": null,
           "resources": [],
           "running_timeout": "PT2H",
@@ -153,7 +150,6 @@ or updated. Note that a non-null value is required for docker_image.
             ],
             "docker_termination_logging": false,
             "env": {"FOO": "bar"},
-            "secret": null,
             "service_account": null,
             "resources": [],
             "running_timeout": "PT2H",
@@ -192,7 +188,6 @@ or updated. Note that a non-null value is required for docker_image.
                 ],
                 "docker_termination_logging": false,
                 "env": {"FOO": "bar"},
-                "secret": null,
                 "resources": [],
                 "running_timeout": "PT2H",
                 "retry_condition": "#tries < 3"
@@ -237,7 +232,6 @@ Returns 204 No Content if the Workflow was found and deleted, 404 Not Found othe
                     ],
                     "docker_termination_logging": false,
                     "env": {"FOO": "bar"},
-                    "secret": null,
                     "resources": [],
                     "running_timeout": "PT2H"
                   }
@@ -538,8 +532,7 @@ Workflow Instance belonging to a Backfill entity.
                                     "CanaryJob"
                                 ],
                                 "docker_image": "styx-canary-dummy:dummy",
-                                "docker_termination_logging": false,
-                                "secret": null
+                                "docker_termination_logging": false
                             },
                             "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133",
                             "last_exit": 0,
@@ -661,8 +654,7 @@ Workflow Instance belonging to a Backfill entity.
                                 "CanaryJob"
                             ],
                             "docker_image": "styx-canary-dummy:dummy",
-                            "docker_termination_logging": false,
-                            "secret": null
+                            "docker_termination_logging": false
                         },
                         "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133",
                         "last_exit": 0,
@@ -762,8 +754,7 @@ Resources related to inspect detailed status of Workflow Instances.
                           "CanaryJob"
                         ],
                         "docker_image": "styx-canary-dummy:dummy",
-                        "docker_termination_logging": false,
-                        "secret": null
+                        "docker_termination_logging": false
                     },
                     "execution_id": "styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b21d5",
                     "last_exit": 20,

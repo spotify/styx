@@ -6,10 +6,6 @@ unauthorized access to Styx and/or the underlying infrastructure.
 | Message  | Description |
 | ------------- | ------------- |
 | `[AUDIT] {} {} by {} with headers {} parameters {} and payload {}`  | Styx received a non-GET http request. These requests might be create, making changes to or deleting workflows or other Styx resources.  |
-| `[AUDIT] Workflow {} refers to secret {} with managed service account key secret name prefix, denying execution`  | Execution was denied for a workflow that attempted to access a managed GCP Service Account Key Kubernetes secret. Styx stores GCP Service Account Keys in Kubernetes with a reserved name prefix `styx-wf-sa-keys`. Manual secret names should not have this prefix and workflows are not allowed to explicitly refer to them as a manual Kubernetes secret. |
-| `[AUDIT] Workflow {} tries to mount secret {} to the reserved path",` | Execution was denied for a workflow that attempted to mount a manual Kubernetes secret to the GCP Service Account Key mount path `/etc/styx-wf-sa-keys/`. Workflows should not attempt to mount manual Kubernetes secrets on this path. |
-| `[AUDIT] Workflow {} refers to a non-existent secret {}",` | Execution was denied for a workflow that referred to a non-existent manual Kubernetes secret. |
-| `[AUDIT] Workflow {} refers to secret {}",` | Styx is executing a workflow that uses a manual Kubernetes secret. |
 | `[AUDIT] Got pod without workflow instance annotation {}", podName);` | Styx detected a Kubernetes Pod without a Styx annotation. It was likely not created by Styx and indicates that someone is accessing the Styx Kubernetes cluster directly. |
 | `[AUDIT] Workflow {} refers to secret {} storing keys of {}",` | Styx is executing a workflow configured with a GCP Service Account. |
 | `[AUDIT] Workflow {} refers to non-existent service account {}", workflowId, serviceAccount);` | Execution was denied for a workflow configured to use a non-existent GCP Service Account. |

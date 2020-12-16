@@ -267,7 +267,6 @@ class PrettyCliOutput implements CliOutput {
     System.out.println("Docker Image:          " + wf.configuration().dockerImage().orElse(""));
     System.out.println("Docker Arguments:      " + wf.configuration().dockerArgs().orElse(Collections.emptyList()));
     System.out.println("Termination Logging:   " + wf.configuration().dockerTerminationLogging());
-    System.out.println("Secret:                " + wf.configuration().secret().map(s -> s.name() + ':' + s.mountPath()).orElse(""));
     System.out.println("Service Account:       " + wf.configuration().serviceAccount().orElse(""));
     System.out.println("Resources:             " + wf.configuration().resources());
     System.out.println("Environment:           " + Joiner.on(' ').withKeyValueSeparator('=').join(wf.configuration().env()));

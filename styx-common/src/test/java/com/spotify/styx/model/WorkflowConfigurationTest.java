@@ -168,7 +168,6 @@ public class WorkflowConfigurationTest {
              + "\"schedule\":\"days\","
              + "\"offset\":\"P1D\","
              + "\"commit_sha\":\"817cdc3f95382c4e4e11232e3a2de484de8a2bea\","
-             + "\"secret\":null,"
              + "\"service_account\":\"foo@project.com\","
              + "\"resources\":[\"resource\"],"
              + "\"env\":{\"STYX_FOO\":\"bar\"},"

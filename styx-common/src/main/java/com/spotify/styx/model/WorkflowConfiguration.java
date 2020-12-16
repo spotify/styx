@@ -57,8 +57,6 @@ public interface WorkflowConfiguration {
    */
   boolean dockerTerminationLogging();
 
-  Optional<Secret> secret();
-
   Optional<String> serviceAccount();
 
   List<String> resources();
@@ -111,26 +109,5 @@ public interface WorkflowConfiguration {
 
   static WorkflowConfigurationBuilder builder() {
     return new WorkflowConfigurationBuilder();
-  }
-
-  @AutoMatter
-  interface Secret {
-
-    String name();
-
-    String mountPath();
-
-    static Secret create(
-        String name,
-        String mountPath) {
-      return Secret.builder()
-          .name(name)
-          .mountPath(mountPath)
-          .build();
-    }
-
-    static SecretBuilder builder() {
-      return new SecretBuilder();
-    }
   }
 }
