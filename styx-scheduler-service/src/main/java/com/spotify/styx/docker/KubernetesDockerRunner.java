@@ -400,7 +400,9 @@ class KubernetesDockerRunner implements DockerRunner {
     if (isTerminated(containerStatus.get())) {
       return shouldDeletePodIfNonDeletePeriodExpired(workflowInstance, pod);
     } else if (imageError(containerStatus.get()).isPresent()) {
-      return PodDeletionDecision.newBuilder().delete(shouldDeletePod(workflowInstance, pod, "Pull image error")).build();
+      return PodDeletionDecision.newBuilder()
+          .delete(shouldDeletePod(workflowInstance, pod, "Pull image error"))
+          .build();
     }
     return PodDeletionDecision.DO_NOT_DELETE;
   }
@@ -439,7 +441,8 @@ class KubernetesDockerRunner implements DockerRunner {
     var pod = podOpt.orElseThrow();
     // if not terminated, delete directly
     if (!isTerminated(pod)) {
-      return PodDeletionDecision.newBuilder().delete(shouldDeletePod(workflowInstance, pod, "No RunState, not terminated"))
+      return PodDeletionDecision.newBuilder()
+          .delete(shouldDeletePod(workflowInstance, pod, "No RunState, not terminated"))
           .build();
     }
     return PodDeletionDecision.DO_NOT_DELETE;
@@ -567,11 +570,11 @@ class KubernetesDockerRunner implements DockerRunner {
       return;
     }
     var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
-    var shouldDelete = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
+    var podDeletionDecision = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
                        ? shouldDeletePodWithRunState(workflowInstance.orElseThrow(), pod, runState.orElseThrow())
                        : shouldDeletePodWithoutRunState(workflowInstance.orElseThrow(), pod);
-    if (shouldDelete.delete()) {
-      client.deletePod(pod.getMetadata().getName(), shouldDelete.force());
+    if (podDeletionDecision.delete()) {
+      client.deletePod(pod.getMetadata().getName(), podDeletionDecision.force());
     }
   }
 

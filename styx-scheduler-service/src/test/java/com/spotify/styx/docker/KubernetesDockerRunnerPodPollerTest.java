@@ -22,7 +22,6 @@ package com.spotify.styx.docker;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -214,7 +213,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient, never()).deletePod(any(), eq(false));
+    verify(k8sClient, never()).deletePod(any(), anyBoolean());
   }
 
   private Map<WorkflowInstance, RunState> setupActiveInstances(RunState.State state, String podName1, String podName2) {
