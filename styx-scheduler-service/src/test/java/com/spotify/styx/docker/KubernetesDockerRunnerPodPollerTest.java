@@ -21,6 +21,8 @@
 package com.spotify.styx.docker;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -162,8 +164,8 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient).deletePod(createdPod1.getMetadata().getName());
-    verify(k8sClient).deletePod(createdPod2.getMetadata().getName());
+    verify(k8sClient).deletePod(createdPod1.getMetadata().getName(), false);
+    verify(k8sClient).deletePod(createdPod2.getMetadata().getName(), false);
   }
 
   @Test
@@ -181,7 +183,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient, never()).deletePod(any());
+    verify(k8sClient, never()).deletePod(any(), anyBoolean());
   }
 
   @Test
@@ -196,7 +198,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient, never()).deletePod(any());
+    verify(k8sClient, never()).deletePod(any(), anyBoolean());
   }
 
   @Test
@@ -212,7 +214,7 @@ public class KubernetesDockerRunnerPodPollerTest {
 
     kdr.tryCleanupPods();
 
-    verify(k8sClient, never()).deletePod(any());
+    verify(k8sClient, never()).deletePod(any(), eq(false));
   }
 
   private Map<WorkflowInstance, RunState> setupActiveInstances(RunState.State state, String podName1, String podName2) {
