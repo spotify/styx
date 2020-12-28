@@ -386,6 +386,21 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
+  public void shouldCleanupPodWhenFailedToParseFinishedAt() {
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(containerStateTerminated.getFinishedAt()).thenReturn("foo");
+    when(containerState.getTerminated()).thenReturn(containerStateTerminated);
+
+    var runState = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED);
+    var shouldDelete = kdr.shouldDeletePodWithRunState(WORKFLOW_INSTANCE, createdPod, runState);
+    assertThat(shouldDelete, is(PodDeletionDecision.DELETE));
+  }
+
+  @Test
   public void shouldNotCleanupPodWhenMissingContainerStatus() {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
@@ -542,6 +557,19 @@ public class KubernetesDockerRunnerTest {
 
     var shouldDelete = kdr.shouldDeletePodWithoutRunState(WORKFLOW_INSTANCE, createdPod);
     assertThat(shouldDelete, is(PodDeletionDecision.DELETE));
+  }
+
+  @Test
+  public void shouldCleanupNonExistPod() {
+    // inject mock status in real instance
+    createdPod.setStatus(podStatus);
+    when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
+    when(containerStatus.getName()).thenReturn(MAIN_CONTAINER_NAME);
+    when(containerStatus.getState()).thenReturn(containerState);
+    when(k8sClient.getPod(POD_NAME)).thenReturn(Optional.empty());
+
+    var shouldDelete = kdr.shouldDeletePodWithoutRunState(WORKFLOW_INSTANCE, createdPod);
+    assertThat(shouldDelete, is(PodDeletionDecision.DO_NOT_DELETE));
   }
 
   @Test
