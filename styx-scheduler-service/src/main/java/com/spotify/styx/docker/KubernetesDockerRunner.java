@@ -863,7 +863,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     boolean delete();
 
-    // Whether to force delete a pod; only application when delete() returns true
+    // Whether to force delete a pod; only applicable when delete() returns true
     boolean force();
 
     PodDeletionDecisionBuilder builder();
