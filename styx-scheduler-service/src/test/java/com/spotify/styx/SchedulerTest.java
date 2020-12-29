@@ -20,14 +20,19 @@
 
 package com.spotify.styx;
 
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toCollection;
+import static java.util.stream.Collectors.toList;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.both;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -71,11 +76,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -113,7 +121,7 @@ public class SchedulerTest {
 
   private List<Resource> resourceLimits = Lists.newArrayList();
 
-  private ExecutorService executor = Executors.newCachedThreadPool();
+  private ExecutorService executor = Executors.newSingleThreadExecutor();
   private ConcurrentMap<WorkflowInstance, RunState> activeStates = Maps.newConcurrentMap();
 
   private Map<WorkflowId, Workflow> workflows;
@@ -126,6 +134,7 @@ public class SchedulerTest {
   @Mock Storage storage;
   @Mock ShardedCounter shardedCounter;
   @Mock Logger log;
+  @Mock Random random;
 
   @Captor ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
 
@@ -150,8 +159,10 @@ public class SchedulerTest {
     when(stateManager.getActiveState(any())).then(a ->
         Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
+    when(random.nextInt(anyInt())).then(a -> a.<Integer>getArgument(0) - 1);
+
     scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, shardedCounter, executor, log);
+        stats, rateLimiter, shardedCounter, executor, log, random);
   }
 
   @After
@@ -262,30 +273,34 @@ public class SchedulerTest {
 
   @Test
   public void shouldExecuteNewTriggers() {
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+    var stateData = StateData.newBuilder().tries(0).build();
 
-    StateData stateData = StateData.newBuilder().tries(0).build();
-
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
-
-    List<WorkflowInstance> workflowInstances = new ArrayList<>();
-
-    for (int i = 1; i <= 10; i++) {
-      WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
-      initWorkflow(workflowUsingResources(workflowId));
-      WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
-      populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
-          time.get().minus(i, ChronoUnit.SECONDS)));
-      workflowInstances.add(instance);
+    for (var i = 1; i < 5; i++) {
+      for (var j = 1; j <= 10; j++) {
+        var workflowId = WorkflowId.create("styx", "example" + j);
+        initWorkflow(workflowUsingResources(workflowId));
+        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + i);
+        populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+            time.get().minus(j, ChronoUnit.SECONDS)));
+      }
     }
+
+    var workflowInstances = activeStates.keySet()
+        .stream()
+        .collect(groupingBy(WorkflowInstance::workflowId,
+            toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))))
+        .values()
+        .stream()
+        .flatMap(Collection::stream)
+        .collect(toList());
 
     scheduler.tick();
 
-    Lists.reverse(workflowInstances)
-        .forEach(x -> verify(stateManager)
+    var orderVerifier = Mockito.inOrder(stateManager);
+
+    workflowInstances
+        .forEach(x -> orderVerifier.verify(stateManager)
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    verify(stateManager).receiveIgnoreClosed(eq(
-        Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
   }
 
   @Test
@@ -309,7 +324,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    Lists.reverse(workflowInstances)
+    workflowInstances
         .forEach(x -> verify(stateManager, timeout(30_000))
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
     verify(stateManager, timeout(30_000)).receiveIgnoreClosed(eq(
