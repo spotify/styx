@@ -321,7 +321,8 @@ public class Scheduler {
   /**
    * Shuffle instances. For the same workflow ID, older instances will be appear early in the list.
    */
-  private List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
+  @VisibleForTesting
+  List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
     var groups = activeInstances
         .stream()
         .collect(groupingBy(WorkflowInstance::workflowId,

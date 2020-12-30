@@ -21,9 +21,11 @@
 package com.spotify.styx;
 
 import static java.util.Comparator.comparing;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.both;
 import static org.hamcrest.Matchers.closeTo;
@@ -275,11 +277,11 @@ public class SchedulerTest {
   public void shouldExecuteNewTriggers() {
     var stateData = StateData.newBuilder().tries(0).build();
 
-    for (var i = 1; i < 5; i++) {
+    for (var i = 1; i <= 5; i++) {
       for (var j = 1; j <= 10; j++) {
-        var workflowId = WorkflowId.create("styx", "example" + j);
+        var workflowId = WorkflowId.create("styx", "example" + i);
         initWorkflow(workflowUsingResources(workflowId));
-        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + i);
+        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + j);
         populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
             time.get().minus(j, ChronoUnit.SECONDS)));
       }
@@ -301,6 +303,29 @@ public class SchedulerTest {
     workflowInstances
         .forEach(x -> orderVerifier.verify(stateManager)
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
+  }
+
+  @Test
+  public void shouldHaveReasonableShuffleTime() {
+    var stateData = StateData.newBuilder().tries(0).build();
+
+    var noWorkflows = 10_000;
+    var noPartitions = 10;
+    for (var i = 1; i <= noWorkflows; i++) {
+      for (var j = 1; j <= noPartitions; j++) {
+        var workflowId = WorkflowId.create("styx", "example" + i);
+        initWorkflow(workflowUsingResources(workflowId));
+        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + j);
+        populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+            time.get().minus(j, ChronoUnit.SECONDS)));
+      }
+    }
+
+    var scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
+        stats, rateLimiter, shardedCounter, executor, log, new Random());
+
+    await().atMost(2, SECONDS)
+        .until(() -> scheduler.shuffleInstances(activeStates.keySet()).size() == activeStates.size());
   }
 
   @Test
