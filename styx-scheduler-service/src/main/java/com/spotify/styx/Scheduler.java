@@ -319,7 +319,7 @@ public class Scheduler {
   }
 
   /**
-   * Shuffle instances. For the same workflow ID, older instances will be appear early in the list.
+   * Shuffle instances. For the same workflow ID, older instances will appear early in the list.
    */
   @VisibleForTesting
   List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
