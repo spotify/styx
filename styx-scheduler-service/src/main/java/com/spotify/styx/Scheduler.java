@@ -67,6 +67,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -326,12 +327,9 @@ public class Scheduler {
     var groups = activeInstances
         .stream()
         .collect(groupingBy(WorkflowInstance::workflowId, LinkedHashMap::new,
-            toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))));
+            toCollection(() -> (SortedSet<WorkflowInstance>) new TreeSet<>(comparing(WorkflowInstance::parameter)))));
 
-    var shuffledGroups = new ArrayList<SortedSet<WorkflowInstance>>(groups.values());
-    shuffler.shuffle(shuffledGroups);
-
-    return merge(shuffledGroups, activeInstances.size());
+    return merge(groups.values(), activeInstances.size());
   }
 
   /**
@@ -346,7 +344,7 @@ public class Scheduler {
    * 3. For each set, take a sorted sublist of the shuffled indices; and insert each item into the indices
    * specified by the sublist
    */
-  private List<WorkflowInstance> merge(List<SortedSet<WorkflowInstance>> instanceGroups, int size) {
+  private List<WorkflowInstance> merge(Collection<SortedSet<WorkflowInstance>> instanceGroups, int size) {
     var indices = IntStream.range(0, size).boxed().collect(toCollection(ArrayList::new));
     shuffler.shuffle(indices);
 
