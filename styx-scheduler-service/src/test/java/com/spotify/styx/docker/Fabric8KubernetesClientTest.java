@@ -20,11 +20,12 @@
 
 package com.spotify.styx.docker;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,7 @@ import io.fabric8.kubernetes.api.model.SecretListBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.dsl.Deletable;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
@@ -70,6 +72,7 @@ public class Fabric8KubernetesClientTest {
   @Mock KubernetesClient client;
   @Mock MixedOperation<Pod, PodList, DoneablePod, PodResource<Pod, DoneablePod>> pods;
   @Mock PodResource<Pod, DoneablePod> namedPod;
+  @Mock Deletable<Boolean> deletablePod;
   @Mock MixedOperation<Secret, SecretList, DoneableSecret, Resource<Secret, DoneableSecret>> secrets;
   @Mock Resource<Secret, DoneableSecret> namedSecret;
   @Mock Watcher<Pod> watcher;
@@ -126,6 +129,7 @@ public class Fabric8KubernetesClientTest {
 
     when(client.pods()).thenReturn(pods);
     when(pods.withName(any())).thenReturn(namedPod);
+    when(namedPod.withGracePeriod(anyLong())).thenReturn(deletablePod);
     when(pods.list()).thenReturn(podList);
     when(pods.watch(any())).thenReturn(watch);
     when(client.secrets()).thenReturn(secrets);
@@ -189,11 +193,22 @@ public class Fabric8KubernetesClientTest {
   @Test
   public void shouldDeletePod(boolean deleted) {
     when(namedPod.delete()).thenReturn(deleted);
-    var actual = sut.deletePod(POD_NAME);
+    var actual = sut.deletePod(POD_NAME, false);
     assertThat(actual, is(deleted));
     verify(client).pods();
     verify(pods).withName(POD_NAME);
     verify(namedPod).delete();
+  }
+
+  @Parameters({ "true", "false" })
+  @Test
+  public void shouldForceDeletePod(boolean deleted) {
+    when(deletablePod.delete()).thenReturn(deleted);
+    var actual = sut.deletePod(POD_NAME, true);
+    assertThat(actual, is(deleted));
+    verify(client).pods();
+    verify(pods).withName(POD_NAME);
+    verify(namedPod).withGracePeriod(0L);
   }
 
   @Test

@@ -27,6 +27,7 @@ import io.fabric8.kubernetes.api.model.SecretList;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.dsl.Deletable;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -45,7 +46,7 @@ public interface Fabric8KubernetesClient {
 
   Pod createPod(Pod pod);
 
-  boolean deletePod(String name);
+  boolean deletePod(String name, boolean force);
 
   Watch watchPods(Watcher<Pod> watcher);
 
@@ -112,8 +113,15 @@ public interface Fabric8KubernetesClient {
     }
 
     @Override
-    public boolean deletePod(String name) {
-      return Optional.ofNullable(client.pods().withName(name).delete()).orElse(false);
+    public boolean deletePod(String name, boolean force) {
+      var pod = client.pods().withName(name);
+      final Deletable<Boolean> deletablePod;
+      if (force) {
+        deletablePod = pod.withGracePeriod(0L);
+      } else {
+        deletablePod = pod;
+      }
+      return Optional.ofNullable(deletablePod.delete()).orElse(false);
     }
   }
 }
