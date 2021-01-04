@@ -24,7 +24,10 @@ import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.spotify.styx.state.StateUtil.workflowResources;
 import static com.spotify.styx.storage.Storage.GLOBAL_RESOURCE_ID;
+import static java.util.Comparator.comparing;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
@@ -64,17 +67,22 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,17 +119,19 @@ public class Scheduler {
   private final ShardedCounter shardedCounter;
   private final Executor executor;
   private final Logger log;
+  private final Shuffler shuffler;
 
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
             ShardedCounter shardedCounter, Executor executor) {
     this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, shardedCounter, executor,
-        LoggerFactory.getLogger(Scheduler.class));
+        LoggerFactory.getLogger(Scheduler.class), Shuffler.DEFAULT);
   }
 
+  @VisibleForTesting
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-            ShardedCounter shardedCounter, Executor executor, Logger log) {
+            ShardedCounter shardedCounter, Executor executor, Logger log, Shuffler shuffler) {
     this.time = Objects.requireNonNull(time);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.storage = Objects.requireNonNull(storage);
@@ -131,6 +141,7 @@ public class Scheduler {
     this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
     this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
     this.log = Objects.requireNonNull(log, "log");
+    this.shuffler = Objects.requireNonNull(shuffler, "shuffler");
   }
 
   void tick() {
@@ -204,8 +215,7 @@ public class Scheduler {
     var resourceExhaustedCache = new ConcurrentHashMap<String, Boolean>();
 
     // Shuffle the instances in order to process them in random order and reduce contention with other schedulers etc
-    var shuffledInstances = new ArrayList<>(activeInstances);
-    Collections.shuffle(shuffledInstances);
+    var shuffledInstances = shuffleInstances(activeInstances);
 
     // Process instances in parallel
     var futures = shuffledInstances.stream()
@@ -309,6 +319,51 @@ public class Scheduler {
     sendDequeue(instance, runState, instanceResourceRefs);
   }
 
+  /**
+   * Shuffle instances. For the same workflow ID, older instances will appear early in the list.
+   */
+  @VisibleForTesting
+  List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
+    final Map<WorkflowId, SortedSet<WorkflowInstance>> groups = activeInstances
+        .stream()
+        // Using LinkedHashMap to have predictable iteration to simplify test
+        .collect(groupingBy(WorkflowInstance::workflowId, LinkedHashMap::new,
+            toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))));
+
+    return merge(groups.values(), activeInstances.size());
+  }
+
+  /**
+   * Merge a list of sorted sets into a list while respecting the original order within each individual set.
+   *
+   * For example [(1, 3, 4), (2, 5), (8, 10)] may become [1, 8, 2, 3, 10, 4, 5]
+   *
+   * This is how it works:
+   *
+   * 1. Generate full indices of the destination list
+   * 2. Shuffle the indices
+   * 3. For each set, take a sorted sublist of the shuffled indices; and insert each item into the indices
+   * specified by the sublist
+   */
+  private List<WorkflowInstance> merge(Collection<SortedSet<WorkflowInstance>> instanceGroups, int size) {
+    var indices = IntStream.range(0, size).boxed().collect(toCollection(ArrayList::new));
+    shuffler.shuffle(indices);
+
+    var merged = new WorkflowInstance[size];
+
+    var from = 0;
+    for (var group : instanceGroups) {
+      var subIndices = indices.subList(from, from + group.size()).stream().sorted().collect(toList());
+      var j = 0;
+      for (var instance : group) {
+        merged[subIndices.get(j++)] = instance;
+      }
+      from += group.size();
+    }
+
+    return List.of(merged);
+  }
+
   @VisibleForTesting
   static long randomizedDelay() {
     return ThreadLocalRandom.current().nextLong(RANDOMIZED_DELAY_BASE / 2, (long) (RANDOMIZED_DELAY_BASE * 1.5));
@@ -362,5 +417,12 @@ public class Scheduler {
     }
     var dequeue = Event.dequeue(workflowInstance, resourceIds);
     stateManager.receiveIgnoreClosed(dequeue, state.counter());
+  }
+
+  interface Shuffler {
+    void shuffle(List<?> list);
+
+    Shuffler DEFAULT = Collections::shuffle;
+    Shuffler NO_OP = list -> {};
   }
 }

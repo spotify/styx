@@ -20,13 +20,15 @@
 
 package com.spotify.styx;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.both;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.either;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
@@ -44,8 +46,8 @@ import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.RateLimiter;
+import com.spotify.styx.Scheduler.Shuffler;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -72,11 +74,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
@@ -109,12 +111,12 @@ public class SchedulerTest {
   private Scheduler scheduler;
 
   private Instant now = Instant.parse("2016-12-02T22:00:00Z");
-  private Time time = () -> now;
+  private final Time time = () -> now;
 
-  private List<Resource> resourceLimits = Lists.newArrayList();
+  private final List<Resource> resourceLimits = Lists.newArrayList();
 
-  private ExecutorService executor = Executors.newCachedThreadPool();
-  private ConcurrentMap<WorkflowInstance, RunState> activeStates = Maps.newConcurrentMap();
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final Map<WorkflowInstance, RunState> activeStates = new LinkedHashMap<>();
 
   private Map<WorkflowId, Workflow> workflows;
 
@@ -151,7 +153,7 @@ public class SchedulerTest {
         Optional.ofNullable(activeStates.get(a.<WorkflowInstance>getArgument(0))));
 
     scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
-        stats, rateLimiter, shardedCounter, executor, log);
+        stats, rateLimiter, shardedCounter, executor, log, Shuffler.NO_OP);
   }
 
   @After
@@ -261,31 +263,54 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldExecuteNewTriggers() {
-    initWorkflow(workflowUsingResources(WORKFLOW_ID1));
+  public void shouldExecuteNewTriggersOlderPartitionFirst() {
+    var stateData = StateData.newBuilder().tries(0).build();
 
-    StateData stateData = StateData.newBuilder().tries(0).build();
-
-    populateActiveStates(RunState.create(INSTANCE_1, State.QUEUED, stateData, time.get()));
-
-    List<WorkflowInstance> workflowInstances = new ArrayList<>();
-
-    for (int i = 1; i <= 10; i++) {
-      WorkflowId workflowId = WorkflowId.create("styx2", "example" + i);
-      initWorkflow(workflowUsingResources(workflowId));
-      WorkflowInstance instance = WorkflowInstance.create(workflowId, "2016-12-02T01");
-      populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
-          time.get().minus(i, ChronoUnit.SECONDS)));
-      workflowInstances.add(instance);
+    for (var i = 1; i <= 5; i++) {
+      for (var j = 9; j >= 0; j--) { // enqueuing newer first, older last
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
+        populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+            time.get().minus(j, ChronoUnit.SECONDS)));
+      }
     }
 
     scheduler.tick();
 
-    Lists.reverse(workflowInstances)
-        .forEach(x -> verify(stateManager)
-            .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
-    verify(stateManager).receiveIgnoreClosed(eq(
-        Event.dequeue(INSTANCE_1, ImmutableSet.of())), anyLong());
+    var orderVerifier = Mockito.inOrder(stateManager);
+    for (var i = 1; i <= 5; i++) {
+      for (var j = 0; j <= 9; j++) { // verifying older first, newer last
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
+        orderVerifier.verify(stateManager)
+            .receiveIgnoreClosed(eq(Event.dequeue(instance, ImmutableSet.of())), anyLong());
+      }
+    }
+  }
+
+  @Test
+  public void shouldHaveReasonableShuffleTime() {
+    var stateData = StateData.newBuilder().tries(0).build();
+
+    var noWorkflows = 10_000;
+    var noPartitions = 10;
+    for (var i = 1; i <= noWorkflows; i++) {
+      for (var j = 1; j <= noPartitions; j++) {
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
+        populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
+            time.get().minus(j, ChronoUnit.SECONDS)));
+      }
+    }
+
+    var scheduler = new Scheduler(time, stateManager, storage, resourceDecorator,
+        stats, rateLimiter, shardedCounter, executor, log, Shuffler.NO_OP);
+
+    await().atMost(2, SECONDS)
+        .until(() -> scheduler.shuffleInstances(activeStates.keySet()).size() == activeStates.size());
+  }
+
+  public WorkflowInstance createWorkflowInstance(String id, String parameter) {
+    var workflowId = WorkflowId.create("styx", id);
+    initWorkflow(workflowUsingResources(workflowId));
+    return WorkflowInstance.create(workflowId, parameter);
   }
 
   @Test
@@ -309,7 +334,7 @@ public class SchedulerTest {
 
     scheduler.tick();
 
-    Lists.reverse(workflowInstances)
+    workflowInstances
         .forEach(x -> verify(stateManager, timeout(30_000))
             .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
     verify(stateManager, timeout(30_000)).receiveIgnoreClosed(eq(
