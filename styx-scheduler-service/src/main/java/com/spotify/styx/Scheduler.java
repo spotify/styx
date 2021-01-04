@@ -68,11 +68,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -118,19 +118,19 @@ public class Scheduler {
   private final ShardedCounter shardedCounter;
   private final Executor executor;
   private final Logger log;
-  private Random random;
+  private final Shuffler shuffler;
 
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
             ShardedCounter shardedCounter, Executor executor) {
     this(time, stateManager, storage, resourceDecorator, stats, dequeueRateLimiter, shardedCounter, executor,
-        LoggerFactory.getLogger(Scheduler.class), new Random());
+        LoggerFactory.getLogger(Scheduler.class), Shuffler.DEFAULT);
   }
 
   @VisibleForTesting
   Scheduler(Time time, StateManager stateManager, Storage storage,
             WorkflowResourceDecorator resourceDecorator, Stats stats, RateLimiter dequeueRateLimiter,
-            ShardedCounter shardedCounter, Executor executor, Logger log, Random random) {
+            ShardedCounter shardedCounter, Executor executor, Logger log, Shuffler shuffler) {
     this.time = Objects.requireNonNull(time);
     this.stateManager = Objects.requireNonNull(stateManager);
     this.storage = Objects.requireNonNull(storage);
@@ -140,7 +140,7 @@ public class Scheduler {
     this.shardedCounter = Objects.requireNonNull(shardedCounter, "shardedCounter");
     this.executor = Context.currentContextExecutor(Objects.requireNonNull(executor, "executor"));
     this.log = Objects.requireNonNull(log, "log");
-    this.random = Objects.requireNonNull(random, "random");
+    this.shuffler = Objects.requireNonNull(shuffler, "shuffler");
   }
 
   void tick() {
@@ -325,11 +325,11 @@ public class Scheduler {
   List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
     var groups = activeInstances
         .stream()
-        .collect(groupingBy(WorkflowInstance::workflowId,
+        .collect(groupingBy(WorkflowInstance::workflowId, LinkedHashMap::new,
             toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))));
 
     var shuffledGroups = new ArrayList<SortedSet<WorkflowInstance>>(groups.values());
-    Collections.shuffle(shuffledGroups, random);
+    shuffler.shuffle(shuffledGroups);
 
     return merge(shuffledGroups, activeInstances.size());
   }
@@ -348,7 +348,7 @@ public class Scheduler {
    */
   private List<WorkflowInstance> merge(List<SortedSet<WorkflowInstance>> instanceGroups, int size) {
     var indices = IntStream.range(0, size).boxed().collect(toCollection(ArrayList::new));
-    Collections.shuffle(indices, random);
+    shuffler.shuffle(indices);
 
     var merged = new WorkflowInstance[size];
 
@@ -418,5 +418,12 @@ public class Scheduler {
     }
     var dequeue = Event.dequeue(workflowInstance, resourceIds);
     stateManager.receiveIgnoreClosed(dequeue, state.counter());
+  }
+
+  interface Shuffler {
+    void shuffle(List<?> list);
+
+    Shuffler DEFAULT = Collections::shuffle;
+    Shuffler NO_OP = list -> {};
   }
 }
