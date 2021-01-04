@@ -324,10 +324,10 @@ public class Scheduler {
    */
   @VisibleForTesting
   List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
-    var groups = activeInstances
+    final Map<WorkflowId, SortedSet<WorkflowInstance>> groups = activeInstances
         .stream()
         .collect(groupingBy(WorkflowInstance::workflowId, LinkedHashMap::new,
-            toCollection(() -> (SortedSet<WorkflowInstance>) new TreeSet<>(comparing(WorkflowInstance::parameter)))));
+            toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))));
 
     return merge(groups.values(), activeInstances.size());
   }
@@ -351,7 +351,7 @@ public class Scheduler {
     var merged = new WorkflowInstance[size];
 
     var from = 0;
-    for (SortedSet<WorkflowInstance> group : instanceGroups) {
+    for (var group : instanceGroups) {
       var subIndices = indices.subList(from, from + group.size()).stream().sorted().collect(toList());
       var j = 0;
       for (var instance : group) {
