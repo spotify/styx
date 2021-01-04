@@ -263,14 +263,12 @@ public class SchedulerTest {
   }
 
   @Test
-  public void shouldExecuteNewTriggers() {
+  public void shouldExecuteNewTriggersOlderPartitionFirst() {
     var stateData = StateData.newBuilder().tries(0).build();
 
     for (var i = 1; i <= 5; i++) {
-      for (var j = 1; j <= 9; j++) {
-        var workflowId = WorkflowId.create("styx", "example" + i);
-        initWorkflow(workflowUsingResources(workflowId));
-        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + j);
+      for (var j = 9; j >= 0; j--) { // enqueuing newer first, older last
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
         populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
             time.get().minus(j, ChronoUnit.SECONDS)));
       }
@@ -279,10 +277,13 @@ public class SchedulerTest {
     scheduler.tick();
 
     var orderVerifier = Mockito.inOrder(stateManager);
-
-    activeStates.keySet()
-        .forEach(x -> orderVerifier.verify(stateManager)
-            .receiveIgnoreClosed(eq(Event.dequeue(x, ImmutableSet.of())), anyLong()));
+    for (var i = 1; i <= 5; i++) {
+      for (var j = 0; j <= 9; j++) { // verifying older first, newer last
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
+        orderVerifier.verify(stateManager)
+            .receiveIgnoreClosed(eq(Event.dequeue(instance, ImmutableSet.of())), anyLong());
+      }
+    }
   }
 
   @Test
@@ -293,9 +294,7 @@ public class SchedulerTest {
     var noPartitions = 10;
     for (var i = 1; i <= noWorkflows; i++) {
       for (var j = 1; j <= noPartitions; j++) {
-        var workflowId = WorkflowId.create("styx", "example" + i);
-        initWorkflow(workflowUsingResources(workflowId));
-        var instance = WorkflowInstance.create(workflowId, "2016-12-02T0" + j);
+        WorkflowInstance instance = createWorkflowInstance("example" + i, "2016-12-02T0" + j);
         populateActiveStates(RunState.create(instance, State.QUEUED, stateData,
             time.get().minus(j, ChronoUnit.SECONDS)));
       }
@@ -306,6 +305,12 @@ public class SchedulerTest {
 
     await().atMost(2, SECONDS)
         .until(() -> scheduler.shuffleInstances(activeStates.keySet()).size() == activeStates.size());
+  }
+
+  public WorkflowInstance createWorkflowInstance(String id, String parameter) {
+    var workflowId = WorkflowId.create("styx", id);
+    initWorkflow(workflowUsingResources(workflowId));
+    return WorkflowInstance.create(workflowId, parameter);
   }
 
   @Test
