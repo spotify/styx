@@ -326,6 +326,7 @@ public class Scheduler {
   List<WorkflowInstance> shuffleInstances(Set<WorkflowInstance> activeInstances) {
     final Map<WorkflowId, SortedSet<WorkflowInstance>> groups = activeInstances
         .stream()
+        // Using LinkedHashMap to have predictable iteration to simplify test
         .collect(groupingBy(WorkflowInstance::workflowId, LinkedHashMap::new,
             toCollection(() -> new TreeSet<>(comparing(WorkflowInstance::parameter)))));
 
