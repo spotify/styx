@@ -482,14 +482,14 @@ class KubernetesDockerRunner implements DockerRunner {
   private PodDeletionDecision isTimeToDeletePossiblyForce(ContainerStatus cs) {
     final ContainerStateTerminated t = cs.getState().getTerminated();
     if (t.getFinishedAt() == null) {
-      return PodDeletionDecision.DELETE;
+      return PodDeletionDecision.FORCE_DELETE;
     }
     final Instant finishedAt;
     try {
       finishedAt = Instant.parse(t.getFinishedAt());
     } catch (DateTimeParseException e) {
       LOG.warn("Failed to parse container state terminated finishedAt: '{}'", t.getFinishedAt(), e);
-      return PodDeletionDecision.DELETE;
+      return PodDeletionDecision.FORCE_DELETE;
     }
     final Instant deletionDeadline = time.get().minus(podDeletionDelay);
     final Instant forceDeletionDeadline = deletionDeadline.minus(POD_FORCE_DELETION_TOLERATION);

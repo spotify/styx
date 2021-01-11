@@ -372,7 +372,7 @@ public class KubernetesDockerRunnerTest {
   }
 
   @Test
-  public void shouldCleanupPodWhenMissingFinishedAt() {
+  public void shouldForceDeletePodWhenMissingFinishedAt() {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
@@ -382,11 +382,11 @@ public class KubernetesDockerRunnerTest {
 
     var runState = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED);
     var shouldDelete = kdr.shouldDeletePodWithRunState(WORKFLOW_INSTANCE, createdPod, runState);
-    assertThat(shouldDelete, is(PodDeletionDecision.DELETE));
+    assertThat(shouldDelete, is(PodDeletionDecision.FORCE_DELETE));
   }
 
   @Test
-  public void shouldCleanupPodWhenFailedToParseFinishedAt() {
+  public void shouldForceDeletePodWhenFailedToParseFinishedAt() {
     // inject mock status in real instance
     createdPod.setStatus(podStatus);
     when(podStatus.getContainerStatuses()).thenReturn(List.of(containerStatus, keepaliveContainerStatus));
@@ -397,7 +397,7 @@ public class KubernetesDockerRunnerTest {
 
     var runState = RunState.create(WORKFLOW_INSTANCE, State.TERMINATED);
     var shouldDelete = kdr.shouldDeletePodWithRunState(WORKFLOW_INSTANCE, createdPod, runState);
-    assertThat(shouldDelete, is(PodDeletionDecision.DELETE));
+    assertThat(shouldDelete, is(PodDeletionDecision.FORCE_DELETE));
   }
 
   @Test
