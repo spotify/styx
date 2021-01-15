@@ -173,6 +173,7 @@ public class StyxScheduler implements AppInit {
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
+  private static final int CLOSING_STATE_PROCESSING_TIMEOUT = 5;
 
   private final String serviceName;
   private final Time time;
@@ -359,23 +360,26 @@ public class StyxScheduler implements AppInit {
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
+    final Stats stats = statsFactory.apply(environment);
+    final Storage storage = MeteredStorageProxy.instrument(
+        TracingProxy.instrument(Storage.class,
+            storageFactory.apply(environment, stats)), stats, time);
+    // Closer is a stack (LIFO) for closing resources and we need to make sure that we close the
+    // storage last (first to register) so that threads are able to persist their state on the storage
+    closer.register(storage);
+
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
     var stateProcessingExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_STATE_PROCESSING_THREADS).orElse(DEFAULT_STYX_STATE_PROCESSING_THREADS));
-    closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(1)));
+    closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(
+        CLOSING_STATE_PROCESSING_TIMEOUT)));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(closeable(eventConsumerExecutor, "event-consumer", Duration.ofSeconds(1)));
     final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
     closer.register(closeable(schedulerExecutor, "scheduler", Duration.ofSeconds(1)));
-
-    final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(
-        TracingProxy.instrument(Storage.class,
-            storageFactory.apply(environment, stats)), stats, time);
-    closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
