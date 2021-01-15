@@ -173,6 +173,7 @@ public class StyxScheduler implements AppInit {
   private static final int DEFAULT_KUBERNETES_REQUEST_TIMEOUT_MILLIS = 60_000;
 
   private static final Logger LOG = LoggerFactory.getLogger(StyxScheduler.class);
+  private static final int CLOSING_STATE_PROCESSING_TIMEOUT = 5;
 
   private final String serviceName;
   private final Time time;
@@ -372,7 +373,8 @@ public class StyxScheduler implements AppInit {
 
     var stateProcessingExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_STATE_PROCESSING_THREADS).orElse(DEFAULT_STYX_STATE_PROCESSING_THREADS));
-    closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(1)));
+    closer.register(closeable(stateProcessingExecutor, "state-processing", Duration.ofSeconds(
+        CLOSING_STATE_PROCESSING_TIMEOUT)));
     final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
     closer.register(closeable(eventConsumerExecutor, "event-consumer", Duration.ofSeconds(1)));
     final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
