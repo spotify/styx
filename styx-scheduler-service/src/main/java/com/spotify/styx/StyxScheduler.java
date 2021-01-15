@@ -359,6 +359,14 @@ public class StyxScheduler implements AppInit {
         .setUncaughtExceptionHandler(uncaughtExceptionHandler)
         .build();
 
+    final Stats stats = statsFactory.apply(environment);
+    final Storage storage = MeteredStorageProxy.instrument(
+        TracingProxy.instrument(Storage.class,
+            storageFactory.apply(environment, stats)), stats, time);
+    // Closer is a stack (LIFO) for closing resources and we need to make sure that we close the
+    // storage last (first to register) so that threads are able to persist their state on the storage
+    closer.register(storage);
+
     final Publisher publisher = publisherFactory.apply(environment);
     closer.register(publisher);
 
@@ -370,12 +378,6 @@ public class StyxScheduler implements AppInit {
     final ExecutorService schedulerExecutor = Executors.newWorkStealingPool(
         optionalInt(config, STYX_SCHEDULER_THREADS).orElse(DEFAULT_STYX_SCHEDULER_THREADS));
     closer.register(closeable(schedulerExecutor, "scheduler", Duration.ofSeconds(1)));
-
-    final Stats stats = statsFactory.apply(environment);
-    final Storage storage = MeteredStorageProxy.instrument(
-        TracingProxy.instrument(Storage.class,
-            storageFactory.apply(environment, stats)), stats, time);
-    closer.register(storage);
 
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
