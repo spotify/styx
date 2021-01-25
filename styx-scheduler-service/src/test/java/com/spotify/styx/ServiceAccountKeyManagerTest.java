@@ -68,6 +68,11 @@ public class ServiceAccountKeyManagerTest {
           new HttpResponseException.Builder(403, "Forbidden", new HttpHeaders()),
           new GoogleJsonError().set("status", "PERMISSION_DENIED"));
 
+  private static final GoogleJsonResponseException BAD_REQUEST =
+      new GoogleJsonResponseException(
+          new HttpResponseException.Builder(400, "Bad Request", new HttpHeaders()),
+          new GoogleJsonError().set("status", "FAILED_PRECONDITION"));
+
   private static final GoogleJsonResponseException NOT_FOUND =
       new GoogleJsonResponseException(
           new HttpResponseException.Builder(404, "Not found", new HttpHeaders()),
@@ -86,6 +91,13 @@ public class ServiceAccountKeyManagerTest {
   @Test
   public void keyExistsTreatsPermissionDeniedAsNotFound() throws Exception {
     when(get.execute()).thenThrow(PERMISSION_DENIED);
+    assertThat(sakm.keyExists("foo"), is(false));
+    verify(iam.projects().serviceAccounts().keys()).get("foo");
+  }
+
+  @Test
+  public void keyExistsTreatsBadRequestAsNotFound() throws Exception {
+    when(get.execute()).thenThrow(BAD_REQUEST);
     assertThat(sakm.keyExists("foo"), is(false));
     verify(iam.projects().serviceAccounts().keys()).get("foo");
   }
