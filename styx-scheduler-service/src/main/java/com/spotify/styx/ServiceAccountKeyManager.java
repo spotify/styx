@@ -68,8 +68,10 @@ public class ServiceAccountKeyManager {
           .execute();
       return true;
     } catch (GoogleJsonResponseException e) {
-      // TODO: handle 403 and 400 correctly once google fixes their API
-      if (e.getStatusCode() == 403 || e.getStatusCode() == 400 || e.getStatusCode() == 404) {
+      // TODO: handle 403 and 400: FAILED_PRECONDITION correctly once google fixes their API
+      if (e.getStatusCode() == 403
+          || (e.getStatusCode() == 400 && e.getDetails().get("status").equals("FAILED_PRECONDITION"))
+          || e.getStatusCode() == 404) {
         return false;
       }
       throw e;
