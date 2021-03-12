@@ -18,20 +18,21 @@
     <maven.compiler.release>11</maven.compiler.release>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
-    <apollo.version>1.15.1</apollo.version>
+    <apollo.version>1.15.8</apollo.version>
     <jackson.version>2.12.1</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
-    <semantic-metrics.version>1.0.2</semantic-metrics.version>
+    <semantic-metrics.version>1.1.1</semantic-metrics.version>
     <metrics.version>4.0.2</metrics.version>
-    <opencensus.version>0.25.0</opencensus.version>
-    <google.client.lib.version>1.30.8</google.client.lib.version>
-    <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
+    <opencensus.version>0.28.0</opencensus.version>
+    <google.client.lib.version>1.31.2</google.client.lib.version>
+    <google.http.client.lib.version>1.39.0</google.http.client.lib.version>
     <auto-matter.version>0.15.3</auto-matter.version>
-    <auto-value.version>1.7</auto-value.version>
+    <auto-value.version>1.7.4</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <errorprone.version>2.3.4</errorprone.version>
-    <grpc.version>1.27.2</grpc.version>
+    <errorprone.version>2.5.1</errorprone.version>
+    <grpc.version>1.36.0</grpc.version>
+    <gax.version>1.62.0</gax.version>
   </properties>
 
   <repositories>
@@ -123,14 +124,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-bom</artifactId>
-        <version>0.122.3-alpha</version>
+        <version>0.149.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-bom</artifactId>
-        <version>3.11.4</version>
+        <version>3.15.5</version>
         <scope>import</scope>
         <type>pom</type>
       </dependency>
@@ -216,7 +217,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>28.2-jre</version>
+        <version>30.1-jre</version>
       </dependency>
       <dependency>
         <groupId>com.github.rholder</groupId>
@@ -438,7 +439,7 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-container</artifactId>
-        <version>v1-rev20200214-${google.client.lib.version}</version>
+        <version>v1-rev20210216-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
@@ -448,28 +449,42 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-cloudresourcemanager</artifactId>
-        <version>v1-rev20200203-${google.client.lib.version}</version>
+        <version>v2-rev20201111-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-oauth2</artifactId>
-        <version>v2-rev20190313-${google.client.lib.version}</version>
+        <version>v2-rev20200213-${google.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>gax</artifactId>
-        <version>1.54.0</version>
+        <version>${gax.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api</groupId>
+        <artifactId>gax-grpc</artifactId>
+        <version>${gax.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
         <artifactId>bigtable-hbase-1.x</artifactId>
-        <version>1.11.0</version>
+        <version>1.19.0</version>
         <exclusions>
           <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>0.24.1</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -484,7 +499,7 @@
       <dependency>
         <groupId>com.google.api</groupId>
         <artifactId>api-common</artifactId>
-        <version>1.8.1</version>
+        <version>1.10.1</version>
       </dependency>
 
       <!-- test libs -->
@@ -576,12 +591,12 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5.11</version>
+        <version>4.5.13</version>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
+        <version>4.4.14</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
@@ -631,7 +646,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.0.0</version>
+        <version>3.8.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -675,7 +690,6 @@
                      -Xplugin:ErrorProne
                      -Xep:RemoveUnusedImports:ERROR
                      -Xep:PrivateConstructorForUtilityClass:ERROR
-                     -Xep:FieldMissingNullable:ERROR
                      -Xep:MultipleTopLevelClasses:ERROR
                      -Xep:MultipleUnaryOperatorsInMethodCall:ERROR
                      -Xep:PackageLocation:ERROR

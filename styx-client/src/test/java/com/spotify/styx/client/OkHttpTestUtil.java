@@ -33,7 +33,6 @@ import okio.Buffer;
 import okio.ByteString;
 
 class OkHttpTestUtil {
-  @SuppressWarnings("FieldMissingNullable")
   static final MediaType APPLICATION_JSON =
       Objects.requireNonNull(MediaType.parse("application/json"));
 

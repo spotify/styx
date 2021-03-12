@@ -46,7 +46,6 @@ class FutureOkHttpClient implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(FutureOkHttpClient.class);
 
-  @SuppressWarnings("FieldMissingNullable")
   private static final MediaType APPLICATION_JSON =
       Objects.requireNonNull(MediaType.parse("application/json"));
 
