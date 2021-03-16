@@ -68,7 +68,7 @@ public class FlyteAdminClient {
       IdentifierOuterClass.Identifier launchPlanId,
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
       Map<String, String> annotations,
-      String parameter) {
+      Map<String, String> extraDefaultInputs) {
     LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
@@ -98,7 +98,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillParameterInInputs(inputs, parameter))
+                .setInputs(fillParameterInInputs(inputs, extraDefaultInputs))
                 .build());
 
     verifyNotNull(

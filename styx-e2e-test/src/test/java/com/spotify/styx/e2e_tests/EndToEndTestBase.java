@@ -105,8 +105,8 @@ public class EndToEndTestBase {
   private static final String FLYTE_PROJECT = "flytesnacks";
 
   private static final String FLYTE_DOMAIN = "development";
-  private static final String FLYTE_LAUNCH_PLAN_NAME = "workflows.hello_world_workflow.lp";
-  private static final String FLYTE_LAUNCH_PLAN_VERSION = "b495f8671b8fc2da9e51acd5803a26d52e18795a";
+  private static final String FLYTE_LAUNCH_PLAN_NAME = "morning_greeting";
+  private static final String FLYTE_LAUNCH_PLAN_VERSION = "04e346ca5f43fc2778259d77a2d9f64ce42b2a27";
   private static final String RESOURCE_TYPE = "LAUNCH_PLAN";
   private static final Map<String, String> REFERENCE_ID =
       Map.of(

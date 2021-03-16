@@ -20,86 +20,88 @@
 
 package com.spotify.styx.flyte.client;
 
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.buildLiteralForPartition;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
-import static org.junit.Assert.assertNull;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
-import java.time.Instant;
+
 import org.junit.Test;
 
 public class FlyteInputsUtilsTest {
-  static final Instant INSTANT = Instant.now();
-  static final String PARAMETER = INSTANT.toString();
-  private static final String KEY = "name";
-  private static final String EXCEPTION_MESSAGE = "LP inputs must have default values. Missing default value for key:" + KEY;
 
   @Test
   public void shouldFillParameterInInputs() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+        .putParameters("EXTRA_PARAMETER", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
                 .setType(Types.LiteralType.newBuilder().
                     setSimple(Types.SimpleType.DATETIME)
                     .build())
                 .build())
-            .setDefault(buildLiteralForPartition("2020-09-15"))
+            .setDefault(datetimeLiteralOf("2020-09-15"))
             .build())
         .build();
 
-    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T01"));
 
-    assertThat(INSTANT.getEpochSecond(), equalTo(inputs.getLiteralsMap()
-        .get(PARAMETER_NAME)
+    var timestamp = inputs.getLiteralsMap()
+        .get("EXTRA_PARAMETER")
         .getScalar()
         .getPrimitive()
-        .getDatetime().getSeconds()));
+        .getDatetime();
+
+    assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
   }
 
   @Test
   public void shouldOnlyFillParameterInInputs() {
-    var inputName = "key";
-    var inputValue = "value";
+    var defaultValue = Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder()
+            .setPrimitive(Literals.Primitive
+                .newBuilder()
+                .setStringValue("value")
+                .build()
+            ).build())
+        .build();
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(inputName, Interface.Parameter.newBuilder()
+        .putParameters("key", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder()
+                    .setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
-            .setDefault(Literals.Literal.newBuilder()
-                .setScalar(Literals.Scalar.newBuilder()
-                    .setPrimitive(Literals.Primitive.newBuilder().setStringValue(inputValue)
-                        .build()).build())
-                .build())
+            .setDefault(defaultValue)
             .build())
         .build();
 
-    var inputs = fillParameterInInputs(parameterMap, PARAMETER);
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T00:00:10"));
 
-    assertNull(inputs.getLiteralsMap()
-        .get(PARAMETER_NAME));
-    assertThat(inputValue, equalTo(inputs.getLiteralsMap()
-        .get(inputName)
-        .getScalar()
-        .getPrimitive()
-        .getStringValue()));
+    assertThat(
+        inputs.getLiteralsMap(),
+        equalTo(ImmutableMap.of("key", defaultValue)));
   }
 
   @Test
   public void shouldThrowExceptionIfInputIsRequired() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(KEY, Interface.Parameter.newBuilder()
+        .putParameters("key", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder()
+                    .setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
             .setRequired(true)
@@ -108,18 +110,18 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, PARAMETER)
-    );
-    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+
+    assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
 
   @Test
   public void shouldThrowExceptionIfInputIsNotRequired() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(KEY, Interface.Parameter.newBuilder()
+        .putParameters("key", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder()
+                    .setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
             .setRequired(false)
@@ -128,18 +130,18 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, PARAMETER)
-    );
-    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+
+    assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
 
   @Test
   public void shouldThrowExceptionIfInputHasNoDefault() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(KEY, Interface.Parameter.newBuilder()
+        .putParameters("key", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder()
+                    .setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
             .build())
@@ -147,19 +149,18 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, PARAMETER)
-    );
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
 
-    assertThat(exception.getMessage(), equalTo(EXCEPTION_MESSAGE));
+    assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
 
   @Test
-  public void shouldThrowExceptionIfParameterHasWrongType() {
+  public void shouldThrowExceptionIfParameterTypeIsUnsupported() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+        .putParameters("PARAMETER", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder().
-                    setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder()
+                    .setSimple(Types.SimpleType.BINARY)
                     .build())
                 .build())
             .setDefault(Literals.Literal.newBuilder()
@@ -172,19 +173,40 @@ public class FlyteInputsUtilsTest {
         .build();
 
     var exception = assertThrows(
-        IllegalArgumentException.class,
-        () -> fillParameterInInputs(parameterMap, PARAMETER)
-    );
+        UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc")));
 
-    assertThat(exception.getMessage(), equalTo(PARAMETER_NAME + " should be of type DATETIME"));
+    assertThat(exception.getMessage(), equalTo("Can't get default value for input [PARAMETER]. Only DATETIME/STRING/BOOLEAN is supported but got [BINARY]"));
   }
 
   @Test
-  public void shouldCreateLiteral() {
-    var parameter = buildLiteralForPartition(PARAMETER);
-    assertTrue(parameter.hasScalar());
-    assertTrue(parameter.getScalar().hasPrimitive());
-    assertTrue(parameter.getScalar().getPrimitive().getValueCase() == Literals.Primitive.ValueCase.DATETIME);
-    assertThat(INSTANT.getEpochSecond(), equalTo(parameter.getScalar().getPrimitive().getDatetime().getSeconds()));
+  public void shouldCreateDatetimeLiteral() {
+    var parameter = datetimeLiteralOf("1970-01-02");
+
+    assertThat(
+        parameter.getScalar().getPrimitive().getDatetime(),
+        equalTo(
+            Timestamp.newBuilder()
+                .setSeconds(3600 * 24)
+                .setNanos(0)
+                .build()));
+  }
+
+  @Test
+  public void shouldCreateStringLiteral() {
+    var parameter = stringLiteralOf("abc");
+
+    assertThat(
+        parameter.getScalar().getPrimitive().getStringValue(),
+        equalTo("abc"));
+  }
+
+  @Test
+  public void shouldCreateBooleanLiteral() {
+    var parameter = booleanLiteralOf("true");
+
+    assertThat(
+        parameter.getScalar().getPrimitive().getBoolean(),
+        equalTo(true));
   }
 }
