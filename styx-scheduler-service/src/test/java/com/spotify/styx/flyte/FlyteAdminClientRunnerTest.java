@@ -29,8 +29,11 @@ import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
 import static flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode.SCHEDULED;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,6 +53,7 @@ import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
+import com.spotify.styx.model.TriggerParametersBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
@@ -66,6 +70,7 @@ import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
@@ -415,7 +420,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testUndefinedShouldNotInteractWithStateManager() throws Exception {
+  public void testUndefinedShouldNotInteractWithStateManager() {
     when(flyteAdminClient.getExecution("flyte-test", "testing", "execution-name")).thenReturn(
         ExecutionOuterClass.Execution
             .newBuilder()
@@ -429,7 +434,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testGetExtraDefaultInputs() {
+  public void testGetExtraDefaultInputsShouldIncludesStyxRelatedInputs() {
     Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(createWorkflowInstance(), runState().data());
 
     assertThat(
@@ -444,17 +449,49 @@ public class FlyteAdminClientRunnerTest {
             .build()));
   }
 
+  @Test
+  public void testGetExtraDefaultInputsShouldIncludeTriggerParamsEnv() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(
+        createWorkflowInstance(), runState(ImmutableMap.of("HADES_OVERWRITE", "true")).data()
+    );
+
+    assertThat(extraDefaultInputs, hasEntry("HADES_OVERWRITE", "true"));
+  }
+
+  @Test
+  public void testGetExtraDefaultInputsShouldExcludeTriggerParamsEnvWithStyxPrefix() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(
+        createWorkflowInstance(), runState(ImmutableMap.of("STYX_EXECUTION_ID", "foo")).data()
+    );
+
+    assertThat(extraDefaultInputs, allOf(
+        not(hasEntry("STYX_EXECUTION_ID", "foo")),
+        hasEntry("STYX_EXECUTION_ID", "exec-id")
+    ));
+  }
+
   private static RunState runState() {
     return runState(Trigger.natural());
   }
 
   private static RunState runState(Trigger trigger) {
+    return runState(trigger, Collections.emptyMap());
+  }
+
+  private static RunState runState(Map<String, String> triggerParamEnvs) {
+    return runState(Trigger.natural(), triggerParamEnvs);
+  }
+
+  private static RunState runState(Trigger trigger, Map<String, String> triggerParamEnvs) {
     return RunState.create(
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTING,
         StateData.newBuilder()
             .executionId("exec-id")
             .trigger(Optional.ofNullable(trigger))
+            .triggerParameters(new TriggerParametersBuilder()
+                .env(triggerParamEnvs)
+                .build())
             .build()
     );
   }

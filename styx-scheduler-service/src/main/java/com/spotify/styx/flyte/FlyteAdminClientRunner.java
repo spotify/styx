@@ -349,6 +349,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     stateData.executionId().ifPresent(value -> mapBuilder.put("STYX_EXECUTION_ID", value));
     triggerId.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_ID", value));
     triggerType.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_TYPE", value));
+    // add trigger parameters but avoid any STYX_XXX ones to prevent collisions
+    stateData.triggerParameters().ifPresent(triggerParameters ->
+        triggerParameters.env().entrySet().stream()
+            .filter(entry -> !entry.getKey().startsWith("STYX_"))
+            .forEach(entry -> mapBuilder.put(entry.getKey(), entry.getValue()))
+    );
 
     return mapBuilder.build();
   }
