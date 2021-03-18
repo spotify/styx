@@ -30,6 +30,7 @@ import static flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -134,8 +136,8 @@ public class FlyteAdminClientRunnerTest {
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
-        LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), execName,
-        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS, RUN_STATE.workflowInstance().parameter());
+        eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq(execName),
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), eq(ANNOTATIONS), any());
   }
 
   private IdentifierOuterClass.Identifier toProto(FlyteIdentifier identifier) {
@@ -198,8 +200,8 @@ public class FlyteAdminClientRunnerTest {
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
-        LAUNCH_PLAN_IDENTIFIER.project(), LAUNCH_PLAN_IDENTIFIER.domain(), "exec",
-        toProto(LAUNCH_PLAN_IDENTIFIER), SCHEDULED, ANNOTATIONS, RUN_STATE.workflowInstance().parameter());
+        eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq("exec"),
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), eq(ANNOTATIONS), any());
   }
 
   @Test
@@ -426,6 +428,22 @@ public class FlyteAdminClientRunnerTest {
     verifyNoInteractions(stateManager);
   }
 
+  @Test
+  public void testGetExtraDefaultInputs() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(createWorkflowInstance(), runState().data());
+
+    assertThat(
+        extraDefaultInputs,
+        equalTo(ImmutableMap.builder()
+            .put("STYX_COMPONENT_ID", "id")
+            .put("STYX_EXECUTION_ID", "exec-id")
+            .put("STYX_PARAMETER", "2016-03-14")
+            .put("STYX_TRIGGER_ID", "natural-trigger")
+            .put("STYX_TRIGGER_TYPE", "natural")
+            .put("STYX_WORKFLOW_ID", "styx.TestEndpoint")
+            .build()));
+  }
+
   private static RunState runState() {
     return runState(Trigger.natural());
   }
@@ -435,6 +453,7 @@ public class FlyteAdminClientRunnerTest {
         WORKFLOW_INSTANCE,
         RunState.State.SUBMITTING,
         StateData.newBuilder()
+            .executionId("exec-id")
             .trigger(Optional.ofNullable(trigger))
             .build()
     );

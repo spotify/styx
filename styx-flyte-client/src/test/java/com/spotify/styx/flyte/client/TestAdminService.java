@@ -23,7 +23,6 @@ package com.spotify.styx.flyte.client;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.DOMAIN;
 import static com.spotify.styx.flyte.client.FlyteAdminClientTest.PROJECT;
 import static java.util.stream.Collectors.toUnmodifiableList;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.PARAMETER_NAME;
 
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
@@ -47,6 +46,7 @@ import java.util.function.Predicate;
 public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
 
   static final String EXEC_NAME_PREFIX = "exec_name_";
+  static final String EXTRA_PARAMETER_NAME = "EXTRA_PARAMETER";
   static final int PAGE_SIZE = 2;
 
   private final List<Execution> allExecutions =
@@ -90,7 +90,7 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
         .setSpec(LaunchPlanOuterClass.LaunchPlanSpec
             .newBuilder()
             .setDefaultInputs(Interface.ParameterMap.newBuilder()
-                .putParameters(PARAMETER_NAME, Interface.Parameter.newBuilder()
+                .putParameters(EXTRA_PARAMETER_NAME, Interface.Parameter.newBuilder()
                     .setVar(Interface.Variable.newBuilder()
                         .setType(Types.LiteralType.newBuilder().
                             setSimple(Types.SimpleType.DATETIME).build())

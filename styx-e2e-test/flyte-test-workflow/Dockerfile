@@ -1,33 +1,32 @@
-FROM ubuntu:bionic
+FROM python:3.8-slim-buster
 
-WORKDIR /app
-ENV VENV /app/venv
+WORKDIR /root
+ENV VENV /opt/venv
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
-ENV PYTHONPATH /app
+ENV PYTHONPATH /root
 
-# Install Python3 and other basics
-RUN apt-get update && apt-get install -y python3.6 python3.6-venv python3-venv python3-pip curl
+RUN apt-get update && apt-get install -y build-essential
 
-# Run this before dealing with our own virtualenv. The AWS CLI uses its own virtual environment
+# Install the AWS cli separately to prevent issues with boto being written over
 RUN pip3 install awscli
+# Similarly, if you're using GCP be sure to update this command to install gsutil
+# RUN curl -sSL https://sdk.cloud.google.com | bash
+# ENV PATH="$PATH:/root/google-cloud-sdk/bin"
 
-# Set up a virtual environment to use with our workflows
-RUN python3.6 -m venv ${VENV}
-RUN ${VENV}/bin/pip install wheel
+ENV VENV /opt/venv
+# Virtual environment
+RUN python3 -m venv ${VENV}
+ENV PATH="${VENV}/bin:$PATH"
 
-COPY ./requirements.txt .
-RUN ${VENV}/bin/pip install -r requirements.txt
+# Install Python dependencies
+COPY ./requirements.txt /root
+RUN pip install -r /root/requirements.txt
 
-# This is a script that enables a virtualenv, copy it to a better location
-RUN cp ${VENV}/bin/flytekit_venv /opt/
+# Copy the actual code
+COPY . /root
 
-# Copy the rest of the code
-COPY . .
-
-# Set this environment variable. It will be used by the flytekit SDK during the registration/compilation steps
+# This tag is supplied by the build script and will be used to determine the version
+# when registering tasks, workflows, and launch plans
 ARG tag
-ENV FLYTE_INTERNAL_IMAGE=$tag
-
-# Enable the virtualenv for this image. Note this relies on the VENV variable we've set in this image.
-ENTRYPOINT ["/opt/flytekit_venv"]
+ENV FLYTE_INTERNAL_IMAGE $tag

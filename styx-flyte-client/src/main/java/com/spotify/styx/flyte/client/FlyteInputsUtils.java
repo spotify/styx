@@ -21,55 +21,98 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.util.ParameterUtil.parseBest;
-import static flyteidl.core.Types.SimpleType.DATETIME;
 
+import com.google.common.collect.ImmutableMap;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import flyteidl.core.Types;
+
+import java.util.Map;
 
 
 public class FlyteInputsUtils {
-  static final String PARAMETER_NAME = "styx_parameter";
-  private static final Logger LOG = LoggerFactory.getLogger(FlyteInputsUtils.class);
-
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
   }
 
-  static Literals.Literal buildLiteralForPartition(String value) {
+  static Literals.Literal literalOf(String key, String value, Types.LiteralType literalType) {
+    if (literalType.getTypeCase() != Types.LiteralType.TypeCase.SIMPLE) {
+      var message = String.format("Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN is supported but got [%s]", key, literalType);
 
+      throw new UnsupportedOperationException(message);
+    }
+
+    switch (literalType.getSimple()) {
+      case DATETIME:
+        return datetimeLiteralOf(value);
+
+      case STRING:
+        return stringLiteralOf(value);
+
+      case BOOLEAN:
+        return booleanLiteralOf(value);
+
+      default:
+        String message = String.format("Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN is supported but got [%s]", key, literalType.getSimple());
+
+        throw new UnsupportedOperationException(message);
+    }
+  }
+
+  static Literals.Literal datetimeLiteralOf(String value) {
     var primitive =
         Literals.Primitive.newBuilder().setDatetime(parseBest(value)).build();
+
     return Literals.Literal.newBuilder()
         .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
         .build();
   }
 
-  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, String parameter) {
+  static Literals.Literal booleanLiteralOf(String value) {
+    var primitive =
+        Literals.Primitive.newBuilder().setBoolean(Boolean.parseBoolean(value)).build();
+
+    return Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
+  }
+
+  static Literals.Literal stringLiteralOf(String value) {
+    var primitive =
+        Literals.Primitive.newBuilder().setStringValue(value).build();
+
+    return Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
+  }
+
+  static Literals.Literal getDefaultValue(String key, Interface.Parameter parameter, Map<String, String> extraDefaultInputs) {
+    var lowercaseKey = key.toLowerCase();
+    var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
+
+    if (extraDefaultInput != null) {
+      return literalOf(key, extraDefaultInput, parameter.getVar().getType());
+    }
+
+    if (parameter.hasDefault()) {
+      return parameter.getDefault();
+    }
+
+    throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
+  }
+
+  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, Map<String, String> extraDefaultInputs) {
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
+    var lowercaseExtraDefaultInputs = extraDefaultInputs.entrySet()
+        .stream()
+        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
+
     parameterMap
         .getParametersMap()
         .forEach(
-            (key, value) -> {
-              if (!key.toLowerCase().equals(PARAMETER_NAME)) {
-                if (value.hasDefault()) {
-                  literalMapBuilder.putLiterals(key, value.getDefault());
-                  return;
-                }
-                var message = "LP inputs must have default values. Missing default value for key:" + key;
-                LOG.error(message);
-                throw new UnsupportedOperationException(message);
-              }
-              if (value.getVar().getType().getSimple() != DATETIME) {
-                var message = PARAMETER_NAME + " should be of type DATETIME";
-                LOG.error(message);
-                throw new IllegalArgumentException(message);
-              } else {
-                var literal = buildLiteralForPartition(parameter);
-                literalMapBuilder.putLiterals(key, literal);
-              }
-            });
+            (key, parameter) -> literalMapBuilder.putLiterals(
+                key,
+                getDefaultValue(key, parameter, lowercaseExtraDefaultInputs)));
 
     return literalMapBuilder.build();
   }

@@ -30,6 +30,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.runAsync;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
@@ -37,6 +38,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
@@ -44,6 +46,7 @@ import com.spotify.styx.state.TriggerVisitor;
 import com.spotify.styx.util.CounterCapacityException;
 import com.spotify.styx.util.IsClosedException;
 import com.spotify.styx.util.Time;
+import com.spotify.styx.util.TriggerUtil;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.Execution;
@@ -119,7 +122,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   FlyteAdminClientRunner(final String runnerId,
                          final FlyteAdminClient flyteAdminClient,
                          final StateManager stateManager) {
-    this(runnerId, flyteAdminClient, stateManager, 
+    this(runnerId, flyteAdminClient, stateManager,
         DEFAULT_TERMINATE_EXEC_INTERVAL,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY),
         Instant::now);
@@ -139,7 +142,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
         .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
-    final var parameter = runState.workflowInstance().parameter();
+    var extraDefaultInputs = getExtraDefaultInputs(runState.workflowInstance(), runState.data());
 
     try {
       flyteAdminClient.createExecution(
@@ -155,7 +158,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .build(),
           execMode,
           annotations,
-          parameter);
+          extraDefaultInputs);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {
@@ -334,6 +337,23 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @VisibleForTesting
+  static Map<String, String> getExtraDefaultInputs(WorkflowInstance workflowInstance, StateData stateData) {
+    var triggerType = stateData.trigger().map(TriggerUtil::triggerType);
+    var triggerId = stateData.trigger().map(TriggerUtil::triggerId);
+
+    var mapBuilder = ImmutableMap.<String, String>builder();
+
+    mapBuilder.put("STYX_COMPONENT_ID", workflowInstance.workflowId().componentId());
+    mapBuilder.put("STYX_WORKFLOW_ID", workflowInstance.workflowId().id());
+    mapBuilder.put("STYX_PARAMETER", workflowInstance.parameter());
+    stateData.executionId().ifPresent(value -> mapBuilder.put("STYX_EXECUTION_ID", value));
+    triggerId.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_ID", value));
+    triggerType.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_TYPE", value));
+
+    return mapBuilder.build();
+  }
+
+  @VisibleForTesting
   void emitFlyteEvents(ExecutionOuterClass.Execution execution, RunState runState) {
     final List<Event> events = translate(execution, runState);
     for (int i = 0; i < events.size(); ++i) {
@@ -393,7 +413,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     Map<String, String> annotation();
 
     static AnnotatedFlyteExecutionId create(FlyteExecutionId identifier, Map<String, String> annotations) {
-      ;return new AnnotatedFlyteExecutionIdBuilder()
+      return new AnnotatedFlyteExecutionIdBuilder()
           .identifier(identifier)
           .annotation(annotations)
           .build();

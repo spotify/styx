@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 
+import com.google.common.collect.ImmutableMap;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
@@ -36,9 +37,10 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.time.Instant;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,7 +54,7 @@ public class FlyteAdminClientTest {
   static final String LP_NAME = "launch_plan_name";
   static final String LP_VERSION = "launch_plan_version_1";
   static final IdentifierOuterClass.ResourceType LP_RESOURCE_TYPE = IdentifierOuterClass.ResourceType.LAUNCH_PLAN;
-  static final String PARAMETER = Instant.now().toString();
+  static final Map<String, String> EXTRA_DEFAULT_INPUTS = ImmutableMap.of(TestAdminService.EXTRA_PARAMETER_NAME, Instant.now().toString());
   private FlyteAdminClient flyteAdminClient;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
@@ -90,7 +92,7 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, Map.of(), PARAMETER);
+            ExecutionMode.SCHEDULED, Map.of(), EXTRA_DEFAULT_INPUTS);
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
@@ -104,7 +106,7 @@ public class FlyteAdminClientTest {
     );
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, annotations, PARAMETER);
+            ExecutionMode.SCHEDULED, annotations, EXTRA_DEFAULT_INPUTS);
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);
