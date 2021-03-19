@@ -129,20 +129,21 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   @Override
-  public String createExecution(final RunState runState, final String execName, final FlyteExecConf flyteExecConf,
-                                final Map<String, String> annotations)
+  public String createExecution(final RunState runState, final String execName, final FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     requireNonNull(runState, "runState");
     requireNonNull(execName, "name");
     requireNonNull(flyteExecConf, "flyteExecConf");
-    requireNonNull(annotations, "annotations");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
     final var execMode = runState.data().trigger()
         .map(this::toFlyteExecutionMode)
         .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
         .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
-    var extraDefaultInputs = getExtraDefaultInputs(runState.workflowInstance(), runState.data());
+    var extraInputs = getExtraInputs(runState.data());
+
+    // Styx related parameters are also going to be added as labels for flyte execution
+    var styxConfigParams = getStyxConfigParams(runState.workflowInstance(), runState.data());
 
     try {
       flyteAdminClient.createExecution(
@@ -157,8 +158,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setVersion(launchPlanIdentifier.version())
               .build(),
           execMode,
-          annotations,
-          extraDefaultInputs);
+          styxConfigParams,
+          mergeInputs(styxConfigParams, extraInputs));
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {
@@ -336,8 +337,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     return true;
   }
 
-  @VisibleForTesting
-  static Map<String, String> getExtraDefaultInputs(WorkflowInstance workflowInstance, StateData stateData) {
+  static Map<String, String> getStyxConfigParams(WorkflowInstance workflowInstance, StateData stateData) {
     var triggerType = stateData.trigger().map(TriggerUtil::triggerType);
     var triggerId = stateData.trigger().map(TriggerUtil::triggerId);
 
@@ -349,7 +349,21 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     stateData.executionId().ifPresent(value -> mapBuilder.put("STYX_EXECUTION_ID", value));
     triggerId.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_ID", value));
     triggerType.ifPresent(value -> mapBuilder.put("STYX_TRIGGER_TYPE", value));
-    // add trigger parameters but avoid any STYX_XXX ones to prevent collisions
+    return mapBuilder.build();
+  }
+
+  static Map<String, String> mergeInputs(Map<String, String> styxConfig, Map<String, String> extraInput) {
+    var mapBuilder = ImmutableMap.<String, String>builder();
+    mapBuilder.putAll(styxConfig);
+    mapBuilder.putAll(extraInput);
+    return mapBuilder.build();
+  }
+
+  @VisibleForTesting
+  static Map<String, String> getExtraInputs(StateData stateData) {
+
+    var mapBuilder = ImmutableMap.<String, String>builder();
+
     stateData.triggerParameters().ifPresent(triggerParameters ->
         triggerParameters.env().entrySet().stream()
             .filter(entry -> !entry.getKey().startsWith("STYX_"))

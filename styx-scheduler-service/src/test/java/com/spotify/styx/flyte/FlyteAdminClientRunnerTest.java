@@ -102,10 +102,6 @@ public class FlyteAdminClientRunnerTest {
       FlyteExecutionId.create("flyte-test", "testing", "execution-name");
   private static final RunState RUN_STATE = runState();
   private static final RunState RUN_STATE_SUBMITTED = runState(RunState.State.SUBMITTED);
-  private static final Map<String, String> ANNOTATIONS = Map.of(
-      "hero", "Spiderman",
-      "villain", "Green Goblin"
-  );
 
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
@@ -137,12 +133,12 @@ public class FlyteAdminClientRunnerTest {
                 .build())
             .build());
 
-    var runnerId = flyteRunner.createExecution(RUN_STATE, execName, FLYTE_EXEC_CONF, ANNOTATIONS);
+    var runnerId = flyteRunner.createExecution(RUN_STATE, execName, FLYTE_EXEC_CONF);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq(execName),
-        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), eq(ANNOTATIONS), any());
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any());
   }
 
   private IdentifierOuterClass.Identifier toProto(FlyteIdentifier identifier) {
@@ -160,7 +156,7 @@ public class FlyteAdminClientRunnerTest {
   public void testStyxTriggerTranslateToFlyteExecutionMode(Trigger styxTrigger, ExecutionMode flyteExecMode)
       throws FlyteRunner.CreateExecutionException {
     final RunState runState = runState(styxTrigger);
-    flyteRunner.createExecution(runState, "test-create-execution", FLYTE_EXEC_CONF, ANNOTATIONS);
+    flyteRunner.createExecution(runState, "test-create-execution", FLYTE_EXEC_CONF);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), Mockito.eq(flyteExecMode),
         any(), any());
   }
@@ -178,7 +174,7 @@ public class FlyteAdminClientRunnerTest {
   public void testCreateExecutionThrowsExceptionForInvalidExecutionMode(Trigger styxTrigger) {
     var exception = assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF, ANNOTATIONS)
+        () -> flyteRunner.createExecution(runState(styxTrigger), "test-create-execution", FLYTE_EXEC_CONF)
     );
 
     assertThat(exception.getMessage(), containsString("Missing trigger or unknown in StateData"));
@@ -194,19 +190,19 @@ public class FlyteAdminClientRunnerTest {
         .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
-        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
   public void testCreateExecutionForAlreadyExistsException() throws FlyteRunner.CreateExecutionException {
     doThrow(new StatusRuntimeException(Status.ALREADY_EXISTS))
         .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
-    var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS);
+    var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq("exec"),
-        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), eq(ANNOTATIONS), any());
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any());
   }
 
   @Test
@@ -215,7 +211,7 @@ public class FlyteAdminClientRunnerTest {
         .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any());
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -225,7 +221,7 @@ public class FlyteAdminClientRunnerTest {
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF, ANNOTATIONS));
+        () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
   }
 
   @Test
@@ -434,8 +430,8 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testGetExtraDefaultInputsShouldIncludesStyxRelatedInputs() {
-    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(createWorkflowInstance(), runState().data());
+  public void testGetStyxConfigParamsShouldIncludesStyxRelatedInputs() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getStyxConfigParams(createWorkflowInstance(), runState().data());
 
     assertThat(
         extraDefaultInputs,
@@ -450,23 +446,22 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testGetExtraDefaultInputsShouldIncludeTriggerParamsEnv() {
-    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(
-        createWorkflowInstance(), runState(ImmutableMap.of("HADES_OVERWRITE", "true")).data()
+  public void testGetExtraInputsShouldIncludeTriggerParamsEnv() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraInputs(
+        runState(ImmutableMap.of("HADES_OVERWRITE", "true")).data()
     );
 
     assertThat(extraDefaultInputs, hasEntry("HADES_OVERWRITE", "true"));
   }
 
   @Test
-  public void testGetExtraDefaultInputsShouldExcludeTriggerParamsEnvWithStyxPrefix() {
-    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraDefaultInputs(
-        createWorkflowInstance(), runState(ImmutableMap.of("STYX_EXECUTION_ID", "foo")).data()
+  public void testGetExtraInputsShouldExcludeTriggerParamsEnvWithStyxPrefix() {
+    Map<String, String> extraDefaultInputs = FlyteAdminClientRunner.getExtraInputs(
+        runState(ImmutableMap.of("STYX_EXECUTION_ID", "foo")).data()
     );
 
     assertThat(extraDefaultInputs, allOf(
-        not(hasEntry("STYX_EXECUTION_ID", "foo")),
-        hasEntry("STYX_EXECUTION_ID", "exec-id")
+        not(hasEntry("STYX_EXECUTION_ID", "foo"))
     ));
   }
 

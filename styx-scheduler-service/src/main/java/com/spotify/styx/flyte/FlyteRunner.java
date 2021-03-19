@@ -25,7 +25,6 @@ import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateManager;
 import java.io.Closeable;
-import java.util.Map;
 import java.util.function.Function;
 
 public interface FlyteRunner extends Closeable {
@@ -33,7 +32,7 @@ public interface FlyteRunner extends Closeable {
     return true;
   }
 
-  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf, Map<String, String> annotations)
+  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException;
 
   void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId);
