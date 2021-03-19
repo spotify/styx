@@ -29,6 +29,7 @@ import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,12 +80,15 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
     final String executionId = state.data().executionId().orElseThrow();
     final String execName = state.data().executionDescription().orElseThrow().flyteExecutionId().orElseThrow();
+    var annotations = Map.of(
+        STYX_WORKFLOW_INSTANCE_ANNOTATION, state.workflowInstance().toString(),
+        STYX_EXECUTION_ID_ANNOTATION, state.data().executionId().orElseThrow());
 
     final String runnerId;
     try {
-      LOG.info("running:{}, conf:{}, state:{}, flyte exec name:{}",
-          state.workflowInstance(), flyteExecConf, state, execName);
-      runnerId = flyteRunner.createExecution(state, execName, flyteExecConf);
+      LOG.info("running:{}, conf:{}, state:{}, flyte exec name:{}, annotations:{}",
+          state.workflowInstance(), flyteExecConf, state, execName, annotations);
+      runnerId = flyteRunner.createExecution(state, execName, flyteExecConf, annotations);
     } catch (Exception e) {
       final var errMessage = "Failed to start execution for " + state.workflowInstance();
       LOG.error(errMessage, e);
