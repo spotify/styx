@@ -25,7 +25,6 @@ import static org.junit.Assert.assertThrows;
 
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.testdata.TestData;
-import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -49,7 +48,7 @@ public class NoopFlyteRunnerTest {
   public void testCreateExecutionThrowsException() {
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
-        () -> runner.createExecution(runState, "name", TestData.FLYTE_EXEC_CONF, Map.of())
+        () -> runner.createExecution(runState, "name", TestData.FLYTE_EXEC_CONF)
     );
   }
 
