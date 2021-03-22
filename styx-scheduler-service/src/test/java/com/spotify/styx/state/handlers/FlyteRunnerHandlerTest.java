@@ -20,13 +20,14 @@
 
 package com.spotify.styx.state.handlers;
 
-import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STYX_EXECUTION_ID_ANNOTATION;
-import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STYX_WORKFLOW_INSTANCE_ANNOTATION;
+import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STYX_EXECUTION_ID_LABEL;
+import static com.spotify.styx.state.handlers.FlyteRunnerHandler.STYX_WORKFLOW_INSTANCE_LABEL;
 import static com.spotify.styx.testdata.TestData.EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.EXECUTION_ID;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXECUTION_DESCRIPTION;
 import static com.spotify.styx.testdata.TestData.FLYTE_EXEC_CONF;
 import static com.spotify.styx.testdata.TestData.WORKFLOW_INSTANCE;
+import static com.spotify.styx.util.LabelValue.normalize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
@@ -67,9 +68,9 @@ public class FlyteRunnerHandlerTest {
 
   private static final FlyteExecutionId FLYTE_EXECUTION_ID = getFlyteExecutionId(FLYTE_EXECUTION_DESCRIPTION,
       TestData.FLYTE_EXECUTION_ID);
-  private static final Map<String, String> ANNOTATIONS = Map.of(
-      STYX_EXECUTION_ID_ANNOTATION, EXECUTION_ID,
-      STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey());
+  private static final Map<String, String> LABELS = Map.of(
+      STYX_EXECUTION_ID_LABEL, normalize(EXECUTION_ID),
+      STYX_WORKFLOW_INSTANCE_LABEL, normalize(WORKFLOW_INSTANCE.toKey()));
 
   @Before
   public void setUp() {
@@ -87,7 +88,7 @@ public class FlyteRunnerHandlerTest {
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
-    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, LABELS);
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, "runnerId"),
         runState.counter());
   }
@@ -118,7 +119,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, LABELS);
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
         runState.counter());
   }

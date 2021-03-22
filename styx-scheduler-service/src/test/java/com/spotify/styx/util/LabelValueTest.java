@@ -17,12 +17,11 @@
  * limitations under the License.
  * -/-/-
  */
-package com.spotify.styx.docker;
+package com.spotify.styx.util;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-import com.spotify.styx.util.ClassEnforcer;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Test;

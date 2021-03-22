@@ -75,8 +75,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClientRunner.class);
   @VisibleForTesting static final String TERMINATE_CAUSE_PREFIX = "Styx workflow instance execution reached state: ";
   @VisibleForTesting static final String TERMINATE_CAUSE = "Styx workflow instance execution is not active";
-  @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
-  @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
+  @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_LABEL = "STYX_WORKFLOW_INSTANCE";
+  @VisibleForTesting static final String STYX_EXECUTION_ID_LABEL = "STYX_EXECUTION_ID";
   @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(3);
   private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
   private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
@@ -130,12 +130,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
   @Override
   public String createExecution(final RunState runState, final String execName, final FlyteExecConf flyteExecConf,
-                                final Map<String, String> annotations)
+                                final Map<String, String> labels)
       throws CreateExecutionException {
     requireNonNull(runState, "runState");
     requireNonNull(execName, "name");
     requireNonNull(flyteExecConf, "flyteExecConf");
-    requireNonNull(annotations, "annotations");
+    requireNonNull(labels, "annotations");
     final var launchPlanIdentifier = flyteExecConf.referenceId();
     final var execMode = runState.data().trigger()
         .map(this::toFlyteExecutionMode)
@@ -157,7 +157,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .setVersion(launchPlanIdentifier.version())
               .build(),
           execMode,
-          annotations,
+          labels,
           extraDefaultInputs);
       return runnerId;
     } catch (StatusRuntimeException e) {
@@ -258,7 +258,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
               .filter(this::haveBeenRunningForAWhile)
               .map(exec -> AnnotatedFlyteExecutionId.create(
                   FlyteExecutionId.fromProto(exec.getId()),
-                  exec.getSpec().getAnnotations().getValuesMap())
+                  exec.getSpec().getLabels().getValuesMap())
               )
               .filter(this::isFlyteExecutionTriggeredByStyx)
               .map(annotatedId -> runAsync(guard(() -> tryTerminateDanglingFlyteExecution(annotatedId)), executor))
@@ -301,7 +301,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
   private boolean isFlyteExecutionTriggeredByStyx(AnnotatedFlyteExecutionId annotatedId) {
     final var annotations = annotatedId.annotation();
-    return annotations != null && annotations.containsKey(STYX_WORKFLOW_INSTANCE_ANNOTATION);
+    return annotations != null && annotations.containsKey(STYX_WORKFLOW_INSTANCE_LABEL);
   }
 
   private WorkflowInstance getWorkflowInstance(AnnotatedFlyteExecutionId annotatedId) {
@@ -309,16 +309,16 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         "Flyte execution is not triggered by styx. annotatedId: " + annotatedId);
 
     return WorkflowInstance.parseKey(
-        annotatedId.annotation().get(STYX_WORKFLOW_INSTANCE_ANNOTATION));
+        annotatedId.annotation().get(STYX_WORKFLOW_INSTANCE_LABEL));
   }
 
   private boolean isFlyteExecRelatedToRunState(AnnotatedFlyteExecutionId annotatedId, RunState runState) {
     final var annotations = annotatedId.annotation();
-    if (!annotations.containsKey(STYX_EXECUTION_ID_ANNOTATION)) {
+    if (!annotations.containsKey(STYX_EXECUTION_ID_LABEL)) {
       LOG.info("Flyte execution without styx execution id annotation {}", annotatedId.identifier());
       return false;
     }
-    final var styxExecIdOnFlyte = annotations.get(STYX_EXECUTION_ID_ANNOTATION);
+    final var styxExecIdOnFlyte = annotations.get(STYX_EXECUTION_ID_LABEL);
 
     final Optional<String> styxExecIdOpt = runState.data().executionId();
     if (styxExecIdOpt.isEmpty()) {

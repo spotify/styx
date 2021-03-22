@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state.handlers;
 
+import static com.spotify.styx.util.LabelValue.normalize;
 import static java.util.Objects.requireNonNull;
 
 import com.spotify.styx.flyte.FlyteExecutionId;
@@ -39,8 +40,8 @@ import org.slf4j.LoggerFactory;
 public class FlyteRunnerHandler extends AbstractRunnerHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlyteRunnerHandler.class);
-  static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
-  static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
+  static final String STYX_WORKFLOW_INSTANCE_LABEL = "STYX_WORKFLOW_INSTANCE";
+  static final String STYX_EXECUTION_ID_LABEL = "STYX_EXECUTION_ID";
 
   private final FlyteRunner flyteRunner;
 
@@ -80,15 +81,15 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     final FlyteExecConf flyteExecConf = state.data().executionDescription().orElseThrow().flyteExecConf().orElseThrow();
     final String executionId = state.data().executionId().orElseThrow();
     final String execName = state.data().executionDescription().orElseThrow().flyteExecutionId().orElseThrow();
-    var annotations = Map.of(
-        STYX_WORKFLOW_INSTANCE_ANNOTATION, state.workflowInstance().toString(),
-        STYX_EXECUTION_ID_ANNOTATION, state.data().executionId().orElseThrow());
+    var labels = Map.of(
+        STYX_WORKFLOW_INSTANCE_LABEL, normalize(state.workflowInstance().toString()),
+        STYX_EXECUTION_ID_LABEL, normalize(state.data().executionId().orElseThrow()));
 
     final String runnerId;
     try {
       LOG.info("running:{}, conf:{}, state:{}, flyte exec name:{}, annotations:{}",
-          state.workflowInstance(), flyteExecConf, state, execName, annotations);
-      runnerId = flyteRunner.createExecution(state, execName, flyteExecConf, annotations);
+          state.workflowInstance(), flyteExecConf, state, execName, labels);
+      runnerId = flyteRunner.createExecution(state, execName, flyteExecConf, labels);
     } catch (Exception e) {
       final var errMessage = "Failed to start execution for " + state.workflowInstance();
       LOG.error(errMessage, e);

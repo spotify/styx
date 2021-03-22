@@ -100,17 +100,17 @@ public class FlyteAdminClientTest {
 
   @Test
   public void shouldPropagateAnnotationsOnCreateExecutionToStub() {
-    final Map<String, String> annotations = Map.of(
+    final Map<String, String> labels = Map.of(
         "Frodo", "Baggins",
         "Sam", "Gamgee"
     );
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, annotations, EXTRA_DEFAULT_INPUTS);
+            ExecutionMode.SCHEDULED, labels, EXTRA_DEFAULT_INPUTS);
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);
-    assertThat(retrievedExecution.getSpec().getAnnotations().getValuesMap(), equalTo(annotations));
+    assertThat(retrievedExecution.getSpec().getLabels().getValuesMap(), equalTo(labels));
   }
 
   @Test

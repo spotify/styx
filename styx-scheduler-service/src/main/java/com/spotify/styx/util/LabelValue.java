@@ -18,7 +18,7 @@
  * -/-/-
  */
 
-package com.spotify.styx.docker;
+package com.spotify.styx.util;
 
 import com.google.common.io.BaseEncoding;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-final class LabelValue {
+public final class LabelValue {
 
   private static final int KUBERNETES_LABEL_MAX_LENGTH = 63;
   private static final int DIGEST_SUFFIX_LENGTH = 7;

@@ -20,8 +20,8 @@
 
 package com.spotify.styx.flyte;
 
-import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_EXECUTION_ID_ANNOTATION;
-import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
+import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_EXECUTION_ID_LABEL;
+import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_WORKFLOW_INSTANCE_LABEL;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATION_GRACE_PERIOD;
 import static org.mockito.ArgumentMatchers.any;
@@ -238,31 +238,31 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   }
 
   private Execution nonRunningExecutions(String name) {
-    return execution(name, styxAnnotations(name, workflowInstance(name)), Phase.SUCCEEDED);
+    return execution(name, styxLabels(name, workflowInstance(name)), Phase.SUCCEEDED);
   }
 
   private Execution noIdInStateDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().build());
-    return execution(name, styxAnnotations(name, workflowInstance), Phase.RUNNING);
+    return execution(name, styxLabels(name, workflowInstance), Phase.RUNNING);
   }
 
   private Execution oldIdInAnnotationDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, oldRunIdStyxAnnotation(name, workflowInstance), Phase.RUNNING);
+    return execution(name, oldRunIdStyxLabel(name, workflowInstance), Phase.RUNNING);
   }
 
   private Execution noIdInAnnotationDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, noRunIdStyxAnnotation(workflowInstance), Phase.RUNNING);
+    return execution(name, noRunIdStyxLabel(workflowInstance), Phase.RUNNING);
   }
 
   private Execution runningExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, styxAnnotations(name, workflowInstance), Phase.RUNNING);
+    return execution(name, styxLabels(name, workflowInstance), Phase.RUNNING);
   }
 
   private void addToActiveStates(WorkflowInstance workflowInstance, StateData state) {
@@ -276,14 +276,14 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   }
 
   private Execution nonActiveDanglingExecution(String name) {
-    return execution(name, styxAnnotations(name, workflowInstance(name)), Phase.RUNNING);
+    return execution(name, styxLabels(name, workflowInstance(name)), Phase.RUNNING);
   }
 
   private Execution runningNonStyxExecution(String name) {
-    return execution(name, emptyAnnotations(), Phase.RUNNING);
+    return execution(name, emptyLabels(), Phase.RUNNING);
   }
 
-  private Execution execution(String name, Common.Annotations annotations, Phase phase) {
+  private Execution execution(String name, Common.Labels labels, Phase phase) {
     var timestamp = nowTimestamp();
     var identifier = IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
         .setProject(PROJECT)
@@ -293,7 +293,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
     return Execution.newBuilder()
         .setId(identifier)
         .setSpec(ExecutionOuterClass.ExecutionSpec.newBuilder()
-            .setAnnotations(annotations)
+            .setLabels(labels)
             .build())
         .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
             .setPhase(phase)
@@ -311,28 +311,28 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
         .build();
   }
 
-  private Common.Annotations styxAnnotations(String name, WorkflowInstance workflowInstance) {
-    return Common.Annotations.newBuilder()
-        .putValues(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .putValues(STYX_EXECUTION_ID_ANNOTATION, name)
+  private Common.Labels styxLabels(String name, WorkflowInstance workflowInstance) {
+    return Common.Labels.newBuilder()
+        .putValues(STYX_WORKFLOW_INSTANCE_LABEL, workflowInstance.toKey())
+        .putValues(STYX_EXECUTION_ID_LABEL, name)
         .build();
   }
 
-  private Common.Annotations noRunIdStyxAnnotation(WorkflowInstance workflowInstance) {
-    return Common.Annotations.newBuilder()
-        .putValues(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
+  private Common.Labels noRunIdStyxLabel(WorkflowInstance workflowInstance) {
+    return Common.Labels.newBuilder()
+        .putValues(STYX_WORKFLOW_INSTANCE_LABEL, workflowInstance.toKey())
         .build();
   }
 
-  private Common.Annotations oldRunIdStyxAnnotation(String name, WorkflowInstance workflowInstance) {
-    return Common.Annotations.newBuilder()
-        .putValues(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
-        .putValues(STYX_EXECUTION_ID_ANNOTATION, "old" + name)
+  private Common.Labels oldRunIdStyxLabel(String name, WorkflowInstance workflowInstance) {
+    return Common.Labels.newBuilder()
+        .putValues(STYX_WORKFLOW_INSTANCE_LABEL, workflowInstance.toKey())
+        .putValues(STYX_EXECUTION_ID_LABEL, "old" + name)
         .build();
   }
 
-  private Common.Annotations emptyAnnotations() {
-    return Common.Annotations.getDefaultInstance();
+  private Common.Labels emptyLabels() {
+    return Common.Labels.getDefaultInstance();
   }
 
   private WorkflowInstance workflowInstance(String name) {

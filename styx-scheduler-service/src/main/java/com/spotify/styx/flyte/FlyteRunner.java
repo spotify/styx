@@ -33,7 +33,7 @@ public interface FlyteRunner extends Closeable {
     return true;
   }
 
-  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf, Map<String, String> annotations)
+  String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf, Map<String, String> labels)
       throws CreateExecutionException;
 
   void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId);
