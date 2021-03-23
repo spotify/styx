@@ -67,6 +67,7 @@ public class FlyteAdminClient {
       String name,
       IdentifierOuterClass.Identifier launchPlanId,
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
+      Map<String, String> labels,
       Map<String, String> annotations,
       Map<String, String> extraDefaultInputs) {
     LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
@@ -86,6 +87,9 @@ public class FlyteAdminClient {
         ExecutionOuterClass.ExecutionSpec.newBuilder()
             .setLaunchPlan(launchPlanId)
             .setMetadata(metadata)
+            .setLabels(Common.Labels.newBuilder()
+                .putAllValues(labels)
+                .build())
             .setAnnotations(Common.Annotations.newBuilder()
                 .putAllValues(annotations)
                 .build())

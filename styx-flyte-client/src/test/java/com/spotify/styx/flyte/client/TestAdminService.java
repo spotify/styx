@@ -176,15 +176,17 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
   }
 
   private Execution execution(ExecutionOuterClass.ExecutionCreateRequest request) {
+    final var spec = request.getSpec();
     return execution(request.getProject(), request.getDomain(), request.getName(),
-        request.getSpec().getAnnotations().getValuesMap());
+        spec.getLabels().getValuesMap(), spec.getAnnotations().getValuesMap());
   }
 
   private static Execution execution(String execName) {
-    return execution(FlyteAdminClientTest.PROJECT, FlyteAdminClientTest.DOMAIN, execName, Map.of());
+    return execution(FlyteAdminClientTest.PROJECT, FlyteAdminClientTest.DOMAIN, execName, Map.of(), Map.of());
   }
 
-  private static Execution execution(String project, String domain, String execName, Map<String, String> annotations) {
+  private static Execution execution(String project, String domain, String execName, Map<String, String> labels,
+                                     Map<String, String> annotations) {
     return Execution
         .newBuilder()
         .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -194,6 +196,9 @@ public class TestAdminService extends AdminServiceGrpc.AdminServiceImplBase  {
             .setName(execName)
             .build())
         .setSpec(ExecutionOuterClass.ExecutionSpec.newBuilder()
+            .setLabels(Common.Labels.newBuilder()
+                .putAllValues(labels)
+                .build())
             .setAnnotations(Common.Annotations.newBuilder()
                 .putAllValues(annotations)
                 .build())

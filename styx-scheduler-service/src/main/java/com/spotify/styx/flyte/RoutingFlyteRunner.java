@@ -23,7 +23,6 @@ package com.spotify.styx.flyte;
 import com.spotify.styx.docker.AbstractRoutingRunner;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
-import java.util.Map;
 import java.util.function.Function;
 
 public class RoutingFlyteRunner extends AbstractRoutingRunner<FlyteRunner>
@@ -37,10 +36,9 @@ public class RoutingFlyteRunner extends AbstractRoutingRunner<FlyteRunner>
 
 
   @Override
-  public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf,
-                                Map<String, String> annotations)
+  public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
-    return runner(runState).createExecution(runState, name, flyteExecConf, annotations);
+    return runner(runState).createExecution(runState, name, flyteExecConf);
   }
 
   @Override

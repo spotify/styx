@@ -59,7 +59,6 @@ import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -93,21 +92,21 @@ public class StyxSchedulerServiceFixture {
 
   @Rule public final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
-  private Time time = () -> now;
+  private final Time time = () -> now;
 
-  private Connection bigtable = setupBigTableMockTable(0);
+  private final Connection bigtable = setupBigTableMockTable(0);
   protected AggregateStorage storage;
-  private DeterministicScheduler executor = new QuietDeterministicScheduler();
-  private Set<String> resourceIdsToDecorateWith = Sets.newHashSet();
+  private final DeterministicScheduler executor = new QuietDeterministicScheduler();
+  private final Set<String> resourceIdsToDecorateWith = Sets.newHashSet();
 
   // circumstantial fields, set by test cases
 
-  private List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
+  private final List<Tuple2<SequenceEvent, RunState.State>> transitionedEvents = Lists.newArrayList();
 
   // captured fields from fakes
-  private Queue<Tuple2<RunState, RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
-  Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
-  Queue<FlyteExecutionId> flyteExecCreations = new ConcurrentLinkedQueue<>();
+  private final Queue<Tuple2<RunState, RunSpec>> dockerRuns = new ConcurrentLinkedQueue<>();
+  final Queue<RunState> dockerPolls = new ConcurrentLinkedQueue<>();
+  final Queue<FlyteExecutionId> flyteExecCreations = new ConcurrentLinkedQueue<>();
 
   // service and helper
   private StyxScheduler styxScheduler;
@@ -354,8 +353,7 @@ public class StyxSchedulerServiceFixture {
   private FlyteRunner fakeFlyteRunner() {
     return new FlyteRunner() {
       @Override
-      public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf,
-                                    Map<String, String> annotations) {
+      public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf) {
         final FlyteExecutionId response = FlyteExecutionId.create(flyteExecConf.referenceId().project(),
                 flyteExecConf.referenceId().domain(), name);
         flyteExecCreations.add(response);
