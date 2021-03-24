@@ -80,14 +80,14 @@ public class FlyteRunnerHandlerTest {
 
   @Test
   public void shouldTransitionIntoSubmitted() throws Exception {
-    when(flyteRunner.createExecution(any(), any(), any(), any())).thenReturn("runnerId");
+    when(flyteRunner.createExecution(any(), any(), any())).thenReturn("runnerId");
     RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
         .build());
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
-    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF);
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.submitted(WORKFLOW_INSTANCE, EXECUTION_ID, "runnerId"),
         runState.counter());
   }
@@ -110,7 +110,7 @@ public class FlyteRunnerHandlerTest {
   @Test
   public void shouldReportRunErrorIfCatchCreateExecutionException() throws Exception {
     doThrow(new FlyteRunner.CreateExecutionException("Houston we have a problem", null))
-        .when(flyteRunner).createExecution(any(), any(), any(), any());
+        .when(flyteRunner).createExecution(any(), any(), any());
     RunState runState = RunState.create(WORKFLOW_INSTANCE, RunState.State.SUBMITTING, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
@@ -118,7 +118,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF, ANNOTATIONS);
+    verify(flyteRunner).createExecution(runState, TestData.FLYTE_EXECUTION_ID, FLYTE_EXEC_CONF);
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.runError(WORKFLOW_INSTANCE, "Houston we have a problem"),
         runState.counter());
   }
@@ -134,7 +134,7 @@ public class FlyteRunnerHandlerTest {
 
     flyteRunnerHandler.transitionInto(runState, eventRouter);
 
-    verify(flyteRunner, never()).createExecution(any(), any(), any(), any());
+    verify(flyteRunner, never()).createExecution(any(), any(), any());
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.halt(WORKFLOW_INSTANCE), runState.counter());
   }
 
