@@ -58,6 +58,7 @@ public class WorkflowActionAuthorizerTest {
 
   @Mock private Storage storage;
   @Mock private ServiceAccountUsageAuthorizer authorizer;
+  @Mock private ActionAuthorizer actionAuthorizer;
   @Mock private Middlewares.AuthContext ac;
   @Mock private GoogleIdToken idToken;
 
@@ -65,7 +66,7 @@ public class WorkflowActionAuthorizerTest {
 
   @Before
   public void setUp() throws Exception {
-    sut = new WorkflowActionAuthorizer(storage, authorizer);
+    sut = new WorkflowActionAuthorizer(storage, authorizer, actionAuthorizer);
   }
 
   @Test

@@ -49,6 +49,7 @@ import com.spotify.apollo.AppInit;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.route.Route;
 import com.spotify.metrics.core.SemanticMetricRegistry;
+import com.spotify.styx.api.ActionAuthorizer;
 import com.spotify.styx.api.Api;
 import com.spotify.styx.api.AuthenticatorConfiguration;
 import com.spotify.styx.api.AuthenticatorFactory;
@@ -188,6 +189,7 @@ public class StyxScheduler implements AppInit {
   private final EventConsumerFactory eventConsumerFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
+  private final ActionAuthorizer actionAuthorizer;
   private final PodMutatorFactory podMutatorFactory;
 
   private StateManager stateManager;
@@ -240,6 +242,7 @@ public class StyxScheduler implements AppInit {
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
+    private ActionAuthorizer actionAuthorizer = ActionAuthorizer.nop();
     private PodMutatorFactory podMutatorFactory = (env) -> PodMutator.NOOP;
 
     public Builder setServiceName(String serviceName) {
@@ -317,6 +320,14 @@ public class StyxScheduler implements AppInit {
       this.serviceAccountUsageAuthorizerFactory = serviceAccountUsageAuthorizerFactory;
       return this;
     }
+
+    public Builder setActionAuthorizer(final ActionAuthorizer actionAuthorizer) {
+      this.actionAuthorizer = actionAuthorizer;
+      return this;
+    }
+
+
+    
   }
 
   public static Builder newBuilder() {
@@ -343,6 +354,7 @@ public class StyxScheduler implements AppInit {
     this.eventConsumerFactory = requireNonNull(builder.eventConsumerFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
+    this.actionAuthorizer = requireNonNull(builder.actionAuthorizer);
     this.podMutatorFactory = requireNonNull(builder.podMutatorFactory);
   }
 
@@ -474,8 +486,9 @@ public class StyxScheduler implements AppInit {
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
         serviceAccountUsageAuthorizerFactory.apply(environment, serviceName);
+    final ActionAuthorizer actionAuthorizer = ActionAuthorizer.create();
     final WorkflowActionAuthorizer workflowActionAuthorizer =
-        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer);
+        new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
     final SchedulerResource schedulerResource =
         new SchedulerResource(stateManager, trigger, storage, time, workflowValidator, workflowActionAuthorizer);
 
