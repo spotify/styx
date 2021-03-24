@@ -61,6 +61,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -381,7 +382,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   // returns trigger parameters but avoid any STYX_XXX ones to prevent collisions
   private static Map<String, String> getFilteredTriggerParams(TriggerParameters triggerParameters) {
     return triggerParameters.env().entrySet().stream()
-                .filter(entry -> !entry.getKey().startsWith("STYX_"))
+                .filter(entry -> !entry.getKey().toLowerCase(Locale.ROOT).startsWith("styx_"))
                 .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 

@@ -500,23 +500,21 @@ public class FlyteAdminClientRunnerTest {
     final var execName = "test-create-execution";
     stubAdminClientCreateExec(execName);
 
-    flyteRunner.createExecution(runState(ImmutableMap.of("HADES_OVERWRITE", "true")), execName, FLYTE_EXEC_CONF);
-
-    final var expectedExtraInputs = ImmutableMap.<String, String>builder()
-        .put("STYX_COMPONENT_ID", "id")
-        .put("STYX_EXECUTION_ID", "exec-id")
-        .put("STYX_PARAMETER", "2016-03-14")
-        .put("STYX_TRIGGER_ID", "natural-trigger")
-        .put("STYX_TRIGGER_TYPE", "natural")
-        .put("STYX_WORKFLOW_ID", "styx.TestEndpoint")
-        .build();
+    var triggeredParams = Map.of(
+        "STYX_EXECUTION_ID", "foo",
+        "styx_parameter", "bar"
+    );
+    flyteRunner.createExecution(runState(triggeredParams), execName, FLYTE_EXEC_CONF);
 
     ArgumentCaptor<Map<String, String>> argCaptor = ArgumentCaptor.forClass(Map.class);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
         any(), any(), argCaptor.capture());
+
     assertThat(argCaptor.getValue(), allOf(
         not(hasEntry("STYX_EXECUTION_ID", "foo")),
-        hasEntry("STYX_EXECUTION_ID", "exec-id")
+        not(hasEntry("styx_parameter", "bar")),
+        hasEntry("STYX_EXECUTION_ID", "exec-id"),
+        hasEntry("STYX_PARAMETER", "2016-03-14")
     ));
   }
 
