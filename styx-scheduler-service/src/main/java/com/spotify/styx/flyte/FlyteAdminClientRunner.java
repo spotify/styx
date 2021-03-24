@@ -22,7 +22,6 @@ package com.spotify.styx.flyte;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
-import static com.spotify.styx.docker.LabelValue.normalize;
 import static com.spotify.styx.flyte.FlyteEventTranslator.translate;
 import static com.spotify.styx.util.CloserUtil.register;
 import static com.spotify.styx.util.GrpcContextUtil.currentContextExecutorService;
@@ -155,7 +154,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .map(FlyteAdminClientRunner::getFilteredTriggerParams)
         .orElseGet(Map::of);
 
-    var labels = Map.of(STYX_EXECUTION_ID, normalize(styxVariables.get(STYX_EXECUTION_ID)));
+    // labels values should be normalized calling LabelValue::normalize, but styx execution ids are normalized already
+    var labels = Map.of(STYX_EXECUTION_ID, styxVariables.get(STYX_EXECUTION_ID));
     final var annotations = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         // just to keep compatibility with removing dangling executions
