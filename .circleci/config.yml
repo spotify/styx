@@ -37,6 +37,7 @@ jobs:
       - run:
           name: "Set up GCP credentials"
           command: |
+            echo $GCLOUD_SERVICE_KEY
             echo "$GCLOUD_SERVICE_KEY" > credentials.json
             echo "export GOOGLE_APPLICATION_CREDENTIALS=\"$(realpath credentials.json)\"" >> $BASH_ENV
             google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=credentials.json
