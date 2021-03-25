@@ -25,6 +25,7 @@ processes that transform data periodically. Its initial use case is to run workf
 orchestrated using [Luigi], but it does not have any intrinsic ties to Luigi. Styx can just as well
 execute a container with some simple bash scripts.
 
+
 Styx was built to function smoothly on Google Cloud Platform, thus it makes use of Google products
 such as Google Cloud Datastore, Google Cloud Bigtable and Google Container Engine. However, the
 integrations with these products are all done through clear interfaces and other backends can easily
