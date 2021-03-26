@@ -128,4 +128,20 @@ public class WorkflowActionAuthorizerTest {
         WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
     assertThat(invocation.getCause(), is(cause));
   }
+
+  @Test
+  public void authorizePatchStateWorkflowActionWithIdShouldFailIfWorkflowNotFound() throws IOException {
+    when(storage.workflow(any())).thenReturn(Optional.empty());
+    exception.expect(ResponseException.class);
+    sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
+  }
+
+  @Test
+  public void authorizePatchStateWorkflowActionWithIdShouldFailIfStorageReadFails() throws IOException {
+    final IOException cause = new IOException();
+    when(storage.workflow(any())).thenThrow(cause);
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
+  }
 }
