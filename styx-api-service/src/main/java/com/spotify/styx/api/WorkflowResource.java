@@ -132,6 +132,7 @@ public final class WorkflowResource {
           throw new ResponseException(response);
         }
         var workflow = workflowOpt.orElseThrow();
+        workflowActionAuthorizer.authorizeDeleteWorkflowAction(workflow);
         workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
         tx.deleteWorkflow(workflowId);
         return workflow;
@@ -161,6 +162,7 @@ public final class WorkflowResource {
 
     final Workflow workflow = Workflow.create(componentId, workflowConfig);
 
+    workflowActionAuthorizer.authorizeCreateOrUpdateWorkflowAction(workflow);
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
     var errors = workflowValidator.validateWorkflow(workflow);
@@ -214,6 +216,7 @@ public final class WorkflowResource {
     }
 
     final WorkflowId workflowId = WorkflowId.create(componentId, id);
+    workflowActionAuthorizer.authorizePatchStateWorkflowAction(workflowId);
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflowId);
 
     final WorkflowState patchState;

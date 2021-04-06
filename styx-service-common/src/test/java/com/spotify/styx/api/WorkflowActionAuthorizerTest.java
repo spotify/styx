@@ -58,6 +58,7 @@ public class WorkflowActionAuthorizerTest {
 
   @Mock private Storage storage;
   @Mock private ServiceAccountUsageAuthorizer authorizer;
+  @Mock private ActionAuthorizer actionAuthorizer;
   @Mock private Middlewares.AuthContext ac;
   @Mock private GoogleIdToken idToken;
 
@@ -65,7 +66,7 @@ public class WorkflowActionAuthorizerTest {
 
   @Before
   public void setUp() throws Exception {
-    sut = new WorkflowActionAuthorizer(storage, authorizer);
+    sut = new WorkflowActionAuthorizer(storage, authorizer, actionAuthorizer);
   }
 
   @Test
@@ -126,5 +127,21 @@ public class WorkflowActionAuthorizerTest {
     verify(authorizer).authorizeServiceAccountUsage(
         WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
     assertThat(invocation.getCause(), is(cause));
+  }
+
+  @Test
+  public void authorizePatchStateWorkflowActionWithIdShouldFailIfWorkflowNotFound() throws IOException {
+    when(storage.workflow(any())).thenReturn(Optional.empty());
+    exception.expect(ResponseException.class);
+    sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
+  }
+
+  @Test
+  public void authorizePatchStateWorkflowActionWithIdShouldFailIfStorageReadFails() throws IOException {
+    final IOException cause = new IOException();
+    when(storage.workflow(any())).thenThrow(cause);
+    exception.expect(RuntimeException.class);
+    exception.expectCause(is(cause));
+    sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
   }
 }

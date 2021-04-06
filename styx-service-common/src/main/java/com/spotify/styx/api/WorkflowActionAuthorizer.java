@@ -35,12 +35,15 @@ public class WorkflowActionAuthorizer {
 
   private final Storage storage;
   private final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer;
+  private final ActionAuthorizer actionAuthorizer;
 
   public WorkflowActionAuthorizer(Storage storage,
-                                  ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer) {
+                                  ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer,
+                                  ActionAuthorizer actionAuthorizer) {
     this.storage = Objects.requireNonNull(storage, "storage");
     this.serviceAccountUsageAuthorizer = Objects.requireNonNull(serviceAccountUsageAuthorizer,
         "serviceAccountUsageAuthorizer");
+    this.actionAuthorizer = Objects.requireNonNull(actionAuthorizer);
   }
 
   public void authorizeWorkflowAction(AuthContext ac, WorkflowId workflowId) {
@@ -62,5 +65,23 @@ public class WorkflowActionAuthorizer {
       return;
     }
     serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), serviceAccount.get(), idToken);
+  }
+
+  public void authorizeCreateOrUpdateWorkflowAction(Workflow workflow){
+    actionAuthorizer.authorizeCreateOrUpdateWorkflowAction(workflow);
+  }
+  public void authorizeDeleteWorkflowAction(Workflow workflow) {
+    actionAuthorizer.authorizeDeleteWorkflowAction(workflow);
+  }
+  public void authorizePatchStateWorkflowAction(WorkflowId workflowId) {
+    final Optional<Workflow> workflowOpt;
+    try {
+      workflowOpt = storage.workflow(workflowId);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    final Workflow workflow = workflowOpt.orElseThrow(() -> new ResponseException(
+        Response.forStatus(Status.NOT_FOUND.withReasonPhrase("workflow not found"))));
+    actionAuthorizer.authorizePatchStateWorkflowAction(workflow);
   }
 }

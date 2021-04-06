@@ -30,6 +30,7 @@ import com.google.cloud.datastore.Datastore;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.spotify.apollo.test.ServiceHelper;
+import com.spotify.styx.api.ActionAuthorizer;
 import com.spotify.styx.api.Authenticator;
 import com.spotify.styx.api.AuthenticatorFactory;
 import com.spotify.styx.api.ServiceAccountUsageAuthorizer;
@@ -149,6 +150,7 @@ public class StyxSchedulerServiceFixture {
 
     final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         (cfg, name) -> ServiceAccountUsageAuthorizer.nop();
+    final ActionAuthorizer actionAuthorizer = ActionAuthorizer.create();
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
         .setStorageFactory(storageFactory)
@@ -161,6 +163,7 @@ public class StyxSchedulerServiceFixture {
         .setEventConsumerFactory(eventConsumerFactory)
         .setAuthenticatorFactory(authenticatorFactory)
         .setServiceAccountUsageAuthorizerFactory(serviceAccountUsageAuthorizerFactory)
+        .setActionAuthorizer(actionAuthorizer)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
