@@ -1,4 +1,4 @@
-# Styx
+# Styx 
 
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
 [![Coverage Status](https://codecov.io/gh/spotify/styx/branch/master/graph/badge.svg)](https://codecov.io/gh/spotify/styx)
