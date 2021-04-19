@@ -30,7 +30,7 @@
     <auto-matter.version>0.16.0</auto-matter.version>
     <auto-value.version>1.8</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <errorprone.version>2.3.4</errorprone.version>
+    <errorprone.version>2.6.0</errorprone.version>
     <grpc.version>1.27.2</grpc.version>
   </properties>
 
@@ -216,7 +216,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>28.2-jre</version>
+        <version>30.0-jre</version>
       </dependency>
       <dependency>
         <groupId>com.github.rholder</groupId>
@@ -364,6 +364,12 @@
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_core</artifactId>
         <version>${errorprone.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.springframework</groupId>
@@ -642,7 +648,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.0.0</version>
+        <version>3.8.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -686,7 +692,6 @@
                      -Xplugin:ErrorProne
                      -Xep:RemoveUnusedImports:ERROR
                      -Xep:PrivateConstructorForUtilityClass:ERROR
-                     -Xep:FieldMissingNullable:ERROR
                      -Xep:MultipleTopLevelClasses:ERROR
                      -Xep:MultipleUnaryOperatorsInMethodCall:ERROR
                      -Xep:PackageLocation:ERROR
