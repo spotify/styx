@@ -24,7 +24,7 @@
     <checkstyle.version>2.17</checkstyle.version>
     <semantic-metrics.version>1.0.2</semantic-metrics.version>
     <metrics.version>4.0.2</metrics.version>
-    <opencensus.version>0.25.0</opencensus.version>
+    <opencensus.version>0.28.0</opencensus.version>
     <google.client.lib.version>1.30.8</google.client.lib.version>
     <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
     <auto-matter.version>0.15.3</auto-matter.version>
@@ -393,6 +393,12 @@
         <groupId>io.opencensus</groupId>
         <artifactId>opencensus-contrib-http-util</artifactId>
         <version>${opencensus.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <!-- cli -->
