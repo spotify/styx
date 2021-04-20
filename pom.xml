@@ -456,11 +456,6 @@
         <version>v2-rev20190313-${google.client.lib.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.api</groupId>
-        <artifactId>gax</artifactId>
-        <version>1.54.0</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
         <artifactId>bigtable-hbase-1.x</artifactId>
         <version>1.11.0</version>
@@ -573,16 +568,6 @@
       </dependency>
 
       <!-- version resolution -->
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.11</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
-      </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
