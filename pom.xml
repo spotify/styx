@@ -22,16 +22,16 @@
     <jackson.version>2.12.3</jackson.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
-    <semantic-metrics.version>1.1.7</semantic-metrics.version>
+    <semantic-metrics.version>1.1.1</semantic-metrics.version>
     <metrics.version>4.0.2</metrics.version>
     <opencensus.version>0.28.0</opencensus.version>
-    <google.client.lib.version>1.30.8</google.client.lib.version>
+    <google.client.lib.version>1.31.3</google.client.lib.version>
     <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
     <auto-matter.version>0.16.0</auto-matter.version>
     <auto-value.version>1.8</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
     <errorprone.version>2.6.0</errorprone.version>
-    <grpc.version>1.27.2</grpc.version>
+    <grpc.version>1.37.0</grpc.version>
   </properties>
 
   <repositories>
@@ -106,34 +106,7 @@
 
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>com.spotify</groupId>
-        <artifactId>apollo-bom</artifactId>
-        <version>${apollo.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-bom</artifactId>
-        <version>${grpc.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-bom</artifactId>
-        <version>0.122.3-alpha</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-bom</artifactId>
-        <version>3.11.4</version>
-        <scope>import</scope>
-        <type>pom</type>
-      </dependency>
+
 
       <!-- submodules-->
       <dependency>
@@ -193,6 +166,42 @@
       </dependency>
 
       <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-bom</artifactId>
+        <version>30.1-jre</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>19.2.1</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
+      <dependency>
+        <groupId>com.spotify</groupId>
+        <artifactId>apollo-bom</artifactId>
+        <version>${apollo.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.oauth-client</groupId>
+        <artifactId>google-oauth-client-bom</artifactId>
+        <version>1.31.4</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
+
+      <dependency>
         <groupId>com.spotify</groupId>
         <artifactId>apollo-test</artifactId>
         <version>${apollo.version}</version>
@@ -213,11 +222,6 @@
       </dependency>
 
       <!-- general utility libs -->
-      <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>30.0-jre</version>
-      </dependency>
       <dependency>
         <groupId>com.github.rholder</groupId>
         <artifactId>guava-retrying</artifactId>
@@ -269,46 +273,6 @@
         <version>2.0.6</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.datatype</groupId>
-        <artifactId>jackson-datatype-jdk8</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-yaml</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-parameter-names</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-jaxb-annotations</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.datatype</groupId>
-        <artifactId>jackson-datatype-jsr310</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.cronutils</groupId>
         <artifactId>cron-utils</artifactId>
         <version>9.1.3</version>
@@ -322,11 +286,11 @@
         <groupId>com.spotify.metrics</groupId>
         <artifactId>semantic-metrics-core</artifactId>
         <version>${semantic-metrics.version}</version>
-        <exclusions>	
-          <exclusion>	
-            <groupId>com.codahale.metrics</groupId>	
-            <artifactId>*</artifactId>	
-          </exclusion>	
+        <exclusions>
+          <exclusion>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -478,22 +442,6 @@
         <version>v2-rev20190313-${google.client.lib.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.api</groupId>
-        <artifactId>gax</artifactId>
-        <version>1.54.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.cloud.bigtable</groupId>
-        <artifactId>bigtable-hbase-1.x</artifactId>
-        <version>1.11.0</version>
-        <exclusions>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>log4j-over-slf4j</artifactId>
         <version>1.7.30</version>
@@ -502,11 +450,6 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-tcnative-boringssl-static</artifactId>
         <version>2.0.29.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api</groupId>
-        <artifactId>api-common</artifactId>
-        <version>1.8.1</version>
       </dependency>
 
       <!-- test libs -->
@@ -596,29 +539,9 @@
 
       <!-- version resolution -->
       <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.11</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
-      </dependency>
-      <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
         <version>2.7.5</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client</artifactId>
-        <version>${google.http.client.lib.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client-jackson2</artifactId>
-        <version>${google.http.client.lib.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
@@ -654,6 +577,21 @@
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
         <version>3.8.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud.bigtable</groupId>
+        <artifactId>bigtable-hbase-1.x</artifactId>
+        <version>1.12.1</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.api</groupId>
+            <artifactId>gax-grpc</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>
