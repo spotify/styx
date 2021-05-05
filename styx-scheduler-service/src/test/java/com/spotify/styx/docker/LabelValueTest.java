@@ -21,6 +21,8 @@ package com.spotify.styx.docker;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import com.spotify.styx.util.ClassEnforcer;
 import junitparams.JUnitParamsRunner;
@@ -104,6 +106,26 @@ public class LabelValueTest {
   @Test
   public void shouldNotBeConstructable() throws ReflectiveOperationException {
     assertThat(ClassEnforcer.assertNotInstantiable(LabelValue.class), is(true));
+  }
+
+  @Test
+  @Parameters({
+      "",
+      "a",
+      "test-value_including-0-and-9",
+  })
+  public void testIsNormalizedShouldAcceptConformingValues(String value) {
+    assertTrue(LabelValue.isNormalized(value));
+  }
+
+  @Test
+  @Parameters({
+      "UPPER",
+      "-dashes",
+      "unsupported#chars",
+  })
+  public void testIsNormalizedShouldRejectNonConformingValues(String value) {
+    assertFalse(LabelValue.isNormalized(value));
   }
 
   private static String repeat(String a, int count) {

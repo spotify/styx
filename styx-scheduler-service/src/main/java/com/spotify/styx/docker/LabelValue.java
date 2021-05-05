@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-final class LabelValue {
+final public class LabelValue {
 
   private static final int KUBERNETES_LABEL_MAX_LENGTH = 63;
   private static final int DIGEST_SUFFIX_LENGTH = 7;
@@ -43,6 +43,20 @@ final class LabelValue {
   private static final BaseEncoding BASE16_ENCODING_LOWER_CASE = BaseEncoding.base16().lowerCase();
 
   /**
+   * Verifies if the label value complies with Kubernetes restrictions as described by:
+   * https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+   *
+   * Note that this verification implements a subset of the restriction, e.g. lower case only, no `.`.
+   *
+   * @param value value of the label to verify.
+   *
+   * @return true if value is a normalized value, false otherwise.
+   */
+  public static boolean isNormalized(String value) {
+    return value.isEmpty() || VALID.matcher(value).matches();
+  }
+
+  /**
    * Cleanup the label value to comply with Kubernetes restrictions as described by:
    * https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
    * 
@@ -53,7 +67,7 @@ final class LabelValue {
    * @return normalized value, might contain less information than input.
    */
   public static String normalize(String value) {
-    if (value.isEmpty() || VALID.matcher(value).matches()) {
+    if (isNormalized(value)) {
       return value;
     }
 
