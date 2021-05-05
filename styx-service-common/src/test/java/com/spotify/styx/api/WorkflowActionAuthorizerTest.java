@@ -150,7 +150,6 @@ public class WorkflowActionAuthorizerTest {
     final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
     doThrow(cause).when(actionAuthorizer).authorizePatchStateWorkflowAction(any());
     exception.expect(ResponseException.class);
-    exception.expectCause(is(cause));
     sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
   }
 
@@ -159,7 +158,6 @@ public class WorkflowActionAuthorizerTest {
     final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
     doThrow(cause).when(actionAuthorizer).authorizeCreateOrUpdateWorkflowAction(any());
     exception.expect(ResponseException.class);
-    exception.expectCause(is(cause));
     sut.authorizeCreateOrUpdateWorkflowAction(WORKFLOW);
   }
 
@@ -168,7 +166,6 @@ public class WorkflowActionAuthorizerTest {
     final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
     doThrow(cause).when(actionAuthorizer).authorizeDeleteWorkflowAction(any());
     exception.expect(ResponseException.class);
-    exception.expectCause(is(cause));
     sut.authorizeDeleteWorkflowAction(WORKFLOW);
   }
 
