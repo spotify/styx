@@ -64,6 +64,23 @@ public class WorkflowActionAuthorizerTest {
 
   private WorkflowActionAuthorizer sut;
 
+  class ThrowActionAuthorizer implements ActionAuthorizer {
+    @Override
+    public void authorizeCreateOrUpdateWorkflowAction(final Workflow workflow) {
+      throw  new ResponseException(Response.forStatus(FORBIDDEN));
+    }
+
+    @Override
+    public void authorizeDeleteWorkflowAction(final Workflow workflow) {
+      throw  new ResponseException(Response.forStatus(FORBIDDEN));
+    }
+
+    @Override
+    public void authorizePatchStateWorkflowAction(final Workflow workflow) {
+      throw  new ResponseException(Response.forStatus(FORBIDDEN));
+    }
+  }
+
   @Before
   public void setUp() throws Exception {
     sut = new WorkflowActionAuthorizer(storage, authorizer, actionAuthorizer);
@@ -147,24 +164,21 @@ public class WorkflowActionAuthorizerTest {
 
   @Test
   public void authorizePatchStateWorkflowActionFailIfActionAutorizerComplains() {
-    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
-    doThrow(cause).when(actionAuthorizer).authorizePatchStateWorkflowAction(any());
+    sut = new WorkflowActionAuthorizer(storage, authorizer, new ThrowActionAuthorizer());
     exception.expect(ResponseException.class);
     sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
   }
 
   @Test
   public void authorizeCreateUpdateWorkflowActionFailIfActionAutorizerComplains() {
-    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
-    doThrow(cause).when(actionAuthorizer).authorizeCreateOrUpdateWorkflowAction(any());
+    sut = new WorkflowActionAuthorizer(storage, authorizer, new ThrowActionAuthorizer());
     exception.expect(ResponseException.class);
     sut.authorizeCreateOrUpdateWorkflowAction(WORKFLOW);
   }
 
   @Test
   public void authorizeDeleteWorkflowActionFailIfActionAutorizerComplains() {
-    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
-    doThrow(cause).when(actionAuthorizer).authorizeDeleteWorkflowAction(any());
+    sut = new WorkflowActionAuthorizer(storage, authorizer, new ThrowActionAuthorizer());
     exception.expect(ResponseException.class);
     sut.authorizeDeleteWorkflowAction(WORKFLOW);
   }
