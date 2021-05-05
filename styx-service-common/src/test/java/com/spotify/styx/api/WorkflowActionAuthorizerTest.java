@@ -144,4 +144,29 @@ public class WorkflowActionAuthorizerTest {
     exception.expectCause(is(cause));
     sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
   }
+
+  @Test
+  public void authorizePatchStateWorkflowActionFailIfActionAutorizerComplains() throws IOException {
+    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
+    doThrow(cause).when(actionAuthorizer).authorizePatchStateWorkflowAction(any());
+    exception.expect(ResponseException.class);
+    sut.authorizePatchStateWorkflowAction(WORKFLOW.id());
+  }
+
+  @Test
+  public void authorizeCreateUpdateWorkflowActionFailIfActionAutorizerComplains() throws IOException {
+    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
+    doThrow(cause).when(actionAuthorizer).authorizeCreateOrUpdateWorkflowAction(any());
+    exception.expect(ResponseException.class);
+    sut.authorizeCreateOrUpdateWorkflowAction(WORKFLOW);
+  }
+
+  @Test
+  public void authorizeDeleteWorkflowActionFailIfActionAutorizerComplains() throws IOException {
+    final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
+    doThrow(cause).when(actionAuthorizer).authorizeDeleteWorkflowAction(any());
+    exception.expect(ResponseException.class);
+    sut.authorizeDeleteWorkflowAction(WORKFLOW);
+  }
+
 }

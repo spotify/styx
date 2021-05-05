@@ -21,6 +21,7 @@
 
 package com.spotify.styx.api;
 
+import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,12 +34,10 @@ public interface ActionAuthorizer {
 
   Logger LOG = LoggerFactory.getLogger(ActionAuthorizer.class);
 
-  static ActionAuthorizer nop() {
-    return ActionAuthorizer.Nop.INSTANCE;
-  }
+  interface Factory{
+    ActionAuthorizer create(Environment environment);
 
-  static ActionAuthorizer create() {
-    return ActionAuthorizer.nop();
+    Factory DEFAULT = e -> Nop.INSTANCE;
   }
 
   /**

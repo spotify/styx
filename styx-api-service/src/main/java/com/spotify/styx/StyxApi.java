@@ -92,7 +92,7 @@ public class StyxApi implements AppInit {
   private final StatsFactory statsFactory;
   private final AuthenticatorFactory authenticatorFactory;
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
-  private final ActionAuthorizer actionAuthorizer;
+  private final ActionAuthorizer.Factory actionAuthorizerFactory;
   private final Time time;
 
   public interface WorkflowConsumerFactory
@@ -107,7 +107,7 @@ public class StyxApi implements AppInit {
     private AuthenticatorFactory authenticatorFactory = AuthenticatorFactory.DEFAULT;
     private ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
-    private ActionAuthorizer actionAuthorizer = ActionAuthorizer.create();
+    private ActionAuthorizer.Factory actionAuthorizerFactory = ActionAuthorizer.Factory.DEFAULT;
     private Time time = Instant::now;
 
     public Builder setServiceName(String serviceName) {
@@ -142,8 +142,8 @@ public class StyxApi implements AppInit {
       return this;
     }
 
-    public Builder setActionAuthorizer(final ActionAuthorizer actionAuthorizer) {
-      this.actionAuthorizer = actionAuthorizer;
+    public Builder setActionAuthorizerFactory(final ActionAuthorizer.Factory actionAuthorizerFactory) {
+      this.actionAuthorizerFactory = actionAuthorizerFactory;
       return this;
     }
 
@@ -172,7 +172,7 @@ public class StyxApi implements AppInit {
     this.statsFactory = requireNonNull(builder.statsFactory);
     this.authenticatorFactory = requireNonNull(builder.authenticatorFactory);
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
-    this.actionAuthorizer = requireNonNull(builder.actionAuthorizer);
+    this.actionAuthorizerFactory = requireNonNull(builder.actionAuthorizerFactory);
     this.time = requireNonNull(builder.time);
   }
 
@@ -198,7 +198,7 @@ public class StyxApi implements AppInit {
 
     final ServiceAccountUsageAuthorizer serviceAccountUsageAuthorizer =
         serviceAccountUsageAuthorizerFactory.apply(environment, serviceName);
-    final ActionAuthorizer actionAuthorizer = ActionAuthorizer.create();
+    final ActionAuthorizer actionAuthorizer = actionAuthorizerFactory.create(environment);
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
 
