@@ -54,6 +54,8 @@ public class FlyteAdminClientTest {
   static final String LP_NAME = "launch_plan_name";
   static final String LP_VERSION = "launch_plan_version_1";
   static final IdentifierOuterClass.ResourceType LP_RESOURCE_TYPE = IdentifierOuterClass.ResourceType.LAUNCH_PLAN;
+  static final Map<String, String> LABELS = ImmutableMap.of("label-key", "id");
+  static final Map<String, String> ANNOTATIONS = ImmutableMap.of("annotation-key", "value");
   static final Map<String, String> EXTRA_DEFAULT_INPUTS = ImmutableMap.of(TestAdminService.EXTRA_PARAMETER_NAME, Instant.now().toString());
   private FlyteAdminClient flyteAdminClient;
 
@@ -92,25 +94,22 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, Map.of(), EXTRA_DEFAULT_INPUTS);
+            ExecutionMode.SCHEDULED, Map.of(), Map.of(), EXTRA_DEFAULT_INPUTS);
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
   }
 
   @Test
-  public void shouldPropagateAnnotationsOnCreateExecutionToStub() {
-    final Map<String, String> annotations = Map.of(
-        "Frodo", "Baggins",
-        "Sam", "Gamgee"
-    );
+  public void shouldPropagateLabelsAndAnnotationsOnCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, annotations, EXTRA_DEFAULT_INPUTS);
+            ExecutionMode.SCHEDULED, LABELS, ANNOTATIONS, EXTRA_DEFAULT_INPUTS);
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);
-    assertThat(retrievedExecution.getSpec().getAnnotations().getValuesMap(), equalTo(annotations));
+    assertThat(retrievedExecution.getSpec().getLabels().getValuesMap(), equalTo(LABELS));
+    assertThat(retrievedExecution.getSpec().getAnnotations().getValuesMap(), equalTo(ANNOTATIONS));
   }
 
   @Test

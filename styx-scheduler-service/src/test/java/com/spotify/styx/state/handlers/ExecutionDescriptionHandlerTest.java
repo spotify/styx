@@ -21,6 +21,7 @@
 package com.spotify.styx.state.handlers;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
+import static com.spotify.styx.docker.LabelValue.isNormalized;
 import static com.spotify.styx.model.Schedule.HOURS;
 import static com.spotify.styx.state.RunState.State.PREPARE;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
@@ -31,6 +32,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -272,6 +274,27 @@ public class ExecutionDescriptionHandlerTest {
 
     verify(eventRouter).receiveIgnoreClosed(Event.halt(workflowInstance), COUNTER);
   }
+
+  @Test
+  public void executionIdShouldConformToKubernetesLabelFormat() throws Exception {
+    var workflow = Workflow.create("id", workflowConfiguration());
+    var workflowState = WorkflowState.builder().enabled(true).build();
+    var workflowWithState = WorkflowWithState.create(workflow, workflowState);
+    var workflowInstance = WorkflowInstance.create(workflow.id(), "2016-03-14");
+    var runState = RunState.create(workflowInstance, PREPARE, NOW, COUNTER);
+
+    when(storage.workflowWithState(workflow.id())).thenReturn(Optional.of(workflowWithState));
+    toTest.transitionInto(runState, eventRouter);
+    verify(eventRouter).receive(eventCaptor.capture(), eq(COUNTER));
+
+    var event = eventCaptor.getValue();
+    event.accept(eventVisitor);
+    verify(eventVisitor)
+        .submit(workflowInstanceCaptor.capture(), executionDescriptionCaptor.capture(), executionIdCaptor.capture());
+
+    assertTrue(isNormalized(executionIdCaptor.getValue()));
+  }
+
 
   private WorkflowConfiguration workflowConfiguration(String... args) {
     return WorkflowConfiguration.builder()

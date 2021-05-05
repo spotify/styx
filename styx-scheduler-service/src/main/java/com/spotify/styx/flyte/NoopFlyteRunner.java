@@ -23,7 +23,6 @@ package com.spotify.styx.flyte;
 import com.google.common.annotations.VisibleForTesting;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.state.RunState;
-import java.util.Map;
 
 /**
  * No-op {@code FlyteRunner} meant to be used when Flyte is disabled or not available.
@@ -37,8 +36,7 @@ public class NoopFlyteRunner implements FlyteRunner {
   }
 
   @Override
-  public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf,
-                                Map<String, String> annotations)
+  public String createExecution(RunState runState, String name, FlyteExecConf flyteExecConf)
       throws CreateExecutionException {
     throw new CreateExecutionException("Cannot create execution for: " + flyteExecConf);
   }
