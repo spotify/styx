@@ -150,7 +150,7 @@ public class StyxSchedulerServiceFixture {
 
     final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory =
         (cfg, name) -> ServiceAccountUsageAuthorizer.nop();
-    final ActionAuthorizer actionAuthorizer = ActionAuthorizer.create();
+    final ActionAuthorizer.Factory actionAuthorizerFactory = ActionAuthorizer.Factory.DEFAULT;
     styxScheduler = StyxScheduler.newBuilder()
         .setTime(time)
         .setStorageFactory(storageFactory)
@@ -163,7 +163,7 @@ public class StyxSchedulerServiceFixture {
         .setEventConsumerFactory(eventConsumerFactory)
         .setAuthenticatorFactory(authenticatorFactory)
         .setServiceAccountUsageAuthorizerFactory(serviceAccountUsageAuthorizerFactory)
-        .setActionAuthorizer(actionAuthorizer)
+        .setActionAuthorizerFactory(actionAuthorizerFactory)
         .build();
 
     serviceHelper = ServiceHelper.create(styxScheduler, StyxScheduler.SERVICE_NAME)
