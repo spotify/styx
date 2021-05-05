@@ -23,16 +23,12 @@ package com.spotify.styx.api;
 
 import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Action Authorizer can be used to implement an extra authorization system for destructive action perform on workflow though POST, DELETE AND PATCH api
  * commands.
  */
 public interface ActionAuthorizer {
-
-  Logger LOG = LoggerFactory.getLogger(ActionAuthorizer.class);
 
   interface Factory{
     ActionAuthorizer create(Environment environment);
