@@ -327,12 +327,22 @@ class KubernetesDockerRunner implements DockerRunner {
         // Use the k8s pause container image. It sleeps forever until terminated.
         .withImage("k8s.gcr.io/pause:3.1")
         .withNewResources()
-        .addToRequests("cpu", new QuantityBuilder()
-            .withAmount("0")
-            .build())
-        .addToRequests("memory", new QuantityBuilder()
-            .withAmount("0")
-            .build())
+        .withLimits(Map.of(
+          "cpu", new QuantityBuilder()
+              .withAmount("250")
+              .withFormat("m")
+              .build(),
+          "memory", new QuantityBuilder()
+              .withAmount("256")
+              .withFormat("Mi")
+              .build()))
+        .withRequests(Map.of(
+          "cpu", new QuantityBuilder()
+              .withAmount("0")
+              .build(),
+          "memory", new QuantityBuilder()
+              .withAmount("0")
+              .build()))
         .endResources()
         .build();
   }
