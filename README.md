@@ -273,7 +273,7 @@ Stable features and APIs:
 * Styx Client API
 * Styx Workflows
 
-All other APIs are considered unstable and can change at any time. E.g. the `StyxScheduler` class offers some plugin APIs for customizing functionality but they might change at any time. This should only affect engineers that link against and customize the Styx services.
+All other APIs are considered unstable and can change at any time. Eg. the `StyxScheduler` class offers some plugin APIs for customizing functionality but they might change at any time. This should only affect engineers that link against and customize the Styx services.
 
 
 ### Code Coverage
