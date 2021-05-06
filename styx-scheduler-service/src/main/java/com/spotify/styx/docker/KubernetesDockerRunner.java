@@ -334,10 +334,10 @@ class KubernetesDockerRunner implements DockerRunner {
             .withAmount("0")
             .build())
         .addToLimits("cpu", new QuantityBuilder()
-            .withAmount("250m")
+            .withAmount("500m")
             .build())
         .addToLimits("memory", new QuantityBuilder()
-            .withAmount("250Mi")
+            .withAmount("500Mi")
             .build())
         .endResources()
         .build();
