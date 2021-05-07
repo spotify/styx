@@ -48,6 +48,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -431,7 +432,14 @@ public class FlyteAdminClientRunnerTest {
 
     flyteRunner.createExecution(RUN_STATE, execName, FLYTE_EXEC_CONF);
 
-    final var expectedLabels = Map.of("STYX_EXECUTION_ID", "exec-id");
+    final var expectedLabels = Map.of(
+        "STYX_EXECUTION_ID", "exec-id",
+        "STYX_COMPONENT_ID", "id",
+        "STYX_WORKFLOW_ID", LabelValue.normalize("styx.TestEndpoint"),
+        "STYX_PARAMETER", "2016-03-14",
+        "STYX_TRIGGER_ID", "natural-trigger",
+        "STYX_TRIGGER_TYPE", "natural"
+    );
     final var expectedAnnotations = ImmutableMap.<String, String>builder()
         .put("STYX_COMPONENT_ID", "id")
         .put("STYX_EXECUTION_ID", "exec-id")

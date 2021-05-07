@@ -21,6 +21,7 @@
 package com.spotify.styx.flyte;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.flyte.FlyteEventTranslator.translate;
 import static com.spotify.styx.util.CloserUtil.register;
@@ -34,6 +35,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -150,13 +152,14 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .filter(mode -> mode != ExecutionMode.UNRECOGNIZED)
         .orElseThrow(() -> new CreateExecutionException("Missing trigger or unknown in StateData: " + runState.data()));
 
-    var styxVariables = getStyxVariables(runState.workflowInstance(), runState.data());
-    var triggeredParams = runState.data().triggerParameters()
+    final var styxVariables = getStyxVariables(runState.workflowInstance(), runState.data());
+    final var triggeredParams = runState.data().triggerParameters()
         .map(FlyteAdminClientRunner::getFilteredTriggerParams)
         .orElseGet(Map::of);
 
-    // labels values should be normalized calling LabelValue::normalize, but styx execution ids are normalized already
-    var labels = Map.of(STYX_EXECUTION_ID, styxVariables.get(STYX_EXECUTION_ID));
+    final var labels = styxVariables.entrySet().stream()
+        .map(entry -> Map.entry(entry.getKey(), LabelValue.normalize(entry.getValue())))
+        .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
     final var annotations = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         // just to keep compatibility with removing dangling executions
@@ -165,7 +168,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, styxVariables.get(STYX_WORKFLOW_ID) + "#" + styxVariables.get(STYX_PARAMETER))
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
-    var extraDefaultInputs = ImmutableMap.<String, String>builder()
+    final var extraDefaultInputs = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         .putAll(triggeredParams)
         .build();
