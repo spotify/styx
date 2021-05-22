@@ -68,6 +68,8 @@ public class ServiceAccountKeyManager {
           .execute();
       return true;
     } catch (GoogleJsonResponseException e) {
+      LOG.info("Couldn't check existence of key {} {} {}",
+          keyName, e.getStatusCode(), e.getDetails().toPrettyString(), e);
       // TODO: handle 403 correctly once google fixes their API
       if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
         return false;
@@ -99,6 +101,7 @@ public class ServiceAccountKeyManager {
           .delete(keyName)
           .execute();
     } catch (GoogleJsonResponseException e) {
+      LOG.info("Couldn't delete key {} {} {}", keyName, e.getStatusCode(), e.getDetails().toPrettyString(), e);
       // TODO: handle 403 correctly once google fixes their API
       if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
         LOG.debug("Couldn't find key to delete {}", keyName, e);
