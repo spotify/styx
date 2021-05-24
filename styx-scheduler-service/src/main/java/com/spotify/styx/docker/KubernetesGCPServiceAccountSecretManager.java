@@ -157,12 +157,7 @@ class KubernetesGCPServiceAccountSecretManager {
             p12KeyName, secretName, workflowId);
       }
 
-
-      deleteSecret(existingSecret);
-
-      // Delete secret and any lingering key before creating new keys
-      keyManager.deleteKey(jsonKeyName);
-      keyManager.deleteKey(p12KeyName);
+      return secretName;
     }
 
     // Create service account keys and secret
