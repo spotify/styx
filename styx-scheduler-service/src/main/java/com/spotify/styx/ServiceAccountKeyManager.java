@@ -81,9 +81,15 @@ public class ServiceAccountKeyManager {
   private ServiceAccountKey createKey(
       String serviceAccount,
       CreateServiceAccountKeyRequest request) throws IOException {
-    return iam.projects().serviceAccounts().keys()
+    final ServiceAccountKey key = iam.projects().serviceAccounts().keys()
         .create("projects/-/serviceAccounts/" + serviceAccount, request)
         .execute();
+    try {
+      keyExists(key.getName());
+    } catch (Exception e) {
+      LOG.info("Got exception when checking key existence {}", key.getName(), e);
+    }
+    return key;
   }
 
   public void tryDeleteKey(String keyName) {
