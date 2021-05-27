@@ -77,7 +77,6 @@ import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -460,7 +459,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  @Ignore
   public void shouldCreateNewServiceAccountKeysIfKeysAreDeleted() throws IOException {
 
     final ObjectMeta metadata = new ObjectMeta();
@@ -505,45 +503,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     assertThat(createdSecret.getMetadata().getAnnotations(), hasEntry("styx-wf-sa", SERVICE_ACCOUNT));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.json", newJsonKey.getPrivateKeyData()));
     assertThat(createdSecret.getData(), hasEntry("styx-wf-sa.p12", newP12Key.getPrivateKeyData()));
-  }
-
-  @Test
-  public void shouldNotCreateNewServiceAccountKeysIfKeysAreDeleted() throws IOException {
-
-    final ObjectMeta metadata = new ObjectMeta();
-    metadata.setAnnotations(Map.of("styx-wf-sa", SERVICE_ACCOUNT));
-
-    final String jsonKeyId = "json-key";
-    final String p12KeyId = "p12-key";
-    final String newJsonKeyId = "new-json-key";
-    final String newP12KeyId = "new-p12-key";
-
-    final String creationTimestamp = CLOCK.instant().minus(Duration.ofDays(1)).toString();
-    final Secret secret = fakeServiceAccountKeySecret(
-        SERVICE_ACCOUNT, SECRET_EPOCH, jsonKeyId, p12KeyId, creationTimestamp);
-
-    final ServiceAccountKey newJsonKey = new ServiceAccountKey()
-        .setName(newJsonKeyId)
-        .setPrivateKeyData("new-json-private-key-data");
-
-    final ServiceAccountKey newP12Key = new ServiceAccountKey()
-        .setName(newP12KeyId)
-        .setPrivateKeyData("new-p12-private-key-data");
-
-    when(serviceAccountKeyManager.serviceAccountExists(SERVICE_ACCOUNT)).thenReturn(true);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, jsonKeyId))).thenReturn(false);
-    when(serviceAccountKeyManager.keyExists(keyName(SERVICE_ACCOUNT, p12KeyId))).thenReturn(false);
-
-    when(k8sClient.getSecret(secret.getMetadata().getName())).thenReturn(Optional.of(secret));
-
-    sut.ensureServiceAccountKeySecret(WORKFLOW_INSTANCE.workflowId().toString(), SERVICE_ACCOUNT);
-
-    verify(serviceAccountKeyManager, never()).deleteKey(keyName(SERVICE_ACCOUNT, jsonKeyId));
-    verify(serviceAccountKeyManager, never()).deleteKey(keyName(SERVICE_ACCOUNT, p12KeyId));
-    verify(serviceAccountKeyManager, never()).createJsonKey(SERVICE_ACCOUNT);
-    verify(serviceAccountKeyManager, never()).createP12Key(SERVICE_ACCOUNT);
-    verify(k8sClient, never()).deleteSecret(secret.getMetadata().getName());
-    verify(k8sClient, never()).createSecret(secretCaptor.capture());
   }
 
   /**
