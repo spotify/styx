@@ -153,11 +153,10 @@ class KubernetesGCPServiceAccountSecretManager {
 
       LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
 
-      deleteSecret(existingSecret);
-
       // Delete secret and any lingering key before creating new keys
       keyManager.deleteKey(jsonKeyName);
       keyManager.deleteKey(p12KeyName);
+      deleteSecret(existingSecret);
     }
 
     // Create service account keys and secret
