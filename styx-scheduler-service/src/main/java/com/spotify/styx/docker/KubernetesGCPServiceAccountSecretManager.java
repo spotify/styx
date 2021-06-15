@@ -147,17 +147,17 @@ class KubernetesGCPServiceAccountSecretManager {
       final String jsonKeyName = annotations.get(STYX_WORKFLOW_SA_JSON_KEY_NAME_ANNOTATION);
       final String p12KeyName = annotations.get(STYX_WORKFLOW_SA_P12_KEY_NAME_ANNOTATION);
 
-      if (!keyExists(jsonKeyName)) {
-        LOG.warn("[AUDIT] Service account JSON key does not exist or cannot be verified, {} in {} for workflow {}",
-            jsonKeyName, secretName, workflowId);
+      if (keyExists(jsonKeyName) && keyExists(p12KeyName)) {
+        return secretName;
       }
 
-      if (!keyExists(p12KeyName)) {
-        LOG.warn("[AUDIT] Service account P12 key does not exist or cannot be verified, {} in {} for workflow {}",
-            p12KeyName, secretName, workflowId);
-      }
+      LOG.info("[AUDIT] Service account keys have been deleted for {}, recreating", serviceAccount);
 
-      return secretName;
+      deleteSecret(existingSecret);
+
+      // Delete secret and any lingering key before creating new keys
+      keyManager.deleteKey(jsonKeyName);
+      keyManager.deleteKey(p12KeyName);
     }
 
     // Create service account keys and secret
