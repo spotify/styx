@@ -45,7 +45,7 @@ statsd==3.3.0             # via flytekit
 stringcase==1.2.0         # via dataclasses-json
 typing-extensions==3.7.4.3  # via importlib-metadata, typing-inspect
 typing-inspect==0.6.0     # via dataclasses-json
-urllib3==1.25.11          # via flytekit, requests, responses
+urllib3==1.26.5          # via flytekit, requests, responses
 wheel==0.36.2             # via flytekit
 wrapt==1.12.1             # via deprecated, flytekit
 zipp==3.4.1               # via importlib-metadata
