@@ -183,6 +183,16 @@ final class NoopStats implements Stats {
   }
 
   @Override
+  public void recordKeyCreation() {
+    // nop
+  }
+
+  @Override
+  public void recordKeyDeletion() {
+    // nop
+  }
+
+  @Override
   public void recordKubernetesOperation(String operation, long durationMillis, String status) {
     // nop
   }

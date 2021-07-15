@@ -31,6 +31,8 @@ import static com.spotify.styx.monitoring.MetricsStats.EVENT_CONSUMER_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_MISMATCH;
 import static com.spotify.styx.monitoring.MetricsStats.EXIT_CODE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.HISTOGRAM;
+import static com.spotify.styx.monitoring.MetricsStats.KEY_CREATION_RATE;
+import static com.spotify.styx.monitoring.MetricsStats.KEY_DELETION_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_ERROR_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.KUBERNETES_RATE;
@@ -111,6 +113,8 @@ public class MetricsStatsTest {
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "miss"))).thenReturn(meter);
     when(registry.meter(COUNTER_CACHE_RATE.tagged("result", "hit"))).thenReturn(meter);
     when(registry.meter(SERVICE_ACCOUNT_CLEANUP_RATE)).thenReturn(meter);
+    when(registry.meter(KEY_CREATION_RATE)).thenReturn(meter);
+    when(registry.meter(KEY_DELETION_RATE)).thenReturn(meter);
     stats = new MetricsStats(registry, time);
   }
 
@@ -364,5 +368,17 @@ public class MetricsStatsTest {
     final Histogram histogram = HISTOGRAM.newMetric();
     assertThat(histogram, is(not(nullValue())));
     assertThat(HISTOGRAM.isInstance(histogram), is(true));
+  }
+
+  @Test
+  public void shouldRecordKeyCreation() {
+    stats.recordKeyCreation();
+    verify(meter).mark();
+  }
+
+  @Test
+  public void shouldRecordKeyDeletion() {
+    stats.recordKeyDeletion();
+    verify(meter).mark();
   }
 }

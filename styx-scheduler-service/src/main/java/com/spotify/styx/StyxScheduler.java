@@ -650,7 +650,7 @@ public class StyxScheduler implements AppInit {
 
     final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
     final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
-    final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager();
+    final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager(stats);
     var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
@@ -699,7 +699,7 @@ public class StyxScheduler implements AppInit {
     }
   }
 
-  private static ServiceAccountKeyManager createServiceAccountKeyManager() {
+  private static ServiceAccountKeyManager createServiceAccountKeyManager(Stats stats) {
     try {
       final HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
       final JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
@@ -710,7 +710,7 @@ public class StyxScheduler implements AppInit {
           httpTransport, jsonFactory, credential)
           .setApplicationName(SERVICE_NAME)
           .build();
-      return new ServiceAccountKeyManager(iam);
+      return new ServiceAccountKeyManager(iam, stats);
     } catch (GeneralSecurityException | IOException e) {
       throw new RuntimeException(e);
     }
