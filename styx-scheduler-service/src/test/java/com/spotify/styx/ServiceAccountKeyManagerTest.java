@@ -31,6 +31,8 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.services.iam.v1.Iam;
+import com.google.api.services.iam.v1.model.ServiceAccountKey;
+import com.spotify.styx.monitoring.Stats;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,6 +58,12 @@ public class ServiceAccountKeyManagerTest {
   @Mock
   private Iam.Projects.ServiceAccounts.Keys.Get get;
 
+  @Mock
+  private Iam.Projects.ServiceAccounts.Keys.Create create;
+
+  @Mock
+  private Stats stats;
+
   private ServiceAccountKeyManager sakm;
 
   private static final GoogleJsonResponseException INTERNAL_SERVER_ERROR =
@@ -79,8 +87,9 @@ public class ServiceAccountKeyManagerTest {
     when(serviceAccounts.keys()).thenReturn(keys);
     when(keys.get(any())).thenReturn(get);
     when(keys.delete(any())).thenReturn(delete);
+    when(keys.create(any(), any())).thenReturn(create);
 
-    sakm = new ServiceAccountKeyManager(iam);
+    sakm = new ServiceAccountKeyManager(iam, stats);
   }
 
   @Test
@@ -130,5 +139,19 @@ public class ServiceAccountKeyManagerTest {
     when(delete.execute()).thenThrow(NOT_FOUND);
     sakm.deleteKey("foo");
     verify(iam.projects().serviceAccounts().keys()).delete("foo");
+  }
+
+  @Test
+  public void createKeyShouldBeRecorded() throws Exception {
+    ServiceAccountKey key = new ServiceAccountKey();
+    when(create.execute()).thenReturn(key);
+    sakm.createJsonKey("SA");
+    verify(stats).recordKeyCreation();
+  }
+
+  @Test
+  public void deleteKeyShouldBeRecorded() throws Exception {
+    sakm.deleteKey("SA");
+    verify(stats).recordKeyDeletion();
   }
 }

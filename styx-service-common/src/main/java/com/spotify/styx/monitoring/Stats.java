@@ -93,6 +93,10 @@ public interface Stats {
 
   void recordServiceAccountCleanup();
 
+  void recordKeyCreation();
+
+  void recordKeyDeletion();
+
   void recordKubernetesOperation(String operation, long durationMillis, String status);
 
   void recordKubernetesOperationError(String operation, String type, int code);

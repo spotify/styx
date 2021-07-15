@@ -24,7 +24,9 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.CreateServiceAccountKeyRequest;
 import com.google.api.services.iam.v1.model.ServiceAccountKey;
+import com.spotify.styx.monitoring.Stats;
 import java.io.IOException;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +36,12 @@ public class ServiceAccountKeyManager {
 
   private final Iam iam;
 
-  ServiceAccountKeyManager(Iam iam) {
-    this.iam = iam;
+  private final Stats stats;
+
+  ServiceAccountKeyManager(Iam iam, Stats stats) {
+    this.iam = Objects.requireNonNull(iam);;
+
+    this.stats = Objects.requireNonNull(stats);;
   }
 
   public ServiceAccountKey createJsonKey(String serviceAccount) throws IOException {
@@ -84,6 +90,7 @@ public class ServiceAccountKeyManager {
     final ServiceAccountKey key = iam.projects().serviceAccounts().keys()
         .create("projects/-/serviceAccounts/" + serviceAccount, request)
         .execute();
+    stats.recordKeyCreation();
     try {
       keyExists(key.getName());
     } catch (Exception e) {
@@ -106,6 +113,7 @@ public class ServiceAccountKeyManager {
       iam.projects().serviceAccounts().keys()
           .delete(keyName)
           .execute();
+      stats.recordKeyDeletion();
     } catch (GoogleJsonResponseException e) {
       LOG.info("Couldn't delete key {} {} {}", keyName, e.getStatusCode(), e.getDetails().toPrettyString(), e);
       // TODO: handle 403 correctly once google fixes their API
