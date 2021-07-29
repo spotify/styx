@@ -24,6 +24,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Verify.verifyNotNull;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 
+import com.google.common.annotations.VisibleForTesting;
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
@@ -41,10 +42,12 @@ public class FlyteAdminClient {
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClient.class);
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
+  private static final int MAX_RETRY_ATTEMPTS = 3;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
-  public FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
+  @VisibleForTesting
+  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
     this.stub = Objects.requireNonNull(stub, "stub");
   }
 
@@ -56,7 +59,7 @@ public class FlyteAdminClient {
     }
     // Enable transparent retries:
     // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
-    var channel = builder.enableRetry().maxRetryAttempts(0).build();
+    var channel = builder.enableRetry().maxRetryAttempts(MAX_RETRY_ATTEMPTS).build();
 
     return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
   }
