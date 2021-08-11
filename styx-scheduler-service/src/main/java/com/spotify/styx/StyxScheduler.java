@@ -675,7 +675,7 @@ public class StyxScheduler implements AppInit {
       return FlyteRunner.noop();
     }
 
-    var flyteAdminClient = getFlyteAdminClient(config, runnerId, flyteAdminClientInterceptors));
+    var flyteAdminClient = getFlyteAdminClient(config, runnerId, flyteAdminClientInterceptors);
     return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
   }
 
