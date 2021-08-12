@@ -46,6 +46,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.StyxScheduler.KubernetesClientFactory;
+import com.spotify.styx.flyte.FlyteAdminClientInterceptors;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.NoopFlyteRunner;
 import com.spotify.styx.model.Workflow;
@@ -277,7 +278,7 @@ public class StyxSchedulerTest {
     var configMap = ImmutableMap.<String, String>builder()
         .put("styx.flyte.enabled", "false");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager, FlyteAdminClientInterceptors.NOOP);
 
     assertThat(flyteRunner, instanceOf(NoopFlyteRunner.class));
   }
@@ -290,7 +291,8 @@ public class StyxSchedulerTest {
         .put("styx.flyte.admin.production.port", "81")
         .put("styx.flyte.admin.production.insecure", "true");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("production", config, stateManager);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("production", config, stateManager,
+        FlyteAdminClientInterceptors.NOOP);
 
     assertThat(flyteRunner.isEnabled(), is(true));
   }
@@ -306,7 +308,7 @@ public class StyxSchedulerTest {
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> StyxScheduler.createFlyteRunner("staging", config, stateManager)
+        () -> StyxScheduler.createFlyteRunner("staging", config, stateManager, FlyteAdminClientInterceptors.NOOP)
     );
   }
 }

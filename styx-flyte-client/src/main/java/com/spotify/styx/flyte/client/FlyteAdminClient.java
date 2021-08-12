@@ -31,7 +31,9 @@ import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
+import io.grpc.ClientInterceptor;
 import io.grpc.ManagedChannelBuilder;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -51,7 +53,8 @@ public class FlyteAdminClient {
     this.stub = Objects.requireNonNull(stub, "stub");
   }
 
-  public static FlyteAdminClient create(String target, boolean insecure) {
+  public static FlyteAdminClient create(String target, boolean insecure,
+                                        List<ClientInterceptor> interceptors) {
     var builder = ManagedChannelBuilder.forTarget(target);
 
     if (insecure) {
@@ -59,7 +62,11 @@ public class FlyteAdminClient {
     }
     // Enable transparent retries:
     // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
-    var channel = builder.enableRetry().maxRetryAttempts(MAX_RETRY_ATTEMPTS).build();
+    var channel = builder
+        .enableRetry()
+        .maxRetryAttempts(MAX_RETRY_ATTEMPTS)
+        .intercept(interceptors)
+        .build();
 
     return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
   }

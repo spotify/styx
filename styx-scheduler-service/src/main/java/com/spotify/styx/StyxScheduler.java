@@ -61,6 +61,7 @@ import com.spotify.styx.docker.DockerRunner;
 import com.spotify.styx.docker.Fabric8KubernetesClient;
 import com.spotify.styx.docker.PodMutator;
 import com.spotify.styx.docker.RunnerId;
+import com.spotify.styx.flyte.FlyteAdminClientInterceptors;
 import com.spotify.styx.flyte.FlyteRunner;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.Event;
@@ -191,6 +192,7 @@ public class StyxScheduler implements AppInit {
   private final ServiceAccountUsageAuthorizer.Factory serviceAccountUsageAuthorizerFactory;
   private final ActionAuthorizer.Factory actionAuthorizerFactory;
   private final PodMutatorFactory podMutatorFactory;
+  private final FlyteAdminClientInterceptorsFactory flyteAdminClientInterceptorsFactory;
 
   private StateManager stateManager;
   private Scheduler scheduler;
@@ -201,6 +203,7 @@ public class StyxScheduler implements AppInit {
   public interface PublisherFactory extends Function<Environment, Publisher> { }
   public interface EventConsumerFactory extends BiFunction<Environment, Stats, EventConsumer> { }
   public interface PodMutatorFactory extends Function<Environment, PodMutator> { }
+  public interface FlyteAdminClientInterceptorsFactory extends Function<Environment, FlyteAdminClientInterceptors> { }
 
   @FunctionalInterface
   interface DockerRunnerFactory {
@@ -216,7 +219,7 @@ public class StyxScheduler implements AppInit {
 
   @FunctionalInterface
   interface FlyteRunnerFactory {
-    FlyteRunner create(String runnerId, Config config, StateManager stateManager);
+    FlyteRunner create(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors);
   }
 
   @FunctionalInterface
@@ -244,6 +247,7 @@ public class StyxScheduler implements AppInit {
         ServiceAccountUsageAuthorizer.Factory.DEFAULT;
     private ActionAuthorizer.Factory actionAuthorizerFactory = ActionAuthorizer.Factory.DEFAULT;
     private PodMutatorFactory podMutatorFactory = (env) -> PodMutator.NOOP;
+    private FlyteAdminClientInterceptorsFactory flyteAdminClientInterceptorsFactory = (env) -> FlyteAdminClientInterceptors.NOOP;
 
     public Builder setServiceName(String serviceName) {
       this.serviceName = serviceName;
@@ -311,6 +315,11 @@ public class StyxScheduler implements AppInit {
       return this;
     }
 
+    public Builder setFlyteAdminClientInterceptorsFactory(FlyteAdminClientInterceptorsFactory flyteAdminClientInterceptorsFactory) {
+      this.flyteAdminClientInterceptorsFactory = flyteAdminClientInterceptorsFactory;
+      return this;
+    }
+
     public StyxScheduler build() {
       return new StyxScheduler(this);
     }
@@ -356,6 +365,7 @@ public class StyxScheduler implements AppInit {
     this.serviceAccountUsageAuthorizerFactory = requireNonNull(builder.serviceAccountUsageAuthorizerFactory);
     this.actionAuthorizerFactory = requireNonNull(builder.actionAuthorizerFactory);
     this.podMutatorFactory = requireNonNull(builder.podMutatorFactory);
+    this.flyteAdminClientInterceptorsFactory = requireNonNull(builder.flyteAdminClientInterceptorsFactory);
   }
 
   @Override
@@ -415,9 +425,11 @@ public class StyxScheduler implements AppInit {
     final DockerRunner dockerRunner = MeteredDockerRunnerProxy.instrument(
         TracingProxy.instrument(DockerRunner.class, routingDockerRunner), stats, time);
 
+    final FlyteAdminClientInterceptors interceptors =
+        flyteAdminClientInterceptorsFactory.apply(environment);
     final Function<RunState, String> flyteRunnerId = RunnerId.flyteRunnerId(styxConfig);
     final FlyteRunner flyteRunner = FlyteRunner.routing(
-        id -> flyteRunnerFactory.create(id, environment.config(), stateManager),
+        id -> flyteRunnerFactory.create(id, environment.config(), stateManager, interceptors),
         flyteRunnerId
     );
 
@@ -658,16 +670,16 @@ public class StyxScheduler implements AppInit {
         serviceAccountKeyManager, debug, styxEnvironment, podMutator));
   }
 
-  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager) {
+  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
     if (!config.getBoolean(FLYTE_ENABLED)) {
       return FlyteRunner.noop();
     }
 
-    var flyteAdminClient = getFlyteAdminClient(config, runnerId);
+    var flyteAdminClient = getFlyteAdminClient(config, runnerId, flyteAdminClientInterceptors);
     return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
   }
 
-  private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId) {
+  private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
     var flyteAdminRootConfig = rootConfig.getConfig(FLYTEADMIN_PATH);
     if (!flyteAdminRootConfig.hasPath(runnerId)) {
       throw new IllegalArgumentException("There is no configuration for flyte admin for runner id: " + runnerId);
@@ -676,7 +688,7 @@ public class StyxScheduler implements AppInit {
     var config = flyteAdminRootConfig.getConfig(runnerId);
     final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
     final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
-    return FlyteAdminClient.create(target, insecure);
+    return FlyteAdminClient.create(target, insecure, flyteAdminClientInterceptors.interceptors());
   }
 
   @VisibleForTesting
