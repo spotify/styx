@@ -187,6 +187,10 @@ public final class MetricsStats implements Stats {
   static final MetricId KEY_DELETION_RATE = BASE
       .tagged("what", "key-deletion-rate");
 
+  static final MetricId ACTION_AUTHORIZER_DURATION = BASE
+      .tagged("what", "action-authorizer-duration")
+      .tagged("unit", UNIT_MILLISECOND);
+
   private static final String STATUS = "status";
   private static final String COUNTER_CACHE_RESULT = "result";
   private static final String COUNTER_CACHE_HIT = "hit";
@@ -225,6 +229,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> publishingErrorMeters;
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
+  private final ConcurrentMap<String, Histogram> actionAuthorizerHistograms;
   private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
 
   /**
@@ -269,6 +274,7 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
+    this.actionAuthorizerHistograms = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -458,6 +464,11 @@ public final class MetricsStats implements Stats {
     kubernetesOpErrorMeter(operation, type, code).mark();
   }
 
+  @Override
+  public void recordActionAuthorizationDuration(String operation, long durationMillis) {
+    actionAuthorizationHistogram(operation).update(durationMillis);
+  }
+
   private void recordDatastoreOperations(String operation, String kind, int n) {
     datastoreOperationMeter(operation, kind).mark(n);
   }
@@ -565,5 +576,10 @@ public final class MetricsStats implements Stats {
   private Meter datastoreOperationMeter(String operation, String kind) {
     return datastoreOperationMeters.computeIfAbsent(Tuple.of(operation, kind),
         t -> registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", operation, "kind", kind)));
+  }
+
+  private Histogram actionAuthorizationHistogram(String operation) {
+    return actionAuthorizerHistograms.computeIfAbsent(
+        operation, (op) -> registry.getOrAdd(ACTION_AUTHORIZER_DURATION.tagged("type", op), HISTOGRAM));
   }
 }

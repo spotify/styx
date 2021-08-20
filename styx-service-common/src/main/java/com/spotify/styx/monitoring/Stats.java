@@ -100,4 +100,6 @@ public interface Stats {
   void recordKubernetesOperation(String operation, long durationMillis, String status);
 
   void recordKubernetesOperationError(String operation, String type, int code);
+
+  void recordActionAuthorizationDuration(String operation, long durationMillis);
 }

@@ -20,6 +20,7 @@
 
 package com.spotify.styx.monitoring;
 
+import static com.spotify.styx.monitoring.MetricsStats.ACTION_AUTHORIZER_DURATION;
 import static com.spotify.styx.monitoring.MetricsStats.ACTIVE_STATES_PER_RUNSTATE_PER_TRIGGER;
 import static com.spotify.styx.monitoring.MetricsStats.COUNTER_CACHE_RATE;
 import static com.spotify.styx.monitoring.MetricsStats.DATASTORE_OPERATION_RATE;
@@ -343,6 +344,14 @@ public class MetricsStatsTest {
     when(registry.meter(DATASTORE_OPERATION_RATE.tagged("operation", "query", "kind", "foobar"))).thenReturn(meter);
     stats.recordDatastoreQueries("foobar", 17);
     verify(meter).mark(17);
+  }
+
+  @Test
+  public void shouldRecordActionAuthorizerDuration() {
+    String type = "delete";
+    when(registry.getOrAdd(ACTION_AUTHORIZER_DURATION.tagged("type", type), HISTOGRAM)).thenReturn(histogram);
+    stats.recordActionAuthorizationDuration(type, 100L);
+    verify(histogram).update(100L);
   }
 
   @Test

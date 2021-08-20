@@ -201,4 +201,9 @@ final class NoopStats implements Stats {
   public void recordKubernetesOperationError(String operation, String type, int code) {
     // nop
   }
+
+  @Override
+  public void recordActionAuthorizationDuration(String operation, long durationMillis) {
+    // nop
+  }
 }
