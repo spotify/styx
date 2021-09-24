@@ -449,7 +449,7 @@ public class FlyteAdminClientRunnerTest {
         .put("STYX_WORKFLOW_ID", "styx.TestEndpoint")
         // TODO: remove once we base the dangling exec removing logic on uppercase keys
         .put("styx-execution-id", "exec-id")
-        .put("styx-workflow-instance", "styx.TestEndpoint#2016-03-14")
+        .put("styx-workflow-instance", "id#styx.TestEndpoint#2016-03-14")
         .build();
     final var expectedExtraInputs = ImmutableMap.<String, String>builder()
         .put("STYX_COMPONENT_ID", "id")

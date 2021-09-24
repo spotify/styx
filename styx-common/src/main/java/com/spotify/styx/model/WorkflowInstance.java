@@ -24,6 +24,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import java.util.Comparator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An instantiation of a {@link Workflow}.
@@ -33,6 +35,7 @@ public abstract class WorkflowInstance {
 
   public static final Comparator<WorkflowInstance> KEY_COMPARATOR =
       Comparator.comparing(WorkflowInstance::toKey);
+  private static final Logger LOG = LoggerFactory.getLogger(WorkflowInstance.class);
 
   @JsonProperty
   public abstract WorkflowId workflowId();
@@ -60,6 +63,7 @@ public abstract class WorkflowInstance {
   public static WorkflowInstance parseKey(String key) {
     final int lastHashPos = key.lastIndexOf('#');
     if (lastHashPos < 1) {
+      LOG.error("Invalid workflow instance key {}", key);
       throw new IllegalArgumentException("Key must contain a hash '#' sign on position > 0");
     }
 

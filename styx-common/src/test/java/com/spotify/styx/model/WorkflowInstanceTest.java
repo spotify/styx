@@ -22,6 +22,7 @@ package com.spotify.styx.model;
 
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 
@@ -50,5 +51,12 @@ public class WorkflowInstanceTest {
   @Test
   public void parseKey() {
     assertThat(WorkflowInstance.parseKey(WORKFLOW_INSTANCE.toKey()), is(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void parseKeyShouldThrowError() {
+    assertThrows(
+        "Key must contain a hash '#' sign on position > 0", IllegalArgumentException.class,
+        () -> WorkflowInstance.parseKey("invalid.workflow.instance.key"));
   }
 }
