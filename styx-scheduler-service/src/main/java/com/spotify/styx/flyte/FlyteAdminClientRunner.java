@@ -165,9 +165,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         // just to keep compatibility with removing dangling executions
         // TODO: base dangling logic on STYX_WORKFLOW_ID, STYX_PARAMETER and STYX_EXECUTION_ID
         //   and the remove these annotations
-        .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, styxVariables.get(STYX_COMPONENT_ID) + "#" +
-                                                styxVariables.get(STYX_WORKFLOW_ID) + "#" +
-                                                styxVariables.get(STYX_PARAMETER))
+        .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
     final var extraDefaultInputs = ImmutableMap.<String, String>builder()
