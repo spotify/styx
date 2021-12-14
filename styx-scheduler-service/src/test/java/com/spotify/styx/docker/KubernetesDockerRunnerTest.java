@@ -247,7 +247,7 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
     var kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
-        POD_DELETION_DELAY_SECONDS, time, spiedExecutor, Collections.EMPTY_MAP);
+        POD_DELETION_DELAY_SECONDS, time, spiedExecutor, Collections.emptyMap());
     kdr.init();
     verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
     kdr.close();

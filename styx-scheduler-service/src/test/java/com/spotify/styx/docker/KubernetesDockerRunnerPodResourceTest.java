@@ -77,7 +77,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
-        Collections.EMPTY_MAP);
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -92,7 +92,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC,
-        Collections.EMPTY_MAP);
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -107,7 +107,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC,
-        Collections.EMPTY_MAP);
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -122,7 +122,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
-        Collections.EMPTY_MAP);
+        Collections.emptyMap());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
@@ -140,7 +140,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
         spec,
         EMPTY_SECRET_SPEC,
-        Collections.EMPTY_MAP);
+        Collections.emptyMap());
 
     var labels = pod.getMetadata().getLabels();
     assertThat(labels, hasEntry(COMPONENT_ID, normalize(WORKFLOW_INSTANCE.workflowId().componentId())));
@@ -178,7 +178,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldDisableTerminationLoggingWhenFalse() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.EMPTY_MAP);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
