@@ -153,7 +153,7 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   private static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
-  private static final String STYX_EXECUTION_ENV_VARS = "styx.execution-env-vars";
+  private static final String STYX_EXECUTION_ENV_VARS = "styx.docker.execution-env-vars";
 
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 

@@ -187,7 +187,7 @@ class KubernetesDockerRunner implements DockerRunner {
         register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor");
     this.executor = currentContextExecutorService(
         register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
-    this.executionEnvVars = Objects.requireNonNull(executionEnvVars);
+    this.executionEnvVars = Objects.requireNonNull(executionEnvVars, "executionEnvVars");
   }
 
   KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager,
@@ -379,7 +379,7 @@ class KubernetesDockerRunner implements DockerRunner {
     env.put(LOGGING, "structured");
     executionEnvVars.forEach((key, value) -> {
       if (env.containsKey(key)) {
-        LOG.error("Key already exists in execution environment variables {}. Key will be skipped", key);
+        LOG.info("Key already exists in execution environment variables {}. Key will be skipped", key);
         return;
       }
       env.put(key, value);
