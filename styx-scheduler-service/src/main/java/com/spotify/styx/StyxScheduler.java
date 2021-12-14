@@ -129,6 +129,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import org.apache.hadoop.hbase.client.Connection;
@@ -152,6 +153,8 @@ public class StyxScheduler implements AppInit {
   private static final String STYX_STATE_MANAGER_TICK_INTERVAL = "styx.state-manager.tick-interval";
   private static final String STYX_SCHEDULER_THREADS = "styx.scheduler-threads";
   private static final String STYX_ENVIRONMENT = "styx.environment";
+  private static final String STYX_EXECUTION_ENV_VARS = "styx.execution-env-vars";
+
   private static final String KUBERNETES_REQUEST_TIMEOUT = "styx.k8s.request-timeout";
 
   private static final String FLYTE_ENABLED = "styx.flyte.enabled";
@@ -661,13 +664,30 @@ public class StyxScheduler implements AppInit {
     final Closer closer = environment.closer();
 
     final String styxEnvironment = config.getString(STYX_ENVIRONMENT);
+
+    final Map<String, String> executionEnvVars = getExecutionEnvironmentVariables(config);
     final NamespacedKubernetesClient kubernetes = closer.register(getKubernetesClient(config, id));
     final ServiceAccountKeyManager serviceAccountKeyManager = createServiceAccountKeyManager(stats);
     var fabric8Client = TracingProxy.instrument(Fabric8KubernetesClient.class,
         MeteredFabric8KubernetesClientProxy.instrument(
             Fabric8KubernetesClient.of(kubernetes), stats, time));
     return closer.register(DockerRunner.kubernetes(id, fabric8Client, stateManager, stats,
-        serviceAccountKeyManager, debug, styxEnvironment, podMutator));
+        serviceAccountKeyManager, debug, styxEnvironment, podMutator, executionEnvVars));
+  }
+
+  private static Map<String, String> getExecutionEnvironmentVariables(Config config) {
+
+    final Config executionEnvVars = config.getConfig(STYX_EXECUTION_ENV_VARS);
+    if (executionEnvVars == null) {
+      return Collections.emptyMap();
+    }
+    return executionEnvVars
+        .entrySet()
+        .stream()
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            entry -> entry.getValue().render()
+        ));
   }
 
   static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
