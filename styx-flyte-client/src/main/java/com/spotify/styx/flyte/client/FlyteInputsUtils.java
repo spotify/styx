@@ -21,6 +21,8 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.util.ParameterUtil.parseBest;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.ImmutableMap;
 import flyteidl.core.Interface;
@@ -106,6 +108,17 @@ public class FlyteInputsUtils {
     var lowercaseExtraDefaultInputs = extraDefaultInputs.entrySet()
         .stream()
         .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
+
+
+    var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
+    var lowercaseInputs = extraDefaultInputs.keySet().stream().map(String::toLowerCase).collect(toSet());
+    if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
+      var unMatchedInputKeys = parameterMap.getParametersMap().keySet().stream()
+          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
+          .collect(toList());
+      throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
+                                              + " " + unMatchedInputKeys);
+    }
 
     parameterMap
         .getParametersMap()

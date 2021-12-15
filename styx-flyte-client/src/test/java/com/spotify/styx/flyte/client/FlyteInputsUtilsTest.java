@@ -35,6 +35,7 @@ import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 
+import java.util.Map;
 import org.junit.Test;
 
 public class FlyteInputsUtilsTest {
@@ -63,6 +64,25 @@ public class FlyteInputsUtilsTest {
         .getDatetime();
 
     assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
+  }
+
+  @Test
+  public void shouldComplainWhenUnmatchedInput() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("EXTRA_PARAMETER", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
+            .setDefault(datetimeLiteralOf("2020-09-15"))
+            .build())
+        .build();
+
+    var ex = assertThrows(UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01")));
+
+    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
   }
 
   @Test
