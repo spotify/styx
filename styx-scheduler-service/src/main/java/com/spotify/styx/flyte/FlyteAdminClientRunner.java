@@ -160,6 +160,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     final var labels = styxVariables.entrySet().stream()
         .map(entry -> Map.entry(entry.getKey(), LabelValue.normalize(entry.getValue())))
         .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+
     final var annotations = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         // just to keep compatibility with removing dangling executions
@@ -169,8 +170,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
     final var extraDefaultInputs = ImmutableMap.<String, String>builder()
-        .putAll(styxVariables)
-        .putAll(triggeredParams)
+        .putAll(keysToLowerCase(flyteExecConf.inputFields()))
+        .putAll(keysToLowerCase(styxVariables))
+        .putAll(keysToLowerCase(triggeredParams))
         .build();
 
     try {
@@ -204,6 +206,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Exception e) {
       throw new CreateExecutionException(flyteExecConf, e);
     }
+  }
+
+  private Map<String, String> keysToLowerCase(Map<String, String> map) {
+    return map.entrySet()
+        .stream()
+        .collect(toUnmodifiableMap(e -> e.getKey().toLowerCase(), Map.Entry::getValue));
   }
 
   @Override
