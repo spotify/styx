@@ -169,10 +169,11 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
+    // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
     final var extraDefaultInputs = ImmutableMap.<String, String>builder()
-        .putAll(keysToLowerCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
-        .putAll(keysToLowerCase(styxVariables)) // Then override with the styx variables
-        .putAll(keysToLowerCase(triggeredParams)) // Then override with the triggeredParams
+        .putAll(keysToUpperCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
+        .putAll(keysToUpperCase(styxVariables)) // Then override with the styx variables
+        .putAll(keysToUpperCase(triggeredParams)) // Then override with the triggeredParams
         .build();
 
     try {
@@ -208,10 +209,10 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     }
   }
 
-  private Map<String, String> keysToLowerCase(Map<String, String> map) {
+  private Map<String, String> keysToUpperCase(Map<String, String> map) {
     return map.entrySet()
         .stream()
-        .collect(toUnmodifiableMap(e -> e.getKey().toLowerCase(), Map.Entry::getValue));
+        .collect(toUnmodifiableMap(e -> e.getKey().toUpperCase(), Map.Entry::getValue));
   }
 
   @Override
