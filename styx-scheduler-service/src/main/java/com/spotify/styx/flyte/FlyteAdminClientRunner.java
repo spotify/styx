@@ -170,9 +170,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
     final var extraDefaultInputs = ImmutableMap.<String, String>builder()
-        .putAll(keysToLowerCase(flyteExecConf.inputFields()))
-        .putAll(keysToLowerCase(styxVariables))
-        .putAll(keysToLowerCase(triggeredParams))
+        .putAll(keysToLowerCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
+        .putAll(keysToLowerCase(styxVariables)) // Then override with the styx variables
+        .putAll(keysToLowerCase(triggeredParams)) // Then override with the triggeredParams
         .build();
 
     try {
