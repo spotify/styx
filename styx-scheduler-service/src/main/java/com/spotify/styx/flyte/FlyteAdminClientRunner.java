@@ -168,6 +168,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
+    final var inputs = flyteExecConf.inputFields();
     final var extraDefaultInputs = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         .putAll(triggeredParams)
@@ -188,6 +189,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           execMode,
           /* labels = */ labels,
           /* annotations = */ annotations,
+          /* inputs = */ inputs,
           /* extraDefaultInputs = */ extraDefaultInputs);
       return runnerId;
     } catch (StatusRuntimeException e) {

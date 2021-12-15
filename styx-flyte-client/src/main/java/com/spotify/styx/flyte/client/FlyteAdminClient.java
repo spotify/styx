@@ -79,6 +79,7 @@ public class FlyteAdminClient {
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
       Map<String, String> labels,
       Map<String, String> annotations,
+      Map<String, String> inputs,
       Map<String, String> extraDefaultInputs) {
     LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
@@ -91,7 +92,7 @@ public class FlyteAdminClient {
 
     var launchPlan = getLaunchPlan(launchPlanId);
 
-    var inputs = launchPlan.getSpec().getDefaultInputs();
+    var defaultInputs = launchPlan.getSpec().getDefaultInputs();
 
     var spec =
         ExecutionOuterClass.ExecutionSpec.newBuilder()
@@ -112,7 +113,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillParameterInInputs(inputs, extraDefaultInputs))
+                .setInputs(fillParameterInInputs(defaultInputs.getParametersMap(), inputs, extraDefaultInputs))
                 .build());
 
     verifyNotNull(

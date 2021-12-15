@@ -21,6 +21,8 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.util.ParameterUtil.parseBest;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.ImmutableMap;
 import flyteidl.core.Interface;
@@ -86,9 +88,17 @@ public class FlyteInputsUtils {
         .build();
   }
 
-  static Literals.Literal getDefaultValue(String key, Interface.Parameter parameter, Map<String, String> extraDefaultInputs) {
+  static Literals.Literal getDefaultValue(String key, Interface.Parameter parameter,
+                                          ImmutableMap<String, String> inputs,
+                                          Map<String, String> extraDefaultInputs) {
     var lowercaseKey = key.toLowerCase();
+    var input = inputs.get(lowercaseKey);
     var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
+
+    // Order of if sentences specify priority
+    if (input != null) {
+      return literalOf(key, input, parameter.getVar().getType());
+    }
 
     if (extraDefaultInput != null) {
       return literalOf(key, extraDefaultInput, parameter.getVar().getType());
@@ -101,18 +111,31 @@ public class FlyteInputsUtils {
     throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
   }
 
-  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, Map<String, String> extraDefaultInputs) {
+  static Literals.LiteralMap fillParameterInInputs(Map<String, Interface.Parameter> parametersMap,
+                                                   Map<String, String> inputs,
+                                                   Map<String, String> extraDefaultInputs) {
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
+    var lowercaseInputs = inputs.entrySet()
+        .stream()
+        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
     var lowercaseExtraDefaultInputs = extraDefaultInputs.entrySet()
         .stream()
         .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
 
-    parameterMap
-        .getParametersMap()
+    var paramsKeysInLowercase = parametersMap.keySet().stream().map(String::toLowerCase).collect(toSet());
+    if (!paramsKeysInLowercase.containsAll(lowercaseInputs.keySet())) {
+      var unMatchedInputKeys = inputs.keySet().stream()
+          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
+          .collect(toList());
+      throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
+                                              + " " + unMatchedInputKeys);
+    }
+
+    parametersMap
         .forEach(
             (key, parameter) -> literalMapBuilder.putLiterals(
                 key,
-                getDefaultValue(key, parameter, lowercaseExtraDefaultInputs)));
+                getDefaultValue(key, parameter, lowercaseInputs, lowercaseExtraDefaultInputs)));
 
     return literalMapBuilder.build();
   }
