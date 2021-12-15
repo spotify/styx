@@ -54,8 +54,10 @@ import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.api.model.VolumeMount;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.junit.Test;
 
@@ -74,7 +76,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldAddLatestTag() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -88,7 +91,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldUseConfiguredTag() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -102,7 +106,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldAddArgs() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -116,7 +121,8 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldAddWorkflowInstanceAnnotation() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
@@ -133,7 +139,8 @@ public class KubernetesDockerRunnerPodResourceTest {
     var pod = createPod(
         WORKFLOW_INSTANCE,
         spec,
-        EMPTY_SECRET_SPEC);
+        EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     var labels = pod.getMetadata().getLabels();
     assertThat(labels, hasEntry(COMPONENT_ID, normalize(WORKFLOW_INSTANCE.workflowId().componentId())));
@@ -145,10 +152,33 @@ public class KubernetesDockerRunnerPodResourceTest {
   }
 
   @Test
+  public void shouldAddEnvVariables() {
+    DockerRunner.RunSpec spec =
+        DockerRunner.RunSpec.builder().executionId("eid").imageName("busybox").trigger(Trigger.natural()).build();
+    var pod = createPod(
+        WORKFLOW_INSTANCE,
+        spec,
+        EMPTY_SECRET_SPEC,
+        Map.of("env-var-1", "some-value"));
+
+    boolean containsEnvVar = containerContainsEnvKey(pod.getSpec().getContainers().get(0), "env-var-1");
+    assertThat(containsEnvVar, is(true));
+  }
+
+  private boolean containerContainsEnvKey(Container container, String key) {
+    for (EnvVar envVar : container.getEnv()) {
+      if (Objects.equals(key, envVar.getName())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Test
   public void shouldDisableTerminationLoggingWhenFalse() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
@@ -168,7 +198,8 @@ public class KubernetesDockerRunnerPodResourceTest {
             .imageName("busybox")
             .terminationLogging(true)
             .build(),
-        EMPTY_SECRET_SPEC);
+        EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
@@ -183,7 +214,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldHaveRestartPolicyNever() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
 
     assertThat(pod.getSpec().getRestartPolicy(), is("Never"));
   }
@@ -192,7 +223,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldNotHaveSecretsMountIfNoSecret() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC);
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -216,7 +247,8 @@ public class KubernetesDockerRunnerPodResourceTest {
             .trigger(Trigger.unknown("trigger-id"))
             .commitSha("abc123")
             .build(),
-        EMPTY_SECRET_SPEC);
+        EMPTY_SECRET_SPEC,
+        Collections.emptyMap());
 
     final List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
@@ -236,8 +268,10 @@ public class KubernetesDockerRunnerPodResourceTest {
 
   private Pod createPod(WorkflowInstance workflowInstance,
                         DockerRunner.RunSpec runSpec,
-                        KubernetesSecretSpec secretSpec) {
+                        KubernetesSecretSpec secretSpec,
+                        Map<String, String> executionEnvVars) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
+            executionEnvVars);
   }
 }

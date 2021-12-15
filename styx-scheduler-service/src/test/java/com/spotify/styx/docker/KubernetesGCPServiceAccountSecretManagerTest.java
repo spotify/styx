@@ -62,6 +62,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Map;
@@ -293,7 +294,8 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec,
+        Collections.emptyMap());
 
     final PodStatus podStatus = podStatus(phase);
     pod.setStatus(podStatus);
@@ -350,7 +352,7 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
     final KubernetesSecretSpec secretSpec = KubernetesSecretSpec.builder()
         .serviceAccountSecret(secret.getMetadata().getName())
         .build();
-    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec);
+    final Pod pod = createPod(WORKFLOW_INSTANCE, RUN_SPEC_WITH_SA, secretSpec, Collections.emptyMap());
     pod.setStatus(podStatus("Running"));
     when(podList.getItems()).thenReturn(List.of(pod));
     sut.cleanup();
@@ -564,8 +566,10 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
 
   private static Pod createPod(WorkflowInstance workflowInstance,
                                DockerRunner.RunSpec runSpec,
-                               KubernetesSecretSpec secretSpec) {
+                               KubernetesSecretSpec secretSpec,
+                               Map<String, String> executionEnvVars) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
+            executionEnvVars);
   }
 }

@@ -203,7 +203,7 @@ public class KubernetesDockerRunnerTest {
 
     kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
-        POD_DELETION_DELAY_SECONDS, time, executor);
+        POD_DELETION_DELAY_SECONDS, time, executor, Collections.emptyMap());
     kdr.init();
 
     verify(k8sClient).watchPods(any());
@@ -247,7 +247,7 @@ public class KubernetesDockerRunnerTest {
     when(k8sClient.watchPods(any())).thenThrow(new KubernetesClientException("Forced failure"));
     var kdr = new KubernetesDockerRunner(RUNNER_ID, k8sClient, stateManager, stats, serviceAccountSecretManager,
         debug, STYX_ENVIRONMENT, PodMutator.NOOP, POD_CLEANUP_INTERVAL_SECONDS,
-        POD_DELETION_DELAY_SECONDS, time, spiedExecutor);
+        POD_DELETION_DELAY_SECONDS, time, spiedExecutor, Collections.emptyMap());
     kdr.init();
     verify(spiedExecutor).schedule(any(Runnable.class), anyLong(), any());
     kdr.close();
@@ -905,6 +905,7 @@ public class KubernetesDockerRunnerTest {
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
+            Collections.emptyMap());
   }
 }

@@ -44,6 +44,7 @@ import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import junitparams.JUnitParamsRunner;
@@ -63,7 +64,8 @@ public class KubernetesPodEventTranslatorTest {
 
   private static final String STYX_ENVIRONMENT = "testing";
 
-  private final Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT, PodMutator.NOOP);
+  private final Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT, PodMutator.NOOP,
+      Collections.emptyMap());
 
   @Test
   public void terminateOnSuccessfulTermination() {
@@ -427,6 +429,7 @@ public class KubernetesPodEventTranslatorTest {
             .terminationLogging(true).build(),
         SECRET_SPEC,
         STYX_ENVIRONMENT,
-        PodMutator.NOOP);
+        PodMutator.NOOP,
+        Collections.emptyMap());
   }
 }

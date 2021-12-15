@@ -159,6 +159,7 @@ class KubernetesDockerRunner implements DockerRunner {
   private final Duration podDeletionDelay;
   private final Time time;
   private final ExecutorService executor;
+  private final Map<String, String> executionEnvVars;
   private Watch watch;
 
   @VisibleForTesting
@@ -169,7 +170,8 @@ class KubernetesDockerRunner implements DockerRunner {
                          int cleanupPodsIntervalSeconds,
                          int podDeletionDelaySeconds,
                          Time time,
-                         ScheduledExecutorService scheduledExecutor) {
+                         ScheduledExecutorService scheduledExecutor,
+                         Map<String, String> executionEnvVars) {
     this.id = Objects.requireNonNull(id, "id");
     this.stateManager = Objects.requireNonNull(stateManager);
     this.client = Objects.requireNonNull(client);
@@ -185,15 +187,18 @@ class KubernetesDockerRunner implements DockerRunner {
         register(closer, Objects.requireNonNull(scheduledExecutor), "kubernetes-scheduled-executor");
     this.executor = currentContextExecutorService(
         register(closer, new ForkJoinPool(K8S_POD_PROCESSING_THREADS), "kubernetes-executor"));
+    this.executionEnvVars = Objects.requireNonNull(executionEnvVars, "executionEnvVars");
   }
 
-  KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager, Stats stats,
+  KubernetesDockerRunner(String id, Fabric8KubernetesClient client, StateManager stateManager,
+                         Stats stats,
                          KubernetesGCPServiceAccountSecretManager serviceAccountSecretManager,
                          Debug debug, String styxEnvironment,
-                         PodMutator podMutator) {
+                         PodMutator podMutator,
+                         Map<String, String> executionEnvVars) {
     this(id, client, stateManager, stats, serviceAccountSecretManager, debug, styxEnvironment,
         podMutator, DEFAULT_POD_CLEANUP_INTERVAL_SECONDS, DEFAULT_POD_DELETION_DELAY_SECONDS, DEFAULT_TIME,
-        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY));
+        Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY), executionEnvVars);
   }
 
   @Override
@@ -213,7 +218,7 @@ class KubernetesDockerRunner implements DockerRunner {
     // Create pod. This might fail with 409 Conflict if the pod already exists as despite the existence
     // check above it might have been concurrently created. That is fine.
     try {
-      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator);
+      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator, executionEnvVars);
       LOG.info("Creating pod: {}: {}", workflowInstance, pod);
       var createdPod = client.createPod(pod);
       stats.recordSubmission(runSpec.executionId());
@@ -265,7 +270,8 @@ class KubernetesDockerRunner implements DockerRunner {
                        RunSpec runSpec,
                        KubernetesSecretSpec secretSpec,
                        String styxEnvironment,
-                       PodMutator podMutator) {
+                       PodMutator podMutator,
+                       final Map<String, String> executionEnvVars) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -291,7 +297,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(MAIN_CONTAINER_NAME)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment))
+        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment, executionEnvVars))
         .withResources(resourceRequirements.build());
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
@@ -354,7 +360,8 @@ class KubernetesDockerRunner implements DockerRunner {
 
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec,
-                                       String styxEnvironment) {
+                                       String styxEnvironment,
+                                       Map<String, String> executionEnvVars) {
     // store user provided env first to prevent accidentally/intentionally overwriting system ones
     final Map<String, String> env = new HashMap<>(runSpec.env());
     env.put(COMPONENT_ID, workflowInstance.workflowId().componentId());
@@ -370,6 +377,13 @@ class KubernetesDockerRunner implements DockerRunner {
     env.put(TRIGGER_TYPE, runSpec.trigger().map(TriggerUtil::triggerType).orElse(null));
     env.put(ENVIRONMENT, styxEnvironment);
     env.put(LOGGING, "structured");
+    executionEnvVars.forEach((key, value) -> {
+      if (env.containsKey(key)) {
+        LOG.info("Key already exists in execution environment variables {}. Key will be skipped", key);
+        return;
+      }
+      env.put(key, value);
+    });
     return env.entrySet().stream()
         .map(entry -> envVar(entry.getKey(), entry.getValue()))
         .collect(toList());

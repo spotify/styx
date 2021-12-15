@@ -45,6 +45,7 @@ import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.PodStatus;
 import io.fabric8.kubernetes.api.model.PodStatusBuilder;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +101,7 @@ public class KubernetesDockerRunnerPodPollerTest {
     when(k8sClient.listPods()).thenReturn(podList);
 
     kdr = new KubernetesDockerRunner("test", k8sClient, stateManager, stats, serviceAccountSecretManager,
-        debug, STYX_ENVIRONMENT, PodMutator.NOOP);
+        debug, STYX_ENVIRONMENT, PodMutator.NOOP, Collections.emptyMap());
   }
 
   @Test
@@ -233,6 +234,7 @@ public class KubernetesDockerRunnerPodPollerTest {
                                DockerRunner.RunSpec runSpec,
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
-        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP);
+        .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
+            Collections.emptyMap());
   }
 }
