@@ -677,7 +677,10 @@ public class StyxScheduler implements AppInit {
 
   private static Map<String, String> getExecutionEnvironmentVariables(Config config) {
 
-    final Config executionEnvVars = config.getConfig(STYX_EXECUTION_ENV_VARS);
+    if (!config.hasPath(STYX_EXECUTION_ENV_VARS)) {
+      return Collections.emptyMap();
+    }
+    Config executionEnvVars = config.getConfig(STYX_EXECUTION_ENV_VARS);
     if (executionEnvVars == null) {
       return Collections.emptyMap();
     }
