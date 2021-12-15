@@ -114,7 +114,7 @@ public class FlyteInputsUtilsTest {
   }
 
   @Test
-  public void shouldFillParameterGivingPriorityToInputs() {
+  public void shouldFillParameterGivingPriorityToExtraInputs() {
     var parameterMap = Interface.ParameterMap.newBuilder()
         .putParameters("EXTRA_PARAMETER", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
@@ -127,7 +127,7 @@ public class FlyteInputsUtilsTest {
         .build();
 
     var inputs = fillParameterInInputs(parameterMap.getParametersMap(),
-        Map.of("EXTRA_PARAMETER", "1970-01-01T01"), Map.of("EXTRA_PARAMETER", "2000-12-31T11"));
+        Map.of("EXTRA_PARAMETER", "2000-12-31T11"), Map.of("EXTRA_PARAMETER", "1970-01-01T01"));
 
     var timestamp = inputs.getLiteralsMap()
         .get("EXTRA_PARAMETER")

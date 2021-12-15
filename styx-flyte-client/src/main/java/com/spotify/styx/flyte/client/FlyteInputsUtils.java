@@ -96,12 +96,14 @@ public class FlyteInputsUtils {
     var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
 
     // Order of if sentences specify priority
-    if (input != null) {
-      return literalOf(key, input, parameter.getVar().getType());
-    }
-
+    // extraDefaultInputs contain also the trigger inputs.
+    // FIXME move this earlier, merge the inputs and extraDefaultInputs before passing them to FlyteAdminClient
     if (extraDefaultInput != null) {
       return literalOf(key, extraDefaultInput, parameter.getVar().getType());
+    }
+
+    if (input != null) {
+      return literalOf(key, input, parameter.getVar().getType());
     }
 
     if (parameter.hasDefault()) {
