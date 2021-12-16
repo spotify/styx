@@ -85,7 +85,7 @@ public class FlyteInputsUtilsTest {
     var ex = assertThrows(UnsupportedOperationException.class,
         () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01")));
 
-    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [unmatched]"));
+    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
   }
 
   @Test
@@ -219,5 +219,17 @@ public class FlyteInputsUtilsTest {
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
     inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
     assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
+  }
+
+  @Test
+  public void testCasingIsPreserved() {
+    var id =
+        FlyteIdentifier.builder().project("project").domain("domain").name("name")
+            .version("version").resourceType("LP").build();
+    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FiElD", "value-flytexecconf").build();
+    var styxVariables = Map.of("field", "value-styx-vars");
+    var extraDefaultInputs = Map.of("field", "value-trigger-params");
+    var inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
+    assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
   }
 }

@@ -32,6 +32,7 @@ import flyteidl.core.Literals;
 import flyteidl.core.Types;
 
 import java.util.Map;
+import java.util.TreeMap;
 
 
 public class FlyteInputsUtils {
@@ -136,16 +137,11 @@ public class FlyteInputsUtils {
   public static Map<String, String> computeExtraDefaultInputs(final FlyteExecConf flyteExecConf,
                                                 final Map<String, String> styxVariables,
                                                 final Map<String, String> triggeredParams) {
-      return ImmutableMap.<String, String>builder()
-          .putAll(keysToUpperCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
-          .putAll(keysToUpperCase(styxVariables)) // Then override with the styx variables
-          .putAll(keysToUpperCase(triggeredParams)) // Then override with the triggeredParams
-          .build();
-  }
-
-  private static Map<String, String> keysToUpperCase(Map<String, String> map) {
-    return map.entrySet()
-        .stream()
-        .collect(toUnmodifiableMap(e -> e.getKey().toUpperCase(), Map.Entry::getValue));
+    Map<String, String> inputsMap =
+        new TreeMap<>(String.CASE_INSENSITIVE_ORDER); // create case insensitive map to keep user defined casing
+    inputsMap.putAll(flyteExecConf.inputFields()); // First use the fields stored in the flyteExecConf
+    inputsMap.putAll(styxVariables); // Then override with the styx variables
+    inputsMap.putAll(triggeredParams); // Then override with the triggeredParams
+    return ImmutableMap.copyOf(inputsMap);
   }
 }
