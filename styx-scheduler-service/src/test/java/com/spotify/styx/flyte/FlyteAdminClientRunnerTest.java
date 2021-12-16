@@ -425,7 +425,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testCreateExecutionsPopulatesLabelsAnnotationsAndExtraDefaultInputs()
+  public void testCreateExecutionsPopulatesLabelsAnnotationsAndStyxVariables()
       throws FlyteRunner.CreateExecutionException {
     final var execName = "test-create-execution";
     stubAdminClientCreateExec(execName);
@@ -451,7 +451,7 @@ public class FlyteAdminClientRunnerTest {
         .put("styx-execution-id", "exec-id")
         .put("styx-workflow-instance", "id#styx.TestEndpoint#2016-03-14")
         .build();
-    final var expectedExtraInputs = ImmutableMap.<String, String>builder()
+    final var expectedStyxVariables = ImmutableMap.<String, String>builder()
         .put("STYX_COMPONENT_ID", "id")
         .put("STYX_EXECUTION_ID", "exec-id")
         .put("STYX_PARAMETER", "2016-03-14")
@@ -461,7 +461,7 @@ public class FlyteAdminClientRunnerTest {
         .build();
 
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
-        eq(expectedLabels), eq(expectedAnnotations), eq(expectedExtraInputs), any());
+        eq(expectedLabels), eq(expectedAnnotations), any(), eq(expectedStyxVariables));
   }
 
   private void stubAdminClientCreateExec(String execName) {
