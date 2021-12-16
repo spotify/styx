@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.FlyteIdentifier;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
@@ -234,7 +235,10 @@ public class FlyteInputsUtilsTest {
 
   @Test
   public void testInputsCameInOrder() {
-    var flyteExecConf = FlyteExecConf.builder().inputFields("FIELD", "value-flytexecconf").build();
+    var id =
+        FlyteIdentifier.builder().project("project").domain("domain").name("name")
+            .version("version").resourceType("LP").build();
+    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FIELD", "value-flytexecconf").build();
     var inputs = computeExtraDefaultInputs(flyteExecConf, Map.of(), Map.of());
     assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
 
