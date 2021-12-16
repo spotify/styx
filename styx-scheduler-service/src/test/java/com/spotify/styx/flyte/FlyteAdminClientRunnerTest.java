@@ -133,7 +133,7 @@ public class FlyteAdminClientRunnerTest {
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq(execName),
-        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any(), any());
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any(), any(), any());
   }
 
   private IdentifierOuterClass.Identifier toProto(FlyteIdentifier identifier) {
@@ -153,7 +153,7 @@ public class FlyteAdminClientRunnerTest {
     final RunState runState = runState(styxTrigger);
     flyteRunner.createExecution(runState, "test-create-execution", FLYTE_EXEC_CONF);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), eq(flyteExecMode),
-        any(), any(), any());
+        any(), any(), any(), any());
   }
 
   private static Object[] styxTriggerToFlyteExecMode() {
@@ -182,7 +182,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testThrowsFlyteLaunchPlanNotFound() {
     doThrow(new StatusRuntimeException(Status.NOT_FOUND))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any(), any());
     assertThrows(
         FlyteRunner.LaunchPlanNotFound.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
@@ -191,19 +191,19 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testCreateExecutionForAlreadyExistsException() throws FlyteRunner.CreateExecutionException {
     doThrow(new StatusRuntimeException(Status.ALREADY_EXISTS))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any(), any());
     var runnerId = flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF);
 
     assertThat(runnerId, is(RUNNER_ID));
     verify(flyteAdminClient).createExecution(
         eq(LAUNCH_PLAN_IDENTIFIER.project()), eq(LAUNCH_PLAN_IDENTIFIER.domain()), eq("exec"),
-        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any(), any());
+        eq(toProto(LAUNCH_PLAN_IDENTIFIER)), eq(SCHEDULED), any(), any(), any(), any());
   }
 
   @Test
   public void testThrowsCreateExecutionExceptionForOtherCode() {
     doThrow(new StatusRuntimeException(Status.INTERNAL))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any(), any());
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
         () -> flyteRunner.createExecution(RUN_STATE, "exec", FLYTE_EXEC_CONF));
@@ -212,7 +212,7 @@ public class FlyteAdminClientRunnerTest {
   @Test
   public void testThrowsCreateExecutionExceptionForUnknownException() {
     doThrow(new IllegalStateException("test"))
-        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any());
+        .when(flyteAdminClient).createExecution(any(), any(), any(), any(), any(), any(), any(), any(), any());
 
     assertThrows(
         FlyteRunner.CreateExecutionException.class,
@@ -425,7 +425,7 @@ public class FlyteAdminClientRunnerTest {
   }
 
   @Test
-  public void testCreateExecutionsPopulatesLabelsAnnotationsAndExtraDefaultInputs()
+  public void testCreateExecutionsPopulatesLabelsAnnotationsAndStyxVariables()
       throws FlyteRunner.CreateExecutionException {
     final var execName = "test-create-execution";
     stubAdminClientCreateExec(execName);
@@ -451,7 +451,7 @@ public class FlyteAdminClientRunnerTest {
         .put("styx-execution-id", "exec-id")
         .put("styx-workflow-instance", "id#styx.TestEndpoint#2016-03-14")
         .build();
-    final var expectedExtraInputs = ImmutableMap.<String, String>builder()
+    final var expectedStyxVariables = ImmutableMap.<String, String>builder()
         .put("STYX_COMPONENT_ID", "id")
         .put("STYX_EXECUTION_ID", "exec-id")
         .put("STYX_PARAMETER", "2016-03-14")
@@ -461,11 +461,11 @@ public class FlyteAdminClientRunnerTest {
         .build();
 
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
-        eq(expectedLabels), eq(expectedAnnotations), eq(expectedExtraInputs));
+        eq(expectedLabels), eq(expectedAnnotations), any(), eq(expectedStyxVariables));
   }
 
   private void stubAdminClientCreateExec(String execName) {
-    when(flyteAdminClient.createExecution(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
+    when(flyteAdminClient.createExecution(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
         ExecutionOuterClass.ExecutionCreateResponse
             .newBuilder()
             .setId(IdentifierOuterClass.WorkflowExecutionIdentifier
@@ -486,18 +486,9 @@ public class FlyteAdminClientRunnerTest {
 
     flyteRunner.createExecution(runState(ImmutableMap.of("HADES_OVERWRITE", "true")), execName, FLYTE_EXEC_CONF);
 
-    final var expectedExtraInputs = ImmutableMap.<String, String>builder()
-        .put("STYX_COMPONENT_ID", "id")
-        .put("STYX_EXECUTION_ID", "exec-id")
-        .put("STYX_PARAMETER", "2016-03-14")
-        .put("STYX_TRIGGER_ID", "natural-trigger")
-        .put("STYX_TRIGGER_TYPE", "natural")
-        .put("STYX_WORKFLOW_ID", "styx.TestEndpoint")
-        .build();
-
     ArgumentCaptor<Map<String, String>> argCaptor = ArgumentCaptor.forClass(Map.class);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
-        any(), any(), argCaptor.capture());
+        any(), any(), argCaptor.capture(), any());
     assertThat(argCaptor.getValue(), hasEntry("HADES_OVERWRITE", "true"));
   }
 
@@ -514,11 +505,11 @@ public class FlyteAdminClientRunnerTest {
     );
     flyteRunner.createExecution(runState(triggeredParams), execName, FLYTE_EXEC_CONF);
 
-    ArgumentCaptor<Map<String, String>> argCaptor = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, String>> styxVariablesArgCaptor = ArgumentCaptor.forClass(Map.class);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
-        any(), any(), argCaptor.capture());
+        any(), any(), any(), styxVariablesArgCaptor.capture());
 
-    assertThat(argCaptor.getValue(), allOf(
+    assertThat(styxVariablesArgCaptor.getValue(), allOf(
         not(hasEntry("STYX_EXECUTION_ID", "foo")),
         not(hasEntry("styx_parameter", "bar")),
         hasEntry("STYX_EXECUTION_ID", "exec-id"),

@@ -79,7 +79,8 @@ public class FlyteAdminClient {
       ExecutionOuterClass.ExecutionMetadata.ExecutionMode executionMode,
       Map<String, String> labels,
       Map<String, String> annotations,
-      Map<String, String> extraDefaultInputs) {
+      Map<String, String> userDefinedInputs,
+      Map<String, String> styxVariables) {
     LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
@@ -112,7 +113,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillParameterInInputs(inputs, extraDefaultInputs))
+                .setInputs(fillParameterInInputs(inputs, userDefinedInputs, styxVariables))
                 .build());
 
     verifyNotNull(

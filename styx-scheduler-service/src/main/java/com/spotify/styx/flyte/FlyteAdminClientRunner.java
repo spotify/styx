@@ -37,6 +37,7 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
+import com.spotify.styx.flyte.client.FlyteInputsUtils;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.TriggerParameters;
@@ -160,6 +161,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     final var labels = styxVariables.entrySet().stream()
         .map(entry -> Map.entry(entry.getKey(), LabelValue.normalize(entry.getValue())))
         .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+
     final var annotations = ImmutableMap.<String, String>builder()
         .putAll(styxVariables)
         // just to keep compatibility with removing dangling executions
@@ -168,10 +170,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
-    final var extraDefaultInputs = ImmutableMap.<String, String>builder()
-        .putAll(styxVariables)
-        .putAll(triggeredParams)
-        .build();
+
+
+    // First use the fields stored in the flyteExecConf
+    // Then override with the triggeredParams
+    var userDefinedInputs = FlyteInputsUtils
+        .combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), triggeredParams);
 
     try {
       flyteAdminClient.createExecution(
@@ -188,7 +192,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           execMode,
           /* labels = */ labels,
           /* annotations = */ annotations,
-          /* extraDefaultInputs = */ extraDefaultInputs);
+          /* extraDefaultInputs = */ userDefinedInputs,
+          /* styxVariables */ styxVariables);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {

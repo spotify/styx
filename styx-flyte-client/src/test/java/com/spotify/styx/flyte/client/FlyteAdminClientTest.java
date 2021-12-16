@@ -94,7 +94,8 @@ public class FlyteAdminClientTest {
   public void shouldPropagateCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, Map.of(), Map.of(), EXTRA_DEFAULT_INPUTS);
+            ExecutionMode.SCHEDULED, Map.of(), Map.of(), EXTRA_DEFAULT_INPUTS,
+            Map.of());
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
@@ -104,7 +105,8 @@ public class FlyteAdminClientTest {
   public void shouldPropagateLabelsAndAnnotationsOnCreateExecutionToStub() {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
-            ExecutionMode.SCHEDULED, LABELS, ANNOTATIONS, EXTRA_DEFAULT_INPUTS);
+            ExecutionMode.SCHEDULED, LABELS, ANNOTATIONS, EXTRA_DEFAULT_INPUTS,
+            Map.of());
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);

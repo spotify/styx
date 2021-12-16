@@ -21,6 +21,7 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
@@ -31,10 +32,13 @@ import static org.hamcrest.Matchers.equalTo;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
+import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.FlyteIdentifier;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 
+import java.util.Map;
 import org.junit.Test;
 
 public class FlyteInputsUtilsTest {
@@ -54,6 +58,7 @@ public class FlyteInputsUtilsTest {
 
     var inputs = fillParameterInInputs(
         parameterMap,
+        ImmutableMap.of(),
         ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T01"));
 
     var timestamp = inputs.getLiteralsMap()
@@ -65,34 +70,51 @@ public class FlyteInputsUtilsTest {
     assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
   }
 
+
   @Test
-  public void shouldOnlyFillParameterInInputs() {
-    var defaultValue = Literals.Literal.newBuilder()
-        .setScalar(Literals.Scalar.newBuilder()
-            .setPrimitive(Literals.Primitive
-                .newBuilder()
-                .setStringValue("value")
-                .build()
-            ).build())
-        .build();
+  public void shouldOverrideStyxVariables() {
     var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters("key", Interface.Parameter.newBuilder()
+        .putParameters("STYX_PARAMETER", Interface.Parameter.newBuilder()
             .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder()
-                    .setSimple(Types.SimpleType.STRING)
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
                     .build())
                 .build())
-            .setDefault(defaultValue)
+            .setDefault(datetimeLiteralOf("2020-09-15"))
             .build())
         .build();
 
     var inputs = fillParameterInInputs(
         parameterMap,
-        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T00:00:10"));
+        ImmutableMap.of("STYX_PARAMETER", "2021-01-01T01"),
+        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"));
 
-    assertThat(
-        inputs.getLiteralsMap(),
-        equalTo(ImmutableMap.of("key", defaultValue)));
+    var timestamp = inputs.getLiteralsMap()
+        .get("STYX_PARAMETER")
+        .getScalar()
+        .getPrimitive()
+        .getDatetime();
+
+    assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
+  }
+
+  @Test
+  public void shouldComplainWhenUnmatchedInput() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("EXTRA_PARAMETER", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
+            .setDefault(datetimeLiteralOf("2020-09-15"))
+            .build())
+        .build();
+
+    var ex = assertThrows(UnsupportedOperationException.class,
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01"), ImmutableMap.of()));
+
+    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
   }
 
   @Test
@@ -110,7 +132,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -130,7 +152,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -149,7 +171,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -174,7 +196,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc")));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc"), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't get default value for input [PARAMETER]. Only DATETIME/STRING/BOOLEAN is supported but got [BINARY]"));
   }
@@ -208,5 +230,30 @@ public class FlyteInputsUtilsTest {
     assertThat(
         parameter.getScalar().getPrimitive().getBoolean(),
         equalTo(true));
+  }
+
+  @Test
+  public void testInputsCameInOrder() {
+    var id =
+        FlyteIdentifier.builder().project("project").domain("domain").name("name")
+            .version("version").resourceType("LP").build();
+    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FIELD", "value-flytexecconf").build();
+    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), Map.of());
+    assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
+
+    var extraDefaultInputs = Map.of("field", "value-trigger-params");
+    inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
+    assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
+  }
+
+  @Test
+  public void testCasingIsPreserved() {
+    var id =
+        FlyteIdentifier.builder().project("project").domain("domain").name("name")
+            .version("version").resourceType("LP").build();
+    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FiElD", "value-flytexecconf").build();
+    var extraDefaultInputs = Map.of("field", "value-trigger-params");
+    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
+    assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
   }
 }
