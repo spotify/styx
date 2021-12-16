@@ -23,8 +23,10 @@ package com.spotify.styx.flyte.client;
 import static com.spotify.styx.util.ParameterUtil.parseBest;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.toUnmodifiableMap;
 
 import com.google.common.collect.ImmutableMap;
+import com.spotify.styx.model.FlyteExecConf;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
@@ -128,5 +130,21 @@ public class FlyteInputsUtils {
                 getDefaultValue(key, parameter, lowercaseExtraDefaultInputs)));
 
     return literalMapBuilder.build();
+  }
+
+  public static Map<String, String> computeExtraDefaultInputs(final FlyteExecConf flyteExecConf,
+                                                final Map<String, String> styxVariables,
+                                                final Map<String, String> triggeredParams) {
+      return ImmutableMap.<String, String>builder()
+          .putAll(keysToUpperCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
+          .putAll(keysToUpperCase(styxVariables)) // Then override with the styx variables
+          .putAll(keysToUpperCase(triggeredParams)) // Then override with the triggeredParams
+          .build();
+  }
+
+  private static Map<String, String> keysToUpperCase(Map<String, String> map) {
+    return map.entrySet()
+        .stream()
+        .collect(toUnmodifiableMap(e -> e.getKey().toUpperCase(), Map.Entry::getValue));
   }
 }

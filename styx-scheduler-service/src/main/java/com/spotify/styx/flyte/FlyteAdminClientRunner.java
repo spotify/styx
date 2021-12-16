@@ -37,6 +37,7 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
+import com.spotify.styx.flyte.client.FlyteInputsUtils;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.TriggerParameters;
@@ -170,11 +171,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
     // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
-    final var extraDefaultInputs = ImmutableMap.<String, String>builder()
-        .putAll(keysToUpperCase(flyteExecConf.inputFields())) // First use the fields stored in the flyteExecConf
-        .putAll(keysToUpperCase(styxVariables)) // Then override with the styx variables
-        .putAll(keysToUpperCase(triggeredParams)) // Then override with the triggeredParams
-        .build();
+    var extraDefaultInputs = FlyteInputsUtils
+        .computeExtraDefaultInputs(flyteExecConf, styxVariables, triggeredParams);
 
     try {
       flyteAdminClient.createExecution(
@@ -207,12 +205,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     } catch (Exception e) {
       throw new CreateExecutionException(flyteExecConf, e);
     }
-  }
-
-  private Map<String, String> keysToUpperCase(Map<String, String> map) {
-    return map.entrySet()
-        .stream()
-        .collect(toUnmodifiableMap(e -> e.getKey().toUpperCase(), Map.Entry::getValue));
   }
 
   @Override

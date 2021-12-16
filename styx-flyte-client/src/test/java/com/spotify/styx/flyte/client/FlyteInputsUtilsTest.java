@@ -21,6 +21,7 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.computeExtraDefaultInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
@@ -31,6 +32,7 @@ import static org.hamcrest.Matchers.equalTo;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
+import com.spotify.styx.model.FlyteExecConf;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
@@ -228,5 +230,20 @@ public class FlyteInputsUtilsTest {
     assertThat(
         parameter.getScalar().getPrimitive().getBoolean(),
         equalTo(true));
+  }
+
+  @Test
+  public void testInputsCameInOrder() {
+    var flyteExecConf = FlyteExecConf.builder().inputFields("field", "value-flytexecconf").build();
+    var inputs = computeExtraDefaultInputs(flyteExecConf, Map.of(), Map.of());
+    assertThat(Map.of("field", "value-flytexecconf"), equalTo(inputs));
+
+    var styxVariables = Map.of("field", "value-styx-vars");
+    inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, Map.of());
+    assertThat(Map.of("field", "value-styx-vars"), equalTo(inputs));
+
+    var extraDefaultInputs = Map.of("field", "value-trigger-params");
+    inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
+    assertThat(Map.of("field", "value-trigger-params"), equalTo(inputs));
   }
 }
