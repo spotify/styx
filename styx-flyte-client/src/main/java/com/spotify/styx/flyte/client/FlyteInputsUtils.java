@@ -115,8 +115,8 @@ public class FlyteInputsUtils {
     var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
     var lowercaseInputs = extraDefaultInputs.keySet().stream().map(String::toLowerCase).collect(toSet());
     if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
-      var unMatchedInputKeys = parameterMap.getParametersMap().keySet().stream()
-          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
+      var unMatchedInputKeys = lowercaseInputs.stream()
+          .filter(key -> !paramsKeysInLowercase.contains(key))
           .collect(toList());
       throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
                                               + " " + unMatchedInputKeys);
