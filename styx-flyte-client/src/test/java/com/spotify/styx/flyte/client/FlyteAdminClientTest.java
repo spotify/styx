@@ -38,7 +38,6 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -96,7 +95,7 @@ public class FlyteAdminClientTest {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
             ExecutionMode.SCHEDULED, Map.of(), Map.of(), EXTRA_DEFAULT_INPUTS,
-            Collections.emptyMap());
+            Map.of());
     assertThat(workflowExecution.getId().getProject(), equalTo(PROJECT));
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
@@ -107,7 +106,7 @@ public class FlyteAdminClientTest {
     var workflowExecution =
         flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
             ExecutionMode.SCHEDULED, LABELS, ANNOTATIONS, EXTRA_DEFAULT_INPUTS,
-            Collections.emptyMap());
+            Map.of());
     assertThat(workflowExecution, notNullValue());
 
     var retrievedExecution = flyteAdminClient.getExecution(PROJECT, DOMAIN, NON_EXISTING_NAME);

@@ -70,6 +70,34 @@ public class FlyteInputsUtilsTest {
     assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
   }
 
+
+  @Test
+  public void shouldOverrideStyxVariables() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("STYX_PARAMETER", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
+            .setDefault(datetimeLiteralOf("2020-09-15"))
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of("STYX_PARAMETER", "2021-01-01T01"),
+        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"));
+
+    var timestamp = inputs.getLiteralsMap()
+        .get("STYX_PARAMETER")
+        .getScalar()
+        .getPrimitive()
+        .getDatetime();
+
+    assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
+  }
+
   @Test
   public void shouldComplainWhenUnmatchedInput() {
     var parameterMap = Interface.ParameterMap.newBuilder()
