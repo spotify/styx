@@ -21,7 +21,7 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.computeExtraDefaultInputs;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.computeUserDefinedInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
@@ -209,15 +209,11 @@ public class FlyteInputsUtilsTest {
         FlyteIdentifier.builder().project("project").domain("domain").name("name")
             .version("version").resourceType("LP").build();
     var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FIELD", "value-flytexecconf").build();
-    var inputs = computeExtraDefaultInputs(flyteExecConf, Map.of(), Map.of());
+    var inputs = computeUserDefinedInputs(flyteExecConf, Map.of());
     assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
 
-    var styxVariables = Map.of("field", "value-styx-vars");
-    inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, Map.of());
-    assertThat(Map.of("FIELD", "value-styx-vars"), equalTo(inputs));
-
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
+    inputs = computeUserDefinedInputs(flyteExecConf, extraDefaultInputs);
     assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
   }
 
@@ -227,9 +223,8 @@ public class FlyteInputsUtilsTest {
         FlyteIdentifier.builder().project("project").domain("domain").name("name")
             .version("version").resourceType("LP").build();
     var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FiElD", "value-flytexecconf").build();
-    var styxVariables = Map.of("field", "value-styx-vars");
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    var inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
+    var inputs = computeUserDefinedInputs(flyteExecConf, extraDefaultInputs);
     assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
   }
 }

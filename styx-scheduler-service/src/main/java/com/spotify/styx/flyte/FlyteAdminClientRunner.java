@@ -171,7 +171,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
     var extraDefaultInputs = FlyteInputsUtils
-        .computeExtraDefaultInputs(flyteExecConf, styxVariables, triggeredParams);
+        .computeUserDefinedInputs(flyteExecConf, triggeredParams);
 
     try {
       flyteAdminClient.createExecution(

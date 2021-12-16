@@ -21,9 +21,6 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.util.ParameterUtil.parseBest;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
-import static java.util.stream.Collectors.toUnmodifiableMap;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.FlyteExecConf;
@@ -112,17 +109,6 @@ public class FlyteInputsUtils {
         .stream()
         .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
 
-
-    var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
-    var lowercaseInputs = extraDefaultInputs.keySet().stream().map(String::toLowerCase).collect(toSet());
-    if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
-      var unMatchedInputKeys = extraDefaultInputs.keySet().stream()
-          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
-          .collect(toList());
-      throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
-                                              + " " + unMatchedInputKeys);
-    }
-
     parameterMap
         .getParametersMap()
         .forEach(
@@ -134,13 +120,11 @@ public class FlyteInputsUtils {
   }
 
   // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
-  public static Map<String, String> computeExtraDefaultInputs(final FlyteExecConf flyteExecConf,
-                                                final Map<String, String> styxVariables,
-                                                final Map<String, String> triggeredParams) {
+  public static Map<String, String> computeUserDefinedInputs(final FlyteExecConf flyteExecConf,
+                                                             final Map<String, String> triggeredParams) {
     Map<String, String> inputsMap =
         new TreeMap<>(String.CASE_INSENSITIVE_ORDER); // create case insensitive map to keep user defined casing
     inputsMap.putAll(flyteExecConf.inputFields()); // First use the fields stored in the flyteExecConf
-    inputsMap.putAll(styxVariables); // Then override with the styx variables
     inputsMap.putAll(triggeredParams); // Then override with the triggeredParams
     return ImmutableMap.copyOf(inputsMap);
   }
