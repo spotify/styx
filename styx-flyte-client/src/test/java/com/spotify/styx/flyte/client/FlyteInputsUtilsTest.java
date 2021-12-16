@@ -85,37 +85,7 @@ public class FlyteInputsUtilsTest {
     var ex = assertThrows(UnsupportedOperationException.class,
         () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01")));
 
-    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
-  }
-
-  @Test
-  public void shouldOnlyFillParameterInInputs() {
-    var defaultValue = Literals.Literal.newBuilder()
-        .setScalar(Literals.Scalar.newBuilder()
-            .setPrimitive(Literals.Primitive
-                .newBuilder()
-                .setStringValue("value")
-                .build()
-            ).build())
-        .build();
-    var parameterMap = Interface.ParameterMap.newBuilder()
-        .putParameters("key", Interface.Parameter.newBuilder()
-            .setVar(Interface.Variable.newBuilder()
-                .setType(Types.LiteralType.newBuilder()
-                    .setSimple(Types.SimpleType.STRING)
-                    .build())
-                .build())
-            .setDefault(defaultValue)
-            .build())
-        .build();
-
-    var inputs = fillParameterInInputs(
-        parameterMap,
-        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T00:00:10"));
-
-    assertThat(
-        inputs.getLiteralsMap(),
-        equalTo(ImmutableMap.of("key", defaultValue)));
+    assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [unmatched]"));
   }
 
   @Test
