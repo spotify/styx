@@ -170,8 +170,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
-    var extraDefaultInputs = FlyteInputsUtils
-        .computeUserDefinedInputs(flyteExecConf, triggeredParams);
+
+
+    // First use the fields stored in the flyteExecConf
+    // Then override with the triggeredParams
+    var userDefinedInputs = FlyteInputsUtils
+        .combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), triggeredParams);
 
     try {
       flyteAdminClient.createExecution(
@@ -188,7 +192,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           execMode,
           /* labels = */ labels,
           /* annotations = */ annotations,
-          /* extraDefaultInputs = */ extraDefaultInputs);
+          /* extraDefaultInputs = */ userDefinedInputs,
+          /* styxVariables */ styxVariables);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {

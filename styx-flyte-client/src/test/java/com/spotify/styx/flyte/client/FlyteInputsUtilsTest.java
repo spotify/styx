@@ -21,7 +21,7 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.computeUserDefinedInputs;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
@@ -58,6 +58,7 @@ public class FlyteInputsUtilsTest {
 
     var inputs = fillParameterInInputs(
         parameterMap,
+        ImmutableMap.of(),
         ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T01"));
 
     var timestamp = inputs.getLiteralsMap()
@@ -83,7 +84,7 @@ public class FlyteInputsUtilsTest {
         .build();
 
     var ex = assertThrows(UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01")));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01"), ImmutableMap.of()));
 
     assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
   }
@@ -103,7 +104,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -123,7 +124,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -142,7 +143,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -167,7 +168,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc")));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc"), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't get default value for input [PARAMETER]. Only DATETIME/STRING/BOOLEAN is supported but got [BINARY]"));
   }
@@ -209,11 +210,11 @@ public class FlyteInputsUtilsTest {
         FlyteIdentifier.builder().project("project").domain("domain").name("name")
             .version("version").resourceType("LP").build();
     var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FIELD", "value-flytexecconf").build();
-    var inputs = computeUserDefinedInputs(flyteExecConf, Map.of());
+    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), Map.of());
     assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
 
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    inputs = computeUserDefinedInputs(flyteExecConf, extraDefaultInputs);
+    inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
     assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
   }
 
@@ -224,7 +225,7 @@ public class FlyteInputsUtilsTest {
             .version("version").resourceType("LP").build();
     var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FiElD", "value-flytexecconf").build();
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    var inputs = computeUserDefinedInputs(flyteExecConf, extraDefaultInputs);
+    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
     assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
   }
 }

@@ -21,6 +21,8 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.util.ParameterUtil.parseBest;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.ImmutableMap;
 import com.spotify.styx.model.FlyteExecConf;
@@ -103,29 +105,45 @@ public class FlyteInputsUtils {
     throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
   }
 
-  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, Map<String, String> extraDefaultInputs) {
+  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, Map<String, String> userDefinedInputs, Map<String, String> styxVariables) {
+
+    // Validate that user defined inputs exist in the LaunchPlan
+    var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
+    var lowercaseInputs = userDefinedInputs.keySet().stream().map(String::toLowerCase).collect(toSet());
+    if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
+      var unMatchedInputKeys = userDefinedInputs.keySet().stream()
+          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
+          .collect(toList());
+      throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
+                                              + " " + unMatchedInputKeys);
+    }
+
+
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
-    var lowercaseExtraDefaultInputs = extraDefaultInputs.entrySet()
+
+    var combinedInputsLowerCase = FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder(userDefinedInputs, styxVariables)
+        .entrySet()
         .stream()
-        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue));
+        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
+        ;
 
     parameterMap
         .getParametersMap()
         .forEach(
             (key, parameter) -> literalMapBuilder.putLiterals(
                 key,
-                getDefaultValue(key, parameter, lowercaseExtraDefaultInputs)));
+                getDefaultValue(key, parameter, combinedInputsLowerCase)));
 
     return literalMapBuilder.build();
   }
 
   // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
-  public static Map<String, String> computeUserDefinedInputs(final FlyteExecConf flyteExecConf,
-                                                             final Map<String, String> triggeredParams) {
+  public static Map<String, String> combineMapsCaseInsensitiveWithOrder(final Map<String, String> map1,
+                                                             final Map<String, String> map2) {
     Map<String, String> inputsMap =
         new TreeMap<>(String.CASE_INSENSITIVE_ORDER); // create case insensitive map to keep user defined casing
-    inputsMap.putAll(flyteExecConf.inputFields()); // First use the fields stored in the flyteExecConf
-    inputsMap.putAll(triggeredParams); // Then override with the triggeredParams
+    inputsMap.putAll(map1); // First use the fields stored in the flyteExecConf
+    inputsMap.putAll(map2); // Then override with the triggeredParams
     return ImmutableMap.copyOf(inputsMap);
   }
 }
