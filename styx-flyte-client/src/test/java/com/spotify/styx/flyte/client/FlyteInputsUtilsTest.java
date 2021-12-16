@@ -234,16 +234,16 @@ public class FlyteInputsUtilsTest {
 
   @Test
   public void testInputsCameInOrder() {
-    var flyteExecConf = FlyteExecConf.builder().inputFields("field", "value-flytexecconf").build();
+    var flyteExecConf = FlyteExecConf.builder().inputFields("FIELD", "value-flytexecconf").build();
     var inputs = computeExtraDefaultInputs(flyteExecConf, Map.of(), Map.of());
-    assertThat(Map.of("field", "value-flytexecconf"), equalTo(inputs));
+    assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
 
     var styxVariables = Map.of("field", "value-styx-vars");
     inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, Map.of());
-    assertThat(Map.of("field", "value-styx-vars"), equalTo(inputs));
+    assertThat(Map.of("FIELD", "value-styx-vars"), equalTo(inputs));
 
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
     inputs = computeExtraDefaultInputs(flyteExecConf, styxVariables, extraDefaultInputs);
-    assertThat(Map.of("field", "value-trigger-params"), equalTo(inputs));
+    assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
   }
 }

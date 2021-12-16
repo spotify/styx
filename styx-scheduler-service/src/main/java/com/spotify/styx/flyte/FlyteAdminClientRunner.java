@@ -170,7 +170,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .put(STYX_WORKFLOW_INSTANCE_ANNOTATION, runState.workflowInstance().toKey())
         .put(STYX_EXECUTION_ID_ANNOTATION, styxVariables.get(STYX_EXECUTION_ID))
         .build();
-    // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
     var extraDefaultInputs = FlyteInputsUtils
         .computeExtraDefaultInputs(flyteExecConf, styxVariables, triggeredParams);
 

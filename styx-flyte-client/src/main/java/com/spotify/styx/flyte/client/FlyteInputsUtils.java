@@ -132,6 +132,7 @@ public class FlyteInputsUtils {
     return literalMapBuilder.build();
   }
 
+  // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
   public static Map<String, String> computeExtraDefaultInputs(final FlyteExecConf flyteExecConf,
                                                 final Map<String, String> styxVariables,
                                                 final Map<String, String> triggeredParams) {
