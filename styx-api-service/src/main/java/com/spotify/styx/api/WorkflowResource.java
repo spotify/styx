@@ -162,6 +162,7 @@ public final class WorkflowResource {
 
     final Workflow workflow = Workflow.create(componentId, workflowConfig);
 
+
     workflowActionAuthorizer.authorizeCreateOrUpdateWorkflowAction(workflow);
     workflowActionAuthorizer.authorizeWorkflowAction(ac, workflow);
 
