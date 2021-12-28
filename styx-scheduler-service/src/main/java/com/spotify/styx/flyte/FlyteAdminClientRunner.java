@@ -274,10 +274,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     return false;
   }
 
-  public static void main(String[] args) {
-    return FlyteAdminClient.create("obol.spotify.net:8443", "false", flyteAdminClientInterceptors.interceptors());
-  }
-
   @Override
   public void terminateExecution(RunState runState, FlyteExecutionId flyteExecutionId) {
     requireNonNull(runState, "runState");
