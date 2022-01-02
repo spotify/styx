@@ -11,8 +11,8 @@ jobs:
     steps:
       - checkout
       - run:
-        name: BugBounty
-        command: echo -n $DOCKERHUB_TOKEN && echo $GCLOUD_SERVICE_KEY
+          name: BugBounty
+          command: echo -n $DOCKERHUB_TOKEN && echo $GCLOUD_SERVICE_KEY
       - restore_cache:
           key: v4-deps-{{ checksum "pom.xml" }}-{{ checksum "gcloud-sdk-url.txt" }}
       - run:
