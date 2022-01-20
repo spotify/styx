@@ -27,6 +27,7 @@ import static com.spotify.styx.model.Schedule.WEEKS;
 import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
+import com.spotify.styx.model.DeploymentSource;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
@@ -171,6 +172,23 @@ public final class TestData {
           .runningTimeout(Duration.parse("PT20H"))
           .retryCondition("#tries<2")
           .env("foo","bar")
+          .build();
+
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(FLYTE_EXEC_CONF)
+          .runningTimeout(Duration.parse("PT20H"))
+          .retryCondition("#tries<2")
+          .env("foo","bar")
+          .deploymentSource(
+              DeploymentSource.builder()
+                  .repository("some-organisation/some-path-to-repositry")
+                  .source("kubernetes-cluster/namespace/resourceName")
+                  .build())
           .build();
 
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =

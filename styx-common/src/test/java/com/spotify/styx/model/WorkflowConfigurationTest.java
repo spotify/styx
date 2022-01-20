@@ -149,6 +149,51 @@ public class WorkflowConfigurationTest {
       };
     }
 
+    @SuppressWarnings("unused")
+    public static Object[] provideDeploymentSource() {
+      return new Object[] {
+          "Original docker centred conf",
+          buildJson(
+              "\"docker_image\":\"gcr.io/some-bucket/some-image\","
+              + "\"docker_args\":[\"1\",\"2\",\"3\"],"
+              + "\"docker_termination_logging\":true,"
+              + "\"deployment_source\":{\"repository\":\"some-organisation/some-path-to-repositry\", \"source\":\"some-tool-name/some/path/to/file\" }"
+          ),
+          configurationBuilder()
+              .dockerImage("gcr.io/some-bucket/some-image")
+              .dockerArgs(Arrays.asList("1", "2", "3"))
+              .dockerTerminationLogging(true)
+              .deploymentSource(
+                  DeploymentSource.builder()
+                      .repository("some-organisation/some-path-to-repositry")
+                      .source("some-tool-name/some/path/to/file")
+                      .build())
+              .build()
+      };
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] providePartialDeploymentSource() {
+      return new Object[] {
+          "Original docker centred conf",
+          buildJson(
+              "\"docker_image\":\"gcr.io/some-bucket/some-image\","
+              + "\"docker_args\":[\"1\",\"2\",\"3\"],"
+              + "\"docker_termination_logging\":true,"
+              + "\"deployment_source\":{\"source\":\"some-tool-name/some/path/to/file\" }"
+          ),
+          configurationBuilder()
+              .dockerImage("gcr.io/some-bucket/some-image")
+              .dockerArgs(Arrays.asList("1", "2", "3"))
+              .dockerTerminationLogging(true)
+              .deploymentSource(
+                  DeploymentSource.builder()
+                      .source("some-tool-name/some/path/to/file")
+                      .build())
+              .build()
+      };
+    }
+
     private static WorkflowConfigurationBuilder configurationBuilder() {
       return WorkflowConfiguration.builder()
           .id("id")
