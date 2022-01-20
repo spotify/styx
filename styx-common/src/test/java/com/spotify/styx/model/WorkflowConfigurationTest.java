@@ -168,9 +168,10 @@ public class WorkflowConfigurationTest {
               .dockerImage("gcr.io/some-bucket/some-image")
               .dockerArgs(Arrays.asList("1", "2", "3"))
               .dockerTerminationLogging(true)
-              .source(new DeploymentSourceBuilder()
-                  .repository("some-repository")
-                  .source("some-source")
+              .source(
+                  DeploymentSource.builder()
+                  .repository("some-organisation/some-path-to-repositry")
+                  .source("some-tool-name/some/path/to/file")
                   .build())
               .build()
       };

@@ -21,7 +21,6 @@
 package com.spotify.styx.model;
 
 import io.norberg.automatter.AutoMatter;
-import java.util.StringJoiner;
 
 
 // The source where the configuration gets managed/deployed from
@@ -31,4 +30,8 @@ public interface DeploymentSource {
   String repository();
   // deployment-agent/path/to/file
   String source();
+
+  static DeploymentSourceBuilder builder() {
+    return new DeploymentSourceBuilder();
+  }
 }
