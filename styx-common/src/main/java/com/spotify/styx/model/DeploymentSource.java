@@ -26,7 +26,7 @@ import java.util.Optional;
 // The source where the configuration gets managed/deployed from
 @AutoMatter
 public interface DeploymentSource {
-  // organisation/repository
+  // organization/repository
   Optional<String> repository();
   // deployment-agent/path/to/file
   // eg:
