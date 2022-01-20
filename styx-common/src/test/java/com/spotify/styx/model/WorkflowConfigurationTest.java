@@ -88,6 +88,11 @@ public class WorkflowConfigurationTest {
   }
 
   @Test
+  public void shouldWorkWithValidDeploymentSource() {
+
+  }
+
+  @Test
   @TestCaseName("{method}: {0}")
   @Parameters(source = ParseJsonArgsProvider.class)
   public void shouldParseFromJson(String testCase, String json, WorkflowConfiguration expected)
@@ -144,6 +149,28 @@ public class WorkflowConfigurationTest {
                       .version("1.0")
                       .build())
                   .inputFields("foo", "bar")
+                  .build())
+              .build()
+      };
+    }
+
+    @SuppressWarnings("unused")
+    public static Object[] provideDeploymentSource() {
+      return new Object[] {
+          "Original docker centred conf",
+          buildJson(
+              "\"docker_image\":\"gcr.io/some-bucket/some-image\","
+              + "\"docker_args\":[\"1\",\"2\",\"3\"],"
+              + "\"docker_termination_logging\":true,"
+              + "\"source\":{\"repository\":\"some-repository\", \"source\":\"some-source\" }"
+          ),
+          configurationBuilder()
+              .dockerImage("gcr.io/some-bucket/some-image")
+              .dockerArgs(Arrays.asList("1", "2", "3"))
+              .dockerTerminationLogging(true)
+              .source(new DeploymentSourceBuilder()
+                  .repository("some-repository")
+                  .source("some-source")
                   .build())
               .build()
       };

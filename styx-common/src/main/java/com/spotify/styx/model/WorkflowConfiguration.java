@@ -69,6 +69,8 @@ public interface WorkflowConfiguration {
 
   Optional<FlyteExecConf> flyteExecConf();
 
+  Optional<DeploymentSource> source();
+
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);
 
