@@ -184,7 +184,7 @@ public final class TestData {
           .runningTimeout(Duration.parse("PT20H"))
           .retryCondition("#tries<2")
           .env("foo","bar")
-          .source(
+          .deploymentSource(
               DeploymentSource.builder()
                   .repository("some-organisation/some-path-to-repositry")
                   .source("kubernetes-cluster/namespace/resourceName")

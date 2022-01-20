@@ -162,13 +162,13 @@ public class WorkflowConfigurationTest {
               "\"docker_image\":\"gcr.io/some-bucket/some-image\","
               + "\"docker_args\":[\"1\",\"2\",\"3\"],"
               + "\"docker_termination_logging\":true,"
-              + "\"source\":{\"repository\":\"some-organisation/some-path-to-repositry\", \"source\":\"some-tool-name/some/path/to/file\" }"
+              + "\"deployment_source\":{\"repository\":\"some-organisation/some-path-to-repositry\", \"source\":\"some-tool-name/some/path/to/file\" }"
           ),
           configurationBuilder()
               .dockerImage("gcr.io/some-bucket/some-image")
               .dockerArgs(Arrays.asList("1", "2", "3"))
               .dockerTerminationLogging(true)
-              .source(
+              .deploymentSource(
                   DeploymentSource.builder()
                       .repository("some-organisation/some-path-to-repositry")
                       .source("some-tool-name/some/path/to/file")
@@ -185,13 +185,13 @@ public class WorkflowConfigurationTest {
               "\"docker_image\":\"gcr.io/some-bucket/some-image\","
               + "\"docker_args\":[\"1\",\"2\",\"3\"],"
               + "\"docker_termination_logging\":true,"
-              + "\"source\":{\"source\":\"some-tool-name/some/path/to/file\" }"
+              + "\"deployment_source\":{\"source\":\"some-tool-name/some/path/to/file\" }"
           ),
           configurationBuilder()
               .dockerImage("gcr.io/some-bucket/some-image")
               .dockerArgs(Arrays.asList("1", "2", "3"))
               .dockerTerminationLogging(true)
-              .source(
+              .deploymentSource(
                   DeploymentSource.builder()
                       .source("some-tool-name/some/path/to/file")
                       .build())
