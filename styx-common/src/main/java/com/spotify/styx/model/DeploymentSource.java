@@ -21,13 +21,13 @@
 package com.spotify.styx.model;
 
 import io.norberg.automatter.AutoMatter;
-
+import java.util.Optional;
 
 // The source where the configuration gets managed/deployed from
 @AutoMatter
 public interface DeploymentSource {
   // organisation/repository
-  String repository();
+  Optional<String> repository();
   // deployment-agent/path/to/file
   // eg:
   // - kubernetes-cluster/namespace/resourceName
