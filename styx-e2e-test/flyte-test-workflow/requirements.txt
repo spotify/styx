@@ -25,7 +25,7 @@ marshmallow-enum==1.5.1   # via dataclasses-json
 marshmallow==3.10.0       # via dataclasses-json, marshmallow-enum
 mypy-extensions==0.4.3    # via typing-inspect
 natsort==7.1.1            # via croniter, flytekit
-numpy==1.20.1             # via pandas, pyarrow
+numpy==1.21               # via pandas, pyarrow
 pandas==1.2.2             # via flytekit
 pathspec==0.8.1           # via scantree
 protobuf==3.15.0          # via flyteidl, flytekit
