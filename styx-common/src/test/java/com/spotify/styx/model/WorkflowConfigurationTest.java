@@ -88,11 +88,6 @@ public class WorkflowConfigurationTest {
   }
 
   @Test
-  public void shouldWorkWithValidDeploymentSource() {
-
-  }
-
-  @Test
   @TestCaseName("{method}: {0}")
   @Parameters(source = ParseJsonArgsProvider.class)
   public void shouldParseFromJson(String testCase, String json, WorkflowConfiguration expected)
