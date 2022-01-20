@@ -28,7 +28,6 @@ import static com.spotify.styx.model.Schedule.YEARS;
 
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.DeploymentSource;
-import com.spotify.styx.model.DeploymentSourceBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.FlyteIdentifier;
