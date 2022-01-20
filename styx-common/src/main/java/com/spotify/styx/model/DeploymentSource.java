@@ -29,6 +29,9 @@ public interface DeploymentSource {
   // organisation/repository
   String repository();
   // deployment-agent/path/to/file
+  // eg:
+  // - kubernetes-cluster/namespace/resourceName
+  // - some-tool-name/path/to/file
   String source();
 
   static DeploymentSourceBuilder builder() {

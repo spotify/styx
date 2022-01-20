@@ -188,7 +188,7 @@ public final class TestData {
           .source(
               DeploymentSource.builder()
                   .repository("some-organisation/some-path-to-repositry")
-                  .source("some-tool-name/some/path/to/file")
+                  .source("kubernetes-cluster/namespace/resourceName")
                   .build())
           .build();
 
