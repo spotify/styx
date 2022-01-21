@@ -4,48 +4,127 @@
 #
 #    pip-compile requirements.in
 #
-attrs==20.3.0             # via scantree
-certifi==2020.12.5        # via requests
-chardet==4.0.0            # via requests
-click==7.1.2              # via flytekit
-croniter==1.0.6           # via flytekit
-dataclasses-json==0.5.2   # via flytekit
-decorator==4.4.2          # via retry
-deprecated==1.2.11        # via flytekit
-dirhash==0.2.1            # via flytekit
-docker-image-py==0.1.10   # via flytekit
-flyteidl==0.18.20         # via flytekit
-flytekit==0.16.0b16       # via -r requirements.in
-future==0.18.2            # via croniter
-grpcio==1.35.0            # via flytekit
-idna==2.10                # via requests
-importlib-metadata==3.7.3  # via keyring
-keyring==22.0.1           # via flytekit
-marshmallow-enum==1.5.1   # via dataclasses-json
-marshmallow==3.10.0       # via dataclasses-json, marshmallow-enum
-mypy-extensions==0.4.3    # via typing-inspect
-natsort==7.1.1            # via croniter, flytekit
-numpy==1.20.1             # via pandas, pyarrow
-pandas==1.2.2             # via flytekit
-pathspec==0.8.1           # via scantree
-protobuf==3.15.0          # via flyteidl, flytekit
-py==1.10.0                # via retry
-pyarrow==3.0.0            # via flytekit
-python-dateutil==2.8.1    # via croniter, flytekit, pandas
-pytimeparse==1.1.8        # via flytekit
-pytz==2018.4              # via flytekit, pandas
-regex==2020.11.13         # via docker-image-py
-requests==2.25.1          # via flytekit, responses
-responses==0.12.1         # via flytekit
-retry==0.9.2              # via flytekit
-scantree==0.0.1           # via dirhash
-six==1.15.0               # via flytekit, grpcio, protobuf, python-dateutil, responses, scantree
-sortedcontainers==2.3.0   # via flytekit
-statsd==3.3.0             # via flytekit
-stringcase==1.2.0         # via dataclasses-json
-typing-extensions==3.7.4.3  # via importlib-metadata, typing-inspect
-typing-inspect==0.6.0     # via dataclasses-json
-urllib3==1.26.5          # via flytekit, requests, responses
-wheel==0.36.2             # via flytekit
-wrapt==1.12.1             # via deprecated, flytekit
-zipp==3.4.1               # via importlib-metadata
+attrs==20.3.0
+    # via scantree
+certifi==2020.12.5
+    # via requests
+cffi==1.15.0
+    # via cryptography
+chardet==4.0.0
+    # via requests
+click==7.1.2
+    # via flytekit
+croniter==1.0.6
+    # via flytekit
+cryptography==36.0.1
+    # via secretstorage
+dataclasses-json==0.5.2
+    # via flytekit
+decorator==4.4.2
+    # via retry
+deprecated==1.2.11
+    # via flytekit
+dirhash==0.2.1
+    # via flytekit
+docker-image-py==0.1.10
+    # via flytekit
+flyteidl==0.18.20
+    # via flytekit
+flytekit==0.16.0b16
+    # via -r requirements.in
+future==0.18.2
+    # via croniter
+grpcio==1.35.0
+    # via flytekit
+idna==2.10
+    # via requests
+jeepney==0.7.1
+    # via
+    #   keyring
+    #   secretstorage
+keyring==22.0.1
+    # via flytekit
+marshmallow==3.10.0
+    # via
+    #   dataclasses-json
+    #   marshmallow-enum
+marshmallow-enum==1.5.1
+    # via dataclasses-json
+mypy-extensions==0.4.3
+    # via typing-inspect
+natsort==7.1.1
+    # via
+    #   croniter
+    #   flytekit
+numpy==1.21.0
+    # via
+    #   pandas
+    #   pyarrow
+pandas==1.2.2
+    # via flytekit
+pathspec==0.8.1
+    # via scantree
+protobuf==3.15.0
+    # via
+    #   flyteidl
+    #   flytekit
+py==1.10.0
+    # via retry
+pyarrow==3.0.0
+    # via flytekit
+pycparser==2.21
+    # via cffi
+python-dateutil==2.8.1
+    # via
+    #   croniter
+    #   flytekit
+    #   pandas
+pytimeparse==1.1.8
+    # via flytekit
+pytz==2018.4
+    # via
+    #   flytekit
+    #   pandas
+regex==2020.11.13
+    # via docker-image-py
+requests==2.25.1
+    # via
+    #   flytekit
+    #   responses
+responses==0.12.1
+    # via flytekit
+retry==0.9.2
+    # via flytekit
+scantree==0.0.1
+    # via dirhash
+secretstorage==3.3.1
+    # via keyring
+six==1.15.0
+    # via
+    #   flytekit
+    #   grpcio
+    #   protobuf
+    #   python-dateutil
+    #   responses
+    #   scantree
+sortedcontainers==2.3.0
+    # via flytekit
+statsd==3.3.0
+    # via flytekit
+stringcase==1.2.0
+    # via dataclasses-json
+typing-extensions==3.7.4.3
+    # via typing-inspect
+typing-inspect==0.6.0
+    # via dataclasses-json
+urllib3==1.25.11
+    # via
+    #   flytekit
+    #   requests
+    #   responses
+wheel==0.36.2
+    # via flytekit
+wrapt==1.12.1
+    # via
+    #   deprecated
+    #   flytekit
