@@ -33,7 +33,7 @@ public class RpcHelper {
   // example:  flytectl get executions -p PROJECT -d DOMAIN --filter.fieldSelector="execution.phase in (RUNNING),execution.started_at>2022-02-07T18:23:05,execution.started_at<2022-02-08T18:10:05" -o json
   public static String getExecutionsListFilter(Instant timeNow, Duration since, Duration to) {
 
-    final String dateSince = timeNow.minus(since).minus(24, ChronoUnit.HOURS)
+    final String dateSince = timeNow.minus(since)
         .atZone(ZoneId.of("UTC"))
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
