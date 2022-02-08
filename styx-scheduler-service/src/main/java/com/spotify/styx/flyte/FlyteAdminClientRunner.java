@@ -298,7 +298,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                   100,
                   paginationToken,
                   RpcHelper.getExecutionsListFilter(
-                      Instant.now(),
+                      time.get(),
                       Duration.of(24, ChronoUnit.HOURS),
                       TERMINATION_GRACE_PERIOD));
           executions.getExecutionsList().stream()
