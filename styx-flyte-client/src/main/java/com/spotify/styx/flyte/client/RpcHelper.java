@@ -24,10 +24,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 
 public class RpcHelper {
 
+  private RpcHelper() {}
 
   // Test this filter by printing it and using it on a flytectl command
   // example:  flytectl get executions -p PROJECT -d DOMAIN --filter.fieldSelector="execution.phase in (RUNNING),execution.started_at>2022-02-07T18:23:05,execution.started_at<2022-02-08T18:10:05" -o json
