@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.flyte.client.FlyteInputsUtils;
+import com.spotify.styx.flyte.client.RpcHelper;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.TriggerParameters;
@@ -64,6 +65,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -295,7 +297,10 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                   domain.getId(),
                   100,
                   paginationToken,
-                  FlyteInputsUtils.getExecutionsListFilter(Instant.now()));
+                  RpcHelper.getExecutionsListFilter(
+                      Instant.now(),
+                      Duration.of(24, ChronoUnit.HOURS),
+                      TERMINATION_GRACE_PERIOD));
           executions.getExecutionsList().stream()
               .filter(this::haveBeenRunningForAWhile)
               .map(exec -> AnnotatedFlyteExecutionId.create(
