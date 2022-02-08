@@ -62,6 +62,8 @@ import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -288,7 +290,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           //TODO: explore using filters for listing only running executions
           // or at least listing only the ones newer than some threshold
           var executions =
-              flyteAdminClient.listExecutions(project.getId(), domain.getId(), 100, paginationToken, "");
+              flyteAdminClient.listExecutions(
+                  project.getId(),
+                  domain.getId(),
+                  100,
+                  paginationToken,
+                  FlyteInputsUtils.getExecutionsListFilter(Instant.now()));
           executions.getExecutionsList().stream()
               .filter(this::haveBeenRunningForAWhile)
               .map(exec -> AnnotatedFlyteExecutionId.create(

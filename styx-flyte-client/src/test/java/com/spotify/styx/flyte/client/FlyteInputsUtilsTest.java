@@ -24,6 +24,7 @@ import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
+import static com.spotify.styx.flyte.client.FlyteInputsUtils.getExecutionsListFilter;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
 import static org.junit.Assert.assertThrows;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -38,6 +39,9 @@ import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import org.junit.Test;
 
@@ -255,5 +259,18 @@ public class FlyteInputsUtilsTest {
     var extraDefaultInputs = Map.of("field", "value-trigger-params");
     var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
     assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
+  }
+
+  @Test
+  public void testGtExecutionsListFilter() {
+    final Instant someTime = LocalDateTime.of(2022, 2, 2, 12, 12, 05)
+        .atZone(ZoneOffset.UTC)
+        .toInstant();
+
+    final String executionsListFilter = getExecutionsListFilter(someTime);
+
+    assertThat(executionsListFilter,
+        equalTo("execution.phase in (RUNNING),execution.started_at>2022-02-01T12:12:05,execution.started_at<2022-02-02T12:09:05"));
+
   }
 }
