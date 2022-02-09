@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.flyte.client.FlyteInputsUtils;
+import com.spotify.styx.flyte.client.RpcHelper;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.TriggerParameters;
@@ -85,6 +86,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
   @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(3);
+  private static final Duration TERMINATION_LOOKUP_SINCE = Duration.ofDays(24);
   private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
   private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -285,10 +287,16 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       for (var domain : project.getDomainsList()) {
         String paginationToken = null;
         do {
-          //TODO: explore using filters for listing only running executions
-          // or at least listing only the ones newer than some threshold
           var executions =
-              flyteAdminClient.listExecutions(project.getId(), domain.getId(), 100, paginationToken, "");
+              flyteAdminClient.listExecutions(
+                  project.getId(),
+                  domain.getId(),
+                  100,
+                  paginationToken,
+                  RpcHelper.getExecutionsListFilter(
+                      time.get(),
+                      TERMINATION_LOOKUP_SINCE,
+                      TERMINATION_GRACE_PERIOD));
           executions.getExecutionsList().stream()
               .filter(this::haveBeenRunningForAWhile)
               .map(exec -> AnnotatedFlyteExecutionId.create(
