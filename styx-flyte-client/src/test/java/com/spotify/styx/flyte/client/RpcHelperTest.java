@@ -46,7 +46,7 @@ public class RpcHelperTest {
         Duration.of(3, ChronoUnit.MINUTES));
 
     assertThat(executionsListFilter,
-        equalTo("execution.phase in (RUNNING),execution.started_at>2022-02-01T12:12:05,execution.started_at<2022-02-02T12:09:05"));
+        equalTo("value_in(phase,RUNNING)+gte(started_at,2022-02-01T12:12:05)+lte(started_at,2022-02-02T12:09:05)"));
 
   }
 }

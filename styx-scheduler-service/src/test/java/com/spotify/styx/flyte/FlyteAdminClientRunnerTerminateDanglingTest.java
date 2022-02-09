@@ -152,11 +152,11 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
 
     ArgumentCaptor<String> filterCatcher = ArgumentCaptor.forClass(String.class);
     verify(adminClient).listExecutions(any(), any(), anyInt(), any(), filterCatcher.capture());
-    var filters = filterCatcher.getValue().split(",");
+    var filters = filterCatcher.getValue().split("\\+");
     assertThat(filters, arrayContainingInAnyOrder(
-        equalTo("execution.phase in (RUNNING)"),
-        startsWith("execution.started_at>"),
-        startsWith("execution.started_at<"))
+        equalTo("value_in(phase,RUNNING)"),
+        startsWith("gte(started_at,"),
+        startsWith("lte(started_at,"))
     );
   }
 

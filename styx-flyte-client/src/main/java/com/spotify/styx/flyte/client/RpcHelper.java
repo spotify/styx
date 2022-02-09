@@ -29,8 +29,7 @@ public class RpcHelper {
 
   private RpcHelper() {}
 
-  // Test this filter by printing it and using it on a flytectl command
-  // example:  flytectl get executions -p PROJECT -d DOMAIN --filter.fieldSelector="execution.phase in (RUNNING),execution.started_at>2022-02-07T18:23:05,execution.started_at<2022-02-08T18:10:05" -o json
+  // Test this filter by running it towards FlyteAdmin
   public static String getExecutionsListFilter(Instant timeNow, Duration since, Duration to) {
 
     final String dateSince = timeNow.minus(since)
@@ -44,6 +43,6 @@ public class RpcHelper {
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
-    return String.format("execution.phase in (RUNNING),execution.started_at>%s,execution.started_at<%s", dateSince, dateTo);
+    return String.format("value_in(phase,RUNNING)+gte(started_at,%s)+lte(started_at,%s)",dateSince,dateTo);
   }
 }
