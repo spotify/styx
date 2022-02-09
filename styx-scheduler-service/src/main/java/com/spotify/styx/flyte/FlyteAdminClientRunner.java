@@ -63,7 +63,6 @@ import io.norberg.automatter.AutoMatter;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -87,6 +86,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
   @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(3);
+  private static final Duration TERMINATION_LOOKUP_SINCE = Duration.ofDays(24);
   private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
   private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
   private static final ThreadFactory THREAD_FACTORY = new ThreadFactoryBuilder()
@@ -295,7 +295,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                   paginationToken,
                   RpcHelper.getExecutionsListFilter(
                       time.get(),
-                      Duration.of(24, ChronoUnit.HOURS),
+                      TERMINATION_LOOKUP_SINCE,
                       TERMINATION_GRACE_PERIOD));
           executions.getExecutionsList().stream()
               .filter(this::haveBeenRunningForAWhile)
