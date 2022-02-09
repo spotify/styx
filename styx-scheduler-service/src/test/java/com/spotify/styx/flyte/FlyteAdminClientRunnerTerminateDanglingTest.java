@@ -24,6 +24,10 @@ import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_EXECUTION_ID_AN
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATE_CAUSE;
 import static com.spotify.styx.flyte.FlyteAdminClientRunner.TERMINATION_GRACE_PERIOD;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
@@ -65,6 +69,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.verification.VerificationMode;
@@ -139,6 +144,20 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   @After
   public void tearDown() throws Exception {
     runner.close();
+  }
+
+  @Test
+  public void shouldCallListExecutionsWithFilter() {
+    runner.terminateDanglingFlyteExecutions();
+
+    ArgumentCaptor<String> filterCatcher = ArgumentCaptor.forClass(String.class);
+    verify(adminClient).listExecutions(any(), any(), anyInt(), any(), filterCatcher.capture());
+    var filters = filterCatcher.getValue().split(",");
+    assertThat(filters, arrayContainingInAnyOrder(
+        equalTo("execution.phase in (RUNNING)"),
+        startsWith("execution.started_at>"),
+        startsWith("execution.started_at<"))
+    );
   }
 
   @Test
