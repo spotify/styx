@@ -287,8 +287,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
       for (var domain : project.getDomainsList()) {
         String paginationToken = null;
         do {
-          //TODO: explore using filters for listing only running executions
-          // or at least listing only the ones newer than some threshold
           var executions =
               flyteAdminClient.listExecutions(
                   project.getId(),
