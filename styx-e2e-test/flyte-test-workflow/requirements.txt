@@ -117,7 +117,7 @@ typing-extensions==3.7.4.3
     # via typing-inspect
 typing-inspect==0.6.0
     # via dataclasses-json
-urllib3==1.25.11
+urllib3==1.26.5
     # via
     #   flytekit
     #   requests
