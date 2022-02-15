@@ -54,12 +54,14 @@ public class FlyteAdminClient {
   }
 
   public static FlyteAdminClient create(String target, boolean insecure,
-                                        List<ClientInterceptor> interceptors) {
+                                        List<ClientInterceptor> interceptors,
+                                        final String serviceName) {
     var builder = ManagedChannelBuilder.forTarget(target);
 
     if (insecure) {
       builder.usePlaintext();
     }
+    builder.intercept(GrpcClientMetadataInterceptor.create(serviceName));
     // Enable transparent retries:
     // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
     var channel = builder

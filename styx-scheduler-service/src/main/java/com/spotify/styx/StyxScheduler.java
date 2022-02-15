@@ -711,7 +711,7 @@ public class StyxScheduler implements AppInit {
     var config = flyteAdminRootConfig.getConfig(runnerId);
     final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
     final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
-    return FlyteAdminClient.create(target, insecure, flyteAdminClientInterceptors.interceptors());
+    return FlyteAdminClient.create(target, insecure, flyteAdminClientInterceptors.interceptors(), SERVICE_NAME);
   }
 
   @VisibleForTesting
