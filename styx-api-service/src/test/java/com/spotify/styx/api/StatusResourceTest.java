@@ -314,8 +314,7 @@ public class StatusResourceTest extends VersionedApiTest {
 
     sinceVersion(Api.Version.V3);
 
-    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL,
-        isFlyteWorkflow))
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL))
         .thenReturn(result);
 
     Response<ByteString> response =
@@ -342,7 +341,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
-    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString(), isFlyteWorkflow))
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString()))
         .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
 
     Response<ByteString> response =

@@ -108,7 +108,7 @@ public class WorkflowActionAuthorizerTest {
     when(ac.user()).thenReturn(Optional.of(idToken));
     assertThat(Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW.id())).isSuccess(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), isFlyteWorkflow, WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
   }
 
   @Test
@@ -129,20 +129,20 @@ public class WorkflowActionAuthorizerTest {
     when(ac.user()).thenReturn(Optional.of(idToken));
     assertThat(Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW)).isSuccess(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), isFlyteWorkflow, WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
   }
 
   @Test
   public void authorizeWorkflowActionShouldFailIfAuthorizerFails() {
     when(ac.user()).thenReturn(Optional.of(idToken));
     final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
-    doThrow(cause).when(authorizer).authorizeServiceAccountUsage(any(), isFlyteWorkflow, any(), any());
+    doThrow(cause).when(authorizer).authorizeServiceAccountUsage(any(), any(), any());
     exception.expect(is(cause));
     sut.authorizeWorkflowAction(ac, WORKFLOW);
     final Try<Void> invocation = Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW));
     assertThat(invocation.isFailure(), is(true));
     verify(authorizer).authorizeServiceAccountUsage(
-        WORKFLOW.id(), isFlyteWorkflow, WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
+        WORKFLOW.id(), WORKFLOW.configuration().serviceAccount().orElseThrow(), idToken);
     assertThat(invocation.getCause(), is(cause));
   }
 
