@@ -195,7 +195,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
     when(idTokenPayload.getEmail()).thenReturn(BLACKLISTED_SA_EMAIL);
     var response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken));
 
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
     assertThat(response.status().code(), is(FORBIDDEN.code()));
@@ -206,7 +206,7 @@ public class ServiceAccountUsageAuthorizerTest {
         .blacklisted(true)
         .message(blacklistedMessage(BLACKLISTED_SA_EMAIL))
         .build();
-    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, BLACKLISTED_SA_EMAIL);
+    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, BLACKLISTED_SA_EMAIL, isFlyteWorkflow);
     assertThat(result, is(expectedResult));
 
     verifyZeroInteractions(iam);
@@ -223,7 +223,7 @@ public class ServiceAccountUsageAuthorizerTest {
         new com.google.api.services.iam.v1.model.Policy());
 
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
@@ -243,14 +243,14 @@ public class ServiceAccountUsageAuthorizerTest {
         .message(deniedMessage(SERVICE_ACCOUNT))
         .serviceAccountProjectId(SERVICE_ACCOUNT_PROJECT)
         .build();
-    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, PRINCIPAL_EMAIL);
+    var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, PRINCIPAL_EMAIL, isFlyteWorkflow);
     assertThat(result, is(expectedResult));
   }
 
   @Test
   public void shouldDenyAccessIfPrincipalDoesNotHaveUserRole() throws IOException {
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken));
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, SERVICE_ACCOUNT, idToken);
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
@@ -266,7 +266,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldCacheAccessDenial() {
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(SERVICE_ACCOUNT)));
 
@@ -276,7 +276,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
     for (int i = 0; i < 3; i++) {
       final Response<?> repeated = assertThrowsResponseException(() ->
-          sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken));
+          sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken));
       assertThat(repeated, is(response));
     }
 
@@ -288,7 +288,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldLookupManagedServiceAccountAndCacheResult() throws IOException {
     for (int i = 0; i < 3; i++) {
-      Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken));
+      Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, MANAGED_SERVICE_ACCOUNT, idToken));
     }
     verify(iam.projects().serviceAccounts(), times(1)).get("projects/-/serviceAccounts/" + MANAGED_SERVICE_ACCOUNT);
   }
@@ -298,7 +298,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = googleJsonResponseException(404);
     when((Object) iam.projects().serviceAccounts().get(any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, MANAGED_SERVICE_ACCOUNT, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
     assertThat(response.status().reasonPhrase(), is("Service account does not exist: " + MANAGED_SERVICE_ACCOUNT));
   }
@@ -308,7 +308,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = new IOException();
     when((Object) iam.projects().serviceAccounts().get(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, MANAGED_SERVICE_ACCOUNT, idToken)).getCause()), is(cause));
     verify(iam.projects().serviceAccounts().get(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
@@ -318,14 +318,14 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = new AssertionError();
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
+    sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken);
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAllowAccessIfNotEnforcingAuthorizationPolicy(String serviceAccount) {
     when(authorizationPolicy.shouldEnforceAuthorization(any(), any(), any())).thenReturn(false);
-    sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken);
+    sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken);
     verify(authorizationPolicy).shouldEnforceAuthorization(WORKFLOW_ID, serviceAccount, idToken);
   }
 
@@ -333,35 +333,35 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectDirectly(String serviceAccount) {
     projectBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalIsAdminUserDirectly(String serviceAccount) {
     when(idTokenPayload.getEmail()).thenReturn(ADMIN_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalIsAdminServiceAccountDirectly(String serviceAccount) {
     when(idTokenPayload.getEmail()).thenReturn(ADMIN_AGENT_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalIsAdminViaGroup(String serviceAccount) throws IOException {
     doReturn(isMember).when(members).hasMember(STYX_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup(String serviceAccount) throws IOException {
     doReturn(isMember).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
@@ -372,7 +372,8 @@ public class ServiceAccountUsageAuthorizerTest {
     doThrow(googleJsonResponseException(404)).when(notFoundRequest).execute();
     doReturn(notFoundRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     final Response<?> response =
-        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow,
+            serviceAccount, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(serviceAccount)));
 
@@ -388,7 +389,8 @@ public class ServiceAccountUsageAuthorizerTest {
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     final Response<?> response =
-        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+        assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow,
+            serviceAccount, idToken));
     assertThat(response.status().code(), is(FORBIDDEN.code()));
     assertThat(response.status().reasonPhrase(), is(deniedMessage(serviceAccount)));
   }
@@ -402,7 +404,7 @@ public class ServiceAccountUsageAuthorizerTest {
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
@@ -414,21 +416,21 @@ public class ServiceAccountUsageAuthorizerTest {
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountDirectly(String serviceAccount) {
     saBinding.getMembers().add("user:" + PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnServiceAccountViaGroup(String serviceAccount) throws IOException {
     doReturn(isMember).when(members).hasMember(SERVICE_ACCOUNT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
-    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
   }
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
@@ -437,7 +439,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = googleJsonResponseException(404);
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
     assertThat(response.status().reasonPhrase(), is("Project does not exist: " + SERVICE_ACCOUNT_PROJECT));
   }
@@ -448,7 +450,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = googleJsonResponseException(404);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken));
     assertThat(response.status().code(), is(BAD_REQUEST.code()));
     assertThat(response.status().reasonPhrase(), is("Service account does not exist: " + serviceAccount));
   }
@@ -459,7 +461,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
     verify(getIamPolicy, atLeast(RETRY_ATTEMPTS)).execute();
   }
 
@@ -469,7 +471,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = googleJsonResponseException(500);
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
     verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
@@ -479,7 +481,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = new IOException();
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
     verify(getIamPolicy, atLeast(RETRY_ATTEMPTS)).execute();
   }
 
@@ -489,7 +491,7 @@ public class ServiceAccountUsageAuthorizerTest {
     final Throwable cause = new IOException();
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
-        sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
+        sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, serviceAccount, idToken)).getCause()), is(cause));
     verify(iam.projects().serviceAccounts().getIamPolicy(any()), atLeast(RETRY_ATTEMPTS)).execute();
   }
 
@@ -516,7 +518,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void testNop() {
     final ServiceAccountUsageAuthorizer sut = ServiceAccountUsageAuthorizer.nop();
-    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, SERVICE_ACCOUNT, idToken)).isSuccess(),
+    assertThat(Try.run(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, isFlyteWorkflow, SERVICE_ACCOUNT, idToken)).isSuccess(),
         is(true));
   }
 

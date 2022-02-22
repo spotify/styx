@@ -116,7 +116,8 @@ public class StatusResource implements Closeable {
   private Response<TestServiceAccountUsageAuthorizationResponse> testServiceAccountUsageAuthorization(
       TestServiceAccountUsageAuthorizationRequest request) {
     final ServiceAccountUsageAuthorizationResult result =
-        accountUsageAuthorizer.checkServiceAccountUsageAuthorization(request.serviceAccount(), request.principal());
+        accountUsageAuthorizer.checkServiceAccountUsageAuthorization(request.serviceAccount(), request.principal(),
+            isFlyteWorkflow);
 
     result.errorResponse().ifPresent(e -> { throw new ResponseException(e); });
 
