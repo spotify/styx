@@ -64,7 +64,9 @@ public class WorkflowActionAuthorizer {
     if (serviceAccount.isEmpty()) {
       return;
     }
-    serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), serviceAccount.get(), idToken);
+    boolean isFlyteWorkflow =workflow.configuration().flyteExecConf().isEmpty();
+    serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), isFlyteWorkflow,
+        serviceAccount.get(), idToken);
   }
 
   public void authorizeCreateOrUpdateWorkflowAction(Workflow workflow){
