@@ -113,15 +113,12 @@ public interface ServiceAccountUsageAuthorizer {
    * Authorize service account usage by a principal in a workflow.
    * @throws ResponseException if not authorized.
    */
-  void authorizeServiceAccountUsage(WorkflowId workflowId, boolean isFlyteWorkflow, String serviceAccount,
-                                    GoogleIdToken idToken);
+  void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken);
 
   /**
    * Check if a principal is authorized to use a service account.
    */
-  ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
-                                                                               String principalEmail,
-                                                                               boolean isFlyteWorkflow);
+  ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount, String principal);
 
   class Impl implements ServiceAccountUsageAuthorizer {
 
@@ -177,8 +174,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     @Override
-    public void authorizeServiceAccountUsage(WorkflowId workflowId, boolean isFlyteWorkflow, String serviceAccount,
-                                             GoogleIdToken idToken) {
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       final String principalEmail = idToken.getPayload().getEmail();
 
       final boolean enforce = authorizationPolicy.shouldEnforceAuthorization(workflowId, serviceAccount, idToken);
@@ -190,7 +186,7 @@ public interface ServiceAccountUsageAuthorizer {
         result = cache.get(Tuple.of(principalEmail, serviceAccount), () -> {
           cached.set(false);
           try {
-            return checkServiceAccountUsageAuthorization(serviceAccount, principalEmail, isFlyteWorkflow);
+            return checkServiceAccountUsageAuthorization(serviceAccount, principalEmail);
           } catch (ResponseException e) {
             return ServiceAccountUsageAuthorizationResult.ofErrorResponse(e.getResponse());
           }
@@ -224,12 +220,11 @@ public interface ServiceAccountUsageAuthorizer {
 
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(String serviceAccount,
-                                                                                        String principalEmail,
-                                                                                        boolean isFlyteWorkflow) {
+                                                                                        String principalEmail) {
       final Supplier<String> projectIdSupplier = Suppliers.memoize(() -> serviceAccountProjectId(serviceAccount));
 
       return checkIsPrincipalBlacklisted(principalEmail)
-          .or(() -> checkIsPrincipalAdmin(principalEmail, isFlyteWorkflow))
+          .or(() -> checkIsPrincipalAdmin(principalEmail))
           .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
           .orElseGet(() -> deny(serviceAccount, principalEmail, projectIdSupplier));
     }
@@ -244,18 +239,7 @@ public interface ServiceAccountUsageAuthorizer {
     }
 
     private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalAdmin(
-        String principalEmail, boolean isFlyteWorkflow) {
-
-      // Temporarily allow metrics catalog to manage flyte workflows
-      List<String> metricsCatalogUsers = List.of("viktorg@spotify.com");
-      if (isFlyteWorkflow) {
-        memberStatus(principalEmail, metricsCatalogUsers)
-            .map(status -> ServiceAccountUsageAuthorizationResult.builder()
-              .authorized(true)
-              .message(String.format("Principal %s is part of metrics catalog %s", principalEmail, status))
-              .build());
-      }
-
+        String principalEmail) {
       return memberStatus(principalEmail, administrators)
           .map(status -> ServiceAccountUsageAuthorizationResult.builder()
               .authorized(true)
@@ -508,14 +492,13 @@ public interface ServiceAccountUsageAuthorizer {
     static final Nop INSTANCE = new Nop();
 
     @Override
-    public void authorizeServiceAccountUsage(WorkflowId workflowId, boolean isFlyteWorkflow, String serviceAccount,
-                                             GoogleIdToken idToken) {
+    public void authorizeServiceAccountUsage(WorkflowId workflowId, String serviceAccount, GoogleIdToken idToken) {
       // nop
     }
 
     @Override
     public ServiceAccountUsageAuthorizationResult checkServiceAccountUsageAuthorization(
-        String serviceAccount, String principalEmail, boolean isFlyteWorkflow) {
+        String serviceAccount, String principal) {
       return ServiceAccountUsageAuthorizationResult.builder().authorized(true).build();
     }
   }
