@@ -25,6 +25,7 @@ import static com.spotify.styx.testdata.TestData.WORKFLOW_ID;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +64,7 @@ public class WorkflowActionAuthorizerTest {
   @Mock private GoogleIdToken idToken;
 
   private WorkflowActionAuthorizer sut;
+  private boolean isFlyteWorkflow = false;
 
   class ThrowActionAuthorizer implements ActionAuthorizer {
     @Override
@@ -136,7 +138,7 @@ public class WorkflowActionAuthorizerTest {
   public void authorizeWorkflowActionShouldFailIfAuthorizerFails() {
     when(ac.user()).thenReturn(Optional.of(idToken));
     final ResponseException cause = new ResponseException(Response.forStatus(FORBIDDEN));
-    doThrow(cause).when(authorizer).authorizeServiceAccountUsage(any(), isFlyteWorkflow, any(), any());
+    doThrow(cause).when(authorizer).authorizeServiceAccountUsage(any(), anyBoolean(), any(), any());
     exception.expect(is(cause));
     sut.authorizeWorkflowAction(ac, WORKFLOW);
     final Try<Void> invocation = Try.run(() -> sut.authorizeWorkflowAction(ac, WORKFLOW));

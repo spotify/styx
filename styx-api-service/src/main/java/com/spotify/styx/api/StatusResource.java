@@ -75,6 +75,7 @@ public class StatusResource implements Closeable {
   private final ServiceAccountUsageAuthorizer accountUsageAuthorizer;
   private final ForkJoinPool forkJoinPool;
   private final Closer closer = Closer.create();
+  private final boolean isFlyteWorkflow = false;
 
   public StatusResource(Storage storage, ServiceAccountUsageAuthorizer accountUsageAuthorizer) {
     this.storage = requireNonNull(storage);

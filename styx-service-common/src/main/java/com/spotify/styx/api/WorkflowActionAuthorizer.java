@@ -64,7 +64,7 @@ public class WorkflowActionAuthorizer {
     if (serviceAccount.isEmpty()) {
       return;
     }
-    boolean isFlyteWorkflow =workflow.configuration().flyteExecConf().isEmpty();
+    boolean isFlyteWorkflow = workflow.configuration().flyteExecConf().isPresent();
     serviceAccountUsageAuthorizer.authorizeServiceAccountUsage(workflow.id(), isFlyteWorkflow,
         serviceAccount.get(), idToken);
   }

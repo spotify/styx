@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -106,6 +107,7 @@ public class StatusResourceTest extends VersionedApiTest {
   private static final ByteString AUTH_PAYLOAD = ByteString.encodeUtf8(
       String.format("{\"service_account\":\"%s\",\"principal\":\"%s\"}", AUTH_SERVICE_ACCOUNT, AUTH_PRINCIPAL));
   private ServiceAccountUsageAuthorizer accountUsageAuthorizer;
+  private static boolean isFlyteWorkflow = false;
 
   public StatusResourceTest(Api.Version version) {
     super(StatusResource.BASE, version);
@@ -342,7 +344,7 @@ public class StatusResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     StatusType statusCode = Status.BAD_REQUEST.withReasonPhrase("Project does not exist: baz");
-    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString(), isFlyteWorkflow))
+    when(accountUsageAuthorizer.checkServiceAccountUsageAuthorization(anyString(), anyString(), anyBoolean()))
         .thenReturn(ServiceAccountUsageAuthorizationResult.ofErrorResponse(Response.forStatus(statusCode)));
 
     Response<ByteString> response =
