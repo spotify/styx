@@ -68,7 +68,7 @@ public interface FlyteRunner extends Closeable {
 
   class CreateExecutionException extends Exception {
     CreateExecutionException(FlyteExecConf conf, Throwable cause) {
-      super("Couldn't create execution for:" + conf, cause);
+      super("Couldn't create execution for:" + conf + " cause: " + cause.getMessage(), cause);
     }
 
     public CreateExecutionException(String message) {
