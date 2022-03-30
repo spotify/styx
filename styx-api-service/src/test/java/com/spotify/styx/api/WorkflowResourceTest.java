@@ -77,6 +77,7 @@ import com.spotify.styx.util.ResourceNotFoundException;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -113,6 +114,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
   @Mock private GoogleIdToken idToken;
   @Mock private RequestAuthenticator requestAuthenticator;
+  @Mock private Clock clock;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
 
@@ -184,7 +186,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            workflowActionAuthorizer);
+            workflowActionAuthorizer, clock);
 
     environment.routingEngine()
         .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
