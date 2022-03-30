@@ -71,6 +71,8 @@ public interface WorkflowConfiguration {
 
   Optional<DeploymentSource> deploymentSource();
 
+  Optional<Instant> deploymentTime();
+
   default Instant addOffset(Instant next) {
     final String offset = offset().orElseGet(this::defaultOffset);
 
