@@ -37,6 +37,7 @@ import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -189,6 +190,7 @@ public final class TestData {
                   .repository("some-organisation/some-path-to-repositry")
                   .source("kubernetes-cluster/namespace/resourceName")
                   .build())
+          .deploymentTime(Instant.now())
           .build();
 
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
