@@ -74,10 +74,10 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -114,10 +114,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
   @Mock private GoogleIdToken idToken;
   @Mock private RequestAuthenticator requestAuthenticator;
-  @Mock private Clock clock;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
-  private static final Instant deploymentTime = Instant.ofEpochSecond(0);
+  private static final Instant deploymentTime = Instant.ofEpochSecond(1638709383);
+  private static final Time time = ()-> deploymentTime;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -128,7 +128,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .serviceAccount(SERVICE_ACCOUNT)
           .env("FOO", "foo", "BAR", "bar")
           .runningTimeout(Duration.parse("PT23H"))
-          .deploymentTime(deploymentTime)
+          .deploymentTime(time.get())
           .build();
 
   private static final Workflow WORKFLOW =
@@ -188,7 +188,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            workflowActionAuthorizer, clock);
+            workflowActionAuthorizer,time);
 
     environment.routingEngine()
         .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
@@ -652,7 +652,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     when(workflowInitializer.store(eq(workflow), any())).thenReturn(Optional.empty());
-    when(clock.instant()).thenReturn(deploymentTime);
 
     Response<ByteString> response =
         awaitResponse(
@@ -681,7 +680,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     when(workflowInitializer.store(eq(workflow), any())).thenReturn(Optional.of(existingWorkflow));
-    when(clock.instant()).thenReturn(deploymentTime);
 
     Response<ByteString> response =
         awaitResponse(
@@ -708,7 +706,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
         .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), eq(EXISTING_WORKFLOW));
-    when(clock.instant()).thenReturn(deploymentTime);
 
     final Response<ByteString> response = awaitResponse(
         serviceHelper.request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));
@@ -724,7 +721,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     when(workflowInitializer.store(eq(WORKFLOW), any()))
         .thenThrow(new WorkflowInitializationException(new Exception()));
-    when(clock.instant()).thenReturn(deploymentTime);
 
     Response<ByteString> response =
         awaitResponse(
@@ -798,7 +794,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     when(workflowValidator.validateWorkflow(any())).thenReturn(List.of("bad", "image"));
-    when(clock.instant()).thenReturn(deploymentTime);
 
     Response<ByteString> response = awaitResponse(serviceHelper
         .request("POST", path("/foo"), serialize(WORKFLOW_CONFIGURATION)));

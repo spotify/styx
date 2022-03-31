@@ -48,6 +48,8 @@ public final class TestData {
   public static final Set<String> RESOURCE_IDS = ImmutableSet.of("foo-resource", "bar-resource");
   public static final String EXECUTION_ID = "test";
   public static final String FLYTE_EXECUTION_ID = "abc";
+  private static final Instant deploymentTime = Instant.ofEpochSecond(1638709383);
+
 
   public static final WorkflowId WORKFLOW_ID =
       WorkflowId.create("styx", "styx.TestEndpoint");
@@ -173,7 +175,7 @@ public final class TestData {
           .runningTimeout(Duration.parse("PT20H"))
           .retryCondition("#tries<2")
           .env("foo","bar")
-          .deploymentTime(Instant.ofEpochSecond(0))
+          .deploymentTime(deploymentTime)
           .build();
 
   public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE =

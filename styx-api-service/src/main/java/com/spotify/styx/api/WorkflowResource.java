@@ -45,10 +45,10 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
@@ -74,21 +74,22 @@ public final class WorkflowResource {
   private final Storage storage;
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
   private final WorkflowActionAuthorizer workflowActionAuthorizer;
-  private final Clock clock;
+
+  private Time time;
 
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
       WorkflowInitializer workflowInitializer,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
       WorkflowActionAuthorizer workflowActionAuthorizer) {
     this(storage, workflowValidator, workflowInitializer, workflowConsumer,
-        workflowActionAuthorizer, Clock.systemUTC());
+        workflowActionAuthorizer, Instant::now);
 
   }
 
   WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
       WorkflowInitializer workflowInitializer,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-      WorkflowActionAuthorizer workflowActionAuthorizer, Clock clock) {
+      WorkflowActionAuthorizer workflowActionAuthorizer, Time time) {
 
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
@@ -96,7 +97,7 @@ public final class WorkflowResource {
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
     this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
         "workflowActionAuthorizer");
-    this.clock = Objects.requireNonNull(clock, "clock");
+    this.time = Objects.requireNonNull(time, "time");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
@@ -169,7 +170,7 @@ public final class WorkflowResource {
     try {
       workflowConfig = OBJECT_MAPPER
           .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
-      workflowConfig = WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(clock.instant()).build();
+      workflowConfig = WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(time.get()).build();
 
 
     } catch (IOException e) {
