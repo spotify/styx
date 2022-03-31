@@ -36,6 +36,7 @@ import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
+import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
@@ -44,6 +45,7 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TimeUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -51,6 +53,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -73,16 +76,21 @@ public final class WorkflowResource {
   private final BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
   private final WorkflowActionAuthorizer workflowActionAuthorizer;
 
+  private final Time time;
+
+
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
-                          WorkflowInitializer workflowInitializer,
-                          BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-                          WorkflowActionAuthorizer workflowActionAuthorizer) {
+      WorkflowInitializer workflowInitializer,
+      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
+      WorkflowActionAuthorizer workflowActionAuthorizer, Time time) {
+
     this.storage = Objects.requireNonNull(storage, "storage");
     this.workflowValidator = Objects.requireNonNull(workflowValidator, "workflowValidator");
     this.workflowInitializer = Objects.requireNonNull(workflowInitializer, "workflowInitializer");
     this.workflowConsumer = Objects.requireNonNull(workflowConsumer, "workflowConsumer");
     this.workflowActionAuthorizer = Objects.requireNonNull(workflowActionAuthorizer,
         "workflowActionAuthorizer");
+    this.time = Objects.requireNonNull(time, "time");
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
@@ -151,11 +159,12 @@ public final class WorkflowResource {
     if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
-    final WorkflowConfiguration workflowConfig;
+    WorkflowConfiguration workflowConfig;
     try {
-      workflowConfig = OBJECT_MAPPER
-          .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
-    } catch (IOException e) {
+
+      workflowConfig = readFromJsonWithDefaults(payload.orElseThrow());
+
+    } catch (IOException | NoSuchElementException e) {
       return Response.forStatus(Status.BAD_REQUEST
           .withReasonPhrase("Invalid payload. " + e.getMessage()));
     }
@@ -190,6 +199,13 @@ public final class WorkflowResource {
     }
 
     return Response.forPayload(workflow);
+  }
+
+  private WorkflowConfiguration readFromJsonWithDefaults(ByteString payload)
+      throws IOException {
+    WorkflowConfiguration workflowConfig = OBJECT_MAPPER
+        .readValue(payload.toByteArray(), WorkflowConfiguration.class);
+    return WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(time.get()).build();
   }
 
   private Response<Collection<Workflow>> workflows() {

@@ -21,6 +21,7 @@
 package com.spotify.styx.e2e_tests;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
+import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -47,6 +48,7 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .dockerImage("busybox")
         .dockerArgs(List.of("echo", "hello world"))
         .serviceAccount(workflowServiceAccount.getEmail())
+        .deploymentTime(TEST_DEPLOYMENT_TIME)
         .build();
     doTestCreateDeleteWorkflow(workflowConfiguration);
   }
@@ -58,6 +60,7 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
         .schedule(Schedule.DAYS)
         .flyteExecConf(
             OBJECT_MAPPER.readValue(OBJECT_MAPPER.writeValueAsBytes(FLYTE_EXEC_CONF_MAP), FlyteExecConf.class))
+        .deploymentTime(TEST_DEPLOYMENT_TIME)
         .build();
     doTestCreateDeleteWorkflow(workflowConfiguration);
   }

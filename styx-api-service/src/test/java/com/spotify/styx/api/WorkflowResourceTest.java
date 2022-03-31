@@ -31,6 +31,7 @@ import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -74,6 +75,7 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
+import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
@@ -102,8 +104,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
-  private Datastore datastore = datastoreEmulator.client();
-  private Connection bigtable = setupBigTableMockTable();
+  private final Datastore datastore = datastoreEmulator.client();
+  private final Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
   private AggregateStorage rawStorage;
 
@@ -115,6 +117,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private RequestAuthenticator requestAuthenticator;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
+  private static final Time time = ()-> TEST_DEPLOYMENT_TIME;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -125,6 +128,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .serviceAccount(SERVICE_ACCOUNT)
           .env("FOO", "foo", "BAR", "bar")
           .runningTimeout(Duration.parse("PT23H"))
+          .deploymentTime(time.get())
           .build();
 
   private static final Workflow WORKFLOW =
@@ -184,7 +188,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            workflowActionAuthorizer);
+            workflowActionAuthorizer,time);
 
     environment.routingEngine()
         .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
