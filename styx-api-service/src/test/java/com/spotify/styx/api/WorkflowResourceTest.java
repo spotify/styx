@@ -31,6 +31,7 @@ import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -116,8 +117,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private RequestAuthenticator requestAuthenticator;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
-  private static final Instant deploymentTime = Instant.ofEpochSecond(1638709383);
-  private static final Time time = ()-> deploymentTime;
+  private static final Time time = ()-> TEST_DEPLOYMENT_TIME;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
