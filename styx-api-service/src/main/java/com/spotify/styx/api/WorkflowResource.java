@@ -99,9 +99,7 @@ public final class WorkflowResource {
     this.clock = Objects.requireNonNull(clock, "clock");
   }
 
-
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(
-      RequestAuthenticator requestAuthenticator) {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -119,9 +117,8 @@ public final class WorkflowResource {
             Middlewares.<Workflow>authed(requestAuthenticator).and(json()), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
-            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE",
-            BASE + "/<cid>/<wfid>",
-            rc -> ac -> deleteWorkflow(arg("cid", rc), arg("wfid", rc), ac)),
+            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE", BASE + "/<cid>/<wfid>",
+            rc -> ac -> deleteWorkflow(arg("cid", rc),arg("wfid", rc), ac)),
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
@@ -132,8 +129,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/state",
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH",
-            BASE + "/<cid>/<wfid>/state",
+            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH", BASE + "/<cid>/<wfid>/state",
             rc -> ac -> patchState(arg("cid", rc), arg("wfid", rc), rc.request(), ac))
     );
 
@@ -146,8 +142,7 @@ public final class WorkflowResource {
       var deletedWorkflow = storage.runInTransactionWithRetries(tx -> {
         var workflowOpt = tx.workflow(workflowId);
         if (workflowOpt.isEmpty()) {
-          var response = Response.forStatus(
-              Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
+          var response = Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
           throw new ResponseException(response);
         }
         var workflow = workflowOpt.orElseThrow();
@@ -231,7 +226,7 @@ public final class WorkflowResource {
   }
 
   private Response<WorkflowState> patchState(String componentId, String id, Request request,
-      AuthContext ac) {
+                                             AuthContext ac) {
     final Optional<ByteString> payload = request.payload();
     if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -310,8 +305,7 @@ public final class WorkflowResource {
         }
         final WorkflowState workflowState = storage.workflowState(workflowId);
         if (workflowState.nextNaturalTrigger().isEmpty()) {
-          return Response.forStatus(
-              Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
+          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
         }
         final Schedule schedule = workflow.get().configuration().schedule();
         final Instant nextNaturalTrigger = workflowState.nextNaturalTrigger().get();
@@ -325,8 +319,7 @@ public final class WorkflowResource {
         data = storage.executionData(workflowId, start, stop);
       }
     } catch (IOException e) {
-      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(),
-          e);
+      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(), e);
     }
     return Response.forPayload(data);
   }
@@ -346,8 +339,7 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
+      throw new RuntimeException("Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
     }
   }
 

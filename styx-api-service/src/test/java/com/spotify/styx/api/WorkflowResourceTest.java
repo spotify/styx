@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -101,28 +101,20 @@ public class WorkflowResourceTest extends VersionedApiTest {
           "BAR", "bar")
       .build();
 
-  @ClassRule
-  public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
+  @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
   private final Datastore datastore = datastoreEmulator.client();
   private final Connection bigtable = setupBigTableMockTable();
   private AggregateStorage storage;
   private AggregateStorage rawStorage;
 
-  @Mock
-  private WorkflowValidator workflowValidator;
-  @Mock
-  private WorkflowInitializer workflowInitializer;
-  @Mock
-  private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
-  @Mock
-  private WorkflowActionAuthorizer workflowActionAuthorizer;
-  @Mock
-  private GoogleIdToken idToken;
-  @Mock
-  private RequestAuthenticator requestAuthenticator;
-  @Mock
-  private Clock clock;
+  @Mock private WorkflowValidator workflowValidator;
+  @Mock private WorkflowInitializer workflowInitializer;
+  @Mock private BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer;
+  @Mock private WorkflowActionAuthorizer workflowActionAuthorizer;
+  @Mock private GoogleIdToken idToken;
+  @Mock private RequestAuthenticator requestAuthenticator;
+  @Mock private Clock clock;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
   private static final Instant deploymentTime = Instant.ofEpochSecond(0);
@@ -171,8 +163,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
   private static final ByteString STATEPAYLOAD_FULL =
       ByteString.encodeUtf8("{\"enabled\":\"true\", "
-          + "\"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
-          + "\"next_natural_offset_trigger\":\"2016-08-10T08:00:01Z\"}");
+                            + "\"next_natural_trigger\":\"2016-08-10T07:00:01Z\", "
+                            + "\"next_natural_offset_trigger\":\"2016-08-10T08:00:01Z\"}");
 
   private static final ByteString STATEPAYLOAD_ENABLED =
       ByteString.encodeUtf8("{\"enabled\":\"true\"}");
@@ -242,7 +234,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_FULL));
+                                            STATEPAYLOAD_FULL));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -253,9 +245,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     final WorkflowState workflowState = storage.workflowState(WORKFLOW.id());
     assertThat(workflowState.enabled().orElseThrow(), is(true));
     assertThat(workflowState.nextNaturalTrigger().orElseThrow().toString(),
-        equalTo("2016-08-10T07:00:01Z"));
+               equalTo("2016-08-10T07:00:01Z"));
     assertThat(workflowState.nextNaturalOffsetTrigger().orElseThrow().toString(),
-        equalTo("2016-08-10T08:00:01Z"));
+               equalTo("2016-08-10T08:00:01Z"));
   }
 
   @Test
@@ -264,7 +256,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_ENABLED));
+                                            STATEPAYLOAD_ENABLED));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertThat(response, hasHeader("Content-Type", equalTo("application/json")));
@@ -279,7 +271,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            STATEPAYLOAD_OTHER_FIELD));
+                                            STATEPAYLOAD_OTHER_FIELD));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "enabled", equalTo(true));
@@ -292,8 +284,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     doThrow(new ResourceNotFoundException(""))
-        .when(storage)
-        .patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
+        .when(storage).patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
             STATEPAYLOAD_ENABLED));
@@ -306,8 +297,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     doThrow(new IOException())
-        .when(storage)
-        .patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
+        .when(storage).patchState(WorkflowId.create("foo", "bar"), WorkflowState.patchEnabled(true));
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
             STATEPAYLOAD_ENABLED));
@@ -326,7 +316,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "enabled", equalTo(false));
 
     storage.patchState(WORKFLOW.id(),
-        WorkflowState.patchEnabled(true));
+                       WorkflowState.patchEnabled(true));
 
     response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
@@ -353,7 +343,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("PATCH", path("/foo/bar/state"),
-            BAD_JSON));
+                                            BAD_JSON));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
@@ -377,8 +367,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -419,8 +408,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -449,8 +437,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
     storage.writeEvent(create(Event.created(wfi, "exec", "img"), 1L, ms("07:00:01")));
     storage.writeEvent(create(Event.started(wfi), 2L, ms("07:00:02")));
 
@@ -473,9 +460,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].status", is("SUBMITTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].status", is("STARTED"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[0].timestamp",
-        is("2016-08-10T07:00:01Z"));
+               is("2016-08-10T07:00:01Z"));
     assertJson(response, "triggers.[0].executions.[0].statuses.[1].timestamp",
-        is("2016-08-10T07:00:02Z"));
+               is("2016-08-10T07:00:02Z"));
   }
 
   @Test
@@ -506,8 +493,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     WorkflowInstance wfi = WorkflowInstance.create(WORKFLOW.id(), "2016-08-10");
-    storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi, BACKFILL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", path("/foo/bar/instances/2016-08-10")));
@@ -530,12 +516,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
-    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo/bar/instances?offset=2016-08-12&limit=1")));
@@ -559,12 +542,9 @@ public class WorkflowResourceTest extends VersionedApiTest {
     WorkflowInstance wfi1 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-11");
     WorkflowInstance wfi2 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-12");
     WorkflowInstance wfi3 = WorkflowInstance.create(WORKFLOW.id(), "2016-08-13");
-    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
-    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L,
-        ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi1, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi2, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
+    storage.writeEvent(create(Event.triggerExecution(wfi3, NATURAL_TRIGGER, TRIGGER_PARAMETERS), 0L, ms("07:00:00")));
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("/foo/bar/instances?limit=2&tail=true")));
@@ -616,13 +596,13 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("POST", path("/foo"),
-            BAD_JSON));
+                                            BAD_JSON));
 
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
     assertThat(response, hasNoPayload());
     assertThat(response, hasStatus(withReasonPhrase(
         startsWith("Invalid payload. Unexpected character ('}' (code 125)): "
-            + "was expecting a colon to separate field name and value"))));
+                   + "was expecting a colon to separate field name and value"))));
   }
 
   @Test
@@ -651,8 +631,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     doThrow(new ResponseException(Response.forStatus(FORBIDDEN)))
         .when(workflowActionAuthorizer).authorizeWorkflowAction(any(), any(Workflow.class));
 
-    final Response<ByteString> response = awaitResponse(
-        serviceHelper.request("DELETE", path("/foo/bar")));
+    final Response<ByteString> response = awaitResponse(serviceHelper.request("DELETE", path("/foo/bar")));
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
@@ -678,8 +657,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     Response<ByteString> response =
         awaitResponse(
             serviceHelper
-                .request("POST", path("/" + workflow.componentId()),
-                    serialize(workflow.configuration())));
+                .request("POST", path("/" + workflow.componentId()), serialize(workflow.configuration())));
 
     verify(workflowValidator).validateWorkflow(workflow);
     verify(workflowInitializer).store(eq(workflow), any());
@@ -708,8 +686,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     Response<ByteString> response =
         awaitResponse(
             serviceHelper
-                .request("POST", path("/" + workflow.componentId()),
-                    serialize(workflow.configuration())));
+                .request("POST", path("/" + workflow.componentId()), serialize(workflow.configuration())));
 
     verify(workflowValidator).validateWorkflow(workflow);
     verify(workflowInitializer).store(eq(workflow), any());
@@ -773,7 +750,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
     assertThat(storage.workflow(workf.id()), is(Optional.of(workf)));
     var response = awaitResponse(serviceHelper.request("DELETE",
-        path("/" + workf.componentId() + "/" + workf.workflowId())));
+        path("/" + workf.componentId() +"/" + workf.workflowId())));
     assertThat(response, hasStatus(withCode(Status.NO_CONTENT)));
     assertThat(response, hasNoPayload());
     assertThat(storage.workflow(workf.id()), is(Optional.empty()));
