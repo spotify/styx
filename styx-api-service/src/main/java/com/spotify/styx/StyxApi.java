@@ -206,7 +206,7 @@ public class StyxApi implements AppInit {
         new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
-        new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer);
+        new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer, time);
 
     final BackfillResource backfillResource = new BackfillResource(schedulerServiceBaseUrl, storage,
         workflowValidator, time, workflowActionAuthorizer);

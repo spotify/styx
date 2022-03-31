@@ -21,6 +21,7 @@
 package com.spotify.styx.e2e_tests;
 
 import static com.spotify.styx.e2e_tests.DatastoreUtil.deleteDatastoreNamespace;
+import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static java.lang.ProcessBuilder.Redirect.INHERIT;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
@@ -48,6 +49,7 @@ import com.spotify.styx.model.WorkflowState;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.serialization.Json;
 import com.spotify.styx.util.Connections;
+import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
@@ -134,6 +136,7 @@ public class EndToEndTestBase {
 
   private Config schedulerConfig;
   private Config apiConfig;
+  private final Time time = ()-> TEST_DEPLOYMENT_TIME;;
 
   private static final int BASE_PORT = 18080;
 
@@ -186,6 +189,7 @@ public class EndToEndTestBase {
     styxApiThread = executor.submit(() -> {
       HttpService.boot(env -> StyxApi.newBuilder()
           .setServiceName(API_SERVICE_NAME)
+          .setTime(time)
           .build()
           .create(env), API_SERVICE_NAME, styxApiInstance::complete);
       return null;

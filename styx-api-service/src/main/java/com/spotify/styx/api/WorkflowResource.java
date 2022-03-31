@@ -78,16 +78,8 @@ public final class WorkflowResource {
 
   private final Time time;
 
+
   public WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
-      WorkflowInitializer workflowInitializer,
-      BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
-      WorkflowActionAuthorizer workflowActionAuthorizer) {
-    this(storage, workflowValidator, workflowInitializer, workflowConsumer,
-        workflowActionAuthorizer, Instant::now);
-
-  }
-
-  WorkflowResource(Storage storage, WorkflowValidator workflowValidator,
       WorkflowInitializer workflowInitializer,
       BiConsumer<Optional<Workflow>, Optional<Workflow>> workflowConsumer,
       WorkflowActionAuthorizer workflowActionAuthorizer, Time time) {
