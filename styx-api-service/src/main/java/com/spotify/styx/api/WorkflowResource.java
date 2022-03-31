@@ -170,11 +170,11 @@ public final class WorkflowResource {
     if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
     }
-    final WorkflowConfiguration workflowConfig;
+    WorkflowConfiguration workflowConfig;
     try {
       workflowConfig = OBJECT_MAPPER
           .readValue(payload.get().toByteArray(), WorkflowConfiguration.class);
-      WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(clock.instant()).build();
+      workflowConfig = WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(clock.instant()).build();
 
 
     } catch (IOException e) {

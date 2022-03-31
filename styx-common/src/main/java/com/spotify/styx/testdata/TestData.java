@@ -173,6 +173,7 @@ public final class TestData {
           .runningTimeout(Duration.parse("PT20H"))
           .retryCondition("#tries<2")
           .env("foo","bar")
+          .deploymentTime(Instant.ofEpochSecond(0))
           .build();
 
   public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE =
