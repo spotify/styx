@@ -193,7 +193,25 @@ public final class TestData {
                   .repository("some-organisation/some-path-to-repositry")
                   .source("kubernetes-cluster/namespace/resourceName")
                   .build())
-          .deploymentTime(Instant.now())
+          .deploymentTime(TEST_DEPLOYMENT_TIME)
+          .build();
+
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(FLYTE_EXEC_CONF)
+          .runningTimeout(Duration.parse("PT20H"))
+          .retryCondition("#tries<2")
+          .env("foo","bar")
+          .deploymentSource(
+              DeploymentSource.builder()
+                  .repository("some-organisation/some-path-to-repositry")
+                  .source("remote-foo")
+                  .build())
+          .deploymentTime(TEST_DEPLOYMENT_TIME)
           .build();
 
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
