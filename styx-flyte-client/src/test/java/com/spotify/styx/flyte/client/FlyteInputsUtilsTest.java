@@ -109,7 +109,7 @@ public class FlyteInputsUtilsTest {
                     setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
-            .setDefault(datetimeLiteralOf("FALSE"))
+            .setDefault(stringLiteralOf("FALSE"))
             .build())
         .build();
 
@@ -137,7 +137,7 @@ public class FlyteInputsUtilsTest {
                     setSimple(Types.SimpleType.STRING)
                     .build())
                 .build())
-            .setDefault(datetimeLiteralOf("FALSE"))
+            .setDefault(stringLiteralOf("FALSE"))
             .build())
         .build();
 
