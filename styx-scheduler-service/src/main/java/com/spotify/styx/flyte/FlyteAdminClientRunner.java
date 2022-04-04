@@ -37,7 +37,6 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
-import com.spotify.styx.flyte.client.FlyteInputsUtils;
 import com.spotify.styx.flyte.client.RpcHelper;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;

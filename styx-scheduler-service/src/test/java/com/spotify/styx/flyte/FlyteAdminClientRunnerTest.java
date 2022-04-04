@@ -488,7 +488,7 @@ public class FlyteAdminClientRunnerTest {
 
     ArgumentCaptor<Map<String, String>> argCaptor = ArgumentCaptor.forClass(Map.class);
     verify(flyteAdminClient).createExecution(any(), any(), any(), any(), any(),
-        any(), any(), argCaptor.capture(), any(), any());
+        any(), any(), any(), any(), argCaptor.capture());
     assertThat(argCaptor.getValue(), hasEntry("HADES_OVERWRITE", "true"));
   }
 

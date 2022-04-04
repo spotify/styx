@@ -94,15 +94,16 @@ public class FlyteInputsUtils {
                                           Map<String, String> extraDefaultInputs,
                                           Map<String, String> triggerParameters) {
     var lowercaseKey = key.toLowerCase();
-    var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
-
-    if (extraDefaultInput != null) {
-      return literalOf(key, extraDefaultInput, parameter.getVar().getType());
-    }
 
     final String triggerParam = triggerParameters.get(lowercaseKey);
     if (triggerParam != null) {
       return literalOf(key, triggerParam, parameter.getVar().getType());
+    }
+
+    var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
+
+    if (extraDefaultInput != null) {
+      return literalOf(key, extraDefaultInput, parameter.getVar().getType());
     }
 
     if (parameter.hasDefault()) {
