@@ -89,7 +89,8 @@ public class FlyteInputsUtils {
         .build();
   }
 
-  static Literals.Literal getDefaultValue(String key, Interface.Parameter parameter,
+  static Literals.Literal getDefaultValue(String key,
+                                          Interface.Parameter parameter,
                                           Map<String, String> extraDefaultInputs,
                                           Map<String, String> triggerParameters) {
     var lowercaseKey = key.toLowerCase();
@@ -137,12 +138,18 @@ public class FlyteInputsUtils {
         .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
         ;
 
+    var triggerParamsToLowerCase = triggerParams
+        .entrySet()
+        .stream()
+        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
+        ;
+
     parameterMap
         .getParametersMap()
         .forEach(
             (key, parameter) -> literalMapBuilder.putLiterals(
                 key,
-                getDefaultValue(key, parameter, combinedInputsLowerCase, triggerParams)));
+                getDefaultValue(key, parameter, combinedInputsLowerCase, triggerParamsToLowerCase)));
 
     return literalMapBuilder.build();
   }
