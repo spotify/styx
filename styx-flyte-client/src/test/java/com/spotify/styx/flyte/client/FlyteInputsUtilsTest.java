@@ -59,7 +59,8 @@ public class FlyteInputsUtilsTest {
     var inputs = fillParameterInInputs(
         parameterMap,
         ImmutableMap.of(),
-        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T01"));
+        ImmutableMap.of("EXTRA_PARAMETER", "1970-01-01T01"),
+        ImmutableMap.of());
 
     var timestamp = inputs.getLiteralsMap()
         .get("EXTRA_PARAMETER")
@@ -87,7 +88,8 @@ public class FlyteInputsUtilsTest {
     var inputs = fillParameterInInputs(
         parameterMap,
         ImmutableMap.of("STYX_PARAMETER", "2021-01-01T01"),
-        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"));
+        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"),
+        ImmutableMap.of());
 
     var timestamp = inputs.getLiteralsMap()
         .get("STYX_PARAMETER")
@@ -96,6 +98,62 @@ public class FlyteInputsUtilsTest {
         .getDatetime();
 
     assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
+  }
+
+  @Test
+  public void shouldNotFailForMissingTriggerParam() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("OVERWRITE", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .setDefault(stringLiteralOf("FALSE"))
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of(),
+        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"),
+        ImmutableMap.of("NOT_EXISTENT_PARAMETER", "TRUE"));
+
+    var timestamp = inputs.getLiteralsMap()
+        .get("OVERWRITE")
+        .getScalar()
+        .getPrimitive()
+        .getStringValue();
+
+    assertThat(timestamp, equalTo("FALSE"));
+  }
+
+  @Test
+  public void shouldSetTriggerParam() {
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("OVERWRITE", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.STRING)
+                    .build())
+                .build())
+            .setDefault(stringLiteralOf("FALSE"))
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of(),
+        ImmutableMap.of("STYX_PARAMETER", "1970-01-01T01"),
+        ImmutableMap.of("OVERWRITE", "TRUE"));
+
+    var timestamp = inputs.getLiteralsMap()
+        .get("OVERWRITE")
+        .getScalar()
+        .getPrimitive()
+        .getStringValue();
+
+    assertThat(timestamp, equalTo("TRUE"));
   }
 
   @Test
@@ -112,7 +170,7 @@ public class FlyteInputsUtilsTest {
         .build();
 
     var ex = assertThrows(UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01"), ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("UNMATCHED", "1970-01-01T01"), ImmutableMap.of(),ImmutableMap.of()));
 
     assertThat(ex.getMessage(), equalTo("Inputs don't correspond with launch plans inputs: [UNMATCHED]"));
   }
@@ -132,7 +190,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -152,7 +210,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -171,7 +229,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't find default value for launch plan input: key"));
   }
@@ -196,7 +254,7 @@ public class FlyteInputsUtilsTest {
 
     var exception = assertThrows(
         UnsupportedOperationException.class,
-        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc"), ImmutableMap.of()));
+        () -> fillParameterInInputs(parameterMap, ImmutableMap.of("PARAMETER", "abc"), ImmutableMap.of(), ImmutableMap.of()));
 
     assertThat(exception.getMessage(), equalTo("Can't get default value for input [PARAMETER]. Only DATETIME/STRING/BOOLEAN is supported but got [BINARY]"));
   }

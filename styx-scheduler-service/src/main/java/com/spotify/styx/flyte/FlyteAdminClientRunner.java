@@ -37,7 +37,6 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.spotify.styx.docker.LabelValue;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
-import com.spotify.styx.flyte.client.FlyteInputsUtils;
 import com.spotify.styx.flyte.client.RpcHelper;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
@@ -174,10 +173,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .build();
 
 
-    // First use the fields stored in the flyteExecConf
-    // Then override with the triggeredParams
-    var userDefinedInputs = FlyteInputsUtils
-        .combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), triggeredParams);
+    // only use the input fields.
+    // pass the trigger params later for optional checking
+    var userDefinedInputs = flyteExecConf.inputFields();
 
     try {
       flyteAdminClient.createExecution(
@@ -195,7 +193,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           /* labels = */ labels,
           /* annotations = */ annotations,
           /* extraDefaultInputs = */ userDefinedInputs,
-          /* styxVariables */ styxVariables);
+          /* styxVariables */ styxVariables,
+          /* triggerParams */ triggeredParams);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {

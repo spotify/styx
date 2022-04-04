@@ -89,8 +89,17 @@ public class FlyteInputsUtils {
         .build();
   }
 
-  static Literals.Literal getDefaultValue(String key, Interface.Parameter parameter, Map<String, String> extraDefaultInputs) {
+  static Literals.Literal getDefaultValue(String key,
+                                          Interface.Parameter parameter,
+                                          Map<String, String> extraDefaultInputs,
+                                          Map<String, String> triggerParameters) {
     var lowercaseKey = key.toLowerCase();
+
+    final String triggerParam = triggerParameters.get(lowercaseKey);
+    if (triggerParam != null) {
+      return literalOf(key, triggerParam, parameter.getVar().getType());
+    }
+
     var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
 
     if (extraDefaultInput != null) {
@@ -104,7 +113,11 @@ public class FlyteInputsUtils {
     throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
   }
 
-  static Literals.LiteralMap fillParameterInInputs(Interface.ParameterMap parameterMap, Map<String, String> userDefinedInputs, Map<String, String> styxVariables) {
+  static Literals.LiteralMap fillParameterInInputs(
+      Interface.ParameterMap parameterMap,
+      Map<String, String> userDefinedInputs,
+      Map<String, String> styxVariables,
+      Map<String, String> triggerParams) {
 
     // Validate that user defined inputs exist in the LaunchPlan
     var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
@@ -126,12 +139,18 @@ public class FlyteInputsUtils {
         .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
         ;
 
+    var triggerParamsToLowerCase = triggerParams
+        .entrySet()
+        .stream()
+        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
+        ;
+
     parameterMap
         .getParametersMap()
         .forEach(
             (key, parameter) -> literalMapBuilder.putLiterals(
                 key,
-                getDefaultValue(key, parameter, combinedInputsLowerCase)));
+                getDefaultValue(key, parameter, combinedInputsLowerCase, triggerParamsToLowerCase)));
 
     return literalMapBuilder.build();
   }
