@@ -82,7 +82,8 @@ public class FlyteAdminClient {
       Map<String, String> labels,
       Map<String, String> annotations,
       Map<String, String> userDefinedInputs,
-      Map<String, String> styxVariables) {
+      Map<String, String> styxVariables,
+      Map<String, String> triggerParams) {
     LOG.debug("createExecution {} {} {}", project, domain, launchPlanId);
 
     var metadata =
@@ -115,7 +116,7 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillParameterInInputs(inputs, userDefinedInputs, styxVariables))
+                .setInputs(fillParameterInInputs(inputs, userDefinedInputs, styxVariables, triggerParams))
                 .build());
 
     verifyNotNull(

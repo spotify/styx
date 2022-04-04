@@ -174,10 +174,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         .build();
 
 
-    // First use the fields stored in the flyteExecConf
-    // Then override with the triggeredParams
-    var userDefinedInputs = FlyteInputsUtils
-        .combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), triggeredParams);
+    // only use the input fields.
+    // pass the trigger params later for optional checking
+    var userDefinedInputs = flyteExecConf.inputFields();
 
     try {
       flyteAdminClient.createExecution(
@@ -195,7 +194,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
           /* labels = */ labels,
           /* annotations = */ annotations,
           /* extraDefaultInputs = */ userDefinedInputs,
-          /* styxVariables */ styxVariables);
+          /* styxVariables */ styxVariables,
+          /* triggerParams */ triggeredParams);
       return runnerId;
     } catch (StatusRuntimeException e) {
       switch (e.getStatus().getCode()) {
