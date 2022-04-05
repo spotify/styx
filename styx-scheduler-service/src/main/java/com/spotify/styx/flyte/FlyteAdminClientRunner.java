@@ -84,7 +84,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   @VisibleForTesting static final String TERMINATE_CAUSE = "Styx workflow instance execution is not active";
   @VisibleForTesting static final String STYX_WORKFLOW_INSTANCE_ANNOTATION = "styx-workflow-instance";
   @VisibleForTesting static final String STYX_EXECUTION_ID_ANNOTATION = "styx-execution-id";
-  @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(3);
+  @VisibleForTesting static final Duration TERMINATION_GRACE_PERIOD = Duration.ofMinutes(10);
   private static final Duration TERMINATION_LOOKUP_SINCE = Duration.ofDays(24);
   private static final int FLYTE_TERMINATING_THREADS = 4; //TODO: tune
   private static final Duration DEFAULT_TERMINATE_EXEC_INTERVAL = Duration.ofMinutes(1);
