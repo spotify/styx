@@ -214,6 +214,36 @@ public final class TestData {
           .deploymentTime(TEST_DEPLOYMENT_TIME)
           .build();
 
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(FLYTE_EXEC_CONF)
+          .runningTimeout(Duration.parse("PT20H"))
+          .retryCondition("#tries<2")
+          .env("foo","bar")
+          .deploymentSource(
+              DeploymentSource.builder()
+                  .repository("some-organisation/some-path-to-repositry")
+                  .source("remote-foo")
+                  .build())
+          .build();
+
+  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME =
+      WorkflowConfiguration.builder()
+          .id("styx.TestEndpoint")
+          .commitSha(VALID_SHA)
+          .schedule(DAYS)
+          .serviceAccount("foo@bar.baz.quux")
+          .flyteExecConf(FLYTE_EXEC_CONF)
+          .runningTimeout(Duration.parse("PT20H"))
+          .retryCondition("#tries<2")
+          .env("foo","bar")
+          .deploymentTime(TEST_DEPLOYMENT_TIME)
+          .build();
+
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
           .dockerImage("gcr.io/image")
@@ -236,6 +266,8 @@ public final class TestData {
           .dockerArgs(List.of("foo", "bar"))
           .commitSha(VALID_SHA)
           .build();
+
+
 
   public static final ExecutionDescription FLYTE_EXECUTION_DESCRIPTION =
       ExecutionDescription.builder().flyteExecConf(FLYTE_EXEC_CONF).flyteExecutionId(FLYTE_EXECUTION_ID).build();

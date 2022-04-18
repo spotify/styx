@@ -25,7 +25,9 @@ import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_AFTER;
 import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_BEFORE;
 import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TYPE;
 import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
@@ -41,6 +43,7 @@ import java.util.Map;
 import org.junit.Test;
 
 public class WorkflowFilteringTest {
+
   public static final Instant TEST_DEPLOYMENT_TIME_BEFORE = Instant.ofEpochSecond(1638709400);
   public static final Instant TEST_DEPLOYMENT_TIME_AFTER = Instant.ofEpochSecond(1638709300);
 
@@ -56,10 +59,9 @@ public class WorkflowFilteringTest {
         "id-2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE
     ));
 
-    Map<FilterParams, String> emptyFilters = new HashMap<>();
-    emptyFilters.put(DEPLOYMENT_TYPE, "");
-    emptyFilters.put(DEPLOYMENT_TIME_BEFORE, "");
-    emptyFilters.put(DEPLOYMENT_TIME_AFTER, "");
+    Map<FilterParams, String> emptyFilters = Map.of(DEPLOYMENT_TYPE, "",
+        DEPLOYMENT_TIME_BEFORE, "",
+        DEPLOYMENT_TIME_AFTER, "");
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, emptyFilters);
 
@@ -77,10 +79,9 @@ public class WorkflowFilteringTest {
         "id-2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE
     ));
 
-    Map<FilterParams, String> emptyFilters = new HashMap<>();
-    emptyFilters.put(DEPLOYMENT_TYPE, "wrong-type");
-    emptyFilters.put(DEPLOYMENT_TIME_BEFORE, "");
-    emptyFilters.put(DEPLOYMENT_TIME_AFTER, "");
+    Map<FilterParams, String> emptyFilters = Map.of(DEPLOYMENT_TYPE, "wrong-type",
+        DEPLOYMENT_TIME_BEFORE, "",
+        DEPLOYMENT_TIME_AFTER, "");
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, emptyFilters);
 
@@ -94,10 +95,9 @@ public class WorkflowFilteringTest {
         "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
     ));
 
-    Map<FilterParams, String> filters = new HashMap<>();
-    filters.put(DEPLOYMENT_TYPE, "remote-foo");
-    filters.put(DEPLOYMENT_TIME_BEFORE, "");
-    filters.put(DEPLOYMENT_TIME_AFTER, "");
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo",
+        DEPLOYMENT_TIME_BEFORE, "",
+        DEPLOYMENT_TIME_AFTER, "");
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
@@ -111,10 +111,9 @@ public class WorkflowFilteringTest {
         "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
     ));
 
-    Map<FilterParams, String> filters = new HashMap<>();
-    filters.put(DEPLOYMENT_TYPE, "remote-foo");
-    filters.put(DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString() );
-    filters.put(DEPLOYMENT_TIME_AFTER, "");
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo",
+        DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString(),
+        DEPLOYMENT_TIME_AFTER, "");
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
@@ -128,10 +127,9 @@ public class WorkflowFilteringTest {
         "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
     ));
 
-    Map<FilterParams, String> filters = new HashMap<>();
-    filters.put(DEPLOYMENT_TYPE, "remote-foo");
-    filters.put(DEPLOYMENT_TIME_BEFORE,"" );
-    filters.put(DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo",
+        DEPLOYMENT_TIME_BEFORE, "",
+        DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
@@ -145,10 +143,9 @@ public class WorkflowFilteringTest {
         "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
     ));
 
-    Map<FilterParams, String> filters = new HashMap<>();
-    filters.put(DEPLOYMENT_TYPE, "remote-foo");
-    filters.put(DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString() );
-    filters.put(DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo",
+        DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString(),
+        DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
@@ -156,20 +153,63 @@ public class WorkflowFilteringTest {
   }
 
   @Test
-  public void shouldReturnWorkflowWithDeploymentTimeBeforeAndAfter() {
+  public void shouldNotReturnWorkflowWithFilterDeploymentType() {
     Collection<Workflow> workflowCollection = new ArrayList<>();
     workflowCollection.add(Workflow.create(
-        "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
+        "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME
     ));
 
-    Map<FilterParams, String> filters = new HashMap<>();
-    filters.put(DEPLOYMENT_TYPE, "");
-    filters.put(DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString() );
-    filters.put(DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo");
+
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
-    assertThat(workflows, equalTo(new ArrayList<>(workflowCollection)));
+    assertThat(workflows, empty());
   }
 
+  @Test
+  public void shouldNotReturnWorkflowWithFilterDeploymentTimeBefore() {
+    Collection<Workflow> workflowCollection = new ArrayList<>();
+    workflowCollection.add(Workflow.create(
+        "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME
+    ));
+
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString());
+
+
+    List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
+
+    assertThat(workflows, empty());
+  }
+
+  @Test
+  public void shouldNotReturnWorkflowWithFilterDeploymentTimeAfter() {
+    Collection<Workflow> workflowCollection = new ArrayList<>();
+    workflowCollection.add(Workflow.create(
+        "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME
+    ));
+
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+
+
+    List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
+
+    assertThat(workflows, empty());
+  }
+
+  @Test
+  public void shouldNotReturnWorkflowWithFilterDeploymentTimeBeforeAndAfter() {
+    Collection<Workflow> workflowCollection = new ArrayList<>();
+    workflowCollection.add(Workflow.create(
+        "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME
+    ));
+
+    Map<FilterParams, String> filters = Map.of(DEPLOYMENT_TIME_BEFORE, TEST_DEPLOYMENT_TIME_BEFORE.toString(),
+        DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+
+
+    List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
+
+    assertThat(workflows, empty());
+  }
 }
