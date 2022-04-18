@@ -37,7 +37,6 @@ import com.spotify.styx.model.Workflow;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
