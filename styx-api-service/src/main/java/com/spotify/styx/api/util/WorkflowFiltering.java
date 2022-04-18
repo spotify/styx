@@ -20,6 +20,9 @@
 
 package com.spotify.styx.api.util;
 
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_AFTER;
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_BEFORE;
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TYPE;
 import static java.util.stream.Collectors.toList;
 
 import com.spotify.styx.model.Workflow;
@@ -38,16 +41,16 @@ public final class WorkflowFiltering {
   private WorkflowFiltering(){}
 
   public static List<Workflow> filterWorkflows(
-      Collection<Workflow> workflows, Map<String, String> paramFilters){
+      Collection<Workflow> workflows, Map<FilterParams, String> paramFilters){
     List<Predicate> workflowFilters = createWorkflowFilters(paramFilters);
 
     return workflows.stream().filter(w -> workflowFilters.stream().allMatch(pre-> pre.test(w))).collect(toList());
   }
 
-  private static List<Predicate> createWorkflowFilters(Map<String, String> paramFilters){
+  private static List<Predicate> createWorkflowFilters(Map<FilterParams, String> paramFilters){
     List<Predicate> predicates = new ArrayList<>();
 
-    String deploymentType = paramFilters.get("deployment_type");
+    String deploymentType = paramFilters.get(DEPLOYMENT_TYPE);
 
     if(!Strings.isNullOrEmpty(deploymentType)) {
       Predicate<Workflow> isWorkflowDeploymentType = workflow -> {
@@ -62,7 +65,7 @@ public final class WorkflowFiltering {
       predicates.add(isWorkflowDeploymentType);
     }
 
-    String deploymentTimeBefore = paramFilters.get("deployment_time_before");
+    String deploymentTimeBefore = paramFilters.get(DEPLOYMENT_TIME_BEFORE);
 
     if(!Strings.isNullOrEmpty(deploymentTimeBefore)){
       Predicate<Workflow> workflowDeploymentTimeBefore = workflow -> {
@@ -77,7 +80,7 @@ public final class WorkflowFiltering {
       predicates.add(workflowDeploymentTimeBefore);
     }
 
-    String deploymentTimeAfter = paramFilters.get("deployment_time_after");
+    String deploymentTimeAfter = paramFilters.get(DEPLOYMENT_TIME_AFTER);
 
     if(!Strings.isNullOrEmpty(deploymentTimeAfter)){
       Predicate<Workflow> workflowDeploymentTimeBefore = workflow -> {

@@ -22,6 +22,9 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_AFTER;
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_BEFORE;
+import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TYPE;
 import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -32,6 +35,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Middlewares.AuthContext;
+import com.spotify.styx.api.util.FilterParams;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
@@ -53,7 +57,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -217,10 +220,10 @@ public final class WorkflowResource {
 
   private Response<Collection<Workflow>> workflows(Request request) {
     try {
-      Map<String, String> paramFilters = new HashMap<>();
-      paramFilters.put("deployment_type", getFilterParams(request, "deployment_type"));
-      paramFilters.put("deployment_time_before", getFilterParams(request, "deployment_time_before"));
-      paramFilters.put("deployment_time_after", getFilterParams(request, "deployment_time_after"));
+      Map<FilterParams, String> paramFilters =
+          Map.of(DEPLOYMENT_TYPE, getFilterParams(request, DEPLOYMENT_TYPE),
+              DEPLOYMENT_TIME_BEFORE, getFilterParams(request, DEPLOYMENT_TIME_BEFORE),
+              DEPLOYMENT_TIME_AFTER, getFilterParams(request, DEPLOYMENT_TIME_AFTER));
 
       Collection<Workflow> workflows = storage.workflows().values();
 
@@ -231,8 +234,8 @@ public final class WorkflowResource {
     }
   }
 
-  private String getFilterParams(Request request, String filter) {
-    return request.parameter(filter).orElse("");
+  private String getFilterParams(Request request, FilterParams filter) {
+    return request.parameter(filter.getString()).orElse("");
   }
 
   private Response<List<Workflow>> workflows(String componentId) {
