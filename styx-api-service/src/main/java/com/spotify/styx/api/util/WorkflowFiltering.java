@@ -20,9 +20,9 @@
 
 package com.spotify.styx.api.util;
 
-import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_AFTER;
-import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TIME_BEFORE;
-import static com.spotify.styx.api.util.FilterParams.DEPLOYMENT_TYPE;
+import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_AFTER;
+import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_BEFORE;
+import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TYPE;
 import static java.util.stream.Collectors.toList;
 
 import com.spotify.styx.model.Workflow;
@@ -41,13 +41,13 @@ public final class WorkflowFiltering {
   private WorkflowFiltering(){}
 
   public static List<Workflow> filterWorkflows(
-      Collection<Workflow> workflows, Map<FilterParams, String> paramFilters){
+      Collection<Workflow> workflows, Map<QueryParams, String> paramFilters){
     List<Predicate> workflowFilters = createWorkflowFilters(paramFilters);
 
     return workflows.stream().filter(w -> workflowFilters.stream().allMatch(pre-> pre.test(w))).collect(toList());
   }
 
-  private static List<Predicate> createWorkflowFilters(Map<FilterParams, String> paramFilters){
+  private static List<Predicate> createWorkflowFilters(Map<QueryParams, String> paramFilters){
     List<Predicate> predicates = new ArrayList<>();
 
     String deploymentType = paramFilters.get(DEPLOYMENT_TYPE);
@@ -56,8 +56,8 @@ public final class WorkflowFiltering {
       Predicate<Workflow> isWorkflowDeploymentType = workflow -> {
         WorkflowConfiguration workflowConfiguration = workflow.configuration();
         return workflowConfiguration.deploymentSource()
-           .map(source -> Objects.equals(source.source(), deploymentType)
-           .orElse(false);
+           .map(source -> Objects.equals(source.source(), deploymentType))
+            .orElse(false);
 
       };
       predicates.add(isWorkflowDeploymentType);

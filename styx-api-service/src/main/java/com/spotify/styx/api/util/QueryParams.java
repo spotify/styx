@@ -20,7 +20,7 @@
 
 package com.spotify.styx.api.util;
 
-public enum FilterParams {
+public enum QueryParams {
   DEPLOYMENT_TYPE("deployment_type"),
   DEPLOYMENT_TIME_BEFORE("deployment_time_before"),
   DEPLOYMENT_TIME_AFTER("deployment_time_after");
@@ -28,7 +28,7 @@ public enum FilterParams {
 
   private final String string;
 
-  FilterParams(String string) {
+  QueryParams(String string) {
     this.string = string;
   }
 
