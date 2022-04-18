@@ -31,7 +31,6 @@ import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE;
 import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
@@ -903,17 +902,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldReturnWorkflowWithDeploymentType() throws Exception {
-    sinceVersion(Api.Version.V3);
-
-    storage.storeWorkflow(Workflow.create("foo", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE));
-
-    var response = awaitResponse(serviceHelper.request("GET", path("/workflows")));
-
-    assertJson(response, "[0]workflow.deployment_source.source", is("remote-foo"));
-  }
-
-  @Test
   public void shouldReturn404WhenWorkflowWithStateNotFound() throws Exception {
     sinceVersion(Api.Version.V3);
 
@@ -933,8 +921,6 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
-
-
 
   private long ms(String time) {
     return Instant.parse("2016-08-10T" + time + "Z").toEpochMilli();

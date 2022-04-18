@@ -92,7 +92,7 @@ public class WorkflowFilteringTest {
     ));
 
     Map<String, String> filters = new HashMap<>();
-    filters.put("deployment-type", "remote-foo");
+    filters.put("deployment_type", "remote-foo");
     filters.put("deployment_time_before", "");
     filters.put("deployment_time_after-type", "");
 
@@ -109,7 +109,7 @@ public class WorkflowFilteringTest {
     ));
 
     Map<String, String> filters = new HashMap<>();
-    filters.put("deployment-type", "remote-foo");
+    filters.put("deployment_type", "remote-foo");
     filters.put("deployment_time_before",TEST_DEPLOYMENT_TIME_BEFORE.toString() );
     filters.put("deployment_time_after-type", "");
 
@@ -126,7 +126,7 @@ public class WorkflowFilteringTest {
     ));
 
     Map<String, String> filters = new HashMap<>();
-    filters.put("deployment-type", "remote-foo");
+    filters.put("deployment_type", "remote-foo");
     filters.put("deployment_time_before","" );
     filters.put("deployment_time_after-type", TEST_DEPLOYMENT_TIME_AFTER.toString());
 
@@ -143,7 +143,7 @@ public class WorkflowFilteringTest {
     ));
 
     Map<String, String> filters = new HashMap<>();
-    filters.put("deployment-type", "remote-foo");
+    filters.put("deployment_type", "remote-foo");
     filters.put("deployment_time_before",TEST_DEPLOYMENT_TIME_BEFORE.toString() );
     filters.put("deployment_time_after-type", TEST_DEPLOYMENT_TIME_AFTER.toString());
 
@@ -153,20 +153,20 @@ public class WorkflowFilteringTest {
   }
 
   @Test
-  public void shouldNotReturnWorkflows() {
+  public void shouldReturnWorkflowWithDeploymentTimeBeforeAndAfter() {
     Collection<Workflow> workflowCollection = new ArrayList<>();
     workflowCollection.add(Workflow.create(
         "id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE
     ));
 
     Map<String, String> filters = new HashMap<>();
-    filters.put("deployment-type", "");
+    filters.put("deployment_type", "");
     filters.put("deployment_time_before",TEST_DEPLOYMENT_TIME_BEFORE.toString() );
     filters.put("deployment_time_after-type", TEST_DEPLOYMENT_TIME_AFTER.toString());
 
     List<Workflow> workflows = filterWorkflows(workflowCollection, filters);
 
-    assertThat(workflows, empty());
+    assertThat(workflows, equalTo(new ArrayList<>(workflowCollection)));
   }
 
 }
