@@ -31,6 +31,8 @@ import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME;
+import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE;
 import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
@@ -83,6 +85,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -157,6 +160,16 @@ public class WorkflowResourceTest extends VersionedApiTest {
               .inputFields("foo", "bar")
               .build()
           ).build());
+
+  private static final Workflow EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE =
+      Workflow.create("styx.TestEndpoint1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE);
+
+  private static final Workflow EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME =
+      Workflow.create("styx.TestEndpoint2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME);
+
+  private static final Map<WorkflowId, Workflow> FLYTE_DEPLOYMENT_WORKFLOWS =
+      Map.of(EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE.id(), EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE,
+          EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME.id(), EXISTING_FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME);
 
   private static final Trigger NATURAL_TRIGGER = Trigger.natural();
   private static final Trigger BACKFILL_TRIGGER = Trigger.backfill("backfill-1");
@@ -817,13 +830,28 @@ public class WorkflowResourceTest extends VersionedApiTest {
   }
 
   @Test
+  public void shouldReturnFilteredDeploymentTypeWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(FLYTE_DEPLOYMENT_WORKFLOWS);
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_type=remote-foo")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("styx.TestEndpoint1"));
+    assertJson(response, "[0].configuration.deployment_source.source", is("remote-foo"));
+  }
+
+  @Test
   public void shouldFailedToReturnWorkflows() throws Exception {
     sinceVersion(Api.Version.V3);
 
     when(storage.workflows()).thenThrow(new IOException());
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("")));
+        serviceHelper.request("GET", path("?deployment_type=")));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
