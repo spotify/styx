@@ -55,11 +55,9 @@ public final class WorkflowFiltering {
     if(!Strings.isNullOrEmpty(deploymentType)) {
       Predicate<Workflow> isWorkflowDeploymentType = workflow -> {
         WorkflowConfiguration workflowConfiguration = workflow.configuration();
-        if(workflowConfiguration.deploymentSource().isEmpty()){
-          return false;
-        }
-        String source = workflowConfiguration.deploymentSource().get().source();
-        return Objects.equals(source, deploymentType);
+        return workflowConfiguration.deploymentSource()
+           .map(source -> Objects.equals(source.source(), deploymentType)
+           .orElse(false);
 
       };
       predicates.add(isWorkflowDeploymentType);
