@@ -22,9 +22,6 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
-import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_AFTER;
-import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_BEFORE;
-import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TYPE;
 import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -63,6 +60,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.slf4j.Logger;
@@ -220,10 +218,10 @@ public final class WorkflowResource {
 
   private Response<Collection<Workflow>> workflows(Request request) {
     try {
-      Map<QueryParams, String> paramFilters =
-          Map.of(DEPLOYMENT_TYPE, getFilterParams(request, DEPLOYMENT_TYPE),
-              DEPLOYMENT_TIME_BEFORE, getFilterParams(request, DEPLOYMENT_TIME_BEFORE),
-              DEPLOYMENT_TIME_AFTER, getFilterParams(request, DEPLOYMENT_TIME_AFTER));
+      var paramFilters = Stream.of(QueryParams.values())
+          .map(e -> getFilterParams(request, e).map(param -> Map.entry(e, param)))
+          .flatMap(Optional::stream)
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
       Collection<Workflow> workflows = storage.workflows().values();
 
@@ -234,8 +232,8 @@ public final class WorkflowResource {
     }
   }
 
-  private String getFilterParams(Request request, QueryParams filter) {
-    return request.parameter(filter.getQueryName()).orElse("");
+  private Optional<String> getFilterParams(Request request, QueryParams filter) {
+    return request.parameter(filter.getQueryName());
   }
 
   private Response<List<Workflow>> workflows(String componentId) {

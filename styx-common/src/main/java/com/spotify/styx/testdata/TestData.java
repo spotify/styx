@@ -267,8 +267,6 @@ public final class TestData {
           .commitSha(VALID_SHA)
           .build();
 
-
-
   public static final ExecutionDescription FLYTE_EXECUTION_DESCRIPTION =
       ExecutionDescription.builder().flyteExecConf(FLYTE_EXEC_CONF).flyteExecutionId(FLYTE_EXECUTION_ID).build();
 

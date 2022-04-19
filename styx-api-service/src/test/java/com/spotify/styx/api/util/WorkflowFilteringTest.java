@@ -57,8 +57,7 @@ public class WorkflowFilteringTest {
     workflowCollection.add(
         Workflow.create("id-2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE));
 
-    Map<QueryParams, String> emptyFilters = Map.of(DEPLOYMENT_TYPE, "", DEPLOYMENT_TIME_BEFORE, "",
-        DEPLOYMENT_TIME_AFTER, "");
+    Map<QueryParams, String> emptyFilters = Map.of();
 
     List<Workflow> result = filterWorkflows(workflowCollection, emptyFilters);
 
