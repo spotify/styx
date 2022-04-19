@@ -32,7 +32,7 @@ public enum QueryParams {
     this.queryName = queryName;
   }
 
-  public String getString() {
+  public String getQueryName() {
     return queryName;
   }
 }

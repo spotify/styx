@@ -235,7 +235,7 @@ public final class WorkflowResource {
   }
 
   private String getFilterParams(Request request, QueryParams filter) {
-    return request.parameter(filter.getString()).orElse("");
+    return request.parameter(filter.getQueryName()).orElse("");
   }
 
   private Response<List<Workflow>> workflows(String componentId) {
