@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -78,15 +78,6 @@ public final class TestData {
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .dockerImage("busybox")
-          .schedule(HOURS)
-          .resources(RESOURCE_IDS)
-          .build();
-
-  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2 =
-      WorkflowConfiguration.builder()
-          .id("ranic")
           .commitSha(VALID_SHA)
           .dockerImage("busybox")
           .schedule(HOURS)
@@ -196,54 +187,6 @@ public final class TestData {
           .deploymentTime(TEST_DEPLOYMENT_TIME)
           .build();
 
-  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE =
-      WorkflowConfiguration.builder()
-          .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .schedule(DAYS)
-          .serviceAccount("foo@bar.baz.quux")
-          .flyteExecConf(FLYTE_EXEC_CONF)
-          .runningTimeout(Duration.parse("PT20H"))
-          .retryCondition("#tries<2")
-          .env("foo","bar")
-          .deploymentSource(
-              DeploymentSource.builder()
-                  .repository("some-organisation/some-path-to-repositry")
-                  .source("remote-foo")
-                  .build())
-          .deploymentTime(TEST_DEPLOYMENT_TIME)
-          .build();
-
-  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME =
-      WorkflowConfiguration.builder()
-          .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .schedule(DAYS)
-          .serviceAccount("foo@bar.baz.quux")
-          .flyteExecConf(FLYTE_EXEC_CONF)
-          .runningTimeout(Duration.parse("PT20H"))
-          .retryCondition("#tries<2")
-          .env("foo","bar")
-          .deploymentSource(
-              DeploymentSource.builder()
-                  .repository("some-organisation/some-path-to-repositry")
-                  .source("remote-foo")
-                  .build())
-          .build();
-
-  public static final WorkflowConfiguration FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME =
-      WorkflowConfiguration.builder()
-          .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .schedule(DAYS)
-          .serviceAccount("foo@bar.baz.quux")
-          .flyteExecConf(FLYTE_EXEC_CONF)
-          .runningTimeout(Duration.parse("PT20H"))
-          .retryCondition("#tries<2")
-          .env("foo","bar")
-          .deploymentTime(TEST_DEPLOYMENT_TIME)
-          .build();
-
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
       WorkflowConfigurationBuilder.from(FLYTE_WORKFLOW_CONFIGURATION)
           .dockerImage("gcr.io/image")
@@ -273,11 +216,15 @@ public final class TestData {
   public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
 
-  public static final Workflow WORKFLOW_WITH_RESOURCES_2 = Workflow.create(WORKFLOW_ID_2.componentId(),
-      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2);
 
   public static final Workflow WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT);
+
+  public static final Instant QUERY_THRESHOLD_BEFORE = Instant.parse("2022-01-01T10:15:29.00Z");
+
+  public static final Instant QUERY_THRESHOLD_AFTER = Instant.parse("2022-01-01T10:15:31.00Z");
+
+  public static final Instant QUERY_THRESHOLD = Instant.parse("2022-01-01T10:15:30.00Z");
 
   private TestData() {
     throw new UnsupportedOperationException();

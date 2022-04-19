@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,14 +21,16 @@
 package com.spotify.styx.api.util;
 
 
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithTime;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithType;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithTypeAndTime;
 import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_AFTER;
 import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TIME_BEFORE;
 import static com.spotify.styx.api.util.QueryParams.DEPLOYMENT_TYPE;
 import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME;
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE;
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME;
-import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_AFTER;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_BEFORE;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -36,26 +38,16 @@ import static org.hamcrest.Matchers.hasSize;
 
 import com.spotify.styx.model.Workflow;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 
 public class WorkflowFilteringTest {
 
-  public static final Instant TEST_DEPLOYMENT_TIME_BEFORE = Instant.ofEpochSecond(1638709400);
-  public static final Instant TEST_DEPLOYMENT_TIME_AFTER = Instant.ofEpochSecond(1638709300);
-
-
   @Test
   public void shouldReturnAllWorkflows() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE));
-
-    workflowCollection.add(
-        Workflow.create("id-2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE));
+    var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"),
+        createWorkflowWithType("id2", "remote-foo"));
 
     Map<QueryParams, String> emptyFilters = Map.of();
 
@@ -66,38 +58,28 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldNotReturnWorkflowsWithDeploymentType() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE));
 
-    workflowCollection.add(
-        Workflow.create("id-2", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_SOURCE));
+    var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"),
+        createWorkflowWithType("id2", "remote-foo"));
 
-    Map<QueryParams, String> emptyFilters = Map.of(DEPLOYMENT_TYPE, "wrong-type",
-        DEPLOYMENT_TIME_BEFORE, "", DEPLOYMENT_TIME_AFTER, "");
+    var filterParams = Map.of(DEPLOYMENT_TYPE, "wrong-type");
 
-    List<Workflow> result = filterWorkflows(workflowCollection, emptyFilters);
+    List<Workflow> result = filterWorkflows(workflowCollection, filterParams);
 
     assertThat(result, empty());
   }
 
   @Test
   public void shouldReturnWorkflowsWithDeploymentType() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
 
-    Workflow validWorkflow = Workflow.create("id-1",
-        FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE);
+    Workflow validWorkflow = createWorkflowWithType("id1", "remote-foo");
+    Workflow invalidWorkflow = createWorkflowWithType("id2", ""); // Empty type
 
-    Workflow invalidWorkflow = Workflow.create("id-3",
-        FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME); // No type set
+    var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
-    workflowCollection.add(validWorkflow);
-    workflowCollection.add(invalidWorkflow);
+    var filters = Map.of(DEPLOYMENT_TYPE, "remote-foo");
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo", DEPLOYMENT_TIME_BEFORE,
-        "", DEPLOYMENT_TIME_AFTER, "");
-
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, hasSize(1));
     assertThat(result.get(0), equalTo(validWorkflow));
@@ -106,18 +88,12 @@ public class WorkflowFilteringTest {
   @Test
   public void shouldReturnWorkflowsWithDeploymentTimeBefore() {
 
-    Workflow validWorkflow = Workflow.create("id-1",
-        FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE);
+    Workflow invalidWorkflow = createWorkflowWithType("id1", "remote-foo");
+    Workflow validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
 
-    Workflow invalidWorkflow = Workflow.create("id-2",
-        FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME);
+    var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(validWorkflow);
-    workflowCollection.add(invalidWorkflow);
-
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo", DEPLOYMENT_TIME_BEFORE,
-        TEST_DEPLOYMENT_TIME_BEFORE.toString(), DEPLOYMENT_TIME_AFTER, "");
+    var filters = Map.of(DEPLOYMENT_TIME_BEFORE, QUERY_THRESHOLD.toString());
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -127,17 +103,12 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldReturnWorkflowsWithDeploymentTimeAfter() {
-    Workflow validWorkflow = Workflow.create("id-1",
-        FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE);
+    Workflow validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_AFTER);
+    Workflow invalidWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
 
-    Workflow invalidWorkflow = Workflow.create("id-2",
-        FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME);
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(validWorkflow);
-    workflowCollection.add(invalidWorkflow);
+    var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo", DEPLOYMENT_TIME_BEFORE,
-        "", DEPLOYMENT_TIME_AFTER, TEST_DEPLOYMENT_TIME_AFTER.toString());
+    var filters = Map.of(DEPLOYMENT_TIME_AFTER, QUERY_THRESHOLD.toString());
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -147,18 +118,20 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldReturnWorkflowsWithDeploymentTypeDeploymentTimeBeforeAndAfter() {
-    Workflow validWorkflow = Workflow.create("id-1",
-        FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TYPE);
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+    var queryThresholdOutsideWindow = "2022-01-01T10:15:33.00Z";
 
-    Workflow invalidWorkflow = Workflow.create("id-2",
-        FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME);
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(validWorkflow);
-    workflowCollection.add(invalidWorkflow);
+    Workflow validWorkflow = createWorkflowWithTypeAndTime("id1", "remote-foo", QUERY_THRESHOLD);
+    Workflow invalidWorkflow = createWorkflowWithTypeAndTime("id2", "remote-foo",
+        Instant.parse(queryThresholdOutsideWindow));
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo", DEPLOYMENT_TIME_BEFORE,
-        TEST_DEPLOYMENT_TIME_BEFORE.toString(), DEPLOYMENT_TIME_AFTER,
-        TEST_DEPLOYMENT_TIME_AFTER.toString());
+    var workflowCollection = List.of(validWorkflow, invalidWorkflow);
+
+    var filters = Map.of(
+        DEPLOYMENT_TYPE, "remote-foo",
+        DEPLOYMENT_TIME_BEFORE, deploymentTimeBefore,
+        DEPLOYMENT_TIME_AFTER, deploymentTimeAfter);
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -168,11 +141,8 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldNotReturnWorkflowWithFilterDeploymentType() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITH_DEPLOYMENT_TIME));
-
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TYPE, "remote-foo");
+    var workflowCollection = List.of(createWorkflowWithType("id1", ""));
+    var filters = Map.of(DEPLOYMENT_TYPE, "remote-foo");
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -181,12 +151,9 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldNotReturnWorkflowWithFilterDeploymentTimeBefore() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME));
+    var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"));
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TIME_BEFORE,
-        TEST_DEPLOYMENT_TIME_BEFORE.toString());
+    var filters = Map.of(DEPLOYMENT_TIME_BEFORE, QUERY_THRESHOLD_BEFORE.toString());
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -195,12 +162,10 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldNotReturnWorkflowWithFilterDeploymentTimeAfter() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME));
+    var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"));
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TIME_AFTER,
-        TEST_DEPLOYMENT_TIME_AFTER.toString());
+    var filters = Map.of(DEPLOYMENT_TIME_AFTER,
+        QUERY_THRESHOLD_AFTER.toString());
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
@@ -209,13 +174,10 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldNotReturnWorkflowWithFilterDeploymentTimeBeforeAndAfter() {
-    Collection<Workflow> workflowCollection = new ArrayList<>();
-    workflowCollection.add(
-        Workflow.create("id-1", FLYTE_WORKFLOW_CONFIGURATION_WITHOUT_DEPLOYMENT_TIME));
+    var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"));
 
-    Map<QueryParams, String> filters = Map.of(DEPLOYMENT_TIME_BEFORE,
-        TEST_DEPLOYMENT_TIME_BEFORE.toString(), DEPLOYMENT_TIME_AFTER,
-        TEST_DEPLOYMENT_TIME_AFTER.toString());
+    var filters = Map.of(DEPLOYMENT_TIME_BEFORE,
+        QUERY_THRESHOLD_BEFORE.toString(), DEPLOYMENT_TIME_AFTER, QUERY_THRESHOLD_AFTER.toString());
 
     List<Workflow> result = filterWorkflows(workflowCollection, filters);
 
