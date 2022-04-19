@@ -28,8 +28,8 @@ public enum QueryParams {
 
   private final String string;
 
-  QueryParams(String string) {
-    this.string = string;
+  QueryParams(String queryName) {
+    this.string = queryName;
   }
 
   public String getString() {

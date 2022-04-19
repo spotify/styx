@@ -857,16 +857,19 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTimeBeforeWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var queryThreshold = "2022-01-01T10:15:30.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTime("id2", Instant.ofEpochSecond(1609539330)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_time_before=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_time_before=" + queryThreshold)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
@@ -877,16 +880,19 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTimeAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var queryThreshold = "2022-01-01T10:15:30.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTime("id2", Instant.ofEpochSecond(1609539330)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_time_after=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_time_after=" + queryThreshold)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
@@ -897,16 +903,21 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnEmptyDeploymentTimeBeforeAndAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:27.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:33.00Z";
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTime("id2", Instant.ofEpochSecond(1609539330)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_time_after=2022-01-01T00:00:00.00Z&deployment_time_before=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_time_after=" + deploymentTimeAfter
+            + "&deployment_time_before=" + deploymentTimeBefore)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(0));
@@ -916,17 +927,21 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTimeBeforeAndAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTime("id2", Instant.ofEpochSecond(1640995201)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1640995202)),
-            createWorkflowWithTime("id4", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_time_after=2022-01-01T00:00:00.00Z&deployment_time_before=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_time_after=" + deploymentTimeAfter
+            + "&deployment_time_before=" + deploymentTimeBefore)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(2));
@@ -936,16 +951,19 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTypeTimeBeforeWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var queryThreshold = "2022-01-01T10:15:30.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTypeAndTime("id2", "remote-foo", Instant.ofEpochSecond(1609539330)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTypeAndTime("id2", "remote-foo", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
             )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_before=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_before=" + queryThreshold)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
@@ -956,16 +974,20 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTypeTimeAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
+    var queryThreshold = "2022-01-01T10:15:30.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
+
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTime("id2", Instant.ofEpochSecond(1609539330)),
-            createWorkflowWithTypeAndTime("id3", "remote-foo", Instant.ofEpochSecond(1643840130))
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTypeAndTime("id3", "remote-foo", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_time_after=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_time_after=" + queryThreshold)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
@@ -975,17 +997,24 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnFilteredDeploymentTypeTimeBeforeAndAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:29.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:31.00Z";
 
     when(storage.workflows()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
-            createWorkflowWithTypeAndTime("id2", "remote-foo", Instant.ofEpochSecond(1640995201)),
-            createWorkflowWithTime("id3", Instant.ofEpochSecond(1640995202))
+            createWorkflowWithTypeAndTime("id2", "remote-foo", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
         )
     );
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_after=2022-01-01T00:00:00.00Z&deployment_time_before=2022-01-01T10:15:30.00Z")));
+        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_after="
+            + deploymentTimeAfter
+            + "&deployment_time_before="
+            + deploymentTimeBefore)));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(1));
