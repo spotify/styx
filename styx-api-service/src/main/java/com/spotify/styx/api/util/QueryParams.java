@@ -26,13 +26,13 @@ public enum QueryParams {
   DEPLOYMENT_TIME_AFTER("deployment_time_after");
 
 
-  private final String string;
+  private final String queryName;
 
   QueryParams(String queryName) {
-    this.string = queryName;
+    this.queryName = queryName;
   }
 
   public String getString() {
-    return string;
+    return queryName;
   }
 }
