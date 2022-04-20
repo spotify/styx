@@ -42,6 +42,10 @@ public final class WorkflowFiltering {
 
   public static List<Workflow> filterWorkflows(
       Collection<Workflow> workflows, Map<QueryParams, String> paramFilters){
+    if (paramFilters.isEmpty()) {
+      // Nothing to filter on
+      return workflows;
+    }
     List<Predicate> workflowFilters = createWorkflowFilters(paramFilters);
 
     return workflows.stream().filter(w -> workflowFilters.stream().allMatch(pre-> pre.test(w))).collect(toList());
