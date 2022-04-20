@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
 import com.spotify.apollo.Request;
@@ -31,6 +32,7 @@ import com.spotify.apollo.Status;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 import com.spotify.styx.api.Middlewares.AuthContext;
+import com.spotify.styx.api.util.QueryParams;
 import com.spotify.styx.api.workflow.WorkflowInitializationException;
 import com.spotify.styx.api.workflow.WorkflowInitializer;
 import com.spotify.styx.model.Schedule;
@@ -53,10 +55,12 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import okio.ByteString;
 import org.slf4j.Logger;
@@ -93,7 +97,8 @@ public final class WorkflowResource {
     this.time = Objects.requireNonNull(time, "time");
   }
 
-  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(RequestAuthenticator requestAuthenticator) {
+  public Stream<Route<AsyncHandler<Response<ByteString>>>> routes(
+      RequestAuthenticator requestAuthenticator) {
     final List<Route<AsyncHandler<Response<ByteString>>>> routes = Arrays.asList(
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>",
@@ -103,7 +108,7 @@ public final class WorkflowResource {
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
             json(), "GET", BASE,
-            rc -> workflows()),
+            rc -> workflows(rc.request())),
         Route.with(
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
@@ -111,8 +116,9 @@ public final class WorkflowResource {
             Middlewares.<Workflow>authed(requestAuthenticator).and(json()), "POST", BASE + "/<cid>",
             rc -> ac -> createOrUpdateWorkflow(arg("cid", rc), rc, ac)),
         Route.with(
-            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE", BASE + "/<cid>/<wfid>",
-            rc -> ac -> deleteWorkflow(arg("cid", rc),arg("wfid", rc), ac)),
+            Middlewares.<ByteString>authed(requestAuthenticator).and(json()), "DELETE",
+            BASE + "/<cid>/<wfid>",
+            rc -> ac -> deleteWorkflow(arg("cid", rc), arg("wfid", rc), ac)),
         Route.with(
             json(), "GET", BASE + "/<cid>/<wfid>/instances",
             rc -> instances(arg("cid", rc), arg("wfid", rc), rc.request())),
@@ -123,7 +129,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/state",
             rc -> state(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH", BASE + "/<cid>/<wfid>/state",
+            Middlewares.<WorkflowState>authed(requestAuthenticator).and(json()), "PATCH",
+            BASE + "/<cid>/<wfid>/state",
             rc -> ac -> patchState(arg("cid", rc), arg("wfid", rc), rc.request(), ac))
     );
 
@@ -136,7 +143,8 @@ public final class WorkflowResource {
       var deletedWorkflow = storage.runInTransactionWithRetries(tx -> {
         var workflowOpt = tx.workflow(workflowId);
         if (workflowOpt.isEmpty()) {
-          var response = Response.forStatus(Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
+          var response = Response.forStatus(
+              Status.NOT_FOUND.withReasonPhrase("Workflow does not exist"));
           throw new ResponseException(response);
         }
         var workflow = workflowOpt.orElseThrow();
@@ -208,12 +216,24 @@ public final class WorkflowResource {
     return WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(time.get()).build();
   }
 
-  private Response<Collection<Workflow>> workflows() {
+  private Response<Collection<Workflow>> workflows(Request request) {
     try {
-      return Response.forPayload(storage.workflows().values());
+      var paramFilters = Stream.of(QueryParams.values())
+          .map(e -> getFilterParams(request, e).map(param -> Map.entry(e, param)))
+          .flatMap(Optional::stream)
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+      Collection<Workflow> workflows = storage.workflows().values();
+
+      return Response.forPayload(filterWorkflows(workflows, paramFilters));
+
     } catch (IOException e) {
       throw new RuntimeException("Failed to get workflows", e);
     }
+  }
+
+  private Optional<String> getFilterParams(Request request, QueryParams filter) {
+    return request.parameter(filter.getQueryName());
   }
 
   private Response<List<Workflow>> workflows(String componentId) {
@@ -225,7 +245,7 @@ public final class WorkflowResource {
   }
 
   private Response<WorkflowState> patchState(String componentId, String id, Request request,
-                                             AuthContext ac) {
+      AuthContext ac) {
     final Optional<ByteString> payload = request.payload();
     if (payload.isEmpty()) {
       return Response.forStatus(Status.BAD_REQUEST.withReasonPhrase("Missing payload."));
@@ -304,7 +324,8 @@ public final class WorkflowResource {
         }
         final WorkflowState workflowState = storage.workflowState(workflowId);
         if (workflowState.nextNaturalTrigger().isEmpty()) {
-          return Response.forStatus(Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
+          return Response.forStatus(
+              Status.NOT_FOUND.withReasonPhrase("No next natural trigger for workflow."));
         }
         final Schedule schedule = workflow.get().configuration().schedule();
         final Instant nextNaturalTrigger = workflowState.nextNaturalTrigger().get();
@@ -318,7 +339,8 @@ public final class WorkflowResource {
         data = storage.executionData(workflowId, start, stop);
       }
     } catch (IOException e) {
-      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(), e);
+      throw new RuntimeException("Failed to get execution data of workflow " + workflowId.toKey(),
+          e);
     }
     return Response.forPayload(data);
   }
@@ -338,7 +360,8 @@ public final class WorkflowResource {
     } catch (ResourceNotFoundException e) {
       return Response.forStatus(Status.NOT_FOUND.withReasonPhrase(e.getMessage()));
     } catch (IOException e) {
-      throw new RuntimeException("Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
+      throw new RuntimeException(
+          "Failed to get execution data of workflow instance" + workflowInstance.toKey(), e);
     }
   }
 

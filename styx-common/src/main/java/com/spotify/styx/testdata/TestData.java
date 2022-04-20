@@ -84,15 +84,6 @@ public final class TestData {
           .resources(RESOURCE_IDS)
           .build();
 
-  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2 =
-      WorkflowConfiguration.builder()
-          .id("ranic")
-          .commitSha(VALID_SHA)
-          .dockerImage("busybox")
-          .schedule(HOURS)
-          .resources(RESOURCE_IDS)
-          .build();
-
   public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_INVALID_OFFSET =
       WorkflowConfiguration.builder()
           .id("styx.TestEndpoint")
@@ -193,7 +184,7 @@ public final class TestData {
                   .repository("some-organisation/some-path-to-repositry")
                   .source("kubernetes-cluster/namespace/resourceName")
                   .build())
-          .deploymentTime(Instant.now())
+          .deploymentTime(TEST_DEPLOYMENT_TIME)
           .build();
 
   public static final WorkflowConfiguration DOCKER_AND_FLYTE_CONFLICTING_CONFIGURATION =
@@ -225,11 +216,15 @@ public final class TestData {
   public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
 
-  public static final Workflow WORKFLOW_WITH_RESOURCES_2 = Workflow.create(WORKFLOW_ID_2.componentId(),
-      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_2);
 
   public static final Workflow WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT);
+
+  public static final Instant QUERY_THRESHOLD_BEFORE = Instant.parse("2022-01-01T10:15:29.00Z");
+
+  public static final Instant QUERY_THRESHOLD_AFTER = Instant.parse("2022-01-01T10:15:31.00Z");
+
+  public static final Instant QUERY_THRESHOLD = Instant.parse("2022-01-01T10:15:30.00Z");
 
   private TestData() {
     throw new UnsupportedOperationException();

@@ -27,10 +27,17 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.buildWorkflowMap;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithTime;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithType;
+import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithTypeAndTime;
 import static com.spotify.styx.model.SequenceEvent.create;
 import static com.spotify.styx.serialization.Json.deserialize;
 import static com.spotify.styx.serialization.Json.serialize;
 import static com.spotify.styx.testdata.TestData.FLYTE_WORKFLOW_CONFIGURATION;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_AFTER;
+import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_BEFORE;
 import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
@@ -814,6 +821,179 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(2));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTypeWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithType("id2", "not-remote-foo")
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_type=remote-foo")));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id1"));
+    assertJson(response, "[0].configuration.deployment_source.source", is("remote-foo"));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTimeBeforeWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTime("id3", QUERY_THRESHOLD_AFTER)
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_time_before=" + QUERY_THRESHOLD)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id2"));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTimeAfterWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTime("id3", QUERY_THRESHOLD_AFTER)
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_time_after=" + QUERY_THRESHOLD)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id3"));
+  }
+
+  @Test
+  public void shouldReturnEmptyDeploymentTimeBeforeAndAfterWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+    var queryThresholdBefore = "2022-01-01T10:15:27.00Z";
+    var queryThresholdAfter = "2022-01-01T10:15:33.00Z";
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
+            createWorkflowWithTime("id3", Instant.parse(queryThresholdAfter))
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_time_after=" + deploymentTimeAfter
+            + "&deployment_time_before=" + deploymentTimeBefore)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(0));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTimeBeforeAndAfterWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTime("id3", QUERY_THRESHOLD_AFTER)
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_time_after=" + deploymentTimeAfter
+            + "&deployment_time_before=" + deploymentTimeBefore)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(2));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTypeTimeBeforeWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTypeAndTime("id2", "remote-foo", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTime("id3", QUERY_THRESHOLD_AFTER)
+            )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_before=" + QUERY_THRESHOLD)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id2"));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTypeTimeAfterWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTypeAndTime("id3", "remote-foo", QUERY_THRESHOLD_AFTER)
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_time_after=" + QUERY_THRESHOLD)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id3"));
+  }
+
+  @Test
+  public void shouldReturnFilteredDeploymentTypeTimeBeforeAndAfterWorkflow() throws Exception {
+    sinceVersion(Api.Version.V3);
+    var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
+    var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
+
+    when(storage.workflows()).thenReturn(
+        buildWorkflowMap(
+            createWorkflowWithType("id1", "remote-foo"),
+            createWorkflowWithTypeAndTime("id2", "remote-foo", QUERY_THRESHOLD_BEFORE),
+            createWorkflowWithTime("id3", QUERY_THRESHOLD_AFTER)
+        )
+    );
+
+    Response<ByteString> response = awaitResponse(
+        serviceHelper.request("GET", path("?deployment_type=remote-foo&deployment_time_after="
+            + deploymentTimeAfter
+            + "&deployment_time_before="
+            + deploymentTimeBefore)));
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(1));
+    assertJson(response, "[0].component_id", is("id2"));
   }
 
   @Test
