@@ -11,7 +11,7 @@
 
   <artifactId>styx</artifactId>
   <packaging>pom</packaging>
-  <version>2.1.148</version>
+  <version>2.1.149-SNAPSHOT</version>
 
   <properties>
     <maven.compiler.version>3.8.0</maven.compiler.version>
@@ -103,7 +103,7 @@
     <url>https://github.com/spotify/styx</url>
     <connection>scm:git:git@github.com:spotify/styx.git</connection>
     <developerConnection>scm:git:git@github.com:spotify/styx.git</developerConnection>
-    <tag>v2.1.148</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <dependencyManagement>
