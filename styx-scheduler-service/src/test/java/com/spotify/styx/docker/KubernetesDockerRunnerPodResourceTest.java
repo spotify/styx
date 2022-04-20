@@ -31,6 +31,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.LOGGING;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
+import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_EXECUTION_COUNTER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
@@ -46,6 +47,7 @@ import static org.hamcrest.Matchers.is;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
@@ -77,7 +79,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -92,7 +94,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox:v7"), EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -107,7 +109,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox", "echo", "foo", "bar"), EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     List<Container> containers = pod.getSpec().getContainers();
     assertThat(containers.size(), is(2));
@@ -122,7 +124,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
         DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations, hasEntry(STYX_WORKFLOW_INSTANCE_ANNOTATION, WORKFLOW_INSTANCE.toKey()));
@@ -140,7 +142,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
         spec,
         EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     var labels = pod.getMetadata().getLabels();
     assertThat(labels, hasEntry(COMPONENT_ID, normalize(WORKFLOW_INSTANCE.workflowId().componentId())));
@@ -159,7 +161,7 @@ public class KubernetesDockerRunnerPodResourceTest {
         WORKFLOW_INSTANCE,
         spec,
         EMPTY_SECRET_SPEC,
-        Map.of("env-var-1", "some-value"));
+        Map.of("env-var-1", "some-value"), StateData.zero());
 
     boolean containsEnvVar = containerContainsEnvKey(pod.getSpec().getContainers().get(0), "env-var-1");
     assertThat(containsEnvVar, is(true));
@@ -178,7 +180,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldDisableTerminationLoggingWhenFalse() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap(), StateData.zero());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("false"));
@@ -199,7 +201,7 @@ public class KubernetesDockerRunnerPodResourceTest {
             .terminationLogging(true)
             .build(),
         EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.zero());
 
     Map<String, String> annotations = pod.getMetadata().getAnnotations();
     assertThat(annotations.get(DOCKER_TERMINATION_LOGGING_ANNOTATION), is("true"));
@@ -214,7 +216,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldHaveRestartPolicyNever() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap(), StateData.zero());
 
     assertThat(pod.getSpec().getRestartPolicy(), is("Never"));
   }
@@ -223,7 +225,7 @@ public class KubernetesDockerRunnerPodResourceTest {
   public void shouldNotHaveSecretsMountIfNoSecret() {
     Pod pod = createPod(
         WORKFLOW_INSTANCE,
-        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap());
+        DockerRunner.RunSpec.simple("eid", "busybox"), EMPTY_SECRET_SPEC, Collections.emptyMap(), StateData.zero());
 
     List<Volume> volumes = pod.getSpec().getVolumes();
     List<Container> containers = pod.getSpec().getContainers();
@@ -248,7 +250,7 @@ public class KubernetesDockerRunnerPodResourceTest {
             .commitSha("abc123")
             .build(),
         EMPTY_SECRET_SPEC,
-        Collections.emptyMap());
+        Collections.emptyMap(), StateData.newBuilder().tries(1).build());
 
     final List<EnvVar> envVars = pod.getSpec().getContainers().get(0).getEnv();
 
@@ -264,14 +266,16 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(envVars, hasItem(envVar(DOCKER_ARGS, "hello world")));
     assertThat(envVars, hasItem(envVar(ENVIRONMENT, STYX_ENVIRONMENT)));
     assertThat(envVars, hasItem(envVar(LOGGING, "structured")));
+    assertThat(envVars, hasItem(envVar(STYX_EXECUTION_COUNTER, "1")));
   }
 
   private Pod createPod(WorkflowInstance workflowInstance,
                         DockerRunner.RunSpec runSpec,
                         KubernetesSecretSpec secretSpec,
-                        Map<String, String> executionEnvVars) {
+                        Map<String, String> executionEnvVars,
+                        StateData stateData) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            executionEnvVars);
+            executionEnvVars, stateData);
   }
 }

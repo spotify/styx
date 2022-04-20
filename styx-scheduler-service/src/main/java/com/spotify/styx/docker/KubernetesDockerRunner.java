@@ -45,6 +45,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
@@ -124,6 +125,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final String ENVIRONMENT = "STYX_ENVIRONMENT";
   static final String LOGGING = "STYX_LOGGING";
+  static final String STYX_EXECUTION_COUNTER = "STYX_EXECUTION_COUNTER";
   private static final int DEFAULT_POD_CLEANUP_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Duration POD_FORCE_DELETION_TOLERATION = Duration.ofMinutes(30);
@@ -205,6 +207,8 @@ class KubernetesDockerRunner implements DockerRunner {
   public String start(RunState runState, RunSpec runSpec) throws IOException {
     var workflowInstance = runState.workflowInstance();
 
+    var stateData = runState.data();
+
     // First make cheap check for if pod already exists
     var existingPod = client.getPod(runSpec.executionId());
     if (existingPod.isPresent()) {
@@ -218,7 +222,7 @@ class KubernetesDockerRunner implements DockerRunner {
     // Create pod. This might fail with 409 Conflict if the pod already exists as despite the existence
     // check above it might have been concurrently created. That is fine.
     try {
-      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator, executionEnvVars);
+      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator, executionEnvVars, stateData);
       LOG.info("Creating pod: {}: {}", workflowInstance, pod);
       var createdPod = client.createPod(pod);
       stats.recordSubmission(runSpec.executionId());
@@ -271,7 +275,8 @@ class KubernetesDockerRunner implements DockerRunner {
                        KubernetesSecretSpec secretSpec,
                        String styxEnvironment,
                        PodMutator podMutator,
-                       final Map<String, String> executionEnvVars) {
+                       final Map<String, String> executionEnvVars,
+                       StateData stateData) {
     final String imageWithTag = runSpec.imageName().contains(":")
         ? runSpec.imageName()
         : runSpec.imageName() + ":latest";
@@ -297,7 +302,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(MAIN_CONTAINER_NAME)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment, executionEnvVars))
+        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment, executionEnvVars, stateData))
         .withResources(resourceRequirements.build());
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
@@ -361,7 +366,9 @@ class KubernetesDockerRunner implements DockerRunner {
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec,
                                        String styxEnvironment,
-                                       Map<String, String> executionEnvVars) {
+                                       Map<String, String> executionEnvVars,
+                                       StateData stateData) {
+
     // store user provided env first to prevent accidentally/intentionally overwriting system ones
     final Map<String, String> env = new HashMap<>(runSpec.env());
     env.put(COMPONENT_ID, workflowInstance.workflowId().componentId());
@@ -377,6 +384,7 @@ class KubernetesDockerRunner implements DockerRunner {
     env.put(TRIGGER_TYPE, runSpec.trigger().map(TriggerUtil::triggerType).orElse(null));
     env.put(ENVIRONMENT, styxEnvironment);
     env.put(LOGGING, "structured");
+    env.put(STYX_EXECUTION_COUNTER, String.valueOf(stateData.tries()));
     executionEnvVars.forEach((key, value) -> {
       if (env.containsKey(key)) {
         LOG.info("Key already exists in execution environment variables {}. Key will be skipped", key);
