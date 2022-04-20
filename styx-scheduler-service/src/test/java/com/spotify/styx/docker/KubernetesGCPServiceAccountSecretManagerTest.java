@@ -48,6 +48,7 @@ import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
+import com.spotify.styx.state.StateData;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
@@ -570,6 +571,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
                                Map<String, String> executionEnvVars) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            executionEnvVars);
+            executionEnvVars, StateData.zero());
   }
 }

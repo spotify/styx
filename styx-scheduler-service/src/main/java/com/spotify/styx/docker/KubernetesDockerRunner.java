@@ -45,6 +45,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.Message;
 import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
 import com.spotify.styx.state.StateTransitionConflictException;
 import com.spotify.styx.state.Trigger;
@@ -81,6 +82,7 @@ import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Tracer;
 import io.opencensus.trace.Tracing;
 import io.opencensus.trace.samplers.Samplers;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -100,6 +102,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+
 import javaslang.control.Try;
 
 /**
@@ -124,6 +127,7 @@ class KubernetesDockerRunner implements DockerRunner {
   static final String TRIGGER_TYPE = "STYX_TRIGGER_TYPE";
   static final String ENVIRONMENT = "STYX_ENVIRONMENT";
   static final String LOGGING = "STYX_LOGGING";
+  static final String STYX_EXECUTION_COUNTER = "STYX_EXECUTION_COUNTER";
   private static final int DEFAULT_POD_CLEANUP_INTERVAL_SECONDS = 60;
   private static final int DEFAULT_POD_DELETION_DELAY_SECONDS = 120;
   private static final Duration POD_FORCE_DELETION_TOLERATION = Duration.ofMinutes(30);
@@ -205,6 +209,8 @@ class KubernetesDockerRunner implements DockerRunner {
   public String start(RunState runState, RunSpec runSpec) throws IOException {
     var workflowInstance = runState.workflowInstance();
 
+    var stateData = runState.data();
+
     // First make cheap check for if pod already exists
     var existingPod = client.getPod(runSpec.executionId());
     if (existingPod.isPresent()) {
@@ -218,7 +224,8 @@ class KubernetesDockerRunner implements DockerRunner {
     // Create pod. This might fail with 409 Conflict if the pod already exists as despite the existence
     // check above it might have been concurrently created. That is fine.
     try {
-      var pod = createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator, executionEnvVars);
+      var pod =
+          createPod(workflowInstance, runSpec, secretSpec, styxEnvironment, podMutator, executionEnvVars, stateData);
       LOG.info("Creating pod: {}: {}", workflowInstance, pod);
       var createdPod = client.createPod(pod);
       stats.recordSubmission(runSpec.executionId());
@@ -271,10 +278,11 @@ class KubernetesDockerRunner implements DockerRunner {
                        KubernetesSecretSpec secretSpec,
                        String styxEnvironment,
                        PodMutator podMutator,
-                       final Map<String, String> executionEnvVars) {
+                       final Map<String, String> executionEnvVars,
+                       StateData stateData) {
     final String imageWithTag = runSpec.imageName().contains(":")
-        ? runSpec.imageName()
-        : runSpec.imageName() + ":latest";
+                                ? runSpec.imageName()
+                                : runSpec.imageName() + ":latest";
 
     final String executionId = runSpec.executionId();
     final PodBuilder podBuilder = new PodBuilder()
@@ -282,7 +290,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(executionId)
         .addToAnnotations(STYX_WORKFLOW_INSTANCE_ANNOTATION, workflowInstance.toKey())
         .addToAnnotations(DOCKER_TERMINATION_LOGGING_ANNOTATION,
-                          String.valueOf(runSpec.terminationLogging()))
+            String.valueOf(runSpec.terminationLogging()))
         .addToLabels(tryBuildLabels(workflowInstance, runSpec, styxEnvironment))
         .endMetadata();
 
@@ -297,7 +305,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .withName(MAIN_CONTAINER_NAME)
         .withImage(imageWithTag)
         .withArgs(runSpec.args())
-        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment, executionEnvVars))
+        .withEnv(buildEnv(workflowInstance, runSpec, styxEnvironment, executionEnvVars, stateData))
         .withResources(resourceRequirements.build());
 
     secretSpec.serviceAccountSecret().ifPresent(serviceAccountSecret -> {
@@ -317,7 +325,7 @@ class KubernetesDockerRunner implements DockerRunner {
           .build();
       mainContainerBuilder.addToVolumeMounts(saMount);
       mainContainerBuilder.addToEnv(envVar(STYX_WORKFLOW_SA_ENV_VARIABLE,
-                                       saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
+          saMount.getMountPath() + STYX_WORKFLOW_SA_JSON_KEY));
     });
 
     specBuilder.addToContainers(mainContainerBuilder.build());
@@ -334,21 +342,21 @@ class KubernetesDockerRunner implements DockerRunner {
         .withImage("k8s.gcr.io/pause:3.1")
         .withNewResources()
         .withLimits(Map.of(
-          "cpu", new QuantityBuilder()
-              .withAmount("250")
-              .withFormat("m")
-              .build(),
-          "memory", new QuantityBuilder()
-              .withAmount("256")
-              .withFormat("Mi")
-              .build()))
+            "cpu", new QuantityBuilder()
+                .withAmount("250")
+                .withFormat("m")
+                .build(),
+            "memory", new QuantityBuilder()
+                .withAmount("256")
+                .withFormat("Mi")
+                .build()))
         .withRequests(Map.of(
-          "cpu", new QuantityBuilder()
-              .withAmount("0")
-              .build(),
-          "memory", new QuantityBuilder()
-              .withAmount("0")
-              .build()))
+            "cpu", new QuantityBuilder()
+                .withAmount("0")
+                .build(),
+            "memory", new QuantityBuilder()
+                .withAmount("0")
+                .build()))
         .endResources()
         .build();
   }
@@ -361,7 +369,9 @@ class KubernetesDockerRunner implements DockerRunner {
   private static List<EnvVar> buildEnv(WorkflowInstance workflowInstance,
                                        RunSpec runSpec,
                                        String styxEnvironment,
-                                       Map<String, String> executionEnvVars) {
+                                       Map<String, String> executionEnvVars,
+                                       StateData stateData) {
+
     // store user provided env first to prevent accidentally/intentionally overwriting system ones
     final Map<String, String> env = new HashMap<>(runSpec.env());
     env.put(COMPONENT_ID, workflowInstance.workflowId().componentId());
@@ -377,6 +387,7 @@ class KubernetesDockerRunner implements DockerRunner {
     env.put(TRIGGER_TYPE, runSpec.trigger().map(TriggerUtil::triggerType).orElse(null));
     env.put(ENVIRONMENT, styxEnvironment);
     env.put(LOGGING, "structured");
+    env.put(STYX_EXECUTION_COUNTER, String.valueOf(stateData.tries()));
     executionEnvVars.forEach((key, value) -> {
       if (env.containsKey(key)) {
         LOG.info("Key already exists in execution environment variables {}. Key will be skipped", key);
@@ -455,7 +466,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
   }
 
-  private PodDeletionDecision shouldDeleteNonTerminatedPodWithoutRunState(WorkflowInstance workflowInstance, String name) {
+  private PodDeletionDecision shouldDeleteNonTerminatedPodWithoutRunState(WorkflowInstance workflowInstance,
+                                                                          String name) {
     // Fetch the pod here to avoid acting on stale information
     var podOpt = client.getPod(name);
     if (podOpt.isEmpty()) {
@@ -595,8 +607,8 @@ class KubernetesDockerRunner implements DockerRunner {
     }
     var runState = stateManager.getActiveState(workflowInstance.orElseThrow());
     var podDeletionDecision = runState.isPresent() && isPodRunState(pod, runState.orElseThrow())
-                       ? shouldDeletePodWithRunState(workflowInstance.orElseThrow(), pod, runState.orElseThrow())
-                       : shouldDeletePodWithoutRunState(workflowInstance.orElseThrow(), pod);
+                              ? shouldDeletePodWithRunState(workflowInstance.orElseThrow(), pod, runState.orElseThrow())
+                              : shouldDeletePodWithoutRunState(workflowInstance.orElseThrow(), pod);
     if (podDeletionDecision.delete()) {
       client.deletePod(pod.getMetadata().getName(), podDeletionDecision.force());
     }
@@ -653,7 +665,8 @@ class KubernetesDockerRunner implements DockerRunner {
         stats.recordPullImageError();
       }
       if (EventUtil.name(event).equals("started")) {
-        runState.data().executionId().ifPresent(executionId -> stats.recordRunning(executionId, pod.getSpec().getNodeName()));
+        runState.data().executionId()
+            .ifPresent(executionId -> stats.recordRunning(executionId, pod.getSpec().getNodeName()));
       }
 
       try {
@@ -679,8 +692,8 @@ class KubernetesDockerRunner implements DockerRunner {
     final String status = readStatus(pod);
 
     LOG.info("{}Pod event for {} ({}) at resource version {}, action: {}, workflow instance: {}, status: {}",
-             polled ? "Polled: " : "", podName, pod.getMetadata().getUid(), resourceVersion, action, workflowInstance,
-             status);
+        polled ? "Polled: " : "", podName, pod.getMetadata().getUid(), resourceVersion, action, workflowInstance,
+        status);
   }
 
   private String readStatus(Pod pod) {
@@ -699,7 +712,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     /**
      * @implNote In order to be able to keep up with the stream of events from k8s, this method should
-     *     not perform any expensive processing or blocking IO.
+     * not perform any expensive processing or blocking IO.
      */
     @Override
     public void eventReceived(Action action, Pod pod) {
@@ -800,7 +813,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean triggerExecution(WorkflowInstance workflowInstance, Trigger trigger,
-        TriggerParameters parameters) {
+                                    TriggerParameters parameters) {
       return false;
     }
 
@@ -821,7 +834,7 @@ class KubernetesDockerRunner implements DockerRunner {
 
     @Override
     public Boolean submit(WorkflowInstance workflowInstance, ExecutionDescription executionDescription,
-        String executionId) {
+                          String executionId) {
       return false;
     }
 
@@ -878,13 +891,14 @@ class KubernetesDockerRunner implements DockerRunner {
 
   @AutoMatter
   interface KubernetesSecretSpec {
+
     Optional<String> serviceAccountSecret();
 
     static KubernetesSecretSpecBuilder builder() {
       return new KubernetesSecretSpecBuilder();
     }
   }
-  
+
   @AutoMatter
   interface PodDeletionDecision {
 

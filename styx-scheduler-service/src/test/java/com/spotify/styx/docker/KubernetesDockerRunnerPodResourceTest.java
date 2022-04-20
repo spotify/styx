@@ -46,6 +46,7 @@ import static org.hamcrest.Matchers.is;
 
 import com.spotify.styx.docker.KubernetesDockerRunner.KubernetesSecretSpec;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.testdata.TestData;
 import com.spotify.styx.util.TriggerUtil;
@@ -272,6 +273,6 @@ public class KubernetesDockerRunnerPodResourceTest {
                         Map<String, String> executionEnvVars) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            executionEnvVars);
+            executionEnvVars, StateData.zero());
   }
 }
