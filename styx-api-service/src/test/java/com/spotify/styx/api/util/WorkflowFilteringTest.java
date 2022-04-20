@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,9 +32,11 @@ import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD;
 import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_AFTER;
 import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_BEFORE;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 
 import com.spotify.styx.model.Workflow;
 import java.time.Instant;
@@ -49,9 +51,9 @@ public class WorkflowFilteringTest {
     var workflowCollection = List.of(createWorkflowWithType("id1", "remote-foo"),
         createWorkflowWithType("id2", "remote-foo"));
 
-    Map<QueryParams, String> emptyFilters = Map.of();
+    var emptyFilters = Map.<QueryParams, String>of();
 
-    List<Workflow> result = filterWorkflows(workflowCollection, emptyFilters);
+    var result = filterWorkflows(workflowCollection, emptyFilters);
 
     assertThat(result, equalTo(workflowCollection));
   }
@@ -64,7 +66,7 @@ public class WorkflowFilteringTest {
 
     var filterParams = Map.of(DEPLOYMENT_TYPE, "wrong-type");
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filterParams);
+    var result = filterWorkflows(workflowCollection, filterParams);
 
     assertThat(result, empty());
   }
@@ -82,7 +84,8 @@ public class WorkflowFilteringTest {
     var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, hasSize(1));
-    assertThat(result.get(0), equalTo(validWorkflow));
+    assertThat(result, contains(validWorkflow));
+    assertThat(result, not(contains(invalidWorkflow)));
   }
 
   @Test
@@ -95,10 +98,11 @@ public class WorkflowFilteringTest {
 
     var filters = Map.of(DEPLOYMENT_TIME_BEFORE, QUERY_THRESHOLD.toString());
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, hasSize(1));
-    assertThat(result.get(0), equalTo(validWorkflow));
+    assertThat(result, contains(validWorkflow));
+    assertThat(result, not(contains(invalidWorkflow)));
   }
 
   @Test
@@ -110,10 +114,11 @@ public class WorkflowFilteringTest {
 
     var filters = Map.of(DEPLOYMENT_TIME_AFTER, QUERY_THRESHOLD.toString());
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, hasSize(1));
-    assertThat(result.get(0), equalTo(validWorkflow));
+    assertThat(result, contains(validWorkflow));
+    assertThat(result, not(contains(invalidWorkflow)));
   }
 
   @Test
@@ -133,10 +138,11 @@ public class WorkflowFilteringTest {
         DEPLOYMENT_TIME_BEFORE, deploymentTimeBefore,
         DEPLOYMENT_TIME_AFTER, deploymentTimeAfter);
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, hasSize(1));
-    assertThat(result.get(0), equalTo(validWorkflow));
+    assertThat(result, contains(validWorkflow));
+    assertThat(result, not(contains(invalidWorkflow)));
   }
 
   @Test
@@ -144,7 +150,7 @@ public class WorkflowFilteringTest {
     var workflowCollection = List.of(createWorkflowWithType("id1", ""));
     var filters = Map.of(DEPLOYMENT_TYPE, "remote-foo");
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, empty());
   }
@@ -155,7 +161,7 @@ public class WorkflowFilteringTest {
 
     var filters = Map.of(DEPLOYMENT_TIME_BEFORE, QUERY_THRESHOLD_BEFORE.toString());
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, empty());
   }
@@ -167,7 +173,7 @@ public class WorkflowFilteringTest {
     var filters = Map.of(DEPLOYMENT_TIME_AFTER,
         QUERY_THRESHOLD_AFTER.toString());
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, empty());
   }
@@ -179,7 +185,7 @@ public class WorkflowFilteringTest {
     var filters = Map.of(DEPLOYMENT_TIME_BEFORE,
         QUERY_THRESHOLD_BEFORE.toString(), DEPLOYMENT_TIME_AFTER, QUERY_THRESHOLD_AFTER.toString());
 
-    List<Workflow> result = filterWorkflows(workflowCollection, filters);
+    var result = filterWorkflows(workflowCollection, filters);
 
     assertThat(result, empty());
   }

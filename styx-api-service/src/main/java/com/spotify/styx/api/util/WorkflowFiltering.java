@@ -40,7 +40,7 @@ public final class WorkflowFiltering {
 
   private WorkflowFiltering(){}
 
-  public static List<Workflow> filterWorkflows(
+  public static Collection<Workflow> filterWorkflows(
       Collection<Workflow> workflows, Map<QueryParams, String> paramFilters){
     if (paramFilters.isEmpty()) {
       // Nothing to filter on
@@ -48,7 +48,10 @@ public final class WorkflowFiltering {
     }
     List<Predicate> workflowFilters = createWorkflowFilters(paramFilters);
 
-    return workflows.stream().filter(w -> workflowFilters.stream().allMatch(pre-> pre.test(w))).collect(toList());
+    return workflows.stream()
+        .filter(w -> workflowFilters.stream()
+            .allMatch(pre-> pre.test(w)))
+        .collect(toList());
   }
 
   private static List<Predicate> createWorkflowFilters(Map<QueryParams, String> paramFilters){
