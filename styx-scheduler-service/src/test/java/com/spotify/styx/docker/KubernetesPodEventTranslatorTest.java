@@ -33,6 +33,7 @@ import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.RunState.State;
+import com.spotify.styx.state.StateData;
 import com.spotify.styx.testdata.TestData;
 import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
@@ -65,7 +66,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final String STYX_ENVIRONMENT = "testing";
 
   private final Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT, PodMutator.NOOP,
-      Collections.emptyMap());
+      Collections.emptyMap(), StateData.zero());
 
   @Test
   public void terminateOnSuccessfulTermination() {
@@ -430,6 +431,7 @@ public class KubernetesPodEventTranslatorTest {
         SECRET_SPEC,
         STYX_ENVIRONMENT,
         PodMutator.NOOP,
-        Collections.emptyMap());
+        Collections.emptyMap(),
+        StateData.zero());
   }
 }
