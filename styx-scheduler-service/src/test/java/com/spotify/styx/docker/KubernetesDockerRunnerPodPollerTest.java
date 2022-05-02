@@ -235,6 +235,6 @@ public class KubernetesDockerRunnerPodPollerTest {
                                KubernetesSecretSpec secretSpec) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            Collections.emptyMap(), StateData.zero());
+            Collections.emptyMap(), StateData.zero().tries());
   }
 }
