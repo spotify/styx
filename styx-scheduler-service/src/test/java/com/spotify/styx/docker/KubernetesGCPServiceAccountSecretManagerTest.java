@@ -571,6 +571,6 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
                                Map<String, String> executionEnvVars) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            executionEnvVars, StateData.zero());
+            executionEnvVars, StateData.zero().tries());
   }
 }

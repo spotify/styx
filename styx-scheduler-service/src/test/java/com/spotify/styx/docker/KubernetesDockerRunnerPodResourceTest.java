@@ -31,7 +31,7 @@ import static com.spotify.styx.docker.KubernetesDockerRunner.LOGGING;
 import static com.spotify.styx.docker.KubernetesDockerRunner.MAIN_CONTAINER_NAME;
 import static com.spotify.styx.docker.KubernetesDockerRunner.PARAMETER;
 import static com.spotify.styx.docker.KubernetesDockerRunner.SERVICE_ACCOUNT;
-import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_EXECUTION_COUNTER;
+import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_EXECUTION_TRIES;
 import static com.spotify.styx.docker.KubernetesDockerRunner.STYX_WORKFLOW_INSTANCE_ANNOTATION;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TERMINATION_LOG;
 import static com.spotify.styx.docker.KubernetesDockerRunner.TRIGGER_ID;
@@ -266,7 +266,7 @@ public class KubernetesDockerRunnerPodResourceTest {
     assertThat(envVars, hasItem(envVar(DOCKER_ARGS, "hello world")));
     assertThat(envVars, hasItem(envVar(ENVIRONMENT, STYX_ENVIRONMENT)));
     assertThat(envVars, hasItem(envVar(LOGGING, "structured")));
-    assertThat(envVars, hasItem(envVar(STYX_EXECUTION_COUNTER, "1")));
+    assertThat(envVars, hasItem(envVar(STYX_EXECUTION_TRIES, "1")));
   }
 
   private Pod createPod(WorkflowInstance workflowInstance,
@@ -276,6 +276,6 @@ public class KubernetesDockerRunnerPodResourceTest {
                         StateData stateData) {
     return KubernetesDockerRunner
         .createPod(workflowInstance, runSpec, secretSpec, STYX_ENVIRONMENT, PodMutator.NOOP,
-            executionEnvVars, stateData);
+            executionEnvVars, stateData.tries());
   }
 }

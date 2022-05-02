@@ -66,7 +66,7 @@ public class KubernetesPodEventTranslatorTest {
   private static final String STYX_ENVIRONMENT = "testing";
 
   private final Pod pod = KubernetesDockerRunner.createPod(WFI, RUN_SPEC, SECRET_SPEC, STYX_ENVIRONMENT, PodMutator.NOOP,
-      Collections.emptyMap(), StateData.zero());
+      Collections.emptyMap(), StateData.zero().tries());
 
   @Test
   public void terminateOnSuccessfulTermination() {
@@ -432,6 +432,6 @@ public class KubernetesPodEventTranslatorTest {
         STYX_ENVIRONMENT,
         PodMutator.NOOP,
         Collections.emptyMap(),
-        StateData.zero());
+        StateData.zero().tries());
   }
 }
