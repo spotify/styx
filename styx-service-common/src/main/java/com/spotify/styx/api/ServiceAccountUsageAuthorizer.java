@@ -391,7 +391,7 @@ public interface ServiceAccountUsageAuthorizer {
           // email does not exist or does not have the same domain as the group if it is enforced
           if (statusCode == 400) {
             log.info("Principal {} does not exist or belongs to different domain than group {}",
-                principalEmail, group, cause);
+                principalEmail, group);
             return false;
           } else if (statusCode == 404) {
             log.info("Group {} does not exist", group, cause);
