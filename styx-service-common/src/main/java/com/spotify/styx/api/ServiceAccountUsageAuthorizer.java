@@ -224,8 +224,8 @@ public interface ServiceAccountUsageAuthorizer {
       final Supplier<String> projectIdSupplier = Suppliers.memoize(() -> serviceAccountProjectId(serviceAccount));
 
       return checkIsPrincipalBlacklisted(principalEmail)
-          .or(() -> checkIsPrincipalAdmin(principalEmail))
           .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
+          .or(() -> checkIsPrincipalAdmin(principalEmail))
           .orElseGet(() -> deny(serviceAccount, principalEmail, projectIdSupplier));
     }
 
@@ -394,7 +394,7 @@ public interface ServiceAccountUsageAuthorizer {
                 principalEmail, group);
             return false;
           } else if (statusCode == 404) {
-            log.info("Group {} does not exist", group, cause);
+            log.info("Group {} does not exist", group);
             return false;
           }
         }
