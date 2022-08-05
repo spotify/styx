@@ -250,9 +250,11 @@ public interface ServiceAccountUsageAuthorizer {
         checkRoleException = e;
       }
 
-      if (result.isEmpty()) {
-        result = checkIsPrincipalAdmin(principalEmail);
+      if (result.isPresent()) {
+        return result;
       }
+
+      result = checkIsPrincipalAdmin(principalEmail);
 
       if (result.isEmpty() && checkRoleException != null) {
         throw checkRoleException;
