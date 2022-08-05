@@ -359,6 +359,18 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
+  public void shouldAuthorizeIfPrincipalIsAdminViaGroupEvenCheckRoleFails(String serviceAccount) throws IOException {
+    final Throwable cause = googleJsonResponseException(418);
+    var errorRequest = mock(Directory.Members.HasMember.class);
+    doThrow(cause).when(errorRequest).execute();
+    doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+    doReturn(isMember).when(members).hasMember(STYX_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
+    assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
+  }
+
+
+  @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
+  @Test
   public void shouldAuthorizeIfPrincipalHasUserRoleOnProjectViaGroup(String serviceAccount) throws IOException {
     doReturn(isMember).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     assertCachedSuccess(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
