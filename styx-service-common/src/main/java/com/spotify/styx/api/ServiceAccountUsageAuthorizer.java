@@ -224,8 +224,7 @@ public interface ServiceAccountUsageAuthorizer {
       final Supplier<String> projectIdSupplier = Suppliers.memoize(() -> serviceAccountProjectId(serviceAccount));
 
       return checkIsPrincipalBlacklisted(principalEmail)
-          .or(() -> checkRole(serviceAccount, principalEmail, projectIdSupplier))
-          .or(() -> checkIsPrincipalAdmin(principalEmail))
+          .or(() -> checkRoleOrIsPrincipalAdmin(serviceAccount, principalEmail, projectIdSupplier))
           .orElseGet(() -> deny(serviceAccount, principalEmail, projectIdSupplier));
     }
 
@@ -236,6 +235,31 @@ public interface ServiceAccountUsageAuthorizer {
               .blacklisted(true)
               .message(blacklistedDenialMessage(principalEmail))
               .build());
+    }
+
+    private Optional<ServiceAccountUsageAuthorizationResult> checkRoleOrIsPrincipalAdmin(String serviceAccount,
+                                                                                         String principalEmail,
+                                                                                         Supplier<String> projectIdSupplier) {
+
+      Optional<ServiceAccountUsageAuthorizationResult> result = Optional.empty();
+      RuntimeException checkRoleException = null;
+
+      try {
+        result = checkRole(serviceAccount, principalEmail, projectIdSupplier);
+      } catch (RuntimeException e) {
+        checkRoleException = e;
+      }
+
+      if (result.isPresent()) {
+        return result;
+      }
+
+      result = checkIsPrincipalAdmin(principalEmail);
+
+      if (result.isEmpty() && checkRoleException != null) {
+        throw checkRoleException;
+      }
+      return result;
     }
 
     private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalAdmin(
