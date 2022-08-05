@@ -237,15 +237,6 @@ public interface ServiceAccountUsageAuthorizer {
               .build());
     }
 
-    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalAdmin(
-        String principalEmail) {
-      return memberStatus(principalEmail, administrators)
-          .map(status -> ServiceAccountUsageAuthorizationResult.builder()
-              .authorized(true)
-              .message(String.format("Principal %s is an admin %s", principalEmail, status))
-              .build());
-    }
-
     private Optional<ServiceAccountUsageAuthorizationResult> checkRoleOrIsPrincipalAdmin(String serviceAccount,
                                                                                          String principalEmail,
                                                                                          Supplier<String> projectIdSupplier) {
@@ -267,6 +258,15 @@ public interface ServiceAccountUsageAuthorizer {
         throw checkRoleException;
       }
       return result;
+    }
+
+    private Optional<ServiceAccountUsageAuthorizationResult> checkIsPrincipalAdmin(
+        String principalEmail) {
+      return memberStatus(principalEmail, administrators)
+          .map(status -> ServiceAccountUsageAuthorizationResult.builder()
+              .authorized(true)
+              .message(String.format("Principal %s is an admin %s", principalEmail, status))
+              .build());
     }
 
     private Optional<ServiceAccountUsageAuthorizationResult> checkRole(String serviceAccount,
