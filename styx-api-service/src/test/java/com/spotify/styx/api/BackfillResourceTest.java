@@ -47,6 +47,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.cloud.Timestamp;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.Response;
@@ -581,7 +582,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFailPostBackfillIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2).size();
+    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Timestamp.MIN_VALUE).size();
 
     final BackfillInput input = BackfillInput.newBuilder()
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -602,7 +603,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
-    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2).size();
+    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Timestamp.MIN_VALUE).size();
     assertThat(backfillsBefore, is(backfillsAfter));
   }
 

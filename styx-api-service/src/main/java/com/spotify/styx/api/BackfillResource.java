@@ -31,6 +31,7 @@ import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static java.util.stream.Collectors.toList;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.cloud.Timestamp;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.common.io.Closer;
@@ -164,12 +165,13 @@ public final class BackfillResource implements Closeable {
     final Optional<String> workflowOpt = rc.request().parameter("workflow");
     final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
     final boolean showAll = rc.request().parameter("showAll").orElse("false").equals("true");
+    final Timestamp start = rc.request().parameter("start").map(Timestamp::parseTimestamp).orElse(Timestamp.MIN_VALUE);
 
     final Stream<Backfill> backfills;
     try {
       if (componentOpt.isPresent() && workflowOpt.isPresent()) {
         final WorkflowId workflowId = WorkflowId.create(componentOpt.get(), workflowOpt.get());
-        backfills = storage.backfillsForWorkflowId(showAll, workflowId).stream();
+        backfills = storage.backfillsForWorkflowId(showAll, workflowId, start).stream();
       } else if (componentOpt.isPresent()) {
         final String component = componentOpt.get();
         backfills = storage.backfillsForComponent(showAll, component).stream();

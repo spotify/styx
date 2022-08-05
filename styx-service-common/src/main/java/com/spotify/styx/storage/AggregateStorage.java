@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
@@ -266,8 +267,8 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
-    return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId);
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Timestamp start) throws IOException {
+    return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId, start);
   }
 
   @Override

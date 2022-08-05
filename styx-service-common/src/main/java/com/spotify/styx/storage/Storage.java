@@ -20,6 +20,7 @@
 
 package com.spotify.styx.storage;
 
+import com.google.cloud.Timestamp;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
@@ -304,7 +305,7 @@ public interface Storage extends Closeable {
 
   List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException;
 
-  List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
+  List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Timestamp start) throws IOException;
 
   Optional<Backfill> backfill(String id) throws IOException;
 
