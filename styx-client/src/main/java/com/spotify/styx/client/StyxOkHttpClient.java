@@ -22,6 +22,7 @@ package com.spotify.styx.client;
 
 import static com.spotify.styx.client.GrpcContextKey.AUTHORIZATION_KEY;
 import static com.spotify.styx.client.FutureOkHttpClient.forUri;
+import static java.time.ZoneOffset.UTC;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -56,6 +57,8 @@ import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -396,7 +399,10 @@ class StyxOkHttpClient implements StyxClient {
     workflowId.ifPresent(w -> url.addQueryParameter("workflow", w));
     url.addQueryParameter("showAll", Boolean.toString(showAll));
     url.addQueryParameter("status", Boolean.toString(includeStatus));
-    start.ifPresent(s -> url.addQueryParameter("start", start.get().toString()));
+    start.ifPresent(s -> {
+      final LocalDateTime startDate = LocalDateTime.ofInstant(start.get(), UTC);
+      url.addQueryParameter("start", DateTimeFormatter.ofPattern("yyyy-MM-dd").format(startDate));
+    });
     return execute(forUri(url), BackfillsPayload.class);
   }
 

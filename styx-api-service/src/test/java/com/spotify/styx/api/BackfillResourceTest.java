@@ -270,8 +270,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
 
-    final String uri = path(String.format("?showAll=true&component=%s&workflow=%s",
-                                          BACKFILL_4.workflowId().componentId(), BACKFILL_4.workflowId().id()));
+    final String uri = path(String.format("?showAll=true&component=%s",
+                                          BACKFILL_4.workflowId().componentId()));
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", uri));
 
