@@ -165,7 +165,7 @@ public final class BackfillResource implements Closeable {
     final Optional<String> workflowOpt = rc.request().parameter("workflow");
     final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
     final boolean showAll = rc.request().parameter("showAll").orElse("false").equals("true");
-    final Instant start = rc.request().parameter("start").map(ParameterUtil::parseDate).orElse(Instant.MIN);
+    final Instant start = rc.request().parameter("start").map(ParameterUtil::parseDate).orElse(Instant.EPOCH);
 
     final Stream<Backfill> backfills;
     try {

@@ -82,6 +82,8 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -160,6 +162,17 @@ public class BackfillResourceTest extends VersionedApiTest {
       .workflowId(WorkflowId.create("component", "workflow1"))
       .concurrency(1)
       .nextTrigger(Instant.parse("2017-01-01T05:00:00Z"))
+      .schedule(Schedule.HOURS)
+      .build();
+
+  private static final Backfill BACKFILL_6 = Backfill.newBuilder()
+      .id("backfill-6")
+      .start(Instant.parse("2021-01-01T00:00:00Z"))
+      .end(Instant.parse("2021-01-01T06:00:00Z"))
+      .reverse(true)
+      .workflowId(WorkflowId.create("other_component", "other_workflow"))
+      .concurrency(1)
+      .nextTrigger(Instant.parse("2021-01-01T05:00:00Z"))
       .schedule(Schedule.HOURS)
       .build();
 
@@ -257,8 +270,8 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
 
-    final String uri = path(String.format("?showAll=true&component=%s",
-                                          BACKFILL_4.workflowId().componentId()));
+    final String uri = path(String.format("?showAll=true&component=%s&workflow=%s",
+                                          BACKFILL_4.workflowId().componentId(), BACKFILL_4.workflowId().id()));
     Response<ByteString> response =
         awaitResponse(serviceHelper.request("GET", uri));
 
@@ -581,7 +594,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFailPostBackfillIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.MIN).size();
+    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.EPOCH).size();
 
     final BackfillInput input = BackfillInput.newBuilder()
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -602,7 +615,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
-    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.MIN).size();
+    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.EPOCH).size();
     assertThat(backfillsBefore, is(backfillsAfter));
   }
 
@@ -1246,6 +1259,62 @@ public class BackfillResourceTest extends VersionedApiTest {
     Backfill postedBackfill = Json.OBJECT_MAPPER.readValue(
         response.payload().orElseThrow().toByteArray(), Backfill.class);
     assertThat(postedBackfill.lastModified().orElseThrow(), equalTo(updateTime));
+  }
+
+  @Test
+  public void shouldFilterOneBackfillUsingStartParameter()
+      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
+    storage.storeBackfill(BACKFILL_6.builder().allTriggered(true).build());
+
+    final String uri = path(String.format("?showAll=true&component=%s&workflow=%s&start=%s",
+        BACKFILL_4.workflowId().componentId(),
+        BACKFILL_4.workflowId().id(),
+        "2019-01-01"));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(1));
+  }
+
+  @Test
+  public void shouldFilterAllBackfillsUsingStartParameter()
+      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
+    storage.storeBackfill(BACKFILL_6.builder().allTriggered(true).build());
+
+    final String uri = path(String.format("?showAll=true&component=%s&workflow=%s&start=%s",
+        BACKFILL_4.workflowId().componentId(),
+        BACKFILL_4.workflowId().id(),
+        "2022-01-01"));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(0));
+  }
+
+  @Test
+  public void shouldUseDefaultValueForStartParameter()
+      throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    sinceVersion(Api.Version.V3);
+
+    storage.storeBackfill(BACKFILL_4.builder().allTriggered(true).build());
+    storage.storeBackfill(BACKFILL_6.builder().allTriggered(true).build());
+
+    final String uri = path(String.format("?showAll=true&component=%s&workflow=%s",
+        BACKFILL_4.workflowId().componentId(),
+        BACKFILL_4.workflowId().id()));
+    Response<ByteString> response =
+        awaitResponse(serviceHelper.request("GET", uri));
+
+    assertThat(response, hasStatus(belongsToFamily(StatusType.Family.SUCCESSFUL)));
+    assertJson(response, "backfills", hasSize(2));
   }
 
   private Connection setupBigTableMockTable() {

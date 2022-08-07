@@ -236,7 +236,7 @@ public class StyxOkHttpClientTest {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
     final CompletableFuture<BackfillsPayload> r =
-        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false).toCompletableFuture();
+        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false, Optional.empty()).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();

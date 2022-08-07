@@ -24,6 +24,7 @@ import com.spotify.styx.api.BackfillPayload;
 import com.spotify.styx.api.BackfillsPayload;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -133,7 +134,8 @@ public interface StyxBackfillClient extends AutoCloseable {
   CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
                                                  Optional<String> workflowId,
                                                  boolean showAll,
-                                                 boolean includeStatus);
+                                                 boolean includeStatus,
+      Optional<Instant> start);
 
   @Override
   void close();

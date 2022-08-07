@@ -389,12 +389,14 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
                                                         Optional<String> workflowId,
                                                         boolean showAll,
-                                                        boolean includeStatus) {
+                                                        boolean includeStatus,
+      Optional<Instant> start) {
     var url = urlBuilder("backfills");
     componentId.ifPresent(c -> url.addQueryParameter("component", c));
     workflowId.ifPresent(w -> url.addQueryParameter("workflow", w));
     url.addQueryParameter("showAll", Boolean.toString(showAll));
     url.addQueryParameter("status", Boolean.toString(includeStatus));
+    start.ifPresent(s -> url.addQueryParameter("start", start.get().toString()));
     return execute(forUri(url), BackfillsPayload.class);
   }
 
