@@ -34,6 +34,7 @@ import com.spotify.styx.model.data.WorkflowInstanceExecutionData;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -266,8 +267,8 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
-    return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId);
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Optional<Instant> start) throws IOException {
+    return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId, start);
   }
 
   @Override

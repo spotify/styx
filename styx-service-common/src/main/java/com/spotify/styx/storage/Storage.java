@@ -34,6 +34,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.TriggerInstantSpec;
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -304,7 +305,7 @@ public interface Storage extends Closeable {
 
   List<Backfill> backfillsForWorkflow(boolean showAll, String workflow) throws IOException;
 
-  List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException;
+  List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Optional<Instant> start) throws IOException;
 
   Optional<Backfill> backfill(String id) throws IOException;
 

@@ -856,11 +856,17 @@ public class DatastoreStorage implements Closeable {
     return backfillsForQuery(query);
   }
 
-  List<Backfill> getBackfillsForWorkflowId(boolean showAll, WorkflowId workflowId) throws IOException {
+  List<Backfill> getBackfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Optional<Instant> start) throws IOException {
+
+    final List<Filter> filters = new ArrayList<>();
+    filters.add(PropertyFilter.eq(PROPERTY_COMPONENT, workflowId.componentId()));
+    filters.add(PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId.id()));
+    start.ifPresent(
+        instant -> filters.add(PropertyFilter.ge(PROPERTY_START, instantToTimestamp(instant))));
+
     final EntityQuery query = backfillQueryBuilder(
         showAll,
-        PropertyFilter.eq(PROPERTY_COMPONENT, workflowId.componentId()),
-        PropertyFilter.eq(PROPERTY_WORKFLOW, workflowId.id()))
+        filters.toArray(new Filter[0]))
         .build();
 
     return backfillsForQuery(query);

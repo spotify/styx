@@ -60,6 +60,7 @@ import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.storage.StorageTransaction;
+import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.RandomGenerator;
 import com.spotify.styx.util.ReplayEvents;
 import com.spotify.styx.util.ResourceNotFoundException;
@@ -164,12 +165,13 @@ public final class BackfillResource implements Closeable {
     final Optional<String> workflowOpt = rc.request().parameter("workflow");
     final boolean includeStatuses = rc.request().parameter("status").orElse("false").equals("true");
     final boolean showAll = rc.request().parameter("showAll").orElse("false").equals("true");
+    final Optional<Instant> start = rc.request().parameter("start").map(ParameterUtil::parseDate);
 
     final Stream<Backfill> backfills;
     try {
       if (componentOpt.isPresent() && workflowOpt.isPresent()) {
         final WorkflowId workflowId = WorkflowId.create(componentOpt.get(), workflowOpt.get());
-        backfills = storage.backfillsForWorkflowId(showAll, workflowId).stream();
+        backfills = storage.backfillsForWorkflowId(showAll, workflowId, start).stream();
       } else if (componentOpt.isPresent()) {
         final String component = componentOpt.get();
         backfills = storage.backfillsForComponent(showAll, component).stream();
