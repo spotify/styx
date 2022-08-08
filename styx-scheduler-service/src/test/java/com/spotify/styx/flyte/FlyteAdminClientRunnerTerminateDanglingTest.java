@@ -245,32 +245,28 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
     when(stateManager.listActiveInstances()).thenReturn(activeInstances);
   }
 
-  private Execution nonRunningExecutions(String name) {
-    return execution(name, styxAnnotations(name, workflowInstance(name)), Phase.SUCCEEDED);
-  }
-
   private Execution noIdInStateDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().build());
-    return execution(name, styxAnnotations(name, workflowInstance), Phase.RUNNING);
+    return execution(name, styxAnnotations(name, workflowInstance));
   }
 
   private Execution oldIdInAnnotationDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, oldRunIdStyxAnnotation(name, workflowInstance), Phase.RUNNING);
+    return execution(name, oldRunIdStyxAnnotation(name, workflowInstance));
   }
 
   private Execution noIdInAnnotationDanglingExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, noRunIdStyxAnnotation(workflowInstance), Phase.RUNNING);
+    return execution(name, noRunIdStyxAnnotation(workflowInstance));
   }
 
   private Execution runningExecution(String name) {
     final var workflowInstance = workflowInstance(name);
     addToActiveStates(workflowInstance, StateData.newBuilder().executionId(name).build());
-    return execution(name, styxAnnotations(name, workflowInstance), Phase.RUNNING);
+    return execution(name, styxAnnotations(name, workflowInstance));
   }
 
   private void addToActiveStates(WorkflowInstance workflowInstance, StateData state) {
@@ -284,14 +280,14 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   }
 
   private Execution nonActiveDanglingExecution(String name) {
-    return execution(name, styxAnnotations(name, workflowInstance(name)), Phase.RUNNING);
+    return execution(name, styxAnnotations(name, workflowInstance(name)));
   }
 
   private Execution runningNonStyxExecution(String name) {
-    return execution(name, emptyAnnotations(), Phase.RUNNING);
+    return execution(name, emptyAnnotations());
   }
 
-  private Execution execution(String name, Common.Annotations annotations, Phase phase) {
+  private Execution execution(String name, Common.Annotations annotations) {
     var timestamp = nowTimestamp();
     var identifier = IdentifierOuterClass.WorkflowExecutionIdentifier.newBuilder()
         .setProject(PROJECT)
@@ -304,7 +300,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
             .setAnnotations(annotations)
             .build())
         .setClosure(ExecutionOuterClass.ExecutionClosure.newBuilder()
-            .setPhase(phase)
+            .setPhase(Phase.RUNNING)
             .setCreatedAt(timestamp)
             .setStartedAt(timestamp)
             .build())
