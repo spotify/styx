@@ -54,7 +54,6 @@ import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
-import flyteidl.core.Execution;
 import flyteidl.core.IdentifierOuterClass;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -313,11 +312,6 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   }
 
   private boolean haveBeenRunningForAWhile(ExecutionOuterClass.Execution exec) {
-    var isRunning = exec.getClosure().getPhase() == Execution.WorkflowExecution.Phase.RUNNING;
-    if (!isRunning) {
-      return false;
-    }
-
     var startedAt = exec.getClosure().getStartedAt();
     var startedAtInstant = Instant.ofEpochSecond(startedAt.getSeconds(), startedAt.getNanos());
     var age = Duration.between(startedAtInstant, time.get());

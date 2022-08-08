@@ -37,12 +37,12 @@ public class RpcHelper {
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
-
-    String dateTo = timeNow.minus(to)
+    final String dateTo = timeNow.minus(to)
         .atZone(ZoneId.of("UTC"))
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
-    return String.format("value_in(phase,RUNNING)+gte(started_at,%s)+lte(started_at,%s)",dateSince,dateTo);
+    return String.format("value_in(phase,RUNNING)+gte(execution-created-at,%s)+lte(execution-created-at,%s)", dateSince,
+        dateTo);
   }
 }

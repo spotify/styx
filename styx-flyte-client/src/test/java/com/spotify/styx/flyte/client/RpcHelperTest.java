@@ -36,7 +36,7 @@ public class RpcHelperTest {
 
   @Test
   public void testGtExecutionsListFilter() {
-    final Instant someTime = LocalDateTime.of(2022, 2, 2, 12, 12, 05)
+    final Instant someTime = LocalDateTime.of(2022, 2, 2, 12, 12, 5)
         .atZone(ZoneOffset.UTC)
         .toInstant();
 
@@ -46,7 +46,8 @@ public class RpcHelperTest {
         Duration.of(3, ChronoUnit.MINUTES));
 
     assertThat(executionsListFilter,
-        equalTo("value_in(phase,RUNNING)+gte(started_at,2022-02-01T12:12:05)+lte(started_at,2022-02-02T12:09:05)"));
+        equalTo("value_in(phase,RUNNING)+gte(execution-created-at,2022-02-01T12:12:05)+lte(execution-created-at,"
+                + "2022-02-02T12:09:05)"));
 
   }
 }
