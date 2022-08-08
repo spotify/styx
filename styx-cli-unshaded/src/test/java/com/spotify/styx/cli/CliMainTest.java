@@ -564,12 +564,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
   }
 
@@ -594,12 +594,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
   }
 
@@ -626,12 +626,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow);
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), false);
   }
 

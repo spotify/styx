@@ -267,7 +267,7 @@ public class AggregateStorage implements Storage {
   }
 
   @Override
-  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Instant start) throws IOException {
+  public List<Backfill> backfillsForWorkflowId(boolean showAll, WorkflowId workflowId, Optional<Instant> start) throws IOException {
     return datastoreStorage.getBackfillsForWorkflowId(showAll, workflowId, start);
   }
 
