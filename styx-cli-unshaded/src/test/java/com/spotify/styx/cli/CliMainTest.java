@@ -64,6 +64,8 @@ import java.net.ConnectException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -564,12 +566,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
   }
 
@@ -594,12 +596,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow, "--no-trunc");
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), true);
   }
 
@@ -626,12 +628,12 @@ public class CliMainTest {
     final BackfillsPayload backfillsPayload = BackfillsPayload.create(
         List.of(BackfillPayload.create(backfill, Optional.empty())));
 
-    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty()))
+    when(client.backfillList(Optional.of(component), Optional.of(workflow), false, false))
         .thenReturn(CompletableFuture.completedFuture(backfillsPayload));
 
     CliMain.run(cliContext, "backfill", "list", "-c", component, "-w", workflow);
 
-    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false, Optional.empty());
+    verify(client).backfillList(Optional.of(component), Optional.of(workflow), false, false);
     verify(cliOutput).printBackfills(backfillsPayload.backfills(), false);
   }
 

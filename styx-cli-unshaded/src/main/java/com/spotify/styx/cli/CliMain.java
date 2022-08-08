@@ -568,7 +568,7 @@ public final class CliMain {
     final boolean noTruncate = namespace.getBoolean(parser.backfillListNoTruncate.getDest());
 
     final BackfillsPayload backfillsPayload =
-        styxClient.backfillList(component, workflow, showAll, false, Optional.empty())
+        styxClient.backfillList(component, workflow, showAll, false)
             .toCompletableFuture().get();
     cliOutput.printBackfills(backfillsPayload.backfills(), noTruncate);
   }

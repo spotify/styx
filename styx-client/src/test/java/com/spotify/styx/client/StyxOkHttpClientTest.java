@@ -71,6 +71,8 @@ import io.grpc.Context;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -236,11 +238,33 @@ public class StyxOkHttpClientTest {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
     final CompletableFuture<BackfillsPayload> r =
-        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false, Optional.empty()).toCompletableFuture();
+        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
     final URI uri = URI.create(API_URL + "/backfills?component=component&workflow=workflow&showAll=false&status=false");
+    assertThat(request.url().toString(), is(uri.toString()));
+    assertThat(request.method(), is("GET"));
+    assertThat(r.join(), is(payload));
+  }
+
+  @Test
+  public void shouldGetBackfillsWithStartFilter() throws Exception {
+    final BackfillsPayload payload = BackfillsPayload.create(
+        List.of(BackfillPayload.create(BACKFILL, Optional.empty())));
+    when(client.send(any(Request.class)))
+        .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, payload)));
+
+    LocalDate date = LocalDate.parse("2015-01-01");
+    Instant instant = date.atStartOfDay(ZoneId.of("UTC")).toInstant();
+
+    System.out.println(instant);
+    final CompletableFuture<BackfillsPayload> r =
+        styx.backfillList(Optional.of("component"), Optional.of("workflow"), false, false, Optional.of(instant)).toCompletableFuture();
+    verify(client, timeout(30_000)).send(requestCaptor.capture());
+    assertThat(r.isDone(), is(true));
+    final Request request = requestCaptor.getValue();
+    final URI uri = URI.create(API_URL + "/backfills?component=component&workflow=workflow&showAll=false&status=false&start="+ date);
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
     assertThat(r.join(), is(payload));

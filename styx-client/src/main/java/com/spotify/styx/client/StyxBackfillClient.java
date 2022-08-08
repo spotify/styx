@@ -131,11 +131,27 @@ public interface StyxBackfillClient extends AutoCloseable {
    * @param includeStatus if to include status info for the {@link Backfill}s
    * @return The required list of {@link Backfill}s, according to the applied filters/options
    */
+  @Deprecated
+  CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
+                                                 Optional<String> workflowId,
+                                                 boolean showAll,
+                                                 boolean includeStatus);
+
+  /**
+   * List of existing {@link Backfill}s
+   *
+   * @param componentId   componentId id to filter on
+   * @param workflowId    componentId id to filter on
+   * @param showAll       if to include also inactive {@link Backfill}s
+   * @param includeStatus if to include status info for the {@link Backfill}s
+   * @param start         (optional) beginning of {@link Backfill}s range, inclusive
+   * @return The required list of {@link Backfill}s, according to the applied filters/options
+   */
   CompletionStage<BackfillsPayload> backfillList(Optional<String> componentId,
                                                  Optional<String> workflowId,
                                                  boolean showAll,
                                                  boolean includeStatus,
-      Optional<Instant> start);
+                                                 Optional<Instant> start);
 
   @Override
   void close();

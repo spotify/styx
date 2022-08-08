@@ -1262,7 +1262,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFilterOneBackfillUsingStartParameter()
+  public void shouldRetrieveOneBackfillUsingStartParameter()
       throws IOException, ExecutionException, InterruptedException, TimeoutException {
     sinceVersion(Api.Version.V3);
 
@@ -1281,7 +1281,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   }
 
   @Test
-  public void shouldFilterAllBackfillsUsingStartParameter()
+  public void shouldFilterOutAllBackfillsUsingStartParameter()
       throws IOException, ExecutionException, InterruptedException, TimeoutException {
     sinceVersion(Api.Version.V3);
 
