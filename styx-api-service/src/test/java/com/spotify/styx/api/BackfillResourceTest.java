@@ -594,7 +594,7 @@ public class BackfillResourceTest extends VersionedApiTest {
   public void shouldFailPostBackfillIfNotAuthorized() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.EPOCH).size();
+    final int backfillsBefore = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Optional.empty()).size();
 
     final BackfillInput input = BackfillInput.newBuilder()
         .start(Instant.parse("2017-01-01T00:00:00Z"))
@@ -615,7 +615,7 @@ public class BackfillResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(FORBIDDEN)));
 
-    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Instant.EPOCH).size();
+    final int backfillsAfter = storage.backfillsForWorkflowId(true, WORKFLOW_ID_2, Optional.empty()).size();
     assertThat(backfillsBefore, is(backfillsAfter));
   }
 
