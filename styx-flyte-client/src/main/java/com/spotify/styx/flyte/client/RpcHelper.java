@@ -42,7 +42,7 @@ public class RpcHelper {
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
-    return String.format("value_in(phase,RUNNING)+gte(execution-created-at,%s)+lte(execution-created-at,%s)", dateSince,
+    return String.format("value_in(phase,RUNNING)+gte(execution_created_at,%s)+lte(execution_created_at,%s)", dateSince,
         dateTo);
   }
 }

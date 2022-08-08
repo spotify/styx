@@ -83,8 +83,6 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
 
   private static final String RUNNING_1 = "running-1";
   private static final String RUNNING_2 = "running-2";
-  private static final String NON_RUNNING_1 = "non-running-1";
-  private static final String NON_RUNNING_2 = "non-running-2";
   private static final String NON_STYX_1 = "non-styx-1";
   private static final String NON_STYX_2 = "non-styx-2";
   private static final String NA_DANGLING_1 = "na-dangling-1";
@@ -131,12 +129,11 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
     var oldIdInAnnotationDangling = executions(this::oldIdInAnnotationDanglingExecution, OA_DANGLING_1, OA_DANGLING_2);
     var running = executions(this::runningExecution, RUNNING_1, RUNNING_2);
     var nonStyx = executions(this::runningNonStyxExecution, NON_STYX_1, NON_STYX_2);
-    var nonRunning = executions(this::nonRunningExecutions, NON_RUNNING_1, NON_RUNNING_2);
 
     time.setOffset(BACK_ENOUGH_TO_MAKE_EXECUTIONS_YOUNG);
     var nonActiveYoungDangling = executions(this::nonActiveDanglingExecution, NA_DANGLING_YOUNG_1, NA_DANGLING_YOUNG_2);
     stubListExecutions(nonActiveYoungDangling, nonActiveDangling, noIdInStateDangling, noIdInAnnotationDangling,
-        oldIdInAnnotationDangling, running, nonStyx, nonRunning);
+        oldIdInAnnotationDangling, running, nonStyx);
 
     time.reset();
   }
@@ -155,8 +152,8 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
     var filters = filterCatcher.getValue().split("\\+");
     assertThat(filters, arrayContainingInAnyOrder(
         equalTo("value_in(phase,RUNNING)"),
-        startsWith("gte(started_at,"),
-        startsWith("lte(started_at,"))
+        startsWith("gte(execution_created_at,"),
+        startsWith("lte(execution_created_at,"))
     );
   }
 
@@ -214,14 +211,6 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
 
     verifyTerminateExecution(never(), NON_STYX_1);
     verifyTerminateExecution(never(), NON_STYX_2);
-  }
-
-  @Test
-  public void shouldNotTerminateFlyteExecutionsInTerminalPhase() {
-    runner.terminateDanglingFlyteExecutions();
-
-    verifyTerminateExecution(never(), NON_RUNNING_1);
-    verifyTerminateExecution(never(), NON_RUNNING_2);
   }
 
   @Test
