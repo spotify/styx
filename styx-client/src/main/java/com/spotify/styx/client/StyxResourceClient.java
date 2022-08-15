@@ -37,7 +37,9 @@ interface StyxResourceClient extends AutoCloseable {
    * @return The created {@link Resource}
    */
   CompletionStage<Resource> resourceCreate(String resourceId,
-                                           int concurrency);
+                                           int concurrency,
+                                           String requestsMemory, Double requestsCpu,
+                                           String limitsMemory, Double limitsCpu);
 
   /**
    * Edit an existing {@link Resource}
@@ -47,7 +49,9 @@ interface StyxResourceClient extends AutoCloseable {
    * @return The updated{@link Resource}
    */
   CompletionStage<Resource> resourceEdit(String resourceId,
-                                         int concurrency);
+                                         int concurrency,
+                                         String requestsMemory, Double requestsCpu,
+                                         String limitsMemory, Double limitsCpu);
 
   /**
    * Get an existing {@link Resource}

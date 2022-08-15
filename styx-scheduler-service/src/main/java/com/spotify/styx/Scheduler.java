@@ -38,6 +38,10 @@ import com.google.common.util.concurrent.AtomicLongMap;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.futures.CompletableFutures;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResource;
+import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -168,10 +172,14 @@ public class Scheduler {
       return;
     }
 
+    final LimitsResource limitsResource = new LimitsResourceBuilder().memory("1Gi").cpu(1D).build();
+    final RequestsResource requestsResource = new RequestsResourceBuilder().memory("1Gi").cpu(1D).build();
+
     globalConcurrency.ifPresent(
         concurrency ->
             resources.put(GLOBAL_RESOURCE_ID,
-                Resource.create(GLOBAL_RESOURCE_ID, concurrency)));
+                Resource.create(GLOBAL_RESOURCE_ID, concurrency,
+                    requestsResource, limitsResource))); // FIXME
 
     var activeInstances = stateManager.listActiveInstances();
     var workflows = new ConcurrentHashMap<WorkflowId, Optional<Workflow>>();

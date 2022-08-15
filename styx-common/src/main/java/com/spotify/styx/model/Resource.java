@@ -36,10 +36,18 @@ public abstract class Resource {
   @JsonProperty
   public abstract long concurrency();
 
+  @JsonProperty
+  public abstract RequestsResource requests();
+
+  @JsonProperty
+  public abstract LimitsResource limits();
+
   @JsonCreator
   public static Resource create(
       @JsonProperty("id") String id,
-      @JsonProperty("concurrency") long concurrency) {
-    return new AutoValue_Resource(id, concurrency);
+      @JsonProperty("concurrency") long concurrency,
+      @JsonProperty("requests") RequestsResource requests,
+      @JsonProperty("limits") LimitsResource limits) {
+    return new AutoValue_Resource(id, concurrency, requests, limits);
   }
 }
