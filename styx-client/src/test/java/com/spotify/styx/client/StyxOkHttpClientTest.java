@@ -54,10 +54,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
@@ -146,14 +142,6 @@ public class StyxOkHttpClientTest {
       .addPathSegment("api").addPathSegment(STYX_API_VERSION).build();
 
   private static final String CLIENT_HOST = API_URL.scheme() + "://" + API_URL.host() ;
-
-  private static final RequestsResource REQUESTS_RESOURCE = new RequestsResourceBuilder()
-      .memory("1Gi")
-      .cpu(1D).build();
-
-  private static final LimitsResource LIMITS_RESOURCE = new LimitsResourceBuilder()
-      .memory("1Gi")
-      .cpu(1D).build();
 
   @Mock FutureOkHttpClient client;
   @Mock GoogleIdTokenAuth auth;
@@ -312,7 +300,7 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldGetResource() throws Exception {
-    final Resource resource = Resource.create("resource", 3, REQUESTS_RESOURCE, LIMITS_RESOURCE);
+    final Resource resource = Resource.create("resource", 3);
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, resource)));
     final CompletableFuture<Resource> r =
@@ -328,7 +316,7 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldEditResource() throws Exception {
-    final Resource resource = Resource.create("resource", 3, REQUESTS_RESOURCE, LIMITS_RESOURCE);
+    final Resource resource = Resource.create("resource", 3);
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, resource)));
     final CompletableFuture<Resource> r =
@@ -346,7 +334,7 @@ public class StyxOkHttpClientTest {
 
   @Test
   public void shouldCreateResource() throws Exception {
-    final Resource resource = Resource.create("resource", 3, REQUESTS_RESOURCE, LIMITS_RESOURCE);
+    final Resource resource = Resource.create("resource", 3);
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK,
                                                                resource)));
