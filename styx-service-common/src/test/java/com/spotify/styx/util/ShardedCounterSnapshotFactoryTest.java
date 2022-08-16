@@ -27,11 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.DatastoreEmulator;
@@ -73,10 +68,8 @@ public class ShardedCounterSnapshotFactoryTest {
 
   @Before
   public void setUp() throws IOException {
-    final RequestsResource requests = new RequestsResourceBuilder().memory("1Gi").cpu(1D).build();
-    final LimitsResource limits = new LimitsResourceBuilder().memory("2Gi").cpu(2D).build();
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
-    storage.storeResource(Resource.create(RESOURCE_ID, 10L, requests, limits));
+    storage.storeResource(Resource.create(RESOURCE_ID, 10L));
   }
 
   @After

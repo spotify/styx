@@ -52,10 +52,6 @@ import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.storage.AggregateStorage;
@@ -109,12 +105,10 @@ public class ShardedCounterTest {
 
   @Before
   public void setUp() throws IOException {
-    final RequestsResource requests = new RequestsResourceBuilder().memory("1Gi").cpu(1D).build();
-    final LimitsResource limits = new LimitsResourceBuilder().memory("2Gi").cpu(2D).build();
     counterSnapshotFactory = spy(new ShardedCounterSnapshotFactory(storage));
     shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
-    storage.storeResource(Resource.create(COUNTER_ID1, 10L, requests, limits));
-    storage.storeResource(Resource.create(COUNTER_ID2, 10L, requests, limits));
+    storage.storeResource(Resource.create(COUNTER_ID1, 10L));
+    storage.storeResource(Resource.create(COUNTER_ID2, 10L));
   }
 
   @After

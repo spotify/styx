@@ -28,6 +28,8 @@ import com.spotify.styx.docker.DockerRunner.RunSpec;
 import com.spotify.styx.docker.InvalidExecutionException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.RequestsResource;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
@@ -58,8 +60,7 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
   public void safeTransitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
-        // TODO pass actual values, but how to get them???:
-        final var runSpec = createRunSpec(state, "1Gi", "2Gi");
+        final var runSpec = createRunSpec(state);
 
         final String runnerId;
         try {
@@ -101,7 +102,7 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  private RunSpec createRunSpec(RunState state, String memoryRequest, String memoryLimit) {
+  private RunSpec createRunSpec(RunState state) {
     final var executionDescription = state.data().executionDescription().orElseThrow();
     final var executionId = state.data().executionId().orElseThrow();
     final var dockerImage = executionDescription.dockerImage().orElseThrow();
@@ -116,9 +117,12 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
         .serviceAccount(executionDescription.serviceAccount())
         .trigger(state.data().trigger())
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
+        .memRequest(state.data().executionDescription().flatMap(ExecutionDescription::requests)
+            .flatMap(RequestsResource::memory))
+        .memLimit(state.data().executionDescription().flatMap(ExecutionDescription::limits)
+            .flatMap(LimitsResource::memory))
+        // TODO add cpu???
         .env(executionDescription.env())
-        .memRequest(Optional.ofNullable(memoryRequest))
-        .memLimit(Optional.ofNullable(memoryLimit))
         .build();
   }
 }

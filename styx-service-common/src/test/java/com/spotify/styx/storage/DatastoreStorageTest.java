@@ -86,10 +86,6 @@ import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.StyxConfig;
 import com.spotify.styx.model.TriggerParameters;
@@ -152,15 +148,8 @@ public class DatastoreStorageTest {
   private static final WorkflowInstance WORKFLOW_INSTANCE2 = WorkflowInstance.create(WORKFLOW_ID2, "2016-09-01");
   private static final WorkflowInstance WORKFLOW_INSTANCE3 = WorkflowInstance.create(WORKFLOW_ID3, "2016-09-01");
 
-  private static final RequestsResource REQUESTS_RESOURCE = new RequestsResourceBuilder()
-      .memory("1Gi").cpu(1D).build();
-  private static final LimitsResource LIMITS_RESOURCE = new LimitsResourceBuilder()
-      .memory("2Gi").cpu(2D).build();
-
-  private static final Resource RESOURCE1 = Resource.create("resource1", 1L,
-      REQUESTS_RESOURCE, LIMITS_RESOURCE);
-  private static final Resource RESOURCE2 = Resource.create("resource2", 2L,
-      REQUESTS_RESOURCE, LIMITS_RESOURCE);
+  private static final Resource RESOURCE1 = Resource.create("resource1", 1L);
+  private static final Resource RESOURCE2 = Resource.create("resource2", 2L);
 
   private static final Instant currentTime = Instant.parse("2019-01-01T00:00:00Z");
 
