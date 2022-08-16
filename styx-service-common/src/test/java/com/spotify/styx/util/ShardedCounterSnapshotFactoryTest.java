@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.DatastoreEmulator;

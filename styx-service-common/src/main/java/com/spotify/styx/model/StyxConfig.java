@@ -53,11 +53,6 @@ public interface StyxConfig {
   Optional<Long> globalConcurrency();
 
   /**
-   * Get the requests memory
-   */
-  Optional<String> requestsMemory();
-
-  /**
    * Get the per-second submission rate limit for Styx.
    */
   Optional<Double> submissionRateLimit();
