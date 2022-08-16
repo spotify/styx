@@ -48,6 +48,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResource;
+import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.SequenceEvent;
 import com.spotify.styx.model.TriggerParameters;
@@ -108,6 +112,10 @@ public class PersistentStateManagerTest {
   private static final RunState INSTANCE_QUEUED_STATE =
       INSTANCE_NEW_STATE.transition(Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), () -> NOW);
 
+  private static final RequestsResource REQUESTS_RESOURCE = new RequestsResourceBuilder()
+      .memory("1Gi").cpu(1D).build();
+  private static final LimitsResource LIMITS_RESOURCE = new LimitsResourceBuilder()
+      .memory("2Gi").cpu(2D).build();
 
   private final ExecutorService executor = Executors.newWorkStealingPool();
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
@@ -636,7 +644,8 @@ public class PersistentStateManagerTest {
     doThrow(new CounterCapacityException("foo"))
         .when(transaction).updateCounter(shardedCounter, "resource1", 1);
 
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
+    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1,
+        REQUESTS_RESOURCE, LIMITS_RESOURCE));
     final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
     final Event dequeueEvent = Event.dequeue(INSTANCE, ImmutableSet.copyOf(resourceIds));
     final Event infoEvent = Event.info(INSTANCE,
@@ -656,7 +665,8 @@ public class PersistentStateManagerTest {
 
   @Test
   public void shouldFailToUpdateResourceCountersOnDequeueDueToCapacityAndNoInfoEventSent() throws Exception {
-    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1));
+    final Set<Resource> resources = ImmutableSet.of(Resource.create("resource1", 1,
+        REQUESTS_RESOURCE, LIMITS_RESOURCE));
     final List<String> resourceIds = resources.stream().map(Resource::id).sorted().collect(toList());
     final Message message = Message.info(String.format("Resource limit reached for: %s", resourceIds));
     final RunState runState = RunState.create(INSTANCE, State.QUEUED,

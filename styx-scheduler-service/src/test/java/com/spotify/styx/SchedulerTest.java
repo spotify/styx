@@ -49,6 +49,10 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
 import com.spotify.styx.Scheduler.Shuffler;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResource;
+import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -162,8 +166,11 @@ public class SchedulerTest {
   }
 
   private void setResourceLimit(String resourceId, long limit) {
+    final RequestsResource requests = new RequestsResourceBuilder().memory("1Gi").cpu(1D).build();
+    final LimitsResource limits = new LimitsResourceBuilder().memory("2Gi").cpu(2D).build();
+
     resourceLimits.removeIf(r -> r.id().equals(resourceId));
-    resourceLimits.add(Resource.create(resourceId, limit));
+    resourceLimits.add(Resource.create(resourceId, limit, requests, limits));
   }
 
   private void initWorkflow(Workflow workflow) {
