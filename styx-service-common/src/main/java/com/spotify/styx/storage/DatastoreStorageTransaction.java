@@ -24,15 +24,11 @@ import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_ALL_TRIGGERED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_COMPONENT;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CONCURRENCY;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CPU_LIMITS;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CPU_REQUESTS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_CREATED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_DESCRIPTION;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_END;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_HALTED;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_LAST_MODIFIED;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_MEMORY_LIMITS;
-import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_MEMORY_REQUESTS;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_NEXT_TRIGGER;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_REVERSE;
 import static com.spotify.styx.storage.DatastoreStorage.PROPERTY_SCHEDULE;
@@ -131,10 +127,6 @@ public class DatastoreStorageTransaction implements StorageTransaction {
     final Key key = datastore.newKeyFactory().setKind(KIND_COUNTER_LIMIT).newKey(resource.id());
     return Entity.newBuilder(key)
         .set(PROPERTY_LIMIT, resource.concurrency())
-        .set(PROPERTY_MEMORY_REQUESTS, resource.requests().memory().orElse("")) // FIXME
-        .set(PROPERTY_CPU_REQUESTS, resource.requests().cpu().orElse(0D)) // FIXME
-        .set(PROPERTY_MEMORY_LIMITS, resource.limits().memory().orElse("")) // FIXME
-        .set(PROPERTY_CPU_LIMITS, resource.limits().cpu().orElse(0D)) // FIXME
         .build();
   }
 

@@ -32,6 +32,7 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +58,8 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
   public void safeTransitionInto(RunState state, EventRouter eventRouter) {
     switch (state.state()) {
       case SUBMITTING:
-        final var runSpec = createRunSpec(state);
+        // TODO pass actual values, but how to get them???:
+        final var runSpec = createRunSpec(state, "1Gi", "2Gi");
 
         final String runnerId;
         try {
@@ -99,7 +101,7 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
     }
   }
 
-  private RunSpec createRunSpec(RunState state) {
+  private RunSpec createRunSpec(RunState state, String memoryRequest, String memoryLimit) {
     final var executionDescription = state.data().executionDescription().orElseThrow();
     final var executionId = state.data().executionId().orElseThrow();
     final var dockerImage = executionDescription.dockerImage().orElseThrow();
@@ -115,6 +117,8 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
         .trigger(state.data().trigger())
         .commitSha(state.data().executionDescription().flatMap(ExecutionDescription::commitSha))
         .env(executionDescription.env())
+        .memRequest(Optional.ofNullable(memoryRequest))
+        .memLimit(Optional.ofNullable(memoryLimit))
         .build();
   }
 }

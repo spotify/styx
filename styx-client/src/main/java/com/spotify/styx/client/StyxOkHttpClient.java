@@ -39,10 +39,6 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.TriggerRequest;
@@ -305,12 +301,7 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Resource> resourceCreate(String resourceId, int concurrency,
                                                   String requestsMemory, Double requestsCpu,
                                                   String limitsMemory, Double limitsCpu) {
-    final RequestsResource requestsResource = new RequestsResourceBuilder()
-        .memory(requestsMemory).cpu(requestsCpu).build();
-    final LimitsResource limitsResource = new LimitsResourceBuilder()
-        .memory(limitsMemory).cpu(limitsCpu).build();
-
-    final Resource resource = Resource.create(resourceId, concurrency, requestsResource, limitsResource);
+    final Resource resource = Resource.create(resourceId, concurrency);
     return execute(forUri(urlBuilder("resources"), "POST", resource),
                    Resource.class);
   }
@@ -319,12 +310,7 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Resource> resourceEdit(String resourceId, int concurrency,
                                                 String requestsMemory, Double requestsCpu,
                                                 String limitsMemory, Double limitsCpu) {
-    final RequestsResource requestsResource = new RequestsResourceBuilder()
-        .memory(requestsMemory).cpu(requestsCpu).build();
-    final LimitsResource limitsResource = new LimitsResourceBuilder()
-        .memory(limitsMemory).cpu(limitsCpu).build();
-
-    final Resource resource = Resource.create(resourceId, concurrency, requestsResource, limitsResource);
+    final Resource resource = Resource.create(resourceId, concurrency);
     return execute(forUri(urlBuilder("resources", resourceId), "PUT", resource),
                    Resource.class);
   }

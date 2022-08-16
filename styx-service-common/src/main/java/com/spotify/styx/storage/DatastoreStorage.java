@@ -65,10 +65,6 @@ import com.google.common.io.Closer;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
-import com.spotify.styx.model.LimitsResource;
-import com.spotify.styx.model.LimitsResourceBuilder;
-import com.spotify.styx.model.RequestsResource;
-import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.StyxConfig;
@@ -174,11 +170,6 @@ public class DatastoreStorage implements Closeable {
   private static final String PROPERTY_STATE_EXECUTION_DESCRIPTION = "executionDescription";
   private static final String PROPERTY_STATE_RESOURCE_IDS = "resourceIds";
   private static final String PROPERTY_STATE_TRIGGER_PARAMETERS = "triggerParameters";
-
-  public static final String PROPERTY_MEMORY_LIMITS = "memoryLimits";
-  public static final String PROPERTY_CPU_LIMITS = "cpuLimits";
-  public static final String PROPERTY_MEMORY_REQUESTS = "memoryRequests";
-  public static final String PROPERTY_CPU_REQUESTS = "cpuRequests";
 
   private static final String KEY_GLOBAL_CONFIG = "styxGlobal";
 
@@ -809,18 +800,7 @@ public class DatastoreStorage implements Closeable {
   }
 
   private Resource entityToResource(Entity entity) {
-    final RequestsResource requestsResource = new RequestsResourceBuilder()
-        .cpu(entity.getDouble(PROPERTY_CPU_REQUESTS))
-        .memory(entity.getString(PROPERTY_MEMORY_REQUESTS))
-        .build();
-
-    final LimitsResource limitsResource = new LimitsResourceBuilder()
-        .cpu(entity.getDouble(PROPERTY_CPU_LIMITS))
-        .memory(entity.getString(PROPERTY_MEMORY_LIMITS))
-        .build();
-
-    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_LIMIT),
-        requestsResource, limitsResource);
+    return Resource.create(entity.getKey().getName(), entity.getLong(PROPERTY_LIMIT));
   }
 
   Optional<Backfill> getBackfill(String id) throws IOException {
