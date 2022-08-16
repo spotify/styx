@@ -293,7 +293,9 @@ class KubernetesDockerRunner implements DockerRunner {
 
     final ResourceRequirementsBuilder resourceRequirements = new ResourceRequirementsBuilder();
     runSpec.memRequest().ifPresent(s -> resourceRequirements.addToRequests("memory", new Quantity(s)));
+    runSpec.cpuRequest().ifPresent(s -> resourceRequirements.addToRequests("cpu", new Quantity(s)));
     runSpec.memLimit().ifPresent(s -> resourceRequirements.addToLimits("memory", new Quantity(s)));
+    runSpec.cpuLimit().ifPresent(s -> resourceRequirements.addToLimits("cpu", new Quantity(s)));
 
     final ContainerBuilder mainContainerBuilder = new ContainerBuilder()
         .withName(MAIN_CONTAINER_NAME)

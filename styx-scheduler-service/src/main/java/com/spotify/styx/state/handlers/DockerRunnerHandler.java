@@ -34,7 +34,6 @@ import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.util.IsClosedException;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +120,10 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
             .flatMap(RequestsResource::memory))
         .memLimit(state.data().executionDescription().flatMap(ExecutionDescription::limits)
             .flatMap(LimitsResource::memory))
-        // TODO add cpu???
+        .cpuRequest(state.data().executionDescription().flatMap(ExecutionDescription::requests)
+            .flatMap(RequestsResource::cpu))
+        .cpuLimit(state.data().executionDescription().flatMap(ExecutionDescription::limits)
+            .flatMap(LimitsResource::cpu))
         .env(executionDescription.env())
         .build();
   }

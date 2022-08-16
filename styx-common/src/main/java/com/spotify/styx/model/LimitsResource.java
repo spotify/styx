@@ -28,7 +28,7 @@ public interface LimitsResource {
 
   Optional<String> memory();
 
-  Optional<Double> cpu();
+  Optional<String> cpu();
 
   static LimitsResourceBuilder builder() {
     return new LimitsResourceBuilder();

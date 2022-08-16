@@ -28,7 +28,7 @@ public interface RequestsResource {
 
   Optional<String> memory();
 
-  Optional<Double> cpu();
+  Optional<String> cpu();
 
   static RequestsResourceBuilder builder() {
     return new RequestsResourceBuilder();
