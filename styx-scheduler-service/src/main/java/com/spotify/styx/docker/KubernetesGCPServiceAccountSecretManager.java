@@ -120,7 +120,7 @@ class KubernetesGCPServiceAccountSecretManager {
         throw new InvalidExecutionException(String.format(
             "Permission denied when creating keys for service account: %s. Styx needs to be Service Account Key Admin.",
             serviceAccount));
-      } else if (GcpUtil.isResourceExhausted(cause)) {
+      } else if (GcpUtil.isResourceExhausted(cause) || GcpUtil.isFailedPrecondition(cause)) {
         throw new InvalidExecutionException(String.format(
             "Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
             serviceAccount));
