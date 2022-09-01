@@ -20,16 +20,16 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.TOO_MANY_REQUESTS;
+
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import java.util.Optional;
 import java.util.function.Predicate;
 
 public class GcpUtil {
-
-  private static final int BAD_REQUEST = 400;
-  private static final int FORBIDDEN = 403;
-  private static final int TOO_MANY_REQUEST_CODE = 429;
 
   private GcpUtil() {
     throw new UnsupportedOperationException();
@@ -41,7 +41,7 @@ public class GcpUtil {
   }
 
   public static boolean isPermissionDenied(GoogleJsonResponseException e) {
-    return matchesCodeAndError(e,  FORBIDDEN, GcpUtil::isPermissionDenied);
+    return matchesCodeAndError(e, FORBIDDEN.code(), GcpUtil::isPermissionDenied);
   }
 
   public static boolean isPermissionDenied(GoogleJsonError error) {
@@ -54,7 +54,7 @@ public class GcpUtil {
   }
 
   public static boolean isResourceExhausted(GoogleJsonResponseException e) {
-    return matchesCodeAndError(e, TOO_MANY_REQUEST_CODE,
+    return matchesCodeAndError(e, TOO_MANY_REQUESTS.code(),
         error -> matchesStatus(error, "RESOURCE_EXHAUSTED"));
   }
 
@@ -68,7 +68,7 @@ public class GcpUtil {
   }
 
   public static boolean isFailedPrecondition(GoogleJsonResponseException e) {
-    return matchesCodeAndError(e, BAD_REQUEST, GcpUtil::isFailedPrecondition);
+    return matchesCodeAndError(e, BAD_REQUEST.code(), GcpUtil::isFailedPrecondition);
   }
 
   public static boolean isFailedPrecondition(GoogleJsonError error) {
