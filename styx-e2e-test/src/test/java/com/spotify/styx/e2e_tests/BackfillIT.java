@@ -84,7 +84,7 @@ public class BackfillIT extends EndToEndTestBase {
         "backfill", "create", component1, workflowId1, start.toString(), end.toString(), "2");
 
     // Wait for backfill to successfully complete
-    await().atMost(5, MINUTES).until(() -> {
+    await().atMost(10, MINUTES).until(() -> {
       var backfillPayload = cliJson(BackfillPayload.class, "backfill", "show", backfill.id());
       if (!backfillPayload.backfill().allTriggered()) {
         return false;
