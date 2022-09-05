@@ -20,9 +20,14 @@
 
 package com.spotify.styx.util;
 
+import static com.spotify.apollo.Status.BAD_REQUEST;
+import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.TOO_MANY_REQUESTS;
+
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 public class GcpUtil {
 
@@ -36,13 +41,11 @@ public class GcpUtil {
   }
 
   public static boolean isPermissionDenied(GoogleJsonResponseException e) {
-    return e.getStatusCode() == 403 && Optional.ofNullable(e.getDetails())
-        .map(GcpUtil::isPermissionDenied)
-        .orElse(false);
+    return matchesCodeAndError(e, FORBIDDEN.code(), GcpUtil::isPermissionDenied);
   }
 
   public static boolean isPermissionDenied(GoogleJsonError error) {
-    return "PERMISSION_DENIED".equals(error.get("status"));
+    return matchesStatus(error, "PERMISSION_DENIED");
   }
 
   public static boolean isResourceExhausted(Throwable t) {
@@ -51,12 +54,35 @@ public class GcpUtil {
   }
 
   public static boolean isResourceExhausted(GoogleJsonResponseException e) {
-    return e.getStatusCode() == 429 && Optional.ofNullable(e.getDetails())
-        .map(GcpUtil::isResourceExhausted)
-        .orElse(false);
+    return matchesCodeAndError(e, TOO_MANY_REQUESTS.code(),
+        error -> matchesStatus(error, "RESOURCE_EXHAUSTED"));
   }
 
-  public static boolean isResourceExhausted(GoogleJsonError error) {
-    return "RESOURCE_EXHAUSTED".equals(error.get("status"));
+  public static boolean isResourceExhausted(GoogleJsonError e) {
+    return matchesStatus(e, "RESOURCE_EXHAUSTED");
+  }
+
+  public static boolean isFailedPrecondition(Throwable t) {
+    return t instanceof GoogleJsonResponseException
+        && isFailedPrecondition((GoogleJsonResponseException) t);
+  }
+
+  public static boolean isFailedPrecondition(GoogleJsonResponseException e) {
+    return matchesCodeAndError(e, BAD_REQUEST.code(), GcpUtil::isFailedPrecondition);
+  }
+
+  public static boolean isFailedPrecondition(GoogleJsonError error) {
+    return matchesStatus(error, "FAILED_PRECONDITION");
+  }
+
+  private static boolean matchesStatus(GoogleJsonError error, String status) {
+    return status.equals(error.get("status"));
+  }
+
+  private static boolean matchesCodeAndError(GoogleJsonResponseException e, int code,
+      Predicate<GoogleJsonError> errMatcher) {
+    return e.getStatusCode() == code && Optional.ofNullable(e.getDetails())
+        .map(errMatcher::test)
+        .orElse(false);
   }
 }

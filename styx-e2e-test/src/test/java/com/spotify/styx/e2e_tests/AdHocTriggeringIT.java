@@ -79,7 +79,7 @@ public class AdHocTriggeringIT extends EndToEndTestBase {
     assertThat(triggerResult, is("Triggered! Use `styx ls -c " + component1 + "` to check active workflow instances."));
 
     // Wait for instance to successfully complete
-    await().atMost(5, MINUTES).until(() -> {
+    await().atMost(10, MINUTES).until(() -> {
       var events = cliJson(new TypeReference<List<EventInfo>>() {}, "e", component1, workflowId1, instance);
       return events.stream().anyMatch(event -> event.name().equals("success"));
     });

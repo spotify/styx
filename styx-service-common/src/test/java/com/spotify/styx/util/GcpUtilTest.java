@@ -20,8 +20,8 @@
 
 package com.spotify.styx.util;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -36,6 +36,9 @@ public class GcpUtilTest {
 
   private static final GoogleJsonError RESOURCE_EXHAUSTED_ERROR = new GoogleJsonError()
       .set("status", "RESOURCE_EXHAUSTED");
+
+  private static final GoogleJsonError FAILED_PRECONDITION_ERROR = new GoogleJsonError()
+      .set("status", "FAILED_PRECONDITION");
 
   @Test
   public void responseIsPermissionDenied() {
@@ -71,6 +74,13 @@ public class GcpUtilTest {
   }
 
   @Test
+  public void responseIsFailedPrecondition() {
+    final Throwable failedPrecondition = new GoogleJsonResponseException(
+        new HttpResponseException.Builder(400, "Precondition check failed", new HttpHeaders()), FAILED_PRECONDITION_ERROR);
+    assertThat(GcpUtil.isFailedPrecondition(failedPrecondition), is(true));
+  }
+
+  @Test
   public void notFoundResponseIsNotPResourceExhausted() {
     assertThat(GcpUtil.isResourceExhausted(new GoogleJsonResponseException(
         new HttpResponseException.Builder(404, "Not Found", new HttpHeaders()), new GoogleJsonError())), is(false));
@@ -81,6 +91,11 @@ public class GcpUtilTest {
   @Test
   public void errorIsResourceExhausted() {
     assertThat(GcpUtil.isResourceExhausted(RESOURCE_EXHAUSTED_ERROR), is(true));
+  }
+
+  @Test
+  public void errorIsFailedPrecondition() {
+    assertThat(GcpUtil.isFailedPrecondition(FAILED_PRECONDITION_ERROR), is(true));
   }
 
   @Test
