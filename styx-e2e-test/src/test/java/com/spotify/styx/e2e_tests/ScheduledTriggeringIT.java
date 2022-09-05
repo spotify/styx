@@ -87,7 +87,7 @@ public class ScheduledTriggeringIT extends EndToEndTestBase {
     log.info("Expected instance: {}", instance);
 
     // Wait for expected instance to successfully complete
-    await().atMost(5, MINUTES).until(() -> {
+    await().atMost(10, MINUTES).until(() -> {
       var events = cliJson(new TypeReference<List<EventInfo>>() {}, "e", component1, workflowId1, instance);
       return events.stream().anyMatch(event -> event.name().equals("success"));
     });

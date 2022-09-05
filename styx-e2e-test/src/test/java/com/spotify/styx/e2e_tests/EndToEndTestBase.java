@@ -20,13 +20,6 @@
 
 package com.spotify.styx.e2e_tests;
 
-import static com.spotify.styx.e2e_tests.DatastoreUtil.deleteDatastoreNamespace;
-import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
-import static java.lang.ProcessBuilder.Redirect.INHERIT;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toList;
-import static org.awaitility.Awaitility.await;
-
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JavaType;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -54,6 +47,15 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import io.norberg.automatter.AutoMatter;
+import javaslang.control.Try;
+import org.awaitility.Awaitility;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -70,14 +72,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import javaslang.control.Try;
-import org.awaitility.Awaitility;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static com.spotify.styx.e2e_tests.DatastoreUtil.deleteDatastoreNamespace;
+import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
+import static java.lang.ProcessBuilder.Redirect.INHERIT;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
+import static org.awaitility.Awaitility.await;
 
 public class EndToEndTestBase {
 
@@ -195,7 +197,7 @@ public class EndToEndTestBase {
       return null;
     });
 
-    await().atMost(300, SECONDS)
+    await().atMost(10, MINUTES)
         .until(() -> {
           if (styxSchedulerThread.isDone()) {
             styxSchedulerThread.get();
