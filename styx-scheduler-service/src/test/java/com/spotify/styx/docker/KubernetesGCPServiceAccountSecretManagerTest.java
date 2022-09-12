@@ -413,12 +413,29 @@ public class KubernetesGCPServiceAccountSecretManagerTest {
   }
 
   @Test
-  public void shouldHandleTooManyKeysCreated() throws IOException {
+  public void shouldHandleTooManyKeysCreatedFromResourceExhausted() throws IOException {
     when(serviceAccountKeyManager.serviceAccountExists(anyString())).thenReturn(true);
 
     final GoogleJsonResponseException resourceExhausted = new GoogleJsonResponseException(
         new HttpResponseException.Builder(429, "RESOURCE_EXHAUSTED", new HttpHeaders()),
         new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
+
+    doThrow(resourceExhausted).when(serviceAccountKeyManager).createJsonKey(any());
+    doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
+
+    assertThrows("Maximum number of keys on service account reached: %s. Styx requires 4 keys to operate.",
+        InvalidExecutionException.class,
+        () -> sut.ensureServiceAccountKeySecret(WORKFLOW_ID.toString(),
+            SERVICE_ACCOUNT));
+  }
+
+  @Test
+  public void shouldHandleTooManyKeysCreatedFromFailedPrecondition() throws IOException {
+    when(serviceAccountKeyManager.serviceAccountExists(anyString())).thenReturn(true);
+
+    final GoogleJsonResponseException resourceExhausted = new GoogleJsonResponseException(
+        new HttpResponseException.Builder(400, "Precondition check failed", new HttpHeaders()),
+        new GoogleJsonError().set("status", "FAILED_PRECONDITION"));
 
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createJsonKey(any());
     doThrow(resourceExhausted).when(serviceAccountKeyManager).createP12Key(any());
