@@ -832,19 +832,23 @@ public final class CliMain {
     final Argument resourceCreateRequestsMemory =
         resourceCreate.addArgument("requestsMemory")
             .help("The requests memory for this resource")
-            .type(String.class);
+            .type(String.class)
+            .required(false);
     final Argument resourceCreateRequestsCpu =
         resourceCreate.addArgument("requestsCpu")
             .help("The requests cpu for this resource")
-            .type(Double.class);
+            .type(Double.class)
+            .required(false);
     final Argument resourceCreateLimitsMemory =
         resourceCreate.addArgument("limitsMemory")
             .help("The limits memory for this resource")
-            .type(String.class);
+            .type(String.class)
+            .required(false);
     final Argument resourceCreateLimitsCpu =
         resourceCreate.addArgument("limitsCpu")
             .help("The limits cpu for this resource")
-            .type(Double.class);
+            .type(Double.class)
+            .required(false);
 
     final Subparsers workflowParser =
         Command.WORKFLOW.parser(subCommands, cliContext)
