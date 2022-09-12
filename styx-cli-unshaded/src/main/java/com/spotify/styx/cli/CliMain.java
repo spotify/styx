@@ -830,22 +830,23 @@ public final class CliMain {
             .help("The concurrency of this resource")
             .type(Integer.class);
     final Argument resourceCreateRequestsMemory =
-        resourceCreate.addArgument("requestsMemory")
+        resourceCreate.addArgument("--requestsMemory")
             .help("The requests memory for this resource")
             .type(String.class)
-            .required(false);
+            .required(false)/*
+            .setDefault(Optional.of("1Gi"))*/;
     final Argument resourceCreateRequestsCpu =
-        resourceCreate.addArgument("requestsCpu")
+        resourceCreate.addArgument("--requestsCpu")
             .help("The requests cpu for this resource")
             .type(Double.class)
             .required(false);
     final Argument resourceCreateLimitsMemory =
-        resourceCreate.addArgument("limitsMemory")
+        resourceCreate.addArgument("--limitsMemory")
             .help("The limits memory for this resource")
             .type(String.class)
             .required(false);
     final Argument resourceCreateLimitsCpu =
-        resourceCreate.addArgument("limitsCpu")
+        resourceCreate.addArgument("--limitsCpu")
             .help("The limits cpu for this resource")
             .type(Double.class)
             .required(false);
