@@ -1033,6 +1033,22 @@ public class CliMainTest {
   }
 
   @Test
+  public void testCreateResourceWithMemoryAndCPU() {
+    final String resourceId = "test-comp-id";
+    final int concurrency = 2;
+
+    when(client.resourceCreate(resourceId, concurrency, "1Gi", 1D, "2Gi", 2D))
+        .thenReturn(CompletableFuture.completedFuture(Resource.create(resourceId, concurrency)));
+
+    CliMain.run(cliContext, "resource", "create", resourceId, Integer.toString(concurrency),
+        "--requestsMemory", "1Gi",
+        "--requestsCpu", "1",
+        "--limitsMemory", "2Gi",
+        "--limitsCpu", "2");
+    verify(client).resourceCreate(resourceId, concurrency, "1Gi", 1D, "2Gi", 2D);
+  }
+
+  @Test
   @Parameters({
       "--host https://foo.bar workflow ls",
       "workflow --host https://foo.bar ls",
