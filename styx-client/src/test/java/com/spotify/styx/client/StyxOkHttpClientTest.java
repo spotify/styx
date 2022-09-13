@@ -54,6 +54,8 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
@@ -109,6 +111,8 @@ public class StyxOkHttpClientTest {
       .dockerImage("busybox")
       .dockerArgs(Arrays.asList("echo", "hello world"))
       .schedule(Schedule.DAYS)
+      .limits(new LimitsResourceBuilder().cpu("1").memory("1Gi").build())
+      .requests(new RequestsResourceBuilder().cpu("1").memory("1Gi").build())
       .build();
 
   private static final Workflow WORKFLOW_1 = Workflow.create("f[ ]o-cmp", WORKFLOW_CONFIGURATION_1);
