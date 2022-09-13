@@ -54,7 +54,9 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.LimitsResource;
 import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResource;
 import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
@@ -99,6 +101,9 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class StyxOkHttpClientTest {
 
+  private static final LimitsResource LIMITS_RESOURCE = new LimitsResourceBuilder().cpu("1").memory("1Gi").build();
+  private static final RequestsResource REQUESTS_RESOURCE = new RequestsResourceBuilder().cpu("1").memory("1Gi").build();
+
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_1 = WorkflowConfiguration.builder()
       .id("bar-wf_1")
       .dockerImage("busybox")
@@ -111,8 +116,8 @@ public class StyxOkHttpClientTest {
       .dockerImage("busybox")
       .dockerArgs(Arrays.asList("echo", "hello world"))
       .schedule(Schedule.DAYS)
-      .limits(new LimitsResourceBuilder().cpu("1").memory("1Gi").build())
-      .requests(new RequestsResourceBuilder().cpu("1").memory("1Gi").build())
+      .limits(LIMITS_RESOURCE)
+      .requests(REQUESTS_RESOURCE)
       .build();
 
   private static final Workflow WORKFLOW_1 = Workflow.create("f[ ]o-cmp", WORKFLOW_CONFIGURATION_1);
