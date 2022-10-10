@@ -22,12 +22,11 @@ package com.spotify.styx.state;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -43,7 +42,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.datastore.DatastoreException;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.spotify.styx.model.Event;
@@ -74,11 +72,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
+
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -114,8 +111,6 @@ public class PersistentStateManagerTest {
 
 
   private PersistentStateManager stateManager;
-
-  @Rule public ExpectedException exception = ExpectedException.none();
 
   @Captor private ArgumentCaptor<RunState> runStateCaptor;
 
@@ -306,6 +301,21 @@ public class PersistentStateManagerTest {
   }
 
   @Test
+  public void shouldSkipProcessingEventWhenInactiveWFIds()
+          throws Exception {
+    Optional<RunState> runState = Optional.empty();
+    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
+
+    Event event = Event.halt(INSTANCE);
+    stateManager.receive(event);
+
+    verify(storage, never()).writeEvent(any());
+    verify(transaction, never()).updateCounter(any(), any(), anyInt());
+    verify(transaction, never()).deleteActiveState(any());
+    verify(transaction, never()).updateActiveState(any(), any());
+  }
+
+  @Test
   public void shouldFailTriggerWFIfAlreadyActive() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
@@ -316,54 +326,54 @@ public class PersistentStateManagerTest {
     when(transactionException.isAlreadyExists()).thenReturn(true);
     doThrow(transactionException).when(transaction).writeActiveState(any(), any());
     when(storage.runInTransactionWithRetries(any())).thenAnswer(a ->
-        a.<TransactionFunction>getArgument(0).apply(transaction));
+            a.<TransactionFunction>getArgument(0).apply(transaction));
 
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (AlreadyInitializedException ignore) {
-    }
+    assertThrows(AlreadyInitializedException.class, () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
   }
 
   @Test
   public void shouldFailTriggerIfGetLatestCounterFails() throws Exception {
-    var cause = new IOException();
-    when(storage.getLatestStoredCounter(any())).thenThrow(cause);
-    exception.expectCause(is(cause));
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+    when(storage.getLatestStoredCounter(any())).thenThrow(new IOException());
+
+    assertThrows(RuntimeException.class,
+            () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
   }
 
   @Test
   public void shouldFailTriggerIfWorkflowNotFound() throws Exception {
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.empty());
-    exception.expect(instanceOf(IllegalArgumentException.class));
-    exception.expectMessage("Workflow not found: " + INSTANCE.workflowId().toKey());
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+
+    var thrown = assertThrows(IllegalArgumentException.class,
+            () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
+
+    assertEquals("Workflow not found: " + INSTANCE.workflowId().toKey(),
+            thrown.getMessage());
   }
 
   @Test
   public void shouldFailTriggerOnExceptionFromTransaction() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
-    var cause = new IOException("fail!");
-    when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    exception.expectCause(is(cause));
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+    when(storage.runInTransactionWithRetries(any())).thenThrow(new IOException("fail!"));
+
+    var thrown = assertThrows(RuntimeException.class,
+            ()-> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
+    assertEquals("java.io.IOException: fail!", thrown.getMessage());
   }
 
   @Test
   public void shouldRejectTriggerIfIsClosed() throws Exception {
     stateManager.close();
-    exception.expect(IsClosedException.class);
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+
+    assertThrows(IsClosedException.class, () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
   }
 
   @Test
   public void shouldRejectEventIfClosed() throws Exception {
     stateManager.close();
-    exception.expect(IsClosedException.class);
-    stateManager.receive(Event.timeTrigger(INSTANCE));
+
+    assertThrows(IsClosedException.class, () -> stateManager.receive(Event.timeTrigger(INSTANCE)));
   }
 
   @Test
@@ -385,12 +395,8 @@ public class PersistentStateManagerTest {
     when(transaction.readActiveState(INSTANCE)).thenReturn(
         Optional.of(RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW, 17)));
 
-    try {
-      stateManager.receive(event, 16);
-      fail();
-    } catch (StateTransitionConflictException ignore) {
-    }
-
+    assertThrows(StateTransitionConflictException.class,
+            ()-> stateManager.receive(event, 16));
     verify(storage, never()).writeEvent(any());
   }
 
@@ -401,12 +407,8 @@ public class PersistentStateManagerTest {
         RunState.create(INSTANCE, State.SUBMITTED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-    try {
-      stateManager.receive(event, 18);
-      fail();
-    } catch (RuntimeException e) {
-      assertThat(e.getMessage(), startsWith("Unexpected current counter is less than last observed one for"));
-    }
+    var thrown = assertThrows(RuntimeException.class,
+            ()-> stateManager.receive(event, 18));
 
     verify(storage, never()).writeEvent(any());
   }
@@ -443,25 +445,8 @@ public class PersistentStateManagerTest {
         RunState.create(INSTANCE, State.QUEUED, StateData.zero(), NOW.minusMillis(1), 17));
     when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
 
-
-    try {
-      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
-      fail();
-    } catch (IllegalStateException ignore) {
-    }
-
-    verify(transaction, never()).updateActiveState(any(), any());
-  }
-
-  @Test
-  public void shouldFailReceiveForUnknownActiveWFInstance() throws Exception {
-    when(transaction.readActiveState(INSTANCE)).thenReturn(Optional.empty());
-
-    try {
-      stateManager.receive(Event.terminate(INSTANCE, Optional.empty()));
-      fail();
-    } catch (IllegalArgumentException ignore) {
-    }
+    assertThrows(IllegalStateException.class,
+            ()-> stateManager.receive(Event.terminate(INSTANCE, Optional.empty())));
     verify(transaction, never()).updateActiveState(any(), any());
   }
 
@@ -512,12 +497,9 @@ public class PersistentStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
+
+    var thrown = assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
+    assertEquals(rootCause, thrown);
   }
 
   @Test
@@ -528,12 +510,10 @@ public class PersistentStateManagerTest {
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
-    try {
-      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
+
+    var thrown = assertThrows(Exception.class, () -> stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())));
+
+    assertEquals(rootCause, thrown);
   }
 
   @Test
@@ -554,11 +534,10 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
-    try {
-      stateManager.receive(event, 4711L);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class,
+            () -> stateManager.receive(event, 4711L));
+
     verify(logger).debug(
         "Failed workflow instance transition: {}, counter={}",
         event, 4711L, cause);
@@ -571,11 +550,9 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS));
+
     verify(logger).debug("Transaction conflict when triggering workflow instance. Aborted: {}",
         INSTANCE);
   }
@@ -587,11 +564,10 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class,
+            ()-> stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS));
+
     verify(logger).debug("Transaction failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
   }
@@ -602,11 +578,8 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS));
     verify(logger).debug("Failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
   }
@@ -615,12 +588,10 @@ public class PersistentStateManagerTest {
   public void shouldThrowRuntimeException() throws Exception {
     final IOException exception = new IOException();
     doThrow(exception).when(storage).runInTransactionWithRetries(any());
-    try {
-      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(exception));
-    }
+
+   var thrown = assertThrows(Exception.class,
+            ()-> stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())));
+   assertThat(thrown.getCause(), is(exception));
   }
 
   @Test
@@ -644,12 +615,8 @@ public class PersistentStateManagerTest {
     final PersistentStateManager spied = spy(stateManager);
     doNothing().when(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
 
-    try {
-      spied.receive(dequeueEvent);
-      fail();
-    } catch (Exception e) {
-      // expected exception
-    }
+    assertThrows(Exception.class,
+            ()-> spied.receive(dequeueEvent));
 
     verify(spied).receiveIgnoreClosed(eq(infoEvent), anyLong());
   }
@@ -671,13 +638,8 @@ public class PersistentStateManagerTest {
         resources.stream().map(Resource::id).collect(toSet()));
     final PersistentStateManager spied = spy(stateManager);
 
-    try {
-      spied.receive(dequeueEvent);
-      fail();
-    } catch (Exception e) {
-      // expected exception
-    }
-
+    assertThrows(Exception.class,
+            ()-> spied.receive(dequeueEvent));
     verify(spied, never()).receiveIgnoreClosed(eq(Event.info(INSTANCE, message)), anyLong());
   }
 
@@ -686,15 +648,13 @@ public class PersistentStateManagerTest {
     givenState(INSTANCE, State.QUEUED);
 
     var rootCause = new DatastoreIOException(new DatastoreException(10, "conflict!", "conflict!"));
-
     doThrow(rootCause).when(transaction).updateCounter(shardedCounter, "resource1", 1);
-
     var dequeueEvent = Event.dequeue(INSTANCE, Set.of("resource1"));
 
-    exception.expect(RuntimeException.class);
-    exception.expectCause(is(rootCause));
+    var thrown = assertThrows(RuntimeException.class,
+            () -> stateManager.receive(dequeueEvent));
 
-    stateManager.receive(dequeueEvent);
+    assertEquals(rootCause, thrown.getCause());
   }
 
   @Test
