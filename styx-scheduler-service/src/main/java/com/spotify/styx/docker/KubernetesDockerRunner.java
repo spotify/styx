@@ -223,7 +223,8 @@ class KubernetesDockerRunner implements DockerRunner {
       LOG.info("Creating pod: {}: {}", workflowInstance, pod);
       var createdPod = client.createPod(pod);
       stats.recordSubmission(runSpec.executionId());
-      LOG.info("Created pod: {}: {}", workflowInstance, createdPod);
+      LOG.info("Created pod: {}", workflowInstance);
+      LOG.debug("Pod details: {}", createdPod);
     } catch (KubernetesClientException kce) {
       if (kce.getCode() == 409 && kce.getStatus().getReason().equals("AlreadyExists")) {
         LOG.info("Pod already existed when creating: {}: {}", workflowInstance, runSpec.executionId());

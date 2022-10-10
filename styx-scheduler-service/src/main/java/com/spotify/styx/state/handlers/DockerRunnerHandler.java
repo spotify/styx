@@ -61,7 +61,7 @@ public class DockerRunnerHandler extends AbstractRunnerHandler {
 
         final String runnerId;
         try {
-          LOG.info("running:{}, spec:{}, state:{}", state.workflowInstance(), runSpec, state);
+          LOG.info("running: {}, spec: {}, state: {}", state.workflowInstance(), runSpec, state);
           runnerId = dockerRunner.start(state, runSpec);
         } catch (Throwable e) {
           try {
