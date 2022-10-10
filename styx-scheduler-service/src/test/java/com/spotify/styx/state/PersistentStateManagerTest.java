@@ -24,11 +24,9 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -74,11 +72,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
+
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -368,15 +365,15 @@ public class PersistentStateManagerTest {
   @Test
   public void shouldRejectTriggerIfIsClosed() throws Exception {
     stateManager.close();
-    exception.expect(IsClosedException.class);
-    stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
+
+    assertThrows(IsClosedException.class, () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
   }
 
   @Test
   public void shouldRejectEventIfClosed() throws Exception {
     stateManager.close();
-    exception.expect(IsClosedException.class);
-    stateManager.receive(Event.timeTrigger(INSTANCE));
+
+    assertThrows(IsClosedException.class, () -> stateManager.receive(Event.timeTrigger(INSTANCE)));
   }
 
   @Test
@@ -500,12 +497,9 @@ public class PersistentStateManagerTest {
     when(transaction.workflow(INSTANCE.workflowId())).thenReturn(Optional.of(WORKFLOW));
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
-    try {
-      stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
+
+    var thrown = assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS));
+    assertEquals(rootCause, thrown);
   }
 
   @Test
@@ -516,12 +510,10 @@ public class PersistentStateManagerTest {
 
     final RuntimeException rootCause = new RuntimeException("foo!");
     doThrow(rootCause).when(outputHandler).transitionInto(any(), any());
-    try {
-      stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of()));
-      fail();
-    } catch (Exception e) {
-      assertThat(Throwables.getRootCause(e), is(rootCause));
-    }
+
+    var thrown = assertThrows(Exception.class, () -> stateManager.receive(Event.dequeue(INSTANCE, ImmutableSet.of())));
+
+    assertEquals(rootCause, thrown);
   }
 
   @Test
@@ -542,11 +534,10 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
     final Event event = Event.started(INSTANCE);
-    try {
-      stateManager.receive(event, 4711L);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class,
+            () -> stateManager.receive(event, 4711L));
+
     verify(logger).debug(
         "Failed workflow instance transition: {}, counter={}",
         event, 4711L, cause);
@@ -559,11 +550,9 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS));
+
     verify(logger).debug("Transaction conflict when triggering workflow instance. Aborted: {}",
         INSTANCE);
   }
@@ -589,11 +578,8 @@ public class PersistentStateManagerTest {
     reset(storage);
     when(storage.getLatestStoredCounter(INSTANCE)).thenReturn(Optional.empty());
     when(storage.runInTransactionWithRetries(any())).thenThrow(cause);
-    try {
-      stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS);
-      fail();
-    } catch (Exception ignore) {
-    }
+
+    assertThrows(Exception.class, () -> stateManager.trigger(INSTANCE, Trigger.natural(), PARAMETERS));
     verify(logger).debug("Failure when triggering workflow instance: {}: {}",
         INSTANCE, cause.getMessage(), cause);
   }
