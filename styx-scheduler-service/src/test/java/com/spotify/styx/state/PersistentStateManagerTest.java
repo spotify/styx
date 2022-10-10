@@ -306,6 +306,22 @@ public class PersistentStateManagerTest {
   }
 
   @Test
+  public void shouldSkipProcessingEventWhenInactiveWFIds()
+          throws Exception {
+    Optional<RunState> runState = Optional.empty();
+    when(transaction.readActiveState(INSTANCE)).thenReturn(runState);
+
+    Event event = Event.halt(INSTANCE);
+    stateManager.receive(event);
+
+    verify(storage, never()).writeEvent(any());
+    verify(transaction, never()).updateCounter(any(), any(), anyInt());
+    verify(transaction, never()).deleteActiveState(any());
+    verify(transaction, never()).updateActiveState(any(), any());
+  }
+
+
+  @Test
   public void shouldFailTriggerWFIfAlreadyActive() throws Exception {
     reset(storage);
     when(storage.getLatestStoredCounter(any())).thenReturn(Optional.empty());
@@ -315,8 +331,7 @@ public class PersistentStateManagerTest {
 
     when(transactionException.isAlreadyExists()).thenReturn(true);
     doThrow(transactionException).when(transaction).writeActiveState(any(), any());
-    when(storage.runInTransactionWithRetries(any())).thenAnswer(a ->
-        a.<TransactionFunction>getArgument(0).apply(transaction));
+
 
     try {
       stateManager.trigger(INSTANCE, TRIGGER1, PARAMETERS);

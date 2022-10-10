@@ -210,11 +210,11 @@ public class PersistentStateManager implements StateManager {
     ensureRunning();
     log.info("Received event {}", event);
 
-    var nextRunState = transition(event, expectedCounter);
-    postTransition(event, nextRunState);
+    var maybeNextRunState = transition(event, expectedCounter);
+    maybeNextRunState.ifPresent(nextRunState -> postTransition(event, nextRunState));
   }
 
-  private RunState transition(Event event, long expectedCounter) {
+  private Optional<RunState> transition(Event event, long expectedCounter) {
     try {
       return storage.runInTransactionWithRetries(tx -> transition0(tx, event, expectedCounter));
     } catch (Throwable e) {
@@ -224,7 +224,16 @@ public class PersistentStateManager implements StateManager {
     }
   }
 
-  private RunState transition0(StorageTransaction tx, Event event, long expectedCounter)
+  /**
+   * Transition the workflow instance state in the storage based on the {@code event} passed.
+   * @param tx the current open transaction in the storage
+   * @param event the event causing the transition. It contains the workflow id inside.
+   * @param expectedCounter expected counter used for event sorting
+   * @return If the workflow instance is no longer active, then an @{link Optional::empty} is returned, otherwise
+   * the transition will be applied and the new {@link RunState} will be returned wrapped in an {@link Optional::of}
+   * @throws IOException if problems reading the sctive state or updating the new state
+   */
+  private Optional<RunState> transition0(StorageTransaction tx, Event event, long expectedCounter)
       throws IOException {
 
     // Read active state from datastore
@@ -233,7 +242,7 @@ public class PersistentStateManager implements StateManager {
     if (currentRunStateOpt.isEmpty()) {
       var message = "Received event for unknown workflow instance: " + event;
       log.warn(message);
-      throw new IllegalArgumentException(message);
+      return Optional.empty();
     }
     var currentRunState = currentRunStateOpt.orElseThrow();
 
@@ -255,7 +264,7 @@ public class PersistentStateManager implements StateManager {
       tx.updateActiveState(event.workflowInstance(), nextRunState);
     }
 
-    return nextRunState;
+    return Optional.of(nextRunState);
   }
 
   private RunState nextRunState(Event event, RunState runState) {
