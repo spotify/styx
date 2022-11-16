@@ -20,7 +20,7 @@
     <maven.compiler.target>11</maven.compiler.target>
     <apollo.version>1.17.11</apollo.version>
     <jackson.version>2.12.6</jackson.version>
-    <jackson-binding.version>2.12.6.1</jackson-binding.version>
+    <jackson-binding.version>2.12.7.1</jackson-binding.version>
     <checkstyle.config.location>checkstyle.xml</checkstyle.config.location>
     <checkstyle.version>2.17</checkstyle.version>
     <semantic-metrics.version>1.1.7</semantic-metrics.version>
