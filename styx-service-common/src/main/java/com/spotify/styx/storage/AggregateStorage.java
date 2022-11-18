@@ -41,6 +41,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.HashMap;
 import org.apache.hadoop.hbase.client.Connection;
 
 /**
@@ -194,6 +195,11 @@ public class AggregateStorage implements Storage {
   @Override
   public Map<WorkflowId, Workflow> workflows() throws IOException {
     return datastoreStorage.workflows();
+  }
+
+  @Override
+  public HashMap<WorkflowId, WorkflowWithState> workflowsWithState() throws IOException {
+    return datastoreStorage.workflowsWithState();
   }
 
   @Override
