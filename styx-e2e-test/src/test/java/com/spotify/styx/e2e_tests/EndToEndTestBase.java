@@ -110,7 +110,7 @@ public class EndToEndTestBase {
 
   private static final String FLYTE_DOMAIN = "development";
   private static final String FLYTE_LAUNCH_PLAN_NAME = "morning_greeting";
-  private static final String FLYTE_LAUNCH_PLAN_VERSION = "04e346ca5f43fc2778259d77a2d9f64ce42b2a27";
+  private static final String FLYTE_LAUNCH_PLAN_VERSION = "v0.3.154";
   private static final String RESOURCE_TYPE = "LAUNCH_PLAN";
   private static final Map<String, String> REFERENCE_ID =
       Map.of(
@@ -123,7 +123,9 @@ public class EndToEndTestBase {
 
   protected static final Map<String, Object> FLYTE_EXEC_CONF_MAP = Map.of(
       "reference_id", REFERENCE_ID,
-      "input_fields", Map.of()
+      "input_fields", Map.of(
+              "day_of_week", 1
+          )
   );
 
   private final CompletableFuture<Service.Instance> styxSchedulerInstance = new CompletableFuture<>();
