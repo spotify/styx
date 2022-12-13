@@ -32,12 +32,15 @@ import com.spotify.styx.serialization.Json;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
 public class AdHocTriggeringIT extends EndToEndTestBase {
 
   @Test
+  @Ignore
   public void testAdhocTriggeringFlyteWorkflow() throws Exception {
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(

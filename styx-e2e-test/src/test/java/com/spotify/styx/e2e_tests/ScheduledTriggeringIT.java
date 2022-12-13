@@ -33,12 +33,15 @@ import java.nio.file.Files;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
 public class ScheduledTriggeringIT extends EndToEndTestBase {
 
   @Test
+  @Ignore
   public void testScheduledTriggeringFlyteWorkflow() throws Exception {
     // Generate workflow configuration
     var workflowJson =
