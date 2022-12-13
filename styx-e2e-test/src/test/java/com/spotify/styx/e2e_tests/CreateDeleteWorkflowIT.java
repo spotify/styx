@@ -36,7 +36,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
@@ -56,7 +55,6 @@ public class CreateDeleteWorkflowIT extends EndToEndTestBase {
   }
 
   @Test
-  @Ignore
   public void testCreateDeleteFlyteWorkflow() throws Exception {
     var workflowConfiguration = WorkflowConfiguration.builder()
         .id(workflowId1)
