@@ -311,4 +311,3 @@ expected to honor this code.
 [configured role]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L66
 [all workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L73
 [subset of workflows]: ./styx-standalone-service/src/main/resources/styx-standalone.conf#L77
-
