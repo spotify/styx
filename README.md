@@ -246,6 +246,8 @@ For each execution, Styx will inject a set of environment variables into the Doc
 | `STYX_EXECUTION_COUNTER` | **to be implemented** - A counter indicating which execution this is. Goes from 0..N per trigger. |
 
 
+
+
 ### High availability
 
 Since version 2.0, Styx supports full HA (High Availability) where both [styx-api-service] and [styx-scheduler-service] can be set up
