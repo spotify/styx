@@ -9,6 +9,7 @@ A batch job scheduler for Kubernetes
 
 ## Description
 
+
 Styx is a service that is used to trigger periodic invocations of Docker containers. The information
 needed to schedule such invocations, is read from a set of files on disk or an external service
 providing such information. The service takes responsibility for triggering and possibly also
