@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -295,7 +295,7 @@ public class DatastoreStorage implements Closeable {
     runInTransactionWithRetries(tx -> tx.updateNextNaturalTrigger(workflowId, triggerSpec));
   }
 
-  public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
+  Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger() throws IOException {
     final Set<WorkflowId> workflowIds = Sets.newHashSet();
     final KeyQuery query =
         Query.newKeyQueryBuilder()
@@ -305,7 +305,7 @@ public class DatastoreStorage implements Closeable {
     return workflowsWithNextNaturalTrigger(workflowIds);
   }
 
-  public Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger(Set<WorkflowId> workflowIds) {
+  Map<Workflow, TriggerInstantSpec> workflowsWithNextNaturalTrigger(Set<WorkflowId> workflowIds) {
     final Iterable<List<WorkflowId>> batches = Iterables.partition(workflowIds,
         MAX_NUMBER_OF_ENTITIES_IN_ONE_BATCH_READ);
     return StreamSupport.stream(batches.spliterator(), false)
