@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -248,6 +248,7 @@ public class DatastoreStorage implements Closeable {
   Set<WorkflowId> enabled() throws IOException {
     var queryWorkflows = EntityQuery.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
     var enabledWorkflows = new HashSet<WorkflowId>();
+    // TODO: datastore query
     datastore.query(queryWorkflows, entity -> {
       var enabled = entity.contains(PROPERTY_WORKFLOW_ENABLED)
                     && entity.getBoolean(PROPERTY_WORKFLOW_ENABLED);
@@ -301,6 +302,7 @@ public class DatastoreStorage implements Closeable {
         Query.newKeyQueryBuilder()
             .setKind(KIND_WORKFLOW)
             .build();
+    // TODO: datastore query (honnix fix, probably OK)
     datastore.query(query, key -> workflowIds.add(WorkflowId.parseKey(key.getName())));
     return workflowsWithNextNaturalTrigger(workflowIds);
   }
@@ -358,6 +360,7 @@ public class DatastoreStorage implements Closeable {
   public Map<WorkflowId, Workflow> workflows() throws IOException {
     var workflows = new HashMap<WorkflowId, Workflow>();
     var query = Query.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
+    // TODO: datastore query (likely problem)
     datastore.query(query, entity -> {
       Workflow workflow;
       try {
@@ -406,6 +409,7 @@ public class DatastoreStorage implements Closeable {
         .setKind(KIND_WORKFLOW)
         .setFilter(PropertyFilter.eq(PROPERTY_COMPONENT, componentId))
         .build();
+    // TODO: datastore query
     datastore.query(query, entity -> {
       final Workflow workflow;
       if (entity.contains(PROPERTY_WORKFLOW_JSON)) {
@@ -429,6 +433,7 @@ public class DatastoreStorage implements Closeable {
   private Set<WorkflowInstance> listActiveInstances0(CompletionStage<Void> timeout) throws IOException {
     // Strongly read active state keys from index shards in parallel
     return gatherIO(activeWorkflowInstanceIndexShardKeys(datastore.newKeyFactory()).stream()
+        // TODO: datastore query (used in scheduler)
         .map(key -> asyncIO(() -> datastore.query(Query.newKeyQueryBuilder()
             .setFilter(PropertyFilter.hasAncestor(key))
             .setKind(KIND_ACTIVE_WORKFLOW_INSTANCE_INDEX_SHARD_ENTRY)
@@ -507,6 +512,7 @@ public class DatastoreStorage implements Closeable {
   private Map<WorkflowInstance, RunState> queryActiveStates(EntityQuery activeStatesQuery)
       throws IOException {
     final ImmutableMap.Builder<WorkflowInstance, RunState> mapBuilder = ImmutableMap.builder();
+    // TODO: datastore query (used in backfills and others)
     datastore.query(activeStatesQuery, entity -> {
       final WorkflowInstance instance = parseWorkflowInstance(entity);
       mapBuilder.put(instance, entityToRunState(entity, instance));
@@ -798,6 +804,7 @@ public class DatastoreStorage implements Closeable {
   List<Resource> getResources() throws IOException {
     final EntityQuery query = Query.newEntityQueryBuilder().setKind(KIND_COUNTER_LIMIT).build();
     final List<Resource> resources = Lists.newArrayList();
+    // TODO: datastore query
     datastore.query(query, entity ->
         resources.add(entityToResource(entity)));
     return resources;
@@ -816,6 +823,7 @@ public class DatastoreStorage implements Closeable {
 
   private void deleteShardsForCounter(String counterId) throws IOException {
     final List<Key> shards = new ArrayList<>();
+    // TODO: datastore query
     datastore.query(EntityQuery.newEntityQueryBuilder()
         .setKind(KIND_COUNTER_SHARD)
         .setFilter(PropertyFilter.eq(PROPERTY_COUNTER_ID, counterId))
@@ -861,6 +869,7 @@ public class DatastoreStorage implements Closeable {
 
   private List<Backfill> backfillsForQuery(EntityQuery query) throws IOException {
     final List<Backfill> backfills = Lists.newArrayList();
+    // TODO: datastore query
     datastore.query(query, entity -> backfills.add(entityToBackfill(entity)));
     return backfills;
   }
