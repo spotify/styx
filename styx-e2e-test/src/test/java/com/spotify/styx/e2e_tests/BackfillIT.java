@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 @AutoService(EndToEndTestBase.class)
@@ -57,7 +56,6 @@ public class BackfillIT extends EndToEndTestBase {
   }
 
   @Test
-  @Ignore
   public void testBackfillFlyteWorkflow() throws Exception {
     // Generate workflow configuration
     var workflowJson = Json.OBJECT_MAPPER.writeValueAsString(Map.of(
