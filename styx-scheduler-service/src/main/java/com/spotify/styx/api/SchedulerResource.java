@@ -41,6 +41,7 @@ import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.TriggerRequest;
+import com.spotify.styx.model.TriggerResponse;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -232,9 +233,15 @@ public class SchedulerResource {
     } catch (Exception e) {
       return handleException(e);
     }
-
-    // todo: change payload to a struct returning the triggerId as well so the user can refer to it
-    return Response.forPayload(triggerRequest);
+    TriggerResponse response;
+    if (triggerRequest.triggerParameters().isPresent()) {
+      response = TriggerResponse.of(triggerRequest.workflowId(), triggerRequest.parameter(),
+       triggerRequest.triggerParameters().get(), triggerId);
+    } else {
+      response = TriggerResponse.of(triggerRequest.workflowId(), triggerRequest.parameter(),
+       triggerId);
+    }
+    return Response.forPayload(response);
   }
 
   private Response<TriggerRequest> handleException(final Throwable e) {
