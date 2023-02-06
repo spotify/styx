@@ -233,14 +233,9 @@ public class SchedulerResource {
     } catch (Exception e) {
       return handleException(e);
     }
-    TriggerResponse response;
-    if (triggerRequest.triggerParameters().isPresent()) {
-      response = TriggerResponse.of(triggerRequest.workflowId(), triggerRequest.parameter(),
-       triggerRequest.triggerParameters().get(), triggerId);
-    } else {
-      response = TriggerResponse.of(triggerRequest.workflowId(), triggerRequest.parameter(),
-       triggerId);
-    }
+    TriggerResponse response = TriggerResponse.of(triggerRequest.workflowId(),
+      triggerRequest.parameter(), triggerRequest.triggerParameters().orElse(null), triggerId);
+
     return Response.forPayload(response);
   }
 
