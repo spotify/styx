@@ -100,7 +100,7 @@ public class SchedulerResource {
             "POST", BASE + "/events",
             ac -> rc -> event -> injectEvent(ac, event)),
         Route.with(
-            authedEntity(authenticator, em.response(TriggerRequest.class)),
+            authedEntity(authenticator, em.response(TriggerRequest.class, TriggerResponse.class)),
             "POST", BASE + "/trigger",
             ac -> rc -> payload -> triggerWorkflowInstance(ac, rc, payload)),
         Route.with(
@@ -169,7 +169,7 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<TriggerRequest> triggerWorkflowInstance(
+  private Response<TriggerResponse> triggerWorkflowInstance(
       AuthContext ac, RequestContext rc, TriggerRequest triggerRequest) {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
@@ -222,7 +222,7 @@ public class SchedulerResource {
     return triggerAndWait(triggerRequest, workflow, instant);
   }
 
-  private Response<TriggerRequest> triggerAndWait(TriggerRequest triggerRequest,
+  private Response<TriggerResponse> triggerAndWait(TriggerRequest triggerRequest,
                                                   Workflow workflow,
                                                   Instant instant) {
     final TriggerParameters parameters =
@@ -244,7 +244,7 @@ public class SchedulerResource {
     return Response.forPayload(response);
   }
 
-  private Response<TriggerRequest> handleException(final Throwable e) {
+  private Response<TriggerResponse> handleException(final Throwable e) {
     Throwable cause;
     if ((cause = findCause(e, IllegalStateException.class)) != null
         || (cause = findCause(e, IllegalArgumentException.class)) != null) {
