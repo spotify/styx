@@ -84,7 +84,9 @@ public class StyxApi implements AppInit {
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+
   private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
+  private static final Duration MAX_STYX_RUNNING_STATE_TTL = Duration.ofHours(30);
 
   private final String serviceName;
   private final StorageFactory storageFactory;
@@ -203,7 +205,7 @@ public class StyxApi implements AppInit {
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
 
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl);
+        new BasicWorkflowValidator(new DockerImageValidator()), MAX_STYX_RUNNING_STATE_TTL);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer, time);
