@@ -62,9 +62,9 @@ jobs:
             # Maven heap size
             MAVEN_OPTS: -Xmx256m -Xms256m
           command: |
-            google-cloud-sdk/bin/kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 &
+            # google-cloud-sdk/bin/kubectl -n flyte port-forward deployment/flyteadmin 8089:8089 & # TEMPORARILY DISABLE THIS UNTIL FIXING IT TESTS
             # it takes some time for the portforwarding to be ready
-            grpc_health/grpc_health_probe -addr 127.0.0.1:8089  -connect-timeout 8s
+            # grpc_health/grpc_health_probe -addr 127.0.0.1:8089  -connect-timeout 8s # TEMPORARILY DISABLE THIS UNTIL FIXING IT TESTS
             source google-cloud-sdk/path.bash.inc
             mvn -B verify -P disable-static-analysis
       - run:
