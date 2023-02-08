@@ -26,8 +26,6 @@ import io.norberg.automatter.AutoMatter;
 public interface TriggerResponse extends TriggerRequest {
   String triggerId();
 
-
-
   static TriggerResponseBuilder builder() {
     return new TriggerResponseBuilder();
   }
