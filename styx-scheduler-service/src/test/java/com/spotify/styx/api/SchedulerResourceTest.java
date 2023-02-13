@@ -51,6 +51,7 @@ import com.spotify.styx.TriggerListener;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.TriggerRequest;
+import com.spotify.styx.model.TriggerResponse;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
@@ -335,13 +336,17 @@ public class SchedulerResourceTest {
     TriggerRequest toTrigger = TriggerRequest.of(HOURLY_WORKFLOW.id(), "2014-12-31T23");
 
     Response<ByteString> response = requestAndWaitTriggerWorkflowInstance(toTrigger);
-
+    final TriggerResponse triggerResponse =
+        OBJECT_MAPPER.readValue(response.payload().get().toByteArray(), TriggerResponse.class);
 
     assertThat(response.status(), is(Status.OK));
     final Instant expectedInstant = Instant.parse("2014-12-31T23:00:00.000Z");
     verify(triggerListener).event(eq(HOURLY_WORKFLOW), triggerCaptor.capture(), eq(expectedInstant), eq(expectedParameters));
-    assertThat(TriggerUtil.triggerType(triggerCaptor.getValue()), is("adhoc"));
-    assertThat(TriggerUtil.triggerId(triggerCaptor.getValue()), startsWith("ad-hoc-cli-"));
+    final Trigger trigger = triggerCaptor.getValue();
+    final String triggerId = TriggerUtil.triggerId(trigger);
+    assertThat(TriggerUtil.triggerType(trigger), is("adhoc"));
+    assertThat(triggerId, startsWith("ad-hoc-cli-"));
+    assertThat(triggerResponse.triggerId(), is(triggerId));
   }
 
   @Test
