@@ -243,7 +243,7 @@ public class SchedulerResource {
     Throwable cause;
     if ((cause = findCause(e, IllegalStateException.class)) != null
         || (cause = findCause(e, IllegalArgumentException.class)) != null) {
-      // TODO: propagate error information using a more specific exception type 
+      // TODO: propagate error information using a more specific exception type
       return Response.forStatus(CONFLICT.withReasonPhrase(cause.getMessage()));
     } else if (findCause(e, AlreadyInitializedException.class) != null) {
       return Response.forStatus(CONFLICT.withReasonPhrase(
