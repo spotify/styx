@@ -223,8 +223,8 @@ public class SchedulerResource {
   }
 
   private Response<TriggerResponse> triggerAndWait(TriggerRequest triggerRequest,
-                                                  Workflow workflow,
-                                                  Instant instant) {
+                                                   Workflow workflow,
+                                                   Instant instant) {
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
