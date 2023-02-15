@@ -26,13 +26,9 @@ import io.norberg.automatter.AutoMatter;
 public interface TriggerResponse extends TriggerRequest {
   String triggerId();
 
-  static TriggerResponseBuilder builder() {
-    return new TriggerResponseBuilder();
-  }
-
   static TriggerResponse of(WorkflowId workflowId, String parameter,
                             TriggerParameters triggerParameters, String triggerId) {
-    return builder()
+    return new TriggerResponseBuilder()
         .workflowId(workflowId)
         .parameter(parameter)
         .triggerParameters(triggerParameters)
