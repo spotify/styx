@@ -23,7 +23,7 @@ package com.spotify.styx.cli;
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;

@@ -29,7 +29,7 @@ import static com.spotify.styx.util.ParameterUtil.parseAlignedInstant;
 import static java.time.Instant.parse;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;;
 import static org.junit.Assert.fail;
 
 import com.google.auto.value.AutoValue;

@@ -22,7 +22,7 @@ package com.spotify.styx.model.data;
 
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;;
 
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;

@@ -23,7 +23,7 @@ package com.spotify.styx.util;
 import static com.spotify.styx.util.TriggerUtil.trigger;
 import static com.spotify.styx.util.TriggerUtil.triggerType;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;;
 
 import com.spotify.styx.state.Trigger;
 import org.junit.Test;
