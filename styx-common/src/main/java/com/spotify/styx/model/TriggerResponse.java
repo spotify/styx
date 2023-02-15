@@ -31,7 +31,7 @@ public interface TriggerResponse extends TriggerRequest {
   }
 
   static TriggerResponse of(WorkflowId workflowId, String parameter,
-                           TriggerParameters triggerParameters, String triggerId) {
+                            TriggerParameters triggerParameters, String triggerId) {
     return builder()
         .workflowId(workflowId)
         .parameter(parameter)
