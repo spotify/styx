@@ -22,10 +22,10 @@ package com.spotify.styx.util;
 
 import static com.spotify.styx.util.MDCUtil.withMDC;
 import static java.util.Collections.emptyMap;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;

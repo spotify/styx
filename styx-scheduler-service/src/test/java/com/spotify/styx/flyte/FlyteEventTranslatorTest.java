@@ -25,10 +25,10 @@ import static com.spotify.styx.state.RunState.MISSING_DEPS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.SUCCESS_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNKNOWN_ERROR_EXIT_CODE;
 import static com.spotify.styx.state.RunState.UNRECOVERABLE_FAILURE_EXIT_CODE;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.assertEquals;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.spotify.styx.model.Event;

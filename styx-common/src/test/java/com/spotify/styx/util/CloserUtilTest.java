@@ -22,8 +22,8 @@ package com.spotify.styx.util;
 
 import static com.spotify.styx.util.CloserUtil.DEFAULT_TIMEOUT;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assume.assumeThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;

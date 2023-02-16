@@ -31,8 +31,8 @@ import static com.spotify.styx.state.RunState.State.SUBMITTING;
 import static com.spotify.styx.state.RunState.State.TERMINATED;
 import static com.spotify.styx.state.consumers.TransitionLogger.stateInfo;
 import static java.lang.String.format;
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.verify;
 
 import com.spotify.styx.model.Event;

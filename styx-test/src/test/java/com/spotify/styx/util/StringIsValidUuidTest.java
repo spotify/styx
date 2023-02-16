@@ -20,8 +20,8 @@
 
 package com.spotify.styx.util;
 
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 import java.util.UUID;
 import org.junit.Test;
