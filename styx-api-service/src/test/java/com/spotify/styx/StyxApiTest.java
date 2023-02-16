@@ -22,7 +22,7 @@ package com.spotify.styx;
 
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.spotify.apollo.Request;

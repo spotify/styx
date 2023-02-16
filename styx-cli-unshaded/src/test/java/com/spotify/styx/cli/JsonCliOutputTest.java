@@ -23,7 +23,7 @@ package com.spotify.styx.cli;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.spotify.styx.api.BackfillPayload;

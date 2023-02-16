@@ -21,7 +21,7 @@
 package com.spotify.styx.storage;
 
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;

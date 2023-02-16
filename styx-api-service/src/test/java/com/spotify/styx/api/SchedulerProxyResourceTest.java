@@ -23,7 +23,7 @@ package com.spotify.styx.api;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import com.google.common.collect.Iterables;
 import com.google.common.net.HttpHeaders;

@@ -28,7 +28,7 @@ import static com.spotify.styx.testdata.TestData.HOURLY_WORKFLOW_CONFIGURATION;
 import static com.spotify.styx.testdata.TestData.VALID_SHA;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

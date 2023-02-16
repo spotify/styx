@@ -21,7 +21,7 @@
 package com.spotify.styx.serialization;
 
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.WorkflowConfiguration;
