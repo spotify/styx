@@ -31,7 +31,7 @@
     <auto-matter.version>0.16.0</auto-matter.version>
     <auto-value.version>1.8</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <errorprone.version>2.6.0</errorprone.version>
+    <errorprone.version>2.18.0</errorprone.version>
     <grpc.version>1.27.2</grpc.version>
     <logback.version>1.2.9</logback.version>
   </properties>
