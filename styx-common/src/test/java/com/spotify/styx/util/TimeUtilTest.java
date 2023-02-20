@@ -29,11 +29,11 @@ import static com.spotify.styx.util.TimeUtil.nextInstant;
 import static com.spotify.styx.util.TimeUtil.offsetInstant;
 import static com.spotify.styx.util.TimeUtil.subtractOffset;
 import static java.time.Instant.parse;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import com.spotify.styx.model.Schedule;
