@@ -220,6 +220,24 @@ public class TimeUtilTest {
   }
 
   @Test
+  public void shouldSubtractPositiveOffset() {
+    String offset = "P1M3DT1H7M5S";
+    ZonedDateTime time = ZonedDateTime.parse("2017-02-25T09:14:16.22Z");
+    ZonedDateTime offsetTime = subtractOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
+  }
+
+  @Test
+  public void shouldSubtractExplicitlyPositiveOffset() {
+    String offset = "+P1M3DT1H7M5S";
+    ZonedDateTime time = ZonedDateTime.parse("2017-02-25T09:14:16.22Z");
+    ZonedDateTime offsetTime = subtractOffset(time, offset);
+
+    assertThat(offsetTime, is(ZonedDateTime.parse("2017-01-22T08:07:11.22Z")));
+  }
+
+  @Test
   public void shouldSubtractNegativeOffset() {
     String offset = "-P1M3DT1H7M5S";
     ZonedDateTime time = ZonedDateTime.parse("2017-02-25T09:14:16.22Z");
