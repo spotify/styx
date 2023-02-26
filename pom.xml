@@ -29,7 +29,7 @@
     <google.client.lib.version>1.30.8</google.client.lib.version>
     <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
     <auto-matter.version>0.16.0</auto-matter.version>
-    <auto-value.version>1.8</auto-value.version>
+    <auto-value.version>1.10.1</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
     <errorprone.version>2.6.0</errorprone.version>
     <grpc.version>1.27.2</grpc.version>
