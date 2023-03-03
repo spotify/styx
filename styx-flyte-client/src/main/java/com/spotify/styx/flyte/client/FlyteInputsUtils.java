@@ -127,12 +127,12 @@ public class FlyteInputsUtils {
       Map<String, String> triggerParams) {
 
     // Validate that user defined inputs exist in the LaunchPlan
-    var paramsKeysInLowercase = getLowerNoSnakeKeys(parameterMap.getParametersMap());
-    var lowercaseInputs = getLowerNoSnakeKeys(userDefinedInputs);
-    if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
+    var lowerNoSnakeParamsKeys = getLowerNoSnakeKeys(parameterMap.getParametersMap());
+    var lowerNoSnakeInputKeys = getLowerNoSnakeKeys(userDefinedInputs);
+    if (!lowerNoSnakeParamsKeys.containsAll(lowerNoSnakeInputKeys)) {
       var unMatchedInputKeys = userDefinedInputs.keySet().stream()
-          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase())
-              && !paramsKeysInLowercase.contains(noSnake(key.toLowerCase())))
+          .filter(key -> !lowerNoSnakeParamsKeys.contains(key.toLowerCase())
+              && !lowerNoSnakeParamsKeys.contains(noSnake(key.toLowerCase())))
           .collect(toList());
       throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
                                               + " " + unMatchedInputKeys);
