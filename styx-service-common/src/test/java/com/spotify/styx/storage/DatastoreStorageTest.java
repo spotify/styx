@@ -113,6 +113,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -902,11 +903,11 @@ public class DatastoreStorageTest {
 
     // Start a losing transaction that reads, waits for barrier and then stores the workflow
     var runs = new AtomicInteger();
-    var barrier = new CompletableFuture<Void>();
+    var barrier = new CountDownLatch(1);
     var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
       runs.incrementAndGet();
       var wf = tx.workflow(workflow.id());
-      barrier.join();
+      barrier.await();
       tx.store(wf.orElseThrow());
       return null;
     }));
@@ -917,7 +918,7 @@ public class DatastoreStorageTest {
       tx.store(wf.orElseThrow());
       return null;
     });
-    barrier.complete(null);
+    barrier.countDown();
 
     // Wait for first transaction to also complete and verify that it ran twice
     future.get(30, SECONDS);
@@ -957,11 +958,11 @@ public class DatastoreStorageTest {
 
     // Start a losing transaction that reads, waits for barrier and then stores the workflow
     var runs = new AtomicInteger();
-    var barrier = new CompletableFuture<Void>();
+    var barrier = new CountDownLatch(1);
     var future = executor.submit(() -> storage.runInTransactionWithRetries(tx -> {
       runs.incrementAndGet();
       var wf = tx.workflow(workflow.id());
-      barrier.join();
+      barrier.await();
       Thread.sleep(RETRY_SETTINGS.getTotalTimeout().toMillis());
       tx.store(wf.orElseThrow());
       return null;
@@ -973,7 +974,7 @@ public class DatastoreStorageTest {
       tx.store(wf.orElseThrow());
       return null;
     });
-    barrier.complete(null);
+    barrier.countDown();
 
     // Wait for first transaction to fail
     try {
