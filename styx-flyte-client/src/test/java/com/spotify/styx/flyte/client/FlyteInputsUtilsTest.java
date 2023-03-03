@@ -21,7 +21,6 @@
 package com.spotify.styx.flyte.client;
 
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.booleanLiteralOf;
-import static com.spotify.styx.flyte.client.FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.datetimeLiteralOf;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.stringLiteralOf;
@@ -32,13 +31,19 @@ import static org.hamcrest.Matchers.equalTo;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import com.spotify.styx.model.FlyteExecConf;
-import com.spotify.styx.model.FlyteIdentifier;
 import flyteidl.core.Interface;
-import flyteidl.core.Literals;
+import flyteidl.core.Literals.Literal;
+import flyteidl.core.Literals.Primitive;
+import flyteidl.core.Literals.Scalar;
 import flyteidl.core.Types;
 
-import java.util.Map;
+import flyteidl.core.Types.SimpleType;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
 public class FlyteInputsUtilsTest {
@@ -71,6 +76,67 @@ public class FlyteInputsUtilsTest {
     assertThat(timestamp, equalTo(Timestamps.fromSeconds(3600)));
   }
 
+  @Test
+  public void shouldFillParameterInInputsEvenWhenCamelCase() {
+    ZonedDateTime executionTime = ZonedDateTime.of(LocalDate.of(2023, 1, 1),
+        LocalTime.of(1, 0), ZoneOffset.UTC);
+
+    var parameterMap = Interface.ParameterMap.newBuilder()
+        .putParameters("styxParameter", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(Types.SimpleType.DATETIME)
+                    .build())
+                .build())
+            .build())
+        .putParameters("endpointA", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(SimpleType.STRING)
+                    .build())
+                .build())
+            .build())
+        .putParameters("hadesOverride", Interface.Parameter.newBuilder()
+            .setVar(Interface.Variable.newBuilder()
+                .setType(Types.LiteralType.newBuilder().
+                    setSimple(SimpleType.BOOLEAN)
+                    .build())
+                .build())
+            .setDefault(primitiveLiteral(of(false)))
+            .build())
+        .build();
+
+    var inputs = fillParameterInInputs(
+        parameterMap,
+        ImmutableMap.of("endpoint_a", "endsong"),
+        ImmutableMap.of("STYX_PARAMETER", executionTime.format(DateTimeFormatter.ISO_DATE_TIME)),
+        ImmutableMap.of("HADES_OVERRIDE", "TRUE"));
+
+    assertThat(
+        inputs.getLiteralsMap()
+            .get("styxParameter")
+            .getScalar()
+            .getPrimitive()
+            .getDatetime(),
+        equalTo(Timestamps.fromSeconds(executionTime.toEpochSecond()))
+    );
+    assertThat(
+        inputs.getLiteralsMap()
+            .get("endpointA")
+            .getScalar()
+            .getPrimitive()
+            .getStringValue(),
+        equalTo("endsong")
+    );
+    assertThat(
+        inputs.getLiteralsMap()
+            .get("hadesOverride")
+            .getScalar()
+            .getPrimitive()
+            .getBoolean(),
+        equalTo(true)
+    );
+  }
 
   @Test
   public void shouldOverrideStyxVariables() {
@@ -243,12 +309,8 @@ public class FlyteInputsUtilsTest {
                     .setSimple(Types.SimpleType.BINARY)
                     .build())
                 .build())
-            .setDefault(Literals.Literal.newBuilder()
-                .setScalar(Literals.Scalar.newBuilder()
-                    .setPrimitive(Literals.Primitive.newBuilder()
-                        .setStringValue("2020-09-15").build())
-                    .build())
-                .build())
+            .setDefault(primitiveLiteral(Primitive.newBuilder()
+                .setStringValue("2020-09-15").build()))
             .build())
         .build();
 
@@ -290,28 +352,15 @@ public class FlyteInputsUtilsTest {
         equalTo(true));
   }
 
-  @Test
-  public void testInputsCameInOrder() {
-    var id =
-        FlyteIdentifier.builder().project("project").domain("domain").name("name")
-            .version("version").resourceType("LP").build();
-    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FIELD", "value-flytexecconf").build();
-    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), Map.of());
-    assertThat(Map.of("FIELD", "value-flytexecconf"), equalTo(inputs));
-
-    var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
-    assertThat(Map.of("FIELD", "value-trigger-params"), equalTo(inputs));
+  @NotNull
+  private static Primitive of(boolean value) {
+    return Primitive.newBuilder().setBoolean(value).build();
   }
 
-  @Test
-  public void testCasingIsPreserved() {
-    var id =
-        FlyteIdentifier.builder().project("project").domain("domain").name("name")
-            .version("version").resourceType("LP").build();
-    var flyteExecConf = FlyteExecConf.builder().referenceId(id).inputFields("FiElD", "value-flytexecconf").build();
-    var extraDefaultInputs = Map.of("field", "value-trigger-params");
-    var inputs = combineMapsCaseInsensitiveWithOrder(flyteExecConf.inputFields(), extraDefaultInputs);
-    assertThat(Map.of("FiElD", "value-trigger-params"), equalTo(inputs));
+  @NotNull
+  private static Literal primitiveLiteral(Primitive primitive) {
+    return Literal.newBuilder()
+        .setScalar(Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
   }
 }
