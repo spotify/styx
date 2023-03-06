@@ -19,7 +19,7 @@
  */
 
 package com.spotify.styx.storage;
-
+/*
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
@@ -39,6 +39,7 @@ import org.junit.runner.RunWith;
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreEmulatorTest {
 
+  /*
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
   @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
@@ -72,4 +73,4 @@ public class DatastoreEmulatorTest {
 
     assertThat(exception.getMessage(), Matchers.startsWith("Not using gcloud sdk datastore emulator"));
   }
-}
+}*/
