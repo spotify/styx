@@ -36,7 +36,6 @@ import org.junit.Test;
 import org.junit.contrib.java.lang.system.EnvironmentVariables;
 import org.junit.runner.RunWith;
 
-/*
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreEmulatorTest {
 
