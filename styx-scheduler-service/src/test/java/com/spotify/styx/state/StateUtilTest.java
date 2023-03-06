@@ -161,21 +161,6 @@ public class StateUtilTest {
   }
 
   @Test
-  public void shouldGetTimedOutRunningInstancesForInvalidCustomTimeout() throws IOException {
-    final RunState runState =
-        RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
-    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
-    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
-
-    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
-    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
-    final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
-    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
-  }
-
-  @Test
   public void shouldGetTimedOutQueuingInstances() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));

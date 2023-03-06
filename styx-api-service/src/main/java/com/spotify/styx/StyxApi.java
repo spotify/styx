@@ -62,7 +62,6 @@ import com.spotify.styx.util.ExtendedWorkflowValidator;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
