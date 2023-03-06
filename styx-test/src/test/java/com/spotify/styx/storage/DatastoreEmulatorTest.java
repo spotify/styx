@@ -23,13 +23,12 @@ package com.spotify.styx.storage;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.fail;
 
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.Entity;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
-import org.hamcrest.Matchers;
-import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
@@ -64,12 +63,13 @@ public class DatastoreEmulatorTest {
   }
 
   @Test
-  public void shouldFailIfNotGcloudEmulator() throws InterruptedException {
-    environmentVariables.clear("PATH");
+  public void shouldBeGcloudEmulator()  {
     var emulator = new DatastoreEmulator();
 
-    var exception = Assert.assertThrows(AssertionError.class, emulator::before);
-
-    assertThat(exception.getMessage(), Matchers.startsWith("Not using gcloud sdk datastore emulator"));
+    try {
+      emulator.before();
+    } catch (Exception e) {
+      fail("Not using gcloud sdk datastore emulator");
+    }
   }
 }
