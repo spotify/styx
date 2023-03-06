@@ -71,4 +71,4 @@ public class DatastoreEmulatorTest {
 
     assertThat(exception.getMessage(), Matchers.startsWith("Not using gcloud sdk datastore emulator"));
   }
-}*/
+}
