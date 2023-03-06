@@ -47,9 +47,9 @@ public class TimeoutConfig {
 
     final ImmutableMap.Builder<RunState.State, Duration> map = ImmutableMap.builder();
     for (RunState.State state : RunState.State.values()) {
-      final String keyForDefaultValue = state.name().toLowerCase();
-      if (ttlSubConfig.hasPath(keyForDefaultValue)) {
-        final Duration ttl = Duration.parse(ttlSubConfig.getString(keyForDefaultValue));
+      final String key = state.name().toLowerCase();
+      if (ttlSubConfig.hasPath(key)) {
+        final Duration ttl = Duration.parse(ttlSubConfig.getString(key));
         map.put(state, ttl);
       }
     }
