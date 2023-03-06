@@ -29,7 +29,6 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.spotify.apollo.Environment;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import java.time.Duration;
