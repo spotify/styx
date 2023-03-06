@@ -80,8 +80,7 @@ public class DatastoreEmulator extends ExternalResource {
       return activeRunner.getClass();
     }).get();
     if (!runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$GcloudEmulatorRunner")
-            && !runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$DownloadableEmulatorRunner")
-    )//&& !runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$EmulatorRunner") )
+            && !runnerClass.getName().equals("com.google.cloud.testing.BaseEmulatorHelper$DownloadableEmulatorRunner"))
     {
       throw new AssertionError("Not using gcloud sdk datastore emulator, please run: "
                                + "gcloud components install beta cloud-datastore-emulator");
