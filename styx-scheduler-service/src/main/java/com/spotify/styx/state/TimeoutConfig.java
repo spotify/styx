@@ -32,6 +32,7 @@ import java.util.Objects;
 public class TimeoutConfig {
 
   private static final String DEFAULT_TTL_KEY = "default";
+  private static final String MAX_RUNNING_TIMEOUT_KEY = "running_max";
 
   private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;
@@ -46,9 +47,9 @@ public class TimeoutConfig {
 
     final ImmutableMap.Builder<RunState.State, Duration> map = ImmutableMap.builder();
     for (RunState.State state : RunState.State.values()) {
-      final String key = state.name().toLowerCase();
-      if (ttlSubConfig.hasPath(key)) {
-        final Duration ttl = Duration.parse(ttlSubConfig.getString(key));
+      final String keyForDefaultValue = state.name().toLowerCase();
+      if (ttlSubConfig.hasPath(keyForDefaultValue)) {
+        final Duration ttl = Duration.parse(ttlSubConfig.getString(keyForDefaultValue));
         map.put(state, ttl);
       }
     }

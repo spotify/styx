@@ -417,7 +417,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING));
+        new BasicWorkflowValidator(new DockerImageValidator()), config);
 
     var podMutator = podMutatorFactory.apply(environment);
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);

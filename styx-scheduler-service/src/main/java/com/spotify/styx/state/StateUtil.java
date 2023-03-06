@@ -120,11 +120,10 @@ public final class StateUtil {
                                           .flatMap(workflow -> workflow.configuration().runningTimeout())
                                           .orElse(timeout)
                                       : timeout;
-    final Duration sanitizedTimeout = effectiveTimeout.compareTo(timeout) < 0 ? effectiveTimeout : timeout;
 
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())
-        .plus(sanitizedTimeout);
+        .plus(effectiveTimeout);
 
     return !deadline.isAfter(instant);
   }
