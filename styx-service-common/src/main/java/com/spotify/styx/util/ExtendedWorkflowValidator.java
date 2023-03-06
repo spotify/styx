@@ -40,19 +40,23 @@ public class ExtendedWorkflowValidator implements WorkflowValidator {
   private final WorkflowValidator delegate;
   private final Duration maxRunningTimeout;
 
+  // This is the max running timeout that is allowed, the one called only running is the default
   static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.stale-state-ttls.running_max";
-  private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
+  private static final Duration DEFAULT_STYX_RUNNING_STATE_MAX_TTL = Duration.ofHours(24);
 
   public ExtendedWorkflowValidator(WorkflowValidator delegate,
                                    Config config) {
-    final Duration maxRunningTimeout = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
-            .map(Duration::parse)
-            .orElse(DEFAULT_STYX_RUNNING_STATE_TTL);
-
+    final Duration maxRunningTimeout = getMaxRunningTimeout(config);
     Preconditions.checkArgument(maxRunningTimeout != null && !maxRunningTimeout.isNegative(),
         "Max Running timeout should be positive");
     this.delegate = Objects.requireNonNull(delegate);
     this.maxRunningTimeout = maxRunningTimeout;
+  }
+
+  private Duration getMaxRunningTimeout(Config config) {
+    return get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+            .map(Duration::parse)
+            .orElse(DEFAULT_STYX_RUNNING_STATE_MAX_TTL);
   }
 
   @Override
