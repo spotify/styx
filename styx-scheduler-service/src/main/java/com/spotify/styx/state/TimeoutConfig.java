@@ -32,7 +32,6 @@ import java.util.Objects;
 public class TimeoutConfig {
 
   private static final String DEFAULT_TTL_KEY = "default";
-  private static final String MAX_RUNNING_TIMEOUT_KEY = "running_max";
 
   private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;
