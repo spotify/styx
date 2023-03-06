@@ -38,7 +38,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnitParamsRunner.class)
 public class DatastoreEmulatorTest {
 
-  /*
   @ClassRule public static final DatastoreEmulator datastoreEmulator = new DatastoreEmulator();
 
   @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
