@@ -55,7 +55,7 @@ public interface OutputHandler {
     return TracingProxy.instrument(OutputHandler.class, outputHandler);
   }
 
-  static List<OutputHandler> tracing(Collection<OutputHandler> outputHandlers) {
+  static List<OutputHandler> tracing(Collection<com.spotify.styx.state.handlers.FlyteRunnerHandler> outputHandlers) {
     return outputHandlers.stream().map(OutputHandler::tracing).collect(Collectors.toList());
   }
 

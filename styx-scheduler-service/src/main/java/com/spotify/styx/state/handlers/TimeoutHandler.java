@@ -54,7 +54,6 @@ public class TimeoutHandler implements OutputHandler {
   private final Time time;
   private final Supplier<Map<WorkflowId, Workflow>> workflows;
   private final Duration maxRunningStateTtl;
-
   public TimeoutHandler(TimeoutConfig ttls,
                         Time time,
                         Supplier<Map<WorkflowId, Workflow>> workflows) {
