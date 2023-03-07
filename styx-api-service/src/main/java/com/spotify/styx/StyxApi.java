@@ -53,7 +53,6 @@ import com.spotify.styx.monitoring.MeteredStorageProxy;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
-import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
@@ -200,12 +199,8 @@ public class StyxApi implements AppInit {
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
 
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-
-    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
-            .map(Duration::parse)
-            .orElse(timeoutConfig.ttlOf(RunState.State.RUNNING));
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(config);
+    final Duration maxRunningStateTtl = timeoutConfig.getMaxRunningTimeout();
 
     var workflowValidator = new ExtendedWorkflowValidator(
         new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);

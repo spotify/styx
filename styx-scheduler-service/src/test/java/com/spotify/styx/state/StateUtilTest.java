@@ -135,14 +135,16 @@ public class StateUtilTest {
   public void shouldGetTimedOutRunningInstances() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
+    final Duration timeout = Duration.ofMillis(3L);
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(timeout);
+    when(timeoutConfig.getMaxRunningTimeout()).thenReturn(timeout);
     when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(12L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(12L), timeoutConfig);
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -150,13 +152,15 @@ public class StateUtilTest {
   public void shouldGetTimedOutRunningInstancesBaseOnGlobalTimeoutIfWorkflowNotFound() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(3L));
+    final Duration timeout = Duration.ofMillis(3L);
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(timeout);
+    when(timeoutConfig.getMaxRunningTimeout()).thenReturn(timeout);
     when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(Map.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
+        getTimedOutInstances(Map.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig);
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -164,14 +168,16 @@ public class StateUtilTest {
   public void shouldGetTimedOutRunningInstancesForInvalidCustomTimeout() throws IOException {
     final RunState runState =
             RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
+    final Duration timeout = Duration.ofMillis(1L);
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(timeout);
+    when(timeoutConfig.getMaxRunningTimeout()).thenReturn(timeout);
     when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-            getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, Duration.ofMillis(1L));
+            getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -179,14 +185,16 @@ public class StateUtilTest {
   public void shouldGetTimedOutQueuingInstances() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.QUEUED, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
+    final Duration timeout = Duration.ofMillis(1L);
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(timeout);
+    when(timeoutConfig.getMaxRunningTimeout()).thenReturn(timeout);
     when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -194,14 +202,16 @@ public class StateUtilTest {
   public void shouldNotGetTimedOutRunningInstances() throws IOException {
     final RunState runState =
         RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
-    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(2L));
+    final Duration timeout = Duration.ofMillis(2L);
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(timeout);
+    when(timeoutConfig.getMaxRunningTimeout()).thenReturn(timeout);
     when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
     when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES));
 
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
     assertThat(timedOutInstances.isEmpty(), is(true));
   }
 

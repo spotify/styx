@@ -53,9 +53,9 @@ public class TimeoutHandler implements OutputHandler {
   private final TimeoutConfig ttls;
   private final Time time;
   private final Supplier<Map<WorkflowId, Workflow>> workflows;
-  private final Duration maxRunningStateTtl;
+  private final Optional<Duration> maxRunningStateTtl;
 
-  public TimeoutHandler(TimeoutConfig ttls, Duration maxRunningStateTtl, 
+  public TimeoutHandler(TimeoutConfig ttls, Optional<Duration> maxRunningStateTtl,
                         Time time,
                         Supplier<Map<WorkflowId, Workflow>> workflows) {
     this.ttls = Objects.requireNonNull(ttls, "ttls");

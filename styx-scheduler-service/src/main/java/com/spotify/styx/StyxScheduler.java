@@ -410,17 +410,13 @@ public class StyxScheduler implements AppInit {
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
 
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
 
-    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
-            .map(Duration::parse)
-            .orElse(timeoutConfig.ttlOf(State.RUNNING));
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(config);
+    final Duration maxRunningStateTtl = timeoutConfig.getMaxRunningTimeout();
 
     var workflowValidator = new ExtendedWorkflowValidator(
         new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
