@@ -203,7 +203,7 @@ public class StyxApi implements AppInit {
     final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
     final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
 
-    Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
             .map(Duration::parse)
             .orElse(timeoutConfig.ttlOf(RunState.State.RUNNING));
 
