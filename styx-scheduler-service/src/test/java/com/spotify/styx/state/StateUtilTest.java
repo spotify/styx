@@ -46,7 +46,6 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -172,7 +171,7 @@ public class StateUtilTest {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-            getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, Duration.of(1, ChronoUnit.HOURS));
+            getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, Duration.ofMillis(1L));
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
