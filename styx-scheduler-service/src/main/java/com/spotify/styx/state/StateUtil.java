@@ -116,13 +116,12 @@ public final class StateUtil {
       return false;
     }
 
-    Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
-                                      ? workflowOpt
-                                          .flatMap(workflow -> workflow.configuration().runningTimeout())
-                                          .orElse(runStateTimeout)
-                                      : runStateTimeout;
+    Duration effectiveTimeout = runStateTimeout;
 
     if (runState.state() == RunState.State.RUNNING) {
+      effectiveTimeout =  workflowOpt
+              .flatMap(workflow -> workflow.configuration().runningTimeout())
+              .orElse(runStateTimeout);
       effectiveTimeout = effectiveTimeout.compareTo(maxRunningTimeout) < 0 ? effectiveTimeout : maxRunningTimeout;
     }
 
