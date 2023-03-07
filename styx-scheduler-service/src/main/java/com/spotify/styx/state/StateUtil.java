@@ -111,7 +111,7 @@ public final class StateUtil {
   }
 
   public static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
-                                     Duration defaultTimeout, Duration maxRunningTimeout) {
+                                     Duration runStateTimeout, Duration maxRunningTimeout) {
     if (runState.state().isTerminal()) {
       return false;
     }
@@ -119,8 +119,8 @@ public final class StateUtil {
     Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
                                       ? workflowOpt
                                           .flatMap(workflow -> workflow.configuration().runningTimeout())
-                                          .orElse(defaultTimeout)
-                                      : defaultTimeout;
+                                          .orElse(runStateTimeout)
+                                      : runStateTimeout;
 
     if (runState.state() == RunState.State.RUNNING) {
       effectiveTimeout = effectiveTimeout.compareTo(maxRunningTimeout) < 0 ? effectiveTimeout : maxRunningTimeout;
