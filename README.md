@@ -196,8 +196,10 @@ guide: [Granting Roles to Service Accounts].
 Custom environment variables to be injected into running container.
 
 #### `running_timeout` **[string]**
-An [ISO 8601 Duration] specification for timing out container execution. Defaults to 24 hours that also
-serves as the upper boundary.
+An [ISO 8601 Duration] specification for timing out container execution. The default is configurable in styx conf file through `styx.stale-state-ttls.running`.
+If not set it defaults to `styx.stale-state-ttls.default`.
+The upper boundary of the running_timeout is configurable through `styx.max-running-timeout`.
+If not set it defaults to `styx.stale-state-ttls.running`, which defaults to `styx.stale-state-ttls.default` as stated above.
 
 #### `retry_condition` **[string]**
 A [SpEL](https://docs.spring.io/spring/docs/current/spring-framework-reference/core.html#expressions) boolean expression.
