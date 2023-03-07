@@ -49,7 +49,7 @@ class StyxIdToFlyteExecNameMapper implements Function<String, String> {
   public String apply(String styxRunId) {
     checkArgument(
         STYX_RUN_ID_REGEX.matcher(styxRunId).matches(),
-        "Not valid styx run id:",
+        "Not valid styx run id: [%s]",
         styxRunId);
     // hex encodes only 4 bits per character
     var hexEncodedUuid = styxRunId.substring(STYX_ID_PREFIX.length()).replace("-", "");

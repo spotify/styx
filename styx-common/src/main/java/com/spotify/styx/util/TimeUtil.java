@@ -235,6 +235,8 @@ public class TimeUtil {
     // Change sign of offset string and add
     if (offset.startsWith("-")) {
       return addOffset(time, offset.substring(1));
+    } else if (offset.startsWith("+")) {
+      return addOffset(time, "-" + offset.substring(1));
     } else {
       return addOffset(time, "-" + offset);
     }
