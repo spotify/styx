@@ -62,6 +62,8 @@ import com.spotify.styx.util.ExtendedWorkflowValidator;
 import com.spotify.styx.util.StorageFactory;
 import com.spotify.styx.util.Time;
 import com.typesafe.config.Config;
+
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -80,6 +82,9 @@ public class StyxApi implements AppInit {
   public static final String SERVICE_NAME = "styx-api";
 
   private static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
+  static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
+  private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+  private static final String STYX_RUNNING_STATE_DEFAULT_TTL_KEY = "styx.stale-state-ttls.default";
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   private final String serviceName;
@@ -195,8 +200,18 @@ public class StyxApi implements AppInit {
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
 
+    final Duration defaultTtl = Duration.parse(config.getString(STYX_RUNNING_STATE_DEFAULT_TTL_KEY));
+
+    Duration styxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_TTL_CONFIG)
+            .map(Duration::parse)
+            .orElse(defaultTtl);
+
+    Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+            .map(Duration::parse)
+            .orElse(styxRunningStateTtl);
+
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), config);
+        new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer, time);

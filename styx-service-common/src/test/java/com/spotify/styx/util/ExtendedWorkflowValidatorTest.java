@@ -21,7 +21,6 @@
 package com.spotify.styx.util;
 
 import static com.spotify.styx.testdata.TestData.FULL_WORKFLOW_CONFIGURATION;
-import static com.spotify.styx.util.ExtendedWorkflowValidator.STYX_RUNNING_STATE_MAX_TTL_CONFIG;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
@@ -33,10 +32,6 @@ import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -54,10 +49,8 @@ public class ExtendedWorkflowValidatorTest {
 
   @Before
   public void setUp() throws Exception {
-    final Config config = ConfigFactory.parseMap(Map.of(
-            STYX_RUNNING_STATE_MAX_TTL_CONFIG, "PT24H"));
     when(basicWorkflowValidator.validateWorkflow(any())).thenReturn(List.of());
-    sut = new ExtendedWorkflowValidator(basicWorkflowValidator, config);
+    sut = new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(1));
   }
 
   @Test
@@ -88,9 +81,7 @@ public class ExtendedWorkflowValidatorTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void shouldFailIfInvalidMaxRunningTimeout() {
-    final Config config = ConfigFactory.parseMap(Map.of(
-            STYX_RUNNING_STATE_MAX_TTL_CONFIG, "PT-3H"));
-    new ExtendedWorkflowValidator(basicWorkflowValidator, config);
+    new ExtendedWorkflowValidator(basicWorkflowValidator, Duration.ofDays(-1));
   }
 
   private String limit(String msg, Object value, Object limit) {

@@ -146,6 +146,7 @@ public class StyxScheduler implements AppInit {
   private static final String GKE_CLUSTER_ID = "cluster-id";
   private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
+  static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
   public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
@@ -416,8 +417,13 @@ public class StyxScheduler implements AppInit {
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
+
+    Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+            .map(Duration::parse)
+            .orElse(timeoutConfig.ttlOf(State.RUNNING));
+
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), config);
+        new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
 
     var podMutator = podMutatorFactory.apply(environment);
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);
