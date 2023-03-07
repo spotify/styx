@@ -146,8 +146,6 @@ public class StyxScheduler implements AppInit {
   private static final String GKE_CLUSTER_ID = "cluster-id";
   private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
-  private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-  private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
   private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   private static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
