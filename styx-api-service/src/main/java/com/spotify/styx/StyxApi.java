@@ -82,10 +82,10 @@ public class StyxApi implements AppInit {
   public static final String SERVICE_NAME = "styx-api";
 
   private static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
-  static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
-  private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
-  private static final String STYX_RUNNING_STATE_DEFAULT_TTL_KEY = "styx.stale-state-ttls.default";
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
+  private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
+  static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
+  private static final String STYX_RUNNING_STATE_DEFAULT_TTL_KEY = "styx.stale-state-ttls.default";
 
   private final String serviceName;
   private final StorageFactory storageFactory;
