@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
@@ -55,16 +56,16 @@ public final class StateUtil {
         .collect(toList());
   }
 
+  @VisibleForTesting
   static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
                                                     List<InstanceState> activeStates,
                                                     Instant instant,
-                                                    TimeoutConfig ttl,
-                                                    Duration maxRunningTimeout) {
+                                                    TimeoutConfig ttl) {
     return activeStates.parallelStream()
         .filter(entry -> {
           final Optional<Workflow> workflowOpt =
               Optional.ofNullable(workflows.get(entry.workflowInstance().workflowId()));
-          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()), maxRunningTimeout);
+          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()), ttl.getMaxRunningTimeout());
         })
         .map(InstanceState::workflowInstance)
         .collect(toSet());
@@ -111,7 +112,7 @@ public final class StateUtil {
   }
 
   public static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
-                                     Duration runStateTimeout, Duration maxRunningTimeout) {
+                                    Duration runStateTimeout, Duration maxRunningTimeout) {
     if (runState.state().isTerminal()) {
       return false;
     }

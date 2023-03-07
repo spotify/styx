@@ -146,8 +146,6 @@ public class StyxScheduler implements AppInit {
   private static final String GKE_CLUSTER_ID = "cluster-id";
   private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
-  private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-  private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
   private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   private static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
@@ -410,17 +408,13 @@ public class StyxScheduler implements AppInit {
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
 
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
 
-    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
-            .map(Duration::parse)
-            .orElse(timeoutConfig.ttlOf(State.RUNNING));
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(config);
+    final Duration maxRunningStateTtl = timeoutConfig.getMaxRunningTimeout();
 
     var workflowValidator = new ExtendedWorkflowValidator(
         new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
@@ -454,7 +448,7 @@ public class StyxScheduler implements AppInit {
         // an extended downtime, many k8s pods will be completed and would transition the instance into done.
         // However, many of those instances would _also_ technically have timed out according to wall clock and
         // the TimeoutHandler would fail them if allowed to run first.
-        new TimeoutHandler(timeoutConfig, maxRunningStateTtl, time, workflowCache)));
+        new TimeoutHandler(timeoutConfig, time, workflowCache)));
     var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
 
     var eventConsumer = fanEvent(EventConsumer.tracing(List.of(

@@ -30,14 +30,11 @@ import org.junit.Test;
 
 public class TimeoutConfigTest {
 
-  private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-
   @Test
   public void testDurations() {
     Config config = ConfigFactory.load("ttl");
-    Config ttls = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
 
-    TimeoutConfig timeouts = TimeoutConfig.createFromConfig(ttls);
+    TimeoutConfig timeouts = TimeoutConfig.createFromConfig(config);
 
     assertThat(timeouts.ttlOf(RunState.State.RUNNING), is(Duration.ofHours(24)));
     assertThat(timeouts.ttlOf(RunState.State.SUBMITTED), is(Duration.ofMinutes(5)));
