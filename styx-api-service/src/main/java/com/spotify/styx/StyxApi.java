@@ -86,7 +86,7 @@ public class StyxApi implements AppInit {
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
   private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
-  static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
+  private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
   private final String serviceName;
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
