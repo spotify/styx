@@ -454,7 +454,7 @@ public class StyxScheduler implements AppInit {
         // an extended downtime, many k8s pods will be completed and would transition the instance into done.
         // However, many of those instances would _also_ technically have timed out according to wall clock and
         // the TimeoutHandler would fail them if allowed to run first.
-        new TimeoutHandler(timeoutConfig, time, workflowCache)));
+        new TimeoutHandler(timeoutConfig, maxRunningStateTtl, time, workflowCache)));
     var outputHandler = OutputHandler.mdcDecorating(fanOutput(outputHandlers));
 
     var eventConsumer = fanEvent(EventConsumer.tracing(List.of(

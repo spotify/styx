@@ -46,6 +46,7 @@ import com.spotify.styx.storage.Storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -142,7 +143,7 @@ public class StateUtilTest {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(12L), timeoutConfig);
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(12L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -156,7 +157,22 @@ public class StateUtilTest {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(Map.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig);
+        getTimedOutInstances(Map.of(), activeInstanceStates, Instant.ofEpochMilli(13L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
+    assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
+  }
+
+  @Test
+  public void shouldGetTimedOutRunningInstancesForInvalidCustomTimeout() throws IOException {
+    final RunState runState =
+            RunState.create(WORKFLOW_INSTANCE, RunState.State.RUNNING, Instant.ofEpochMilli(10L));
+    when(timeoutConfig.ttlOf(runState.state())).thenReturn(Duration.ofMillis(1L));
+    when(storage.readActiveStates()).thenReturn(Map.of(WORKFLOW_INSTANCE, runState));
+    when(workflowCache.get()).thenReturn(Map.of(WORKFLOW_ID, WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT));
+
+    final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
+    final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
+    final Set<WorkflowInstance> timedOutInstances =
+            getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, Duration.of(1, ChronoUnit.HOURS));
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -171,7 +187,7 @@ public class StateUtilTest {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
@@ -186,7 +202,7 @@ public class StateUtilTest {
     final Map<WorkflowInstance, RunState> activeStates = storage.readActiveStates();
     final List<InstanceState> activeInstanceStates = getActiveInstanceStates(activeStates);
     final Set<WorkflowInstance> timedOutInstances =
-        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig);
+        getTimedOutInstances(workflowCache.get(), activeInstanceStates, Instant.ofEpochMilli(11L), timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING));
     assertThat(timedOutInstances.isEmpty(), is(true));
   }
 

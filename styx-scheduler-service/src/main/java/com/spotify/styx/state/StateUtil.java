@@ -58,12 +58,13 @@ public final class StateUtil {
   static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
                                                     List<InstanceState> activeStates,
                                                     Instant instant,
-                                                    TimeoutConfig ttl) {
+                                                    TimeoutConfig ttl,
+                                                    Duration maxRunningTimeout) {
     return activeStates.parallelStream()
         .filter(entry -> {
           final Optional<Workflow> workflowOpt =
               Optional.ofNullable(workflows.get(entry.workflowInstance().workflowId()));
-          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()));
+          return hasTimedOut(workflowOpt, entry.runState(), instant, ttl.ttlOf(entry.runState().state()), maxRunningTimeout);
         })
         .map(InstanceState::workflowInstance)
         .collect(toSet());
@@ -110,16 +111,20 @@ public final class StateUtil {
   }
 
   public static boolean hasTimedOut(Optional<Workflow> workflowOpt, RunState runState, Instant instant,
-                                     Duration timeout) {
+                                     Duration defaultTimeout, Duration maxRunningTimeout) {
     if (runState.state().isTerminal()) {
       return false;
     }
 
-    final Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
+    Duration effectiveTimeout = runState.state() == RunState.State.RUNNING
                                       ? workflowOpt
                                           .flatMap(workflow -> workflow.configuration().runningTimeout())
-                                          .orElse(timeout)
-                                      : timeout;
+                                          .orElse(defaultTimeout)
+                                      : defaultTimeout;
+
+    if (runState.state() == RunState.State.RUNNING) {
+      effectiveTimeout = effectiveTimeout.compareTo(maxRunningTimeout) < 0 ? effectiveTimeout : maxRunningTimeout;
+    }
 
     final Instant deadline = Instant
         .ofEpochMilli(runState.timestamp())
