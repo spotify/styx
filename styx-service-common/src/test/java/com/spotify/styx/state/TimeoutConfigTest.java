@@ -20,10 +20,10 @@
 
 package com.spotify.styx.state;
 
+import static com.spotify.styx.state.TimeoutConfig.STYX_STALE_STATE_TTL_CONFIG;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-import com.spotify.styx.StyxScheduler;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.time.Duration;
@@ -34,7 +34,7 @@ public class TimeoutConfigTest {
   @Test
   public void testDurations() {
     Config config = ConfigFactory.load("ttl");
-    Config ttls = config.getConfig(StyxScheduler.STYX_STALE_STATE_TTL_CONFIG);
+    Config ttls = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
 
     TimeoutConfig timeouts = TimeoutConfig.createFromConfig(ttls);
 

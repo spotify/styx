@@ -24,6 +24,7 @@ import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.state.EventConsumer.fanEvent;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
+import static com.spotify.styx.state.TimeoutConfig.STYX_STALE_STATE_TTL_CONFIG;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
@@ -147,7 +148,6 @@ public class StyxScheduler implements AppInit {
   private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
   private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
-  public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   private static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
