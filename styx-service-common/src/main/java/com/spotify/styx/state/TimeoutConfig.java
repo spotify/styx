@@ -32,7 +32,6 @@ import java.util.Objects;
 public class TimeoutConfig {
 
   private static final String DEFAULT_TTL_KEY = "default";
-  public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
 
   private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;
