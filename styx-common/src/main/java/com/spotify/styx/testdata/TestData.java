@@ -193,15 +193,40 @@ public final class TestData {
           .dockerArgs(List.of("other", "args"))
           .build();
 
-  public static final WorkflowConfiguration HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT =
-      WorkflowConfiguration.builder()
-          .id("styx.TestEndpoint")
-          .commitSha(VALID_SHA)
-          .dockerImage("busybox")
-          .schedule(HOURS)
-          .resources(RESOURCE_IDS)
-          .runningTimeout(Duration.ofMillis(2L))
-          .build();
+  public static WorkflowConfiguration getWorkflowConfiguration(Duration runningTimeout) {
+    return WorkflowConfiguration.builder()
+                    .id("styx.TestEndpoint")
+                    .commitSha(VALID_SHA)
+                    .dockerImage("busybox")
+                    .schedule(HOURS)
+                    .resources(RESOURCE_IDS)
+                    .runningTimeout(runningTimeout)
+                    .build();
+  }
+
+  public static WorkflowConfiguration getWorkflowNoRunningTimeout() {
+    return WorkflowConfiguration.builder()
+            .id("styx.TestEndpoint")
+            .commitSha(VALID_SHA)
+            .dockerImage("busybox")
+            .schedule(HOURS)
+            .resources(RESOURCE_IDS)
+            .build();
+  }
+
+  public static Workflow getWorkflow(WorkflowId workflowId, Duration runningTimeout) {
+    return Workflow.create(workflowId.componentId(),
+            getWorkflowConfiguration(runningTimeout));
+  }
+
+  public static Workflow getWorkflowNoRunningTimeout(WorkflowId workflowId) {
+    return Workflow.create(workflowId.componentId(),
+            getWorkflowNoRunningTimeout());
+  }
+
+  public static WorkflowInstance getWorkflowInstance(WorkflowId workflowId) {
+    return WorkflowInstance.create(workflowId, "2016-09-01");
+  }
 
   public static final ExecutionDescription EXECUTION_DESCRIPTION =
       ExecutionDescription.builder()
@@ -215,10 +240,6 @@ public final class TestData {
 
   public static final Workflow WORKFLOW_WITH_RESOURCES = Workflow.create(WORKFLOW_ID.componentId(),
       HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES);
-
-
-  public static final Workflow WORKFLOW_WITH_RESOURCES_RUNNING_TIMEOUT = Workflow.create(WORKFLOW_ID.componentId(),
-      HOURLY_WORKFLOW_CONFIGURATION_WITH_RESOURCES_RUNNING_TIMEOUT);
 
   public static final Instant QUERY_THRESHOLD_BEFORE = Instant.parse("2022-01-01T10:15:29.00Z");
 
