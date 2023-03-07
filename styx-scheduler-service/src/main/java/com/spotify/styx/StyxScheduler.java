@@ -419,7 +419,7 @@ public class StyxScheduler implements AppInit {
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
 
-    Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
             .map(Duration::parse)
             .orElse(timeoutConfig.ttlOf(State.RUNNING));
 
