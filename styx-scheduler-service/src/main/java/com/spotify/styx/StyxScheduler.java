@@ -24,7 +24,6 @@ import static com.spotify.apollo.environment.ConfigUtil.optionalInt;
 import static com.spotify.styx.ScheduledExecutionUtil.scheduleWithJitter;
 import static com.spotify.styx.state.EventConsumer.fanEvent;
 import static com.spotify.styx.state.OutputHandler.fanOutput;
-import static com.spotify.styx.state.TimeoutConfig.STYX_STALE_STATE_TTL_CONFIG;
 import static com.spotify.styx.util.CloserUtil.closeable;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static com.spotify.styx.util.Connections.createBigTableConnection;
