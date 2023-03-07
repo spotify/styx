@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.WorkflowResourceDecorator;
 import com.spotify.styx.model.Workflow;
@@ -55,6 +56,7 @@ public final class StateUtil {
         .collect(toList());
   }
 
+  @VisibleForTesting
   static Set<WorkflowInstance> getTimedOutInstances(Map<WorkflowId, Workflow> workflows,
                                                     List<InstanceState> activeStates,
                                                     Instant instant,

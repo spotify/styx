@@ -20,6 +20,7 @@
 
 package com.spotify.styx.state;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import java.time.Duration;
@@ -71,6 +72,7 @@ public class TimeoutConfig {
     return new TimeoutConfig(map.build(), defaultTtl, maxRunningTimeout);
   }
 
+  @VisibleForTesting
   public static TimeoutConfig createWithDefaultTtl(Duration defaultTtl) {
     return new TimeoutConfig(Map.of(), defaultTtl, Optional.of(defaultTtl));
   }
