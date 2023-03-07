@@ -176,7 +176,6 @@ public class StateUtilTest {
     assertThat(timedOutInstances, contains(WORKFLOW_INSTANCE));
   }
 
-
   @Test
   public void shouldGetTimedOutQueuingInstances() throws IOException {
     final RunState runState =
