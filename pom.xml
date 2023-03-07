@@ -28,7 +28,7 @@
     <opencensus.version>0.28.0</opencensus.version>
     <google.client.lib.version>1.30.8</google.client.lib.version>
     <google.http.client.lib.version>1.34.2</google.http.client.lib.version>
-    <auto-matter.version>0.16.0</auto-matter.version>
+    <auto-matter.version>0.26.1</auto-matter.version>
     <auto-value.version>1.10.1</auto-value.version>
     <hamcrest.version>2.2</hamcrest.version>
     <errorprone.version>2.18.0</errorprone.version>
