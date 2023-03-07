@@ -24,7 +24,6 @@ import static com.spotify.styx.util.WorkflowValidator.upperLimit;
 
 import com.google.common.base.Preconditions;
 import com.spotify.styx.model.Workflow;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
