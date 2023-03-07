@@ -72,7 +72,7 @@ public class TimeoutHandlerTest {
 
   private void setUpWithTimeoutSeconds(int timeoutSeconds) {
     TimeoutConfig timeoutConfig = createWithDefaultTtl(ofSeconds(timeoutSeconds));
-    timeoutHandler = new TimeoutHandler(timeoutConfig, timeoutConfig.ttlOf(RunState.State.RUNNING), time, workflows);
+    timeoutHandler = new TimeoutHandler(timeoutConfig, time, workflows);
   }
 
   @Parameters(source = State.class)
