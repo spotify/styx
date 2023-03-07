@@ -53,6 +53,8 @@ import com.spotify.styx.monitoring.MeteredStorageProxy;
 import com.spotify.styx.monitoring.MetricsStats;
 import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.monitoring.StatsFactory;
+import com.spotify.styx.state.RunState;
+import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.Storage;
 import com.spotify.styx.util.BasicWorkflowValidator;
@@ -83,9 +85,8 @@ public class StyxApi implements AppInit {
   private static final String SCHEDULER_SERVICE_BASE_URL = "styx.scheduler.base-url";
   private static final String DEFAULT_SCHEDULER_SERVICE_BASE_URL = "http://localhost:8080";
 
-  private static final String STYX_RUNNING_STATE_TTL_CONFIG = "styx.stale-state-ttls.running";
-  private static final Duration DEFAULT_STYX_RUNNING_STATE_TTL = Duration.ofHours(24);
-
+  private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
+  private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
   private final String serviceName;
   private final StorageFactory storageFactory;
   private final WorkflowConsumerFactory workflowConsumerFactory;
@@ -181,9 +182,6 @@ public class StyxApi implements AppInit {
     final Config config = environment.config();
     final String schedulerServiceBaseUrl = get(config, config::getString, SCHEDULER_SERVICE_BASE_URL)
         .orElse(DEFAULT_SCHEDULER_SERVICE_BASE_URL);
-    final Duration runningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_TTL_CONFIG)
-        .map(Duration::parse)
-        .orElse(DEFAULT_STYX_RUNNING_STATE_TTL);
 
     final Stats stats = statsFactory.apply(environment);
     final Storage storage = MeteredStorageProxy.instrument(storageFactory.apply(environment, stats), stats, time);
@@ -202,8 +200,15 @@ public class StyxApi implements AppInit {
     final WorkflowActionAuthorizer workflowActionAuthorizer =
         new WorkflowActionAuthorizer(storage, serviceAccountUsageAuthorizer, actionAuthorizer);
 
+    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
+
+    final Duration maxRunningStateTtl = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG)
+            .map(Duration::parse)
+            .orElse(timeoutConfig.ttlOf(RunState.State.RUNNING));
+
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), runningStateTtl);
+        new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
 
     final WorkflowResource workflowResource = new WorkflowResource(storage, workflowValidator,
         new WorkflowInitializer(storage, time), workflowConsumer, workflowActionAuthorizer, time);

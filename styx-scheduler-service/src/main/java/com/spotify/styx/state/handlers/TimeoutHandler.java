@@ -32,6 +32,8 @@ import com.spotify.styx.state.OutputHandler;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.TimeoutConfig;
 import com.spotify.styx.util.Time;
+
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -51,10 +53,13 @@ public class TimeoutHandler implements OutputHandler {
   private final TimeoutConfig ttls;
   private final Time time;
   private final Supplier<Map<WorkflowId, Workflow>> workflows;
+  private final Duration maxRunningStateTtl;
 
-  public TimeoutHandler(TimeoutConfig ttls, Time time,
+  public TimeoutHandler(TimeoutConfig ttls, Duration maxRunningStateTtl, 
+                        Time time,
                         Supplier<Map<WorkflowId, Workflow>> workflows) {
     this.ttls = Objects.requireNonNull(ttls, "ttls");
+    this.maxRunningStateTtl = Objects.requireNonNull(maxRunningStateTtl, "maxRunningStateTtl");
     this.time = Objects.requireNonNull(time, "time");
     this.workflows = Objects.requireNonNull(workflows, "workflows");
   }
@@ -62,7 +67,7 @@ public class TimeoutHandler implements OutputHandler {
   @Override
   public void transitionInto(RunState runState, EventRouter eventRouter) {
     var workflow = Optional.ofNullable(workflows.get().get(runState.workflowInstance().workflowId()));
-    if (hasTimedOut(workflow, runState, time.get(), ttls.ttlOf(runState.state()))) {
+    if (hasTimedOut(workflow, runState, time.get(), ttls.ttlOf(runState.state()), maxRunningStateTtl)) {
       sendTimeout(runState.workflowInstance(), runState, eventRouter);
     }
   }
