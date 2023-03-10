@@ -108,7 +108,7 @@ public final class WorkflowResource {
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
                 json(), "GET", BASE + "/state",
-                rc -> workflowsWithState(rc.request())),
+                rc -> workflowsWithState()),
         Route.with(
             json(), "GET", BASE,
             rc -> workflows(rc.request())),
@@ -219,17 +219,10 @@ public final class WorkflowResource {
     return WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(time.get()).build();
   }
 
-  private Response<Collection<WorkflowWithState>> workflowsWithState(Request request) {
+  private Response<Collection<WorkflowWithState>> workflowsWithState() {
     try {
-      var paramFilters = Stream.of(QueryParams.values())
-              .map(e -> getFilterParams(request, e).map(param -> Map.entry(e, param)))
-              .flatMap(Optional::stream)
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
       Collection<WorkflowWithState> workflows = storage.workflowsWithState().values();
-
       return Response.forPayload(workflows);
-
     } catch (IOException e) {
       throw new RuntimeException("Failed to get workflows", e);
     }
