@@ -830,7 +830,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     Response<ByteString> response = awaitResponse(
-            serviceHelper.request("GET", path("/state")));
+            serviceHelper.request("GET", path("/full")));
 
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
     var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, WorkflowState.builder().enabled(false).build());
