@@ -1108,7 +1108,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturn404WhenWorkflowWithStateNotFound() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    var response = awaitResponse(serviceHelper.request("GET", path("/example/workflow/state")));
+    var response = awaitResponse(serviceHelper.request("GET", path("/example/workflow/full")));
 
     assertThat(response, hasStatus(withCode(Status.NOT_FOUND)));
   }
@@ -1120,7 +1120,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(storage.workflowWithState(WorkflowId.create("foo", "bar"))).thenThrow(new IOException());
 
     Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("/foo/bar/state")));
+        serviceHelper.request("GET", path("/foo/bar/full")));
 
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
   }
