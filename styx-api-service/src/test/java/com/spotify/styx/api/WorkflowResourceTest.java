@@ -1097,7 +1097,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     storage.storeWorkflow(Workflow.create("other_component", WORKFLOW_CONFIGURATION));
 
-    var response = awaitResponse(serviceHelper.request("GET", path("/foo/bar/state")));
+    var response = awaitResponse(serviceHelper.request("GET", path("/foo/bar/full")));
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "workflow.component_id", is("foo"));
