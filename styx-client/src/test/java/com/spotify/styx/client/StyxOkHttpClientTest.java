@@ -405,7 +405,7 @@ public class StyxOkHttpClientTest {
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     var request = requestCaptor.getValue();
-    var uri = URI.create(API_URL + "/workflows/component/workflow/full");
+    var uri = URI.create(API_URL + "/workflows/component/workflow/state");
     assertThat(request.url().toString(), is(uri.toString()));
     assertThat(request.method(), is("GET"));
     assertThat(r.join(), is(workflowWithState));
