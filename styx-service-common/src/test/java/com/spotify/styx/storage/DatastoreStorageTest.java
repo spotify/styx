@@ -570,24 +570,24 @@ public class DatastoreStorageTest {
     storage.store(workflow3);
 
     var instant = Instant.parse("2016-03-14T14:00:00Z");
-    var state_workflow_id1 = WorkflowState.builder()
+    var stateWorkflow1 = WorkflowState.builder()
             .enabled(true)
             .nextNaturalTrigger(instant)
             .nextNaturalOffsetTrigger(instant.plus(1, ChronoUnit.DAYS))
             .build();
-    var state_workflow_id2 = state_workflow_id1.toBuilder().enabled(false).build();
-    var state_workflow_id3 = state_workflow_id1.toBuilder().nextNaturalOffsetTrigger(instant.plus(2, ChronoUnit.DAYS)).build();
+    var stateWorkflow2 = stateWorkflow1.toBuilder().enabled(false).build();
+    var stateWorkflow3 = stateWorkflow1.toBuilder().nextNaturalOffsetTrigger(instant.plus(2, ChronoUnit.DAYS)).build();
 
-    storage.patchState(WORKFLOW_ID1, state_workflow_id1);
-    storage.patchState(WORKFLOW_ID2, state_workflow_id2);
-    storage.patchState(WORKFLOW_ID3, state_workflow_id3);
+    storage.patchState(WORKFLOW_ID1, stateWorkflow1);
+    storage.patchState(WORKFLOW_ID2, stateWorkflow2);
+    storage.patchState(WORKFLOW_ID3, stateWorkflow3);
 
     var workflows = storage.workflowsWithState();
     assertThat(workflows.size(), is(3));
 
-    assertThat(workflows, hasEntry(WORKFLOW_ID1, WorkflowWithState.create(workflow1, state_workflow_id1)));
-    assertThat(workflows, hasEntry(WORKFLOW_ID2, WorkflowWithState.create(workflow2, state_workflow_id2)));
-    assertThat(workflows, hasEntry(WORKFLOW_ID3, WorkflowWithState.create(workflow3, state_workflow_id3)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, WorkflowWithState.create(workflow1, stateWorkflow1)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, WorkflowWithState.create(workflow2, stateWorkflow2)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, WorkflowWithState.create(workflow3, stateWorkflow3)));
   }
 
   @Test
