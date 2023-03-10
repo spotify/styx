@@ -104,7 +104,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>",
             rc -> workflow(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "GET", BASE + "/<cid>/<wfid>/state",
+            json(), "GET", BASE + "/<cid>/<wfid>/full",
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
                 json(), "GET", BASE + "/state",
