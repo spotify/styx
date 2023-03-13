@@ -84,6 +84,7 @@ import com.google.cloud.datastore.QueryResults;
 import com.google.cloud.datastore.StringValue;
 import com.google.common.collect.ImmutableSet;
 import com.spotify.styx.model.Backfill;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.model.BackfillBuilder;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.Resource;
@@ -554,6 +555,39 @@ public class DatastoreStorageTest {
     WorkflowState retrieved = storage.workflowState(WORKFLOW.id());
 
     assertThat(retrieved, is(state));
+  }
+
+  @Test
+  public void shouldReturnWorkflowsWithState() throws Exception {
+    assertThat(storage.workflowsWithState().isEmpty(), is(true));
+
+    Workflow workflow1 = workflow(WORKFLOW_ID1);
+    Workflow workflow2 = workflow(WORKFLOW_ID2);
+    Workflow workflow3 = workflow(WORKFLOW_ID3);
+
+    storage.store(workflow1);
+    storage.store(workflow2);
+    storage.store(workflow3);
+
+    var instant = Instant.parse("2016-03-14T14:00:00Z");
+    var stateWorkflow1 = WorkflowState.builder()
+            .enabled(true)
+            .nextNaturalTrigger(instant)
+            .nextNaturalOffsetTrigger(instant.plus(1, ChronoUnit.DAYS))
+            .build();
+    var stateWorkflow2 = stateWorkflow1.toBuilder().enabled(false).build();
+    var stateWorkflow3 = stateWorkflow1.toBuilder().nextNaturalOffsetTrigger(instant.plus(2, ChronoUnit.DAYS)).build();
+
+    storage.patchState(WORKFLOW_ID1, stateWorkflow1);
+    storage.patchState(WORKFLOW_ID2, stateWorkflow2);
+    storage.patchState(WORKFLOW_ID3, stateWorkflow3);
+
+    var workflows = storage.workflowsWithState();
+    assertThat(workflows.size(), is(3));
+
+    assertThat(workflows, hasEntry(WORKFLOW_ID1, WorkflowWithState.create(workflow1, stateWorkflow1)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID2, WorkflowWithState.create(workflow2, stateWorkflow2)));
+    assertThat(workflows, hasEntry(WORKFLOW_ID3, WorkflowWithState.create(workflow3, stateWorkflow3)));
   }
 
   @Test
