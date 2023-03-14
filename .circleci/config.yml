@@ -1,4 +1,15 @@
-general:
-  branches:
-    ignore:
-      - gh-pages
+version: 2.1
+jobs:
+  no-op:
+    docker:
+      - image: circleci/python:3.9
+    steps:
+      - run: echo "No-op job"
+workflows:
+  version: 2
+  build:
+    jobs:
+      - no-op:
+          filters:
+            branches:
+              ignore: gh-pages
