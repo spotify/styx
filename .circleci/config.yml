@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   no-op:
     docker:
-      - image: circleci/python:3.9
+      - image: non-existing-image
     steps:
       - run: echo "No-op job"
 workflows:
