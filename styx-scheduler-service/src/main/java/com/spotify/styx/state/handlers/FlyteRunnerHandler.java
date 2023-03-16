@@ -53,7 +53,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
     if (!flyteRunner.isEnabled()) {
       var workflowInstance = state.workflowInstance();
       LOG.error("Unable to transition {} into {}. Flyte system is not available", workflowInstance, state.state());
-      // halt the execution if we have not; ERROR state is issued by halt event
+      // halt the execution if we have not; ERROR state is driven by halt event
       if (state.state() != RunState.State.ERROR) {
         eventRouter.receiveIgnoreClosed(Event.halt(workflowInstance), state.counter());
       }
