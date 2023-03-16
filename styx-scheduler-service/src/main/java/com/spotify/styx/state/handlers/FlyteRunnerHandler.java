@@ -65,6 +65,7 @@ public class FlyteRunnerHandler extends AbstractRunnerHandler {
       case RUNNING:
         pollingExecution(state);
         break;
+      case ERROR:
       case FAILED:
         cleanUpExecution(state);
         break;
