@@ -20,10 +20,9 @@
 
 package com.spotify.styx.state;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
-import com.spotify.styx.StyxScheduler;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.time.Duration;
@@ -34,9 +33,8 @@ public class TimeoutConfigTest {
   @Test
   public void testDurations() {
     Config config = ConfigFactory.load("ttl");
-    Config ttls = config.getConfig(StyxScheduler.STYX_STALE_STATE_TTL_CONFIG);
 
-    TimeoutConfig timeouts = TimeoutConfig.createFromConfig(ttls);
+    TimeoutConfig timeouts = TimeoutConfig.createFromConfig(config);
 
     assertThat(timeouts.ttlOf(RunState.State.RUNNING), is(Duration.ofHours(24)));
     assertThat(timeouts.ttlOf(RunState.State.SUBMITTED), is(Duration.ofMinutes(5)));

@@ -146,7 +146,6 @@ public class StyxScheduler implements AppInit {
   private static final String GKE_CLUSTER_ID = "cluster-id";
   private static final String GKE_CLUSTER_NAMESPACE = "namespace";
 
-  public static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
   private static final String STYX_STATE_PROCESSING_THREADS = "styx.state-processing-threads";
   private static final String STYX_SCHEDULER_TICK_INTERVAL = "styx.scheduler.tick-interval";
   private static final String STYX_TRIGGER_TICK_INTERVAL = "styx.trigger.tick-interval";
@@ -409,15 +408,16 @@ public class StyxScheduler implements AppInit {
     final CounterSnapshotFactory counterSnapshotFactory = new ShardedCounterSnapshotFactory(storage);
     final ShardedCounter shardedCounter = new ShardedCounter(stats, counterSnapshotFactory);
 
-    final Config staleStateTtlConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
-    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(staleStateTtlConfig);
-
     final Supplier<Map<WorkflowId, Workflow>> workflowCache = new CachedSupplier<>(storage::workflows, time);
 
     final Supplier<StyxConfig> styxConfig = new CachedSupplier<>(storage::config, time);
     final Debug debug = () -> styxConfig.get().debugEnabled();
+
+    final TimeoutConfig timeoutConfig = TimeoutConfig.createFromConfig(config);
+    final Duration maxRunningStateTtl = timeoutConfig.getMaxRunningTimeout();
+
     var workflowValidator = new ExtendedWorkflowValidator(
-        new BasicWorkflowValidator(new DockerImageValidator()), timeoutConfig.ttlOf(State.RUNNING));
+        new BasicWorkflowValidator(new DockerImageValidator()), maxRunningStateTtl);
 
     var podMutator = podMutatorFactory.apply(environment);
     final Function<RunState, String> dockerRunnerId = RunnerId.dockerRunnerId(styxConfig);

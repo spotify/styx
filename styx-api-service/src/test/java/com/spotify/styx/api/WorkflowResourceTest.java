@@ -40,6 +40,7 @@ import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_AFTER;
 import static com.spotify.styx.testdata.TestData.QUERY_THRESHOLD_BEFORE;
 import static com.spotify.styx.testdata.TestData.TEST_DEPLOYMENT_TIME;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -74,6 +75,7 @@ import com.spotify.styx.model.WorkflowConfigurationBuilder;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
 import com.spotify.styx.state.Trigger;
 import com.spotify.styx.storage.AggregateStorage;
 import com.spotify.styx.storage.BigtableMocker;
@@ -82,12 +84,12 @@ import com.spotify.styx.storage.DatastoreEmulator;
 import com.spotify.styx.storage.TransactionFunction;
 import com.spotify.styx.util.ParameterUtil;
 import com.spotify.styx.util.ResourceNotFoundException;
-import com.spotify.styx.util.Time;
 import com.spotify.styx.util.TriggerUtil;
 import com.spotify.styx.util.WorkflowValidator;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -124,7 +126,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Mock private RequestAuthenticator requestAuthenticator;
 
   private static final String SERVICE_ACCOUNT = "foo@bar.iam.gserviceaccount.com";
-  private static final Time time = ()-> TEST_DEPLOYMENT_TIME;
+  private static final Instant time = TEST_DEPLOYMENT_TIME;
 
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION =
       WorkflowConfiguration.builder()
@@ -135,7 +137,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
           .serviceAccount(SERVICE_ACCOUNT)
           .env("FOO", "foo", "BAR", "bar")
           .runningTimeout(Duration.parse("PT23H"))
-          .deploymentTime(time.get())
+          .deploymentTime(time)
           .build();
 
   private static final Workflow WORKFLOW =
@@ -195,7 +197,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     when(requestAuthenticator.authenticate(any())).thenReturn(() -> Optional.of(idToken));
     WorkflowResource workflowResource =
         new WorkflowResource(storage, workflowValidator, workflowInitializer, workflowConsumer,
-            workflowActionAuthorizer,time);
+            workflowActionAuthorizer, () -> time);
 
     environment.routingEngine()
         .registerRoutes(workflowResource.routes(requestAuthenticator).map(r ->
@@ -821,6 +823,27 @@ public class WorkflowResourceTest extends VersionedApiTest {
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(2));
+  }
+
+  @Test
+  public void shouldReturnWorkflowsWithState() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    Response<ByteString> response = awaitResponse(
+            serviceHelper.request("GET", path("/full")));
+
+    var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
+    var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, WorkflowState.builder().enabled(false).build());
+    var expectedWF2 = WorkflowWithState.create(WORKFLOW, WorkflowState.builder().enabled(false).build());
+
+    assertThat(response, hasStatus(withCode(Status.OK)));
+    assertJson(response, "[*]", hasSize(2));
+    assertThat(parsedResponse,
+            containsInAnyOrder(
+                    expectedWF1,
+                    expectedWF2
+            )
+    );
   }
 
   @Test

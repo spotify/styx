@@ -20,9 +20,9 @@
 
 package com.spotify.styx.util;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertThat;
 
 import java.time.Instant;
 import org.junit.Test;

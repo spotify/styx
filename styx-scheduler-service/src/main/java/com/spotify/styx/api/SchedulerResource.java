@@ -41,6 +41,7 @@ import com.spotify.styx.api.Middlewares.AuthContext;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.TriggerRequest;
+import com.spotify.styx.model.TriggerResponse;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.serialization.Json;
@@ -99,7 +100,7 @@ public class SchedulerResource {
             "POST", BASE + "/events",
             ac -> rc -> event -> injectEvent(ac, event)),
         Route.with(
-            authedEntity(authenticator, em.response(TriggerRequest.class)),
+            authedEntity(authenticator, em.response(TriggerRequest.class, TriggerResponse.class)),
             "POST", BASE + "/trigger",
             ac -> rc -> payload -> triggerWorkflowInstance(ac, rc, payload)),
         Route.with(
@@ -168,7 +169,7 @@ public class SchedulerResource {
     return OK;
   }
 
-  private Response<TriggerRequest> triggerWorkflowInstance(
+  private Response<TriggerResponse> triggerWorkflowInstance(
       AuthContext ac, RequestContext rc, TriggerRequest triggerRequest) {
     final WorkflowInstance workflowInstance = WorkflowInstance.create(
         triggerRequest.workflowId(), triggerRequest.parameter());
@@ -221,9 +222,9 @@ public class SchedulerResource {
     return triggerAndWait(triggerRequest, workflow, instant);
   }
 
-  private Response<TriggerRequest> triggerAndWait(TriggerRequest triggerRequest,
-                                                  Workflow workflow,
-                                                  Instant instant) {
+  private Response<TriggerResponse> triggerAndWait(TriggerRequest triggerRequest,
+                                                   Workflow workflow,
+                                                   Instant instant) {
     final TriggerParameters parameters =
         triggerRequest.triggerParameters().orElse(TriggerParameters.zero());
     final String triggerId = randomGenerator.generateUniqueId(AD_HOC_CLI_TRIGGER_PREFIX);
@@ -232,12 +233,13 @@ public class SchedulerResource {
     } catch (Exception e) {
       return handleException(e);
     }
+    TriggerResponse response = TriggerResponse.of(triggerRequest.workflowId(),
+      triggerRequest.parameter(), triggerRequest.triggerParameters().orElse(null), triggerId);
 
-    // todo: change payload to a struct returning the triggerId as well so the user can refer to it
-    return Response.forPayload(triggerRequest);
+    return Response.forPayload(response);
   }
 
-  private Response<TriggerRequest> handleException(final Throwable e) {
+  private Response<TriggerResponse> handleException(final Throwable e) {
     Throwable cause;
     if ((cause = findCause(e, IllegalStateException.class)) != null
         || (cause = findCause(e, IllegalArgumentException.class)) != null) {

@@ -23,8 +23,8 @@ package com.spotify.styx.api;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasJsonPath;
 import static com.jayway.jsonpath.matchers.JsonPathMatchers.hasNoJsonPath;
 import static com.spotify.apollo.test.unit.ResponseMatchers.hasPayload;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
 
 import com.spotify.apollo.Response;
 import okio.ByteString;

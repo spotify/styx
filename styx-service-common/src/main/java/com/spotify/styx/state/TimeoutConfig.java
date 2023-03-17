@@ -20,11 +20,15 @@
 
 package com.spotify.styx.state;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+
+import static com.spotify.styx.util.ConfigUtil.get;
 
 /**
  * Configuration object for mappings from {@link RunState.State} to TTL values.
@@ -32,16 +36,26 @@ import java.util.Objects;
 public class TimeoutConfig {
 
   private static final String DEFAULT_TTL_KEY = "default";
+  private static final String STYX_RUNNING_STATE_MAX_TTL_CONFIG = "styx.max-running-timeout";
+  private static final String STYX_STALE_STATE_TTL_CONFIG = "styx.stale-state-ttls";
 
   private final Map<RunState.State, Duration> ttls;
   private final Duration defaultTtl;
+  private final Duration maxRunningTimeout;
 
-  private TimeoutConfig(Map<RunState.State, Duration> ttls, Duration defaultTtl) {
+  private TimeoutConfig(Map<RunState.State, Duration> ttls, Duration defaultTtl, Optional<Duration> maxRunningTimeout) {
     this.ttls = Objects.requireNonNull(ttls);
     this.defaultTtl = Objects.requireNonNull(defaultTtl);
+    this.maxRunningTimeout = maxRunningTimeout.orElseGet(() -> ttlOf(RunState.State.RUNNING));
   }
 
-  public static TimeoutConfig createFromConfig(Config ttlSubConfig) {
+  public Duration getMaxRunningTimeout() {
+    return maxRunningTimeout;
+  }
+
+  public static TimeoutConfig createFromConfig(Config config) {
+    final Config ttlSubConfig = config.getConfig(STYX_STALE_STATE_TTL_CONFIG);
+
     final Duration defaultTtl = Duration.parse(ttlSubConfig.getString(DEFAULT_TTL_KEY));
 
     final ImmutableMap.Builder<RunState.State, Duration> map = ImmutableMap.builder();
@@ -53,11 +67,14 @@ public class TimeoutConfig {
       }
     }
 
-    return new TimeoutConfig(map.build(), defaultTtl);
+    Optional<Duration> maxRunningTimeout = get(config, config::getString, STYX_RUNNING_STATE_MAX_TTL_CONFIG).map(Duration::parse);
+
+    return new TimeoutConfig(map.build(), defaultTtl, maxRunningTimeout);
   }
 
+  @VisibleForTesting
   public static TimeoutConfig createWithDefaultTtl(Duration defaultTtl) {
-    return new TimeoutConfig(Map.of(), defaultTtl);
+    return new TimeoutConfig(Map.of(), defaultTtl, Optional.of(defaultTtl));
   }
 
   public Duration ttlOf(RunState.State state) {

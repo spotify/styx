@@ -24,16 +24,18 @@ import static com.spotify.styx.util.ParameterUtil.parseBest;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
-import com.google.common.collect.ImmutableMap;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.Optional;
+import java.util.Set;
 
 
 public class FlyteInputsUtils {
+
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
   }
@@ -93,17 +95,17 @@ public class FlyteInputsUtils {
                                           Interface.Parameter parameter,
                                           Map<String, String> extraDefaultInputs,
                                           Map<String, String> triggerParameters) {
-    var lowercaseKey = key.toLowerCase();
+    var lowerCaseKey = key.toLowerCase();
+    var lowerWithSnakeRemoved = noSnake(lowerCaseKey);
 
-    final String triggerParam = triggerParameters.get(lowercaseKey);
-    if (triggerParam != null) {
-      return literalOf(key, triggerParam, parameter.getVar().getType());
+    var triggerParam = getMultiKeys(triggerParameters, lowerCaseKey, lowerWithSnakeRemoved);
+    if (triggerParam.isPresent()) {
+      return literalOf(key, triggerParam.get(), parameter.getVar().getType());
     }
 
-    var extraDefaultInput = extraDefaultInputs.get(lowercaseKey);
-
-    if (extraDefaultInput != null) {
-      return literalOf(key, extraDefaultInput, parameter.getVar().getType());
+    var extraDefaultInput = getMultiKeys(extraDefaultInputs, lowerCaseKey, lowerWithSnakeRemoved);
+    if (extraDefaultInput.isPresent()) {
+      return literalOf(key, extraDefaultInput.get(), parameter.getVar().getType());
     }
 
     if (parameter.hasDefault()) {
@@ -113,6 +115,11 @@ public class FlyteInputsUtils {
     throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
   }
 
+  private static Optional<String> getMultiKeys(Map<String, String> map, String key1, String key2) {
+    return Optional.ofNullable(map.get(key1))
+        .or(() -> Optional.ofNullable(map.get(key2)));
+  }
+
   static Literals.LiteralMap fillParameterInInputs(
       Interface.ParameterMap parameterMap,
       Map<String, String> userDefinedInputs,
@@ -120,11 +127,12 @@ public class FlyteInputsUtils {
       Map<String, String> triggerParams) {
 
     // Validate that user defined inputs exist in the LaunchPlan
-    var paramsKeysInLowercase = parameterMap.getParametersMap().keySet().stream().map(String::toLowerCase).collect(toSet());
-    var lowercaseInputs = userDefinedInputs.keySet().stream().map(String::toLowerCase).collect(toSet());
-    if (!paramsKeysInLowercase.containsAll(lowercaseInputs)) {
+    var lowerNoSnakeParamsKeys = getLowerNoSnakeKeys(parameterMap.getParametersMap());
+    var lowerNoSnakeInputKeys = getLowerNoSnakeKeys(userDefinedInputs);
+    if (!lowerNoSnakeParamsKeys.containsAll(lowerNoSnakeInputKeys)) {
       var unMatchedInputKeys = userDefinedInputs.keySet().stream()
-          .filter(key -> !paramsKeysInLowercase.contains(key.toLowerCase()))
+          .filter(key -> !lowerNoSnakeParamsKeys.contains(key.toLowerCase())
+              && !lowerNoSnakeParamsKeys.contains(noSnake(key.toLowerCase())))
           .collect(toList());
       throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
                                               + " " + unMatchedInputKeys);
@@ -133,35 +141,49 @@ public class FlyteInputsUtils {
 
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
 
-    var combinedInputsLowerCase = FlyteInputsUtils.combineMapsCaseInsensitiveWithOrder(userDefinedInputs, styxVariables)
-        .entrySet()
-        .stream()
-        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
-        ;
+    var multiCaseDefaultValues = FlyteInputsUtils.combineMapsWithPreference(
+        toMultiCaseMap(userDefinedInputs),
+        toMultiCaseMap(styxVariables));
 
-    var triggerParamsToLowerCase = triggerParams
-        .entrySet()
-        .stream()
-        .collect(ImmutableMap.toImmutableMap(x -> x.getKey().toLowerCase(), Map.Entry::getValue))
-        ;
+    var multiCaseTriggerParams = toMultiCaseMap(triggerParams);
 
     parameterMap
         .getParametersMap()
         .forEach(
             (key, parameter) -> literalMapBuilder.putLiterals(
                 key,
-                getDefaultValue(key, parameter, combinedInputsLowerCase, triggerParamsToLowerCase)));
+                getDefaultValue(key, parameter, multiCaseDefaultValues, multiCaseTriggerParams)));
 
     return literalMapBuilder.build();
   }
 
-  // case shouldnt matter because the case is inhereted from the FlyteLaunchPlan
-  public static Map<String, String> combineMapsCaseInsensitiveWithOrder(final Map<String, String> map1,
-                                                             final Map<String, String> map2) {
-    Map<String, String> inputsMap =
-        new TreeMap<>(String.CASE_INSENSITIVE_ORDER); // create case insensitive map to keep user defined casing
-    inputsMap.putAll(map1); // First use the fields stored in the flyteExecConf
-    inputsMap.putAll(map2); // Then override with the triggeredParams
-    return ImmutableMap.copyOf(inputsMap);
+  private static Set<String> getLowerNoSnakeKeys(Map<String, ?> map) {
+    return map.keySet().stream()
+        .map(String::toLowerCase)
+        .map(FlyteInputsUtils::noSnake)
+        .collect(toSet());
+  }
+
+  private static Map<String, String> combineMapsWithPreference(
+      final Map<String, String> map1,
+      final Map<String, String> map2) {
+    Map<String, String> combinedMap = new HashMap<>();
+    combinedMap.putAll(map1);
+    combinedMap.putAll(map2);
+    return Map.copyOf(combinedMap);
+  }
+
+  private static Map<String, String> toMultiCaseMap(Map<String, String> map) {
+    var multiCaseMap = new HashMap<String, String>();
+    map.forEach((varName, value) -> {
+      String lowerCase = varName.toLowerCase();
+      multiCaseMap.put(lowerCase, value);
+      multiCaseMap.put(noSnake(lowerCase), value);
+    });
+    return multiCaseMap;
+  }
+
+  private static String noSnake(String str) {
+    return str.replaceAll("_", "");
   }
 }
