@@ -66,12 +66,14 @@
         <artifactId>protobuf-maven-plugin</artifactId>
         <version>0.6.1</version>
         <configuration>
+          <!-- FIXME: temporarily separate name from arch to work around compiling on Apple silicon -->
           <protocArtifact>
-            com.google.protobuf:protoc:3.11.0:exe:${os.detected.classifier}
+            com.google.protobuf:protoc:3.11.0:exe:${os.detected.name}-${os.detected.arch}
           </protocArtifact>
           <pluginId>grpc-java</pluginId>
+          <!-- FIXME: temporarily separate name from arch to work around compiling on Apple silicon -->
           <pluginArtifact>
-            io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
+            io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.name}-${os.detected.arch}
           </pluginArtifact>
           <checkStaleness>true</checkStaleness>
         </configuration>
