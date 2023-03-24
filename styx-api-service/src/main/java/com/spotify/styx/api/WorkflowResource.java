@@ -69,6 +69,7 @@ import org.slf4j.LoggerFactory;
 public final class WorkflowResource {
 
   private static final String BASE = "/workflows";
+  private static final String STATE_BASE = "/workflow_states";
   private static final int DEFAULT_PAGE_LIMIT = 24 * 7;
 
   private static final Logger LOG = LoggerFactory.getLogger(WorkflowResource.class);
@@ -107,7 +108,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/full",
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-                json(), "GET", BASE + "/full",
+                json(), "GET", STATE_BASE,
                 rc -> workflowsWithState()),
         Route.with(
             json(), "GET", BASE,

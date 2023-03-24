@@ -134,6 +134,10 @@ public abstract class VersionedApiTest {
     return version.prefix() + basePath + path;
   }
 
+  String pathPrefix() {
+    return version.prefix();
+  }
+
   Response<ByteString> awaitResponse(CompletionStage<Response<ByteString>> completionStage)
       throws InterruptedException, ExecutionException, TimeoutException {
     return completionStage.toCompletableFuture().get(5, TimeUnit.SECONDS);
