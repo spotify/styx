@@ -27,6 +27,8 @@ import static com.spotify.apollo.test.unit.ResponseMatchers.hasStatus;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withCode;
 import static com.spotify.apollo.test.unit.StatusTypeMatchers.withReasonPhrase;
 import static com.spotify.styx.api.JsonMatchers.assertJson;
+import static com.spotify.styx.api.WorkflowResource.BASE;
+import static com.spotify.styx.api.WorkflowResource.STATE_BASE;
 import static com.spotify.styx.api.util.CreateWorkflowUtil.buildWorkflowMap;
 import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithTime;
 import static com.spotify.styx.api.util.CreateWorkflowUtil.createWorkflowWithType;
@@ -185,7 +187,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
       ByteString.encodeUtf8("{\"The BAD\"}");
 
   public WorkflowResourceTest(Api.Version version) {
-    super("/workflows", version, "workflow-test");
+    super(BASE, version, "workflow-test");
     MockitoAnnotations.initMocks(this);
   }
 
@@ -830,7 +832,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     Response<ByteString> response = awaitResponse(
-            serviceHelper.request("GET", pathPrefix() + "/workflow_states"));
+            serviceHelper.request("GET", pathPrefix() + STATE_BASE));
 
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
     var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, WorkflowState.builder().enabled(false).build());

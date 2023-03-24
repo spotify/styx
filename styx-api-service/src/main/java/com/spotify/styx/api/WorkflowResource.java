@@ -68,8 +68,8 @@ import org.slf4j.LoggerFactory;
 
 public final class WorkflowResource {
 
-  private static final String BASE = "/workflows";
-  private static final String STATE_BASE = "/workflow_states";
+  static final String BASE = "/workflows";
+  static final String STATE_BASE = "/workflow_states";
   private static final int DEFAULT_PAGE_LIMIT = 24 * 7;
 
   private static final Logger LOG = LoggerFactory.getLogger(WorkflowResource.class);
