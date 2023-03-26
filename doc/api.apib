@@ -48,7 +48,9 @@ Resources related to the Workflows registered in Styx.
     + version: `v3` (enum[string]) - API version
         + Members
             + `v3`
+    + full: `true` (optional, boolean) - Return the state of the workflow
 
+#### Without full
 + Response 200 (application/json)
 
         [{
@@ -72,15 +74,7 @@ Resources related to the Workflows registered in Styx.
               }
         }]
 
-
-## Workflows [/{version}/workflows/full]
-
-+ Parameters
-    + version: `v3` (enum[string]) - API version
-        + Members
-            + `v3`
-
-### Get Workflows with State [GET]
+#### With full=true
 
 + Response 200 (application/json)
 

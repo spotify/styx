@@ -850,7 +850,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTypeWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithType("id2", "not-remote-foo")
@@ -870,7 +870,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTimeBeforeWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
@@ -890,7 +890,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTimeAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
@@ -915,7 +915,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     var queryThresholdBefore = "2022-01-01T10:15:27.00Z";
     var queryThresholdAfter = "2022-01-01T10:15:33.00Z";
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTime("id2", Instant.parse(queryThresholdBefore)),
@@ -938,7 +938,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
     var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
@@ -958,7 +958,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTypeTimeBeforeWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTypeAndTime("id2", "remote-foo", QUERY_THRESHOLD_BEFORE),
@@ -978,7 +978,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldReturnFilteredDeploymentTypeTimeAfterWorkflow() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE),
@@ -1000,7 +1000,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     var deploymentTimeAfter = "2022-01-01T10:15:28.00Z";
     var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
 
-    when(storage.workflows()).thenReturn(
+    when(storage.workflowsWithState()).thenReturn(
         buildWorkflowMap(
             createWorkflowWithType("id1", "remote-foo"),
             createWorkflowWithTypeAndTime("id2", "remote-foo", QUERY_THRESHOLD_BEFORE),

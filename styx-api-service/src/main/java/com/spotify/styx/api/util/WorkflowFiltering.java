@@ -34,23 +34,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
+
+import com.spotify.styx.model.WorkflowWithState;
 import joptsimple.internal.Strings;
 
 public final class WorkflowFiltering {
 
   private WorkflowFiltering(){}
 
-  public static Collection<Workflow> filterWorkflows(
-      Collection<Workflow> workflows, Map<QueryParams, String> paramFilters){
+  public static Collection<WorkflowWithState> filterWorkflows(
+          Collection<WorkflowWithState> workflowWithStates, Map<QueryParams, String> paramFilters){
     if (paramFilters.isEmpty()) {
       // Nothing to filter on
-      return workflows;
+      return workflowWithStates;
     }
     List<Predicate> workflowFilters = createWorkflowFilters(paramFilters);
 
-    return workflows.stream()
+    return workflowWithStates.stream()
         .filter(w -> workflowFilters.stream()
-            .allMatch(pre-> pre.test(w)))
+            .allMatch(pre-> pre.test(w.workflow())))
         .collect(toList());
   }
 

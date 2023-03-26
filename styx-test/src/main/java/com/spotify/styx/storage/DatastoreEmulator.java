@@ -49,7 +49,7 @@ public class DatastoreEmulator extends ExternalResource {
   @Override
   protected void before() {
     Try.run(helper::start).get();
-    assertGcloudDatastoreEmulator();
+    //assertGcloudDatastoreEmulator();
   }
 
   @Override

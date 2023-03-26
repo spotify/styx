@@ -22,6 +22,7 @@ package com.spotify.styx.api;
 
 import static com.spotify.styx.api.Api.Version.V3;
 import static com.spotify.styx.api.Middlewares.json;
+import static com.spotify.styx.api.util.QueryParams.INCLUDE_STATES;
 import static com.spotify.styx.api.util.WorkflowFiltering.filterWorkflows;
 import static com.spotify.styx.serialization.Json.OBJECT_MAPPER;
 
@@ -107,11 +108,11 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/full",
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-                json(), "GET", BASE + "/full",
-                rc -> workflowsWithState()),
-        Route.with(
-            json(), "GET", BASE,
+            json(), "GET", BASE + "?full=true",
             rc -> workflows(rc.request())),
+            Route.with(
+                    json(), "GET", BASE + "",
+                    rc -> workflows(rc.request())),
         Route.with(
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
@@ -219,26 +220,23 @@ public final class WorkflowResource {
     return WorkflowConfigurationBuilder.from(workflowConfig).deploymentTime(time.get()).build();
   }
 
-  private Response<Collection<WorkflowWithState>> workflowsWithState() {
-    try {
-      Collection<WorkflowWithState> workflows = storage.workflowsWithState().values();
-      return Response.forPayload(workflows);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get workflows", e);
-    }
-  }
-
-  private Response<Collection<Workflow>> workflows(Request request) {
+  private Response<? extends Collection<?>> workflows(Request request) {
     try {
       var paramFilters = Stream.of(QueryParams.values())
           .map(e -> getFilterParams(request, e).map(param -> Map.entry(e, param)))
           .flatMap(Optional::stream)
           .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-      Collection<Workflow> workflows = storage.workflows().values();
+      Collection<WorkflowWithState> workflowsWithState = storage.workflowsWithState().values();
+      Collection<WorkflowWithState> filteredWorkflows = filterWorkflows(workflowsWithState, paramFilters);
+      Optional<String> includeStates = getFilterParams(request, INCLUDE_STATES);
 
-      return Response.forPayload(filterWorkflows(workflows, paramFilters));
+      if (includeStates.isPresent() && Boolean.parseBoolean(includeStates.get())) {
+        return Response.forPayload(filteredWorkflows);
+      }
 
+      List<Workflow> workflows = workflowsWithState.stream().map(WorkflowWithState::workflow).collect(Collectors.toList());
+      return Response.forPayload(workflows);
     } catch (IOException e) {
       throw new RuntimeException("Failed to get workflows", e);
     }
