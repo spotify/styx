@@ -830,7 +830,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     Response<ByteString> response = awaitResponse(
-            serviceHelper.request("GET", path("/full")));
+            serviceHelper.request("GET", path("?full=true")));
 
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
     var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, WorkflowState.builder().enabled(false).build());
@@ -1023,7 +1023,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
   public void shouldFailedToReturnWorkflows() throws Exception {
     sinceVersion(Api.Version.V3);
 
-    when(storage.workflows()).thenThrow(new IOException());
+    when(storage.workflowsWithState()).thenThrow(new IOException());
 
     Response<ByteString> response = awaitResponse(
         serviceHelper.request("GET", path("")));

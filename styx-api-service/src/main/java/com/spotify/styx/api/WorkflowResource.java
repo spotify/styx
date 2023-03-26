@@ -235,7 +235,7 @@ public final class WorkflowResource {
         return Response.forPayload(filteredWorkflows);
       }
 
-      List<Workflow> workflows = workflowsWithState.stream().map(WorkflowWithState::workflow).collect(Collectors.toList());
+      List<Workflow> workflows = filteredWorkflows.stream().map(WorkflowWithState::workflow).collect(Collectors.toList());
       return Response.forPayload(workflows);
     } catch (IOException e) {
       throw new RuntimeException("Failed to get workflows", e);
