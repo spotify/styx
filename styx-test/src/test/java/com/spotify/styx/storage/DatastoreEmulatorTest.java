@@ -31,7 +31,6 @@ import junitparams.Parameters;
 import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.EnvironmentVariables;
@@ -65,7 +64,6 @@ public class DatastoreEmulatorTest {
   }
 
   @Test
-  @Ignore
   public void shouldFailIfNotGcloudEmulator() throws InterruptedException {
     environmentVariables.clear("PATH");
     var emulator = new DatastoreEmulator();
