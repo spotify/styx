@@ -108,11 +108,8 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/full",
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "GET", BASE + "?full=true",
+            json(), "GET", BASE + "",
             rc -> workflows(rc.request())),
-            Route.with(
-                    json(), "GET", BASE + "",
-                    rc -> workflows(rc.request())),
         Route.with(
             json(), "GET", BASE + "/<cid>",
             rc -> workflows(arg("cid", rc))),
@@ -231,7 +228,7 @@ public final class WorkflowResource {
       Collection<WorkflowWithState> filteredWorkflows = filterWorkflows(workflowsWithState, paramFilters);
       Optional<String> includeStates = getFilterParams(request, INCLUDE_STATES);
 
-      if (includeStates.isPresent() && Boolean.parseBoolean(includeStates.get())) {
+      if (shouldIncludeState(includeStates)) {
         return Response.forPayload(filteredWorkflows);
       }
 
@@ -240,6 +237,10 @@ public final class WorkflowResource {
     } catch (IOException e) {
       throw new RuntimeException("Failed to get workflows", e);
     }
+  }
+
+  private boolean shouldIncludeState(Optional<String> includeStates) {
+    return includeStates.filter(Boolean::parseBoolean).isPresent();
   }
 
   private Optional<String> getFilterParams(Request request, QueryParams filter) {
