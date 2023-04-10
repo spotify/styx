@@ -108,7 +108,7 @@ public final class WorkflowResource {
             json(), "GET", BASE + "/<cid>/<wfid>/full",
             rc -> workflowWithState(arg("cid", rc), arg("wfid", rc))),
         Route.with(
-            json(), "GET", BASE + "",
+            json(), "GET", BASE,
             rc -> workflows(rc.request())),
         Route.with(
             json(), "GET", BASE + "/<cid>",
@@ -226,9 +226,8 @@ public final class WorkflowResource {
 
       Collection<WorkflowWithState> workflowsWithState = storage.workflowsWithState().values();
       Collection<WorkflowWithState> filteredWorkflows = filterWorkflows(workflowsWithState, paramFilters);
-      Optional<String> includeStates = getFilterParams(request, INCLUDE_STATES);
 
-      if (shouldIncludeState(includeStates)) {
+      if (includeStates(request)) {
         return Response.forPayload(filteredWorkflows);
       }
 
@@ -239,8 +238,9 @@ public final class WorkflowResource {
     }
   }
 
-  private boolean shouldIncludeState(Optional<String> includeStates) {
-    return includeStates.filter(Boolean::parseBoolean).isPresent();
+  private boolean includeStates(Request request) {
+    Optional<String> full = getFilterParams(request, INCLUDE_STATES);
+    return full.filter(Boolean::parseBoolean).isPresent();
   }
 
   private Optional<String> getFilterParams(Request request, QueryParams filter) {

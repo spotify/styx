@@ -95,6 +95,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+
 import okio.ByteString;
 import org.apache.hadoop.hbase.client.Connection;
 import org.junit.After;
@@ -814,15 +815,26 @@ public class WorkflowResourceTest extends VersionedApiTest {
     assertThat(response, hasStatus(withCode(Status.BAD_REQUEST)));
   }
 
+
+
   @Test
   public void shouldReturnWorkflows() throws Exception {
     sinceVersion(Api.Version.V3);
+    var paths = List.of("", "?full", "?full=false");
+    for(String path: paths) {
+      Response<ByteString> response = awaitResponse(
+          serviceHelper.request("GET", path(path)));
 
-    Response<ByteString> response = awaitResponse(
-        serviceHelper.request("GET", path("")));
-
-    assertThat(response, hasStatus(withCode(Status.OK)));
-    assertJson(response, "[*]", hasSize(2));
+      var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  Workflow[].class));
+      assertThat(response, hasStatus(withCode(Status.OK)));
+      assertJson(response, "[*]", hasSize(2));
+      assertThat(parsedResponse,
+              containsInAnyOrder(
+                      FLYTE_EXEC_WORKFLOW,
+                      WORKFLOW
+              )
+      );
+    }
   }
 
   @Test
@@ -832,9 +844,10 @@ public class WorkflowResourceTest extends VersionedApiTest {
     Response<ByteString> response = awaitResponse(
             serviceHelper.request("GET", path("?full=true")));
 
+    var state = WorkflowState.builder().enabled(false).build();
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
-    var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, WorkflowState.builder().enabled(false).build());
-    var expectedWF2 = WorkflowWithState.create(WORKFLOW, WorkflowState.builder().enabled(false).build());
+    var expectedWF1 = WorkflowWithState.create(FLYTE_EXEC_WORKFLOW, state);
+    var expectedWF2 = WorkflowWithState.create(WORKFLOW, state);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
     assertJson(response, "[*]", hasSize(2));
