@@ -239,8 +239,7 @@ public final class WorkflowResource {
   }
 
   private boolean includeStates(Request request) {
-    Optional<String> full = getFilterParams(request, INCLUDE_STATES);
-    return full.filter(Boolean::parseBoolean).isPresent();
+    return getFilterParams(request, INCLUDE_STATES).isPresent();
   }
 
   private Optional<String> getFilterParams(Request request, QueryParams filter) {

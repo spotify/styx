@@ -820,10 +820,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnWorkflows() throws Exception {
     sinceVersion(Api.Version.V3);
-    var paths = List.of("", "?full", "?full=false");
-    for(String path: paths) {
       Response<ByteString> response = awaitResponse(
-          serviceHelper.request("GET", path(path)));
+          serviceHelper.request("GET", path("")));
 
       var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  Workflow[].class));
       assertThat(response, hasStatus(withCode(Status.OK)));
@@ -834,7 +832,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
                       WORKFLOW
               )
       );
-    }
+
   }
 
   @Test
@@ -842,7 +840,7 @@ public class WorkflowResourceTest extends VersionedApiTest {
     sinceVersion(Api.Version.V3);
 
     Response<ByteString> response = awaitResponse(
-            serviceHelper.request("GET", path("?full=true")));
+            serviceHelper.request("GET", path("?full")));
 
     var state = WorkflowState.builder().enabled(false).build();
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  WorkflowWithState[].class));
