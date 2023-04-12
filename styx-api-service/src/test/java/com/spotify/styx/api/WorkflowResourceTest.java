@@ -820,7 +820,8 @@ public class WorkflowResourceTest extends VersionedApiTest {
   @Test
   public void shouldReturnWorkflows() throws Exception {
     sinceVersion(Api.Version.V3);
-    Response<ByteString> response = awaitResponse(serviceHelper.request("GET", path("")));
+    Response<ByteString> response = awaitResponse(
+            serviceHelper.request("GET", path("")));
 
     var parsedResponse = Arrays.asList(deserialize(response.payload().orElseThrow(),  Workflow[].class));
     assertThat(response, hasStatus(withCode(Status.OK)));
