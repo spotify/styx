@@ -334,7 +334,7 @@ class KubernetesDockerRunner implements DockerRunner {
     return new ContainerBuilder()
         .withName(KEEPALIVE_CONTAINER_NAME)
         // Use the k8s pause container image. It sleeps forever until terminated.
-        .withImage("k8s.gcr.io/pause:3.1")
+        .withImage("registry.k8s.io/pause:3.1")
         .withNewResources()
         .withLimits(Map.of(
           "cpu", new QuantityBuilder()
