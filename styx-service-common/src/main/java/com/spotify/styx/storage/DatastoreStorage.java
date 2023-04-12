@@ -668,7 +668,7 @@ public class DatastoreStorage implements Closeable {
     return Optional.of(WorkflowWithState.create(workflow, workflowState));
   }
 
-  HashMap<WorkflowId, WorkflowWithState> workflowsWithState() throws IOException {
+  Map<WorkflowId, WorkflowWithState> workflowsWithState() throws IOException {
     HashMap<WorkflowId, WorkflowWithState> workflows = new HashMap<>();
     var query = Query.newEntityQueryBuilder().setKind(KIND_WORKFLOW).build();
     datastore.query(query, entity -> {

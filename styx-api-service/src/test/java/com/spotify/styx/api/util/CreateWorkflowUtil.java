@@ -25,6 +25,9 @@ import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowId;
+import com.spotify.styx.model.WorkflowState;
+import com.spotify.styx.model.WorkflowWithState;
+
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
@@ -32,28 +35,34 @@ import java.util.stream.Collectors;
 
 public class CreateWorkflowUtil {
 
+  public static WorkflowState STATE = WorkflowState.builder().enabled(true).build();
   private CreateWorkflowUtil() {
     // no instantiation
   }
 
-  public static Workflow createWorkflowWithType(String id, String type) {
-    return Workflow.create(id, WorkflowConfiguration.builder().id(id).schedule(Schedule.DAYS)
-        .deploymentSource(DeploymentSource.builder().source(type).build()).build());
+
+  public static WorkflowWithState workflowWithState(Workflow workflow) {
+    return WorkflowWithState.create(workflow, STATE);
   }
 
-  public static Workflow createWorkflowWithTime(String id, Instant instant) {
-    return Workflow.create(id,
-        WorkflowConfiguration.builder().id(id).schedule(Schedule.DAYS).deploymentTime(instant).build());
+  public static WorkflowWithState createWorkflowWithType(String id, String type) {
+    return workflowWithState(Workflow.create(id, WorkflowConfiguration.builder().id(id).schedule(Schedule.DAYS)
+        .deploymentSource(DeploymentSource.builder().source(type).build()).build()));
   }
 
-  public static Workflow createWorkflowWithTypeAndTime(String id, String type, Instant instant) {
-    return Workflow.create(id,
+  public static WorkflowWithState createWorkflowWithTime(String id, Instant instant) {
+    return workflowWithState(Workflow.create(id,
+        WorkflowConfiguration.builder().id(id).schedule(Schedule.DAYS).deploymentTime(instant).build()));
+  }
+
+  public static WorkflowWithState createWorkflowWithTypeAndTime(String id, String type, Instant instant) {
+    return workflowWithState(Workflow.create(id,
         WorkflowConfiguration.builder().id(id).schedule(Schedule.DAYS).deploymentTime(instant).deploymentSource(
-            DeploymentSource.builder().source(type).build()).build());
+            DeploymentSource.builder().source(type).build()).build()));
   }
 
-  public static Map<WorkflowId, Workflow> buildWorkflowMap(Workflow... workflows){
-    return Arrays.stream(workflows).collect(Collectors.toMap(Workflow::id, w->w));
+  public static Map<WorkflowId, WorkflowWithState> buildWorkflowMap(WorkflowWithState... workflows){
+    return Arrays.stream(workflows).collect(Collectors.toMap(w-> w.workflow().id(), w->w));
   }
 
 }
