@@ -1,0 +1,914 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Styx API specification</title><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css"><style>@import url('https://fonts.googleapis.com/css?family=Roboto:400,700|Inconsolata|Raleway:200');@import url('https://fonts.googleapis.com/css?family=Roboto:100,400,700|Source+Code+Pro');.hljs-comment,.hljs-title{color:#8e908c}.hljs-variable,.hljs-attribute,.hljs-tag,.hljs-regexp,.ruby .hljs-constant,.xml .hljs-tag .hljs-title,.xml .hljs-pi,.xml .hljs-doctype,.html .hljs-doctype,.css .hljs-id,.css .hljs-class,.css .hljs-pseudo{color:#c82829}.hljs-number,.hljs-preprocessor,.hljs-pragma,.hljs-built_in,.hljs-literal,.hljs-params,.hljs-constant{color:#f5871f}.ruby .hljs-class .hljs-title,.css .hljs-rules .hljs-attribute{color:#eab700}.hljs-string,.hljs-value,.hljs-inheritance,.hljs-header,.ruby .hljs-symbol,.xml .hljs-cdata{color:#718c00}.css .hljs-hexcolor{color:#3e999f}.hljs-function,.python .hljs-decorator,.python .hljs-title,.ruby .hljs-function .hljs-title,.ruby .hljs-title .hljs-keyword,.perl .hljs-sub,.javascript .hljs-title,.coffeescript .hljs-title{color:#4271ae}.hljs-keyword,.javascript .hljs-function{color:#8959a8}.hljs{display:block;background:white;color:#4d4d4c;padding:.5em}.coffeescript .javascript,.javascript .xml,.tex .hljs-formula,.xml .javascript,.xml .vbscript,.xml .css,.xml .hljs-cdata{opacity:.5}.right .hljs-comment{color:#969896}.right .css .hljs-class,.right .css .hljs-id,.right .css .hljs-pseudo,.right .hljs-attribute,.right .hljs-regexp,.right .hljs-tag,.right .hljs-variable,.right .html .hljs-doctype,.right .ruby .hljs-constant,.right .xml .hljs-doctype,.right .xml .hljs-pi,.right .xml .hljs-tag .hljs-title{color:#c66}.right .hljs-built_in,.right .hljs-constant,.right .hljs-literal,.right .hljs-number,.right .hljs-params,.right .hljs-pragma,.right .hljs-preprocessor{color:#de935f}.right .css .hljs-rule .hljs-attribute,.right .ruby .hljs-class .hljs-title{color:#f0c674}.right .hljs-header,.right .hljs-inheritance,.right .hljs-name,.right .hljs-string,.right .hljs-value,.right .ruby .hljs-symbol,.right .xml .hljs-cdata{color:#b5bd68}.right .css .hljs-hexcolor,.right .hljs-title{color:#8abeb7}.right .coffeescript .hljs-title,.right .hljs-function,.right .javascript .hljs-title,.right .perl .hljs-sub,.right .python .hljs-decorator,.right .python .hljs-title,.right .ruby .hljs-function .hljs-title,.right .ruby .hljs-title .hljs-keyword{color:#81a2be}.right .hljs-keyword,.right .javascript .hljs-function{color:#b294bb}.right .hljs{display:block;overflow-x:auto;background:#1d1f21;color:#c5c8c6;padding:.5em;-webkit-text-size-adjust:none}.right .coffeescript .javascript,.right .javascript .xml,.right .tex .hljs-formula,.right .xml .css,.right .xml .hljs-cdata,.right .xml .javascript,.right .xml .vbscript{opacity:.5}.hljs-comment{color:#969896}.css .hljs-class,.css .hljs-id,.css .hljs-pseudo,.hljs-attribute,.hljs-regexp,.hljs-tag,.hljs-variable,.html .hljs-doctype,.ruby .hljs-constant,.xml .hljs-doctype,.xml .hljs-pi,.xml .hljs-tag .hljs-title{color:#77A619}.hljs-literal{color:#A69819}.hljs-built_in,.hljs-constant,.hljs-number,.hljs-params,.hljs-pragma,.hljs-preprocessor{color:#1B88B3}.css .hljs-rule .hljs-attribute,.ruby .hljs-class .hljs-title{color:#A37518}.hljs-header,.hljs-inheritance,.hljs-name,.hljs-string,.hljs-value,.ruby .hljs-symbol,.xml .hljs-cdata{color:inherit}.coffeescript .hljs-title,.css .hljs-hexcolor,.hljs-function,.hljs-title,.javascript .hljs-title,.perl .hljs-sub,.python .hljs-decorator,.python .hljs-title,.ruby .hljs-function .hljs-title,.ruby .hljs-title .hljs-keyword{color:#A63A4A}.hljs-keyword,.javascript .hljs-function{color:#A69819}.hljs{display:block;overflow-x:auto;background:#1d1f21;color:#c5c8c6;padding:.5em;-webkit-text-size-adjust:none}.coffeescript .javascript,.javascript .xml,.tex .hljs-formula,.xml .css,.xml .hljs-cdata,.xml .javascript,.xml .vbscript{opacity:.5}.right .hljs-comment{color:#969896}.right .css .hljs-class,.right .css .hljs-id,.right .css .hljs-pseudo,.right .hljs-attribute,.right .hljs-regexp,.right .hljs-tag,.right .hljs-variable,.right .html .hljs-doctype,.right .ruby .hljs-constant,.right .xml .hljs-doctype,.right .xml .hljs-pi,.right .xml .hljs-tag .hljs-title{color:#C1EF65}.right .hljs-literal{color:#EBDE68}.right .hljs-built_in,.right .hljs-constant,.right .hljs-number,.right .hljs-params,.right .hljs-pragma,.right .hljs-preprocessor{color:#77BCD7}.right .css .hljs-rule .hljs-attribute,.right .ruby .hljs-class .hljs-title{color:#f0c674}.right .hljs-header,.right .hljs-inheritance,.right .hljs-name,.right .hljs-string,.right .hljs-value,.right .ruby .hljs-symbol,.right .xml .hljs-cdata{color:inherit}.right .coffeescript .hljs-title,.right .css .hljs-hexcolor,.right .hljs-function,.right .hljs-title,.right .javascript .hljs-title,.right .perl .hljs-sub,.right .python .hljs-decorator,.right .python .hljs-title,.right .ruby .hljs-function .hljs-title,.right .ruby .hljs-title .hljs-keyword{color:#f099a6}.right .hljs-keyword,.right .javascript .hljs-function{color:#EBDE68}.right .hljs{display:block;overflow-x:auto;background:#1d1f21;color:#c5c8c6;padding:.5em;-webkit-text-size-adjust:none}.right .coffeescript .javascript,.right .javascript .xml,.right .tex .hljs-formula,.right .xml .css,.right .xml .hljs-cdata,.right .xml .javascript,.right .xml .vbscript{opacity:.5}body{color:#4c555a;background:white;font:400 14px / 1.42 'Roboto',Helvetica,sans-serif}header{border-bottom:1px solid transparent;margin-bottom:12px}h1,h2,h3,h4,h5{color:#292e31;margin:12px 0}h1 .permalink,h2 .permalink,h3 .permalink,h4 .permalink,h5 .permalink{margin-left:0;opacity:0;transition:opacity .25s ease}h1:hover .permalink,h2:hover .permalink,h3:hover .permalink,h4:hover .permalink,h5:hover .permalink{opacity:1}.triple h1 .permalink,.triple h2 .permalink,.triple h3 .permalink,.triple h4 .permalink,.triple h5 .permalink{opacity:.15}.triple h1:hover .permalink,.triple h2:hover .permalink,.triple h3:hover .permalink,.triple h4:hover .permalink,.triple h5:hover .permalink{opacity:.15}h1{font:100 36px 'Roboto',Helvetica,sans-serif;font-size:36px}h2{font:100 36px 'Roboto',Helvetica,sans-serif;font-size:30px}h3{font-size:100%;text-transform:uppercase}h5{font-size:100%;font-weight:normal}p{margin:0 0 10px}p.choices{line-height:1.6}a{color:#0099e5;text-decoration:none}li p{margin:0}hr.split{border:0;height:1px;width:100%;padding-left:6px;margin:12px auto;background-image:linear-gradient(to right, rgba(76,85,90,0) 20%, rgba(76,85,90,0.2) 48%, rgba(221,228,232,0.2) 48%, rgba(221,228,232,0) 80%)}dl dt{float:left;width:130px;clear:left;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}dl dd{margin-left:150px}blockquote{color:rgba(76,85,90,0.5);font-size:15.5px;padding:10px 20px;margin:12px 0;border-left:5px solid #e8e8e8}blockquote p:last-child{margin-bottom:0}pre{background-color:#f5f5f5;padding:12px;border:1px solid #cfcfcf;border-radius:3px;overflow:auto}pre code{color:#4c555a;background-color:transparent;padding:0;border:none}code{color:#b93d6a;background-color:#f5f5f5;font:13px / 19.5px 'Source Code Pro',Menlo,monospace;padding:1px 4px;border:1px solid #cfcfcf;border-radius:3px}ul,ol{padding-left:2em}table{border-collapse:collapse;border-spacing:0;margin-bottom:12px}table tr:nth-child(2n){background-color:#fafafa}table th,table td{padding:6px 12px;border:1px solid #e6e6e6}.text-muted{opacity:.5}.note,.warning{padding:.3em 1em;margin:1em 0;border-radius:2px;font-size:90%}.note h1,.warning h1,.note h2,.warning h2,.note h3,.warning h3,.note h4,.warning h4,.note h5,.warning h5,.note h6,.warning h6{font-family:100 36px 'Roboto',Helvetica,sans-serif;font-size:135%;font-weight:500}.note p,.warning p{margin:.5em 0}.note{color:#4c555a;background-color:#ebf7fd;border-left:4px solid #0099e5}.note h1,.note h2,.note h3,.note h4,.note h5,.note h6{color:#0099e5}.warning{color:#4c555a;background-color:#faf0f4;border-left:4px solid #B82E5F}.warning h1,.warning h2,.warning h3,.warning h4,.warning h5,.warning h6{color:#B82E5F}header{margin-top:24px}nav{position:fixed;top:24px;bottom:0;overflow-y:auto}nav .resource-group{padding:0}nav .resource-group .heading{position:relative}nav .resource-group .heading .chevron{position:absolute;top:12px;right:12px;opacity:.5}nav .resource-group .heading a{display:block;color:#4c555a;opacity:.7;border-left:2px solid transparent;margin:0}nav .resource-group .heading a:hover{text-decoration:underline;background-color:transparent;border-left:2px solid transparent}nav ul{list-style-type:none;padding-left:0}nav ul a{display:block;font-size:13px;color:rgba(76,85,90,0.7);padding:8px 12px;border-top:1px solid transparent;border-left:2px solid transparent;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}nav ul a:hover{text-decoration:underline;background-color:transparent;border-left:2px solid transparent}nav ul>li{margin:0}nav ul>li:first-child{margin-top:-12px}nav ul>li:last-child{margin-bottom:-12px}nav ul ul a{padding-left:24px}nav ul ul li{margin:0}nav ul ul li:first-child{margin-top:0}nav ul ul li:last-child{margin-bottom:0}nav>div>div>ul>li:first-child>a{border-top:none}.preload *{transition:none !important}.pull-left{float:left}.pull-right{float:right}.badge{display:inline-block;float:right;min-width:10px;min-height:14px;padding:3px 7px;font-size:12px;color:black;background-color:transparent;border-radius:10px;margin:-2px -8px -2px 0}.badge.get{color:#fff;background-color:#ddf1fc}.badge.head{color:#fff;background-color:#ddf1fc}.badge.options{color:#fff;background-color:#ddf1fc}.badge.put{color:#fff;background-color:#f7f2c3}.badge.patch{color:#fff;background-color:#f7f2c3}.badge.post{color:#fff;background-color:#e4f2c8}.badge.delete{color:#fff;background-color:#f2d8e1}.collapse-button{float:right}.collapse-button .close{display:none;color:#0099e5;cursor:pointer}.collapse-button .open{color:#0099e5;cursor:pointer}.collapse-button.show .close{display:inline}.collapse-button.show .open{display:none}.collapse-content{max-height:0;overflow:hidden;transition:max-height .3s ease-in-out}nav{width:220px}.container{max-width:940px;margin-left:auto;margin-right:auto}.container .row .content{margin-left:244px;width:696px}.container .row:after{content:'';display:block;clear:both}.container-fluid nav{width:22%}.container-fluid .row .content{margin-left:24%}.container-fluid.triple nav{width:15%;padding-right:1px}.container-fluid.triple .row .content{position:relative;margin-left:15%;padding-left:24px}.middle:before,.middle:after{content:'';display:table}.middle:after{clear:both}.middle{box-sizing:border-box;width:48%;padding-right:12px}.right{box-sizing:border-box;float:right;width:52%;padding-left:12px}.right a{color:#0099e5}.right h1,.right h2,.right h3,.right h4,.right h5,.right p,.right div{color:#dde4e8}.right pre{background-color:#272B2D;border:1px solid #272B2D}.right pre code{color:#D0D0D0}.right .description{margin-top:12px}.triple .resource-heading{font-size:125%}.definition{margin-top:12px;margin-bottom:12px}.definition .method{font-weight:bold}.definition .method.get{color:#2e8ab8}.definition .method.head{color:#2e8ab8}.definition .method.options{color:#2e8ab8}.definition .method.post{color:#8ab82e}.definition .method.put{color:#b8aa2e}.definition .method.patch{color:#b8aa2e}.definition .method.delete{color:#b82e5f}.definition .uri{word-break:break-all;word-wrap:break-word}.definition .hostname{opacity:.5}.example-names{background-color:#eee;padding:12px;border-radius:3px}.example-names .tab-button{cursor:pointer;color:#4c555a;border:1px solid #ddd;padding:6px;margin-left:12px}.example-names .tab-button.active{background-color:#d5d5d5}.right .example-names{background-color:#424648}.right .example-names .tab-button{color:#dde4e8;border:1px solid #6C6F71;border-radius:3px}.right .example-names .tab-button.active{background-color:#5a6063}#nav-background{position:fixed;left:0;top:0;bottom:0;width:15%;padding-right:14.4px;background-color:#fafcfc;border-right:1px solid #f0f4f7;z-index:-1}#right-panel-background{position:absolute;right:-12px;top:-12px;bottom:-12px;width:52%;background-color:#2d3134;z-index:-1}@media (max-width:1200px){nav{width:198px}.container{max-width:840px}.container .row .content{margin-left:224px;width:606px}}@media (max-width:992px){nav{width:169.4px}.container{max-width:720px}.container .row .content{margin-left:194px;width:526px}}@media (max-width:768px){nav{display:none}.container{width:95%;max-width:none}.container .row .content,.container-fluid .row .content,.container-fluid.triple .row .content{margin-left:auto;margin-right:auto;width:95%}#nav-background{display:none}#right-panel-background{width:52%}}.back-to-top{position:fixed;z-index:1;bottom:0;right:24px;padding:4px 8px;color:rgba(76,85,90,0.5);background-color:transparent;text-decoration:none !important;border-top:1px solid transparent;border-left:1px solid transparent;border-right:1px solid transparent;border-top-left-radius:3px;border-top-right-radius:3px}.resource-group{padding:12px 12px 12px 0;margin-bottom:12px;background-color:transparent;border:1px solid transparent;border-radius:3px}.resource-group h2.group-heading,.resource-group .heading a{padding:12px 12px 12px 0;margin:0 0 12px 0;background-color:transparent;border-bottom:1px solid transparent;border-top-left-radius:3px;border-top-right-radius:3px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.triple .content .resource-group{padding:0;border:none}.triple .content .resource-group h2.group-heading,.triple .content .resource-group .heading a{margin:0 0 12px 0;border:1px solid transparent}nav .resource-group .heading a{padding:12px;margin-bottom:0}nav .resource-group .collapse-content{padding:0}.action{margin-bottom:12px;padding:12px 12px 0 12px;overflow:hidden;border:1px solid transparent;border-radius:3px}.action h4.action-heading{padding:6px 12px;margin:-12px -12px 12px -12px;border-bottom:1px solid transparent;border-top-left-radius:3px;border-top-right-radius:3px;overflow:hidden}.action h4.action-heading .name{float:right;font-weight:normal;padding:6px 0}.action h4.action-heading .method{padding:6px 12px;margin-right:12px;border-radius:2px;display:inline-block}.action h4.action-heading .method.get{color:#fff;background-color:#0099e5}.action h4.action-heading .method.head{color:#fff;background-color:#0099e5}.action h4.action-heading .method.options{color:#fff;background-color:#0099e5}.action h4.action-heading .method.put{color:#fff;background-color:#b1a74e}.action h4.action-heading .method.patch{color:#fff;background-color:#b1a74e}.action h4.action-heading .method.post{color:#fff;background-color:#85a546}.action h4.action-heading .method.delete{color:#fff;background-color:#c14a74}.action h4.action-heading code{color:#444;background-color:#f5f5f5;border-color:#cfcfcf;font-weight:normal;word-break:break-all;display:inline-block;margin-top:2px}.action dl.inner{padding-bottom:2px}.action .title{border-bottom:1px solid transparent;margin:0 -12px -1px -12px;padding:12px}.action.get{border-color:#ddf1fc}.action.get h4.action-heading{color:#0099e5;background:#ddf1fc;border-bottom-color:#ddf1fc}.action.head{border-color:#ddf1fc}.action.head h4.action-heading{color:#0099e5;background:#ddf1fc;border-bottom-color:#ddf1fc}.action.options{border-color:#ddf1fc}.action.options h4.action-heading{color:#0099e5;background:#ddf1fc;border-bottom-color:#ddf1fc}.action.post{border-color:#e4f2c8}.action.post h4.action-heading{color:#85a546;background:#e4f2c8;border-bottom-color:#e4f2c8}.action.put{border-color:#f7f2c3}.action.put h4.action-heading{color:#b1a74e;background:#f7f2c3;border-bottom-color:#f7f2c3}.action.patch{border-color:#f7f2c3}.action.patch h4.action-heading{color:#b1a74e;background:#f7f2c3;border-bottom-color:#f7f2c3}.action.delete{border-color:#f2d8e1}.action.delete h4.action-heading{color:#c14a74;background:#f2d8e1;border-bottom-color:#f2d8e1}</style></head><body class="preload"><div id="nav-background"></div><div class="container-fluid triple"><div class="row"><nav><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#top">Overview</a></div><div class="collapse-content"><ul><li><a href="#header-usage">Usage</a></li><li><a href="#header-authentication">Authentication</a></li><li><a href="#header-authorization">Authorization</a></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#workflows">Workflows</a></div><div class="collapse-content"><ul><li><a href="#workflows-workflows-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflows</a></li><li><a href="#workflows-workflows-1">Workflows</a><ul><li><a href="#workflows-workflows-get-1"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflows for component</a></li><li><a href="#workflows-workflows-post"><span class="badge post"><i class="fa fa-plus"></i></span>Create or update Workflow</a></li></ul></li><li><a href="#workflows-workflow">Workflow</a><ul><li><a href="#workflows-workflow-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow</a></li><li><a href="#workflows-workflow-delete"><span class="badge delete"><i class="fa fa-times"></i></span>Delete Workflow</a></li></ul></li><li><a href="#workflows-workflow-with-state-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow with State</a></li><li><a href="#workflows-workflow-instances-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow Instances</a></li><li><a href="#workflows-workflow-instance-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow Instance</a></li><li><a href="#workflows-workflow-state">Workflow state</a><ul><li><a href="#workflows-workflow-state-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow state</a></li><li><a href="#workflows-workflow-state-patch"><span class="badge patch"><i class="fa fa-pencil"></i></span>Set Workflow state</a></li></ul></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#resources">Resources</a></div><div class="collapse-content"><ul><li><a href="#resources-resources">Resources</a><ul><li><a href="#resources-resources-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Resources</a></li><li><a href="#resources-resources-post"><span class="badge post"><i class="fa fa-plus"></i></span>Create Resource</a></li></ul></li><li><a href="#resources-resource">Resource</a><ul><li><a href="#resources-resource-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Resource</a></li><li><a href="#resources-resource-delete"><span class="badge delete"><i class="fa fa-times"></i></span>Delete Resource</a></li><li><a href="#resources-resource-put"><span class="badge put"><i class="fa fa-pencil"></i></span>Modify Resource</a></li></ul></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#backfills">Backfills</a></div><div class="collapse-content"><ul><li><a href="#backfills-backfills">Backfills</a><ul><li><a href="#backfills-backfills-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Backfills</a></li><li><a href="#backfills-backfills-post"><span class="badge post"><i class="fa fa-plus"></i></span>Create Backfill</a></li></ul></li><li><a href="#backfills-backfill">Backfill</a><ul><li><a href="#backfills-backfill-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Backfill</a></li><li><a href="#backfills-backfill-put"><span class="badge put"><i class="fa fa-pencil"></i></span>Modify Backfill</a></li><li><a href="#backfills-backfill-delete"><span class="badge delete"><i class="fa fa-times"></i></span>Delete Backfill</a></li></ul></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#status">Status</a></div><div class="collapse-content"><ul><li><a href="#status-active-states-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Active States</a></li><li><a href="#status-events-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Workflow Instance events</a></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#scheduler">Scheduler</a></div><div class="collapse-content"><ul><li><a href="#scheduler-retry-post"><span class="badge post"><i class="fa fa-plus"></i></span>Send Retry</a></li><li><a href="#scheduler-halt-post"><span class="badge post"><i class="fa fa-plus"></i></span>Send Halt</a></li><li><a href="#scheduler-trigger-post"><span class="badge post"><i class="fa fa-plus"></i></span>Trigger Workflow Instance</a></li></ul></div></div><div class="resource-group"><div class="heading"><div class="chevron"><i class="open fa fa-angle-down"></i></div><a href="#styx-config">Styx Config</a></div><div class="collapse-content"><ul><li><a href="#styx-config-global-enabled">Global Enabled</a><ul><li><a href="#styx-config-global-enabled-get"><span class="badge get"><i class="fa fa-arrow-down"></i></span>Get Global Enabled</a></li><li><a href="#styx-config-global-enabled-post"><span class="badge post"><i class="fa fa-plus"></i></span>Set Global Enabled</a></li></ul></li></ul></div></div></nav><div class="content"><div id="right-panel-background"></div><div class="middle"><header><h1 id="top">Styx API specification</h1></header></div><div class="right"><h5>API Endpoint</h5><a></a></div><div class="middle"><p>This document is written using <a href="https://apiblueprint.org/">api-blueprint</a></p>
+<h2 id="header-usage">Usage <a class="permalink" href="#header-usage" aria-hidden="true">¶</a></h2>
+<ol>
+<li>
+<p>install <a href="https://github.com/apiaryio/dredd">dredd</a>: <code>npm install -g dredd</code></p>
+</li>
+<li>
+<p>package project: <code>mvn package</code></p>
+</li>
+<li>
+<p>run tests: <code>styx-api-service/bin/api-test.sh</code></p>
+</li>
+</ol>
+<p>To generate an html version of this spec, use <a href="https://github.com/danielgtaylor/aglio">aglio</a></p>
+<pre><code>aglio -<span class="hljs-tag">i</span> doc/api<span class="hljs-class">.apib</span> -o api<span class="hljs-class">.html</span> --theme-template triple --theme-variables streak</code></pre>
+<h2 id="header-authentication">Authentication <a class="permalink" href="#header-authentication" aria-hidden="true">¶</a></h2>
+<p>Starting from V3, any request except <code>GET</code> requires Google Authentication.</p>
+<p>HTTP header <code>Authorization: Bearer &lt;id_token&gt;</code> with a valid Google ID token is required
+in those requests.</p>
+<p>To know more details, please check
+<a href="https://developers.google.com/identity/sign-in/web/backend-auth">Google documentation</a>.</p>
+<h2 id="header-authorization">Authorization <a class="permalink" href="#header-authorization" aria-hidden="true">¶</a></h2>
+<p>If authorization is enabled for the Styx service, any workflow with a <code>service_account</code>
+configured can only be updated by an authorized user of that <code>service_account</code>.</p>
+<p>Updates include deploying, enabling/disabling and triggering the workflow.</p>
+<p>In order to authorize an account, you need to grant it the <a href="https://github.com/spotify/styx/blob/master/styx-standalone-service/src/main/resources/styx-standalone.conf#L66">configured role</a>
+for the workflow <code>service_account</code>. For more information, see <a href="https://cloud.google.com/iam/docs/granting-roles-to-service-accounts">Granting Roles to Service Accounts</a>.</p>
+</div><div class="middle"><section id="workflows" class="resource-group"><h2 class="group-heading">Workflows <a href="#workflows" class="permalink">&para;</a></h2><p>Resources related to the Workflows registered in Styx.</p>
+</section></div><div class="middle"><div id="workflows-workflows" class="resource"><h3 class="resource-heading">Workflows <a href="#workflows-workflows" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows</span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>[
+  {
+    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+    "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+    "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+      "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+      "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+        <span class="hljs-string">"luigi"</span>,
+        <span class="hljs-string">"--module"</span>,
+        <span class="hljs-string">"canary_job"</span>,
+        <span class="hljs-string">"CanaryJob"</span>
+      ]</span>,
+      "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
+    </span>}
+  </span>}
+]</code></pre><div style="height: 1px;"></div></div></div></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>[
+  {
+    "<span class="hljs-attribute">workflow</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+      "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+      "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+      "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+        "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+        "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+        "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+        "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+          <span class="hljs-string">"luigi"</span>,
+          <span class="hljs-string">"--module"</span>,
+          <span class="hljs-string">"canary_job"</span>,
+          <span class="hljs-string">"CanaryJob"</span>
+        ]</span>,
+        "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+        "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]</span>,
+        "<span class="hljs-attribute">running_timeout</span>": <span class="hljs-value"><span class="hljs-string">"PT2H"</span>
+      </span>}
+    </span>}</span>,
+    "<span class="hljs-attribute">state</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span></span>,
+      "<span class="hljs-attribute">next_natural_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+      "<span class="hljs-attribute">next_natural_offset_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T02:00:00Z"</span>
+    </span>}
+  </span>}
+]</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflows-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflows</div><a href="#workflows-workflows-get" class="method get">GET</a><code class="uri">/{version}/workflows</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>full</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>false</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>Return the state of the workflow</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflows-1" class="resource"><h3 class="resource-heading">Workflows <a href="#workflows-workflows-1" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>[
+  {
+    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+    "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+    "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+      "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+      "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+        <span class="hljs-string">"luigi"</span>,
+        <span class="hljs-string">"--module"</span>,
+        <span class="hljs-string">"canary_job"</span>,
+        <span class="hljs-string">"CanaryJob"</span>
+      ]</span>,
+      "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]
+    </span>}
+  </span>}
+]</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflows-get-1" class="action get"><h4 class="action-heading"><div class="name">Get Workflows for component</div><a href="#workflows-workflows-get-1" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+  "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"days"</span></span>,
+  "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+  "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-dummy:dummy"</span></span>,
+  "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+    <span class="hljs-string">"luigi"</span>,
+    <span class="hljs-string">"--module"</span>,
+    <span class="hljs-string">"canary_job"</span>,
+    <span class="hljs-string">"CanaryJob"</span>
+  ]</span>,
+  "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+  "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+  </span>}</span>,
+  "<span class="hljs-attribute">service_account</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+  "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]</span>,
+  "<span class="hljs-attribute">running_timeout</span>": <span class="hljs-value"><span class="hljs-string">"PT2H"</span></span>,
+  "<span class="hljs-attribute">retry_condition</span>": <span class="hljs-value"><span class="hljs-string">"#tries &lt; 3"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+  "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+  "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+  "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+    "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"days"</span></span>,
+    "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+    "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-dummy:dummy"</span></span>,
+    "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+      <span class="hljs-string">"luigi"</span>,
+      <span class="hljs-string">"--module"</span>,
+      <span class="hljs-string">"canary_job"</span>,
+      <span class="hljs-string">"CanaryJob"</span>
+    ]</span>,
+    "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">service_account</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+    "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]</span>,
+    "<span class="hljs-attribute">running_timeout</span>": <span class="hljs-value"><span class="hljs-string">"PT2H"</span></span>,
+    "<span class="hljs-attribute">retry_condition</span>": <span class="hljs-value"><span class="hljs-string">"#tries &lt; 3"</span>
+  </span>}</span>,
+  "<span class="hljs-attribute">__from_api</span>": <span class="hljs-value"><span class="hljs-string">"V3"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflows-post" class="action post"><h4 class="action-heading"><div class="name">Create or update Workflow</div><a href="#workflows-workflows-post" class="method post">POST</a><code class="uri">/{version}/workflows/{component_id}</code></h4><p>Accepts a Workflow definition as a JSON object. Returns 200 OK if the Workflow was registered
+or updated. Note that a non-null value is required for docker_image.</p>
+<div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflow" class="resource"><h3 class="resource-heading">Workflow <a href="#workflows-workflow" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+  "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+  "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+  "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+    "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+    "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+    "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+    "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+      <span class="hljs-string">"luigi"</span>,
+      <span class="hljs-string">"--module"</span>,
+      <span class="hljs-string">"canary_job"</span>,
+      <span class="hljs-string">"CanaryJob"</span>
+    ]</span>,
+    "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]</span>,
+    "<span class="hljs-attribute">running_timeout</span>": <span class="hljs-value"><span class="hljs-string">"PT2H"</span></span>,
+    "<span class="hljs-attribute">retry_condition</span>": <span class="hljs-value"><span class="hljs-string">"#tries &lt; 3"</span>
+  </span>}
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow</div><a href="#workflows-workflow-get" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method delete">DELETE</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">204</span><span class="tab-button">404</span></div><div class="tab"><div><div class="inner"><div class="description text-muted">This response has no content.</div><div style="height: 1px;"></div></div></div></div><div class="tab"><div><div class="inner"><div class="description text-muted">This response has no content.</div><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-delete" class="action delete"><h4 class="action-heading"><div class="name">Delete Workflow</div><a href="#workflows-workflow-delete" class="method delete">DELETE</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}</code></h4><p>Returns 204 No Content if the Workflow was found and deleted, 404 Not Found otherwise.</p>
+<div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflow-with-state" class="resource"><h3 class="resource-heading">Workflow with state <a href="#workflows-workflow-with-state" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/full</span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+    "<span class="hljs-attribute">component_uri</span>": <span class="hljs-value"><span class="hljs-string">"file:///etc/styx/schedule.yaml"</span></span>,
+    "<span class="hljs-attribute">configuration</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+      "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+      "<span class="hljs-attribute">offset</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+      "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+        <span class="hljs-string">"luigi"</span>,
+        <span class="hljs-string">"--module"</span>,
+        <span class="hljs-string">"canary_job"</span>,
+        <span class="hljs-string">"CanaryJob"</span>
+      ]</span>,
+      "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+      "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[]</span>,
+      "<span class="hljs-attribute">running_timeout</span>": <span class="hljs-value"><span class="hljs-string">"PT2H"</span>
+    </span>}
+  </span>}</span>,
+  "<span class="hljs-attribute">state</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span></span>,
+    "<span class="hljs-attribute">next_natural_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+    "<span class="hljs-attribute">next_natural_offset_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T02:00:00Z"</span>
+  </span>}
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-with-state-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow with State</div><a href="#workflows-workflow-with-state-get" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}/full</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflow-instances" class="resource"><h3 class="resource-heading">Workflow Instances <a href="#workflows-workflow-instances" class="permalink">&para;</a></h3><p>Query can be done in three different styles: <code>offset+limit</code>, <code>start+stop</code> or <code>tail+limit</code>.</p>
+<p>By using <code>offset</code> and <code>limit</code>, the oldest workflow instances is specified by <code>offset</code>, and
+the max number of workflows instances is specified by <code>limit</code>.</p>
+<p>By using <code>start</code> and <code>stop</code>, the oldest workflow instance is specified by <code>start</code>, and the latest is
+specified by <code>stop</code>; <code>start</code> is required while <code>stop</code> is optional.</p>
+<p>When using <code>tail</code> and <code>limit</code>, the newest (naturally triggered) instances are returned. The maxium number of instances
+returned is specified by <code>limit</code> but fewer instances may be returned even though more instances exist.</p>
+</div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/instances?<span class="hljs-attribute">offset=</span><span class="hljs-literal">2017-01-01</span>&<span class="hljs-attribute">limit=</span><span class="hljs-literal">10</span>&<span class="hljs-attribute">tail=</span><span class="hljs-literal">true</span>&<span class="hljs-attribute">start=</span><span class="hljs-literal">2017-01-01</span>&<span class="hljs-attribute">stop=</span><span class="hljs-literal">2017-01-03</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>[
+  {
+    "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">workflow</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T08"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">triggers</span>": <span class="hljs-value">[
+      {
+        "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"UNKNOWN"</span></span>,
+        "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:23.941Z"</span></span>,
+        "<span class="hljs-attribute">complete</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
+        "<span class="hljs-attribute">executions</span>": <span class="hljs-value">[
+          {
+            "<span class="hljs-attribute">execution_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-run-qcp3r"</span></span>,
+            "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"UNKNOWN"</span></span>,
+            "<span class="hljs-attribute">commit_sha</span>": <span class="hljs-value"><span class="hljs-string">"19c1a6"</span></span>,
+            "<span class="hljs-attribute">runner_id</span>": <span class="hljs-value"><span class="hljs-string">"production"</span></span>,
+            "<span class="hljs-attribute">statuses</span>": <span class="hljs-value">[
+              {
+                "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:45.882Z"</span></span>,
+                "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"SUBMITTED"</span>
+              </span>},
+              {
+                "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:49.076Z"</span></span>,
+                "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"STARTED"</span>
+              </span>},
+              {
+                "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:49.313Z"</span></span>,
+                "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"SUCCESS"</span>
+              </span>}
+            ]
+          </span>}
+        ]
+      </span>}
+    ]
+  </span>}
+]</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-instances-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow Instances</div><a href="#workflows-workflow-instances-get" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}/instances{?offset,limit,tail,start,stop}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd><dt>offset</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>2017-01-01</span></span><p>the offset parameter</p>
+</dd><dt>limit</dt><dd><code>number</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>10</span></span><p>max number of instances</p>
+</dd><dt>start</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>2017-01-01</span></span><p>the start parameter</p>
+</dd><dt>stop</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>2017-01-03</span></span><p>the stop parameter (exclusive)</p>
+</dd><dt>tail</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>Return the newest workflow instances?</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflow-instance" class="resource"><h3 class="resource-heading">Workflow Instance <a href="#workflows-workflow-instance" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/instances/<span class="hljs-attribute" title="instance">2016-07-13T08</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">workflow</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T08"</span>
+  </span>}</span>,
+  "<span class="hljs-attribute">triggers</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"UNKNOWN"</span></span>,
+      "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:23.941Z"</span></span>,
+      "<span class="hljs-attribute">complete</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
+      "<span class="hljs-attribute">executions</span>": <span class="hljs-value">[
+        {
+          "<span class="hljs-attribute">execution_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-run-qcp3r"</span></span>,
+          "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"UNKNOWN"</span></span>,
+          "<span class="hljs-attribute">commit_sha</span>": <span class="hljs-value"><span class="hljs-string">"19c1a6"</span></span>,
+          "<span class="hljs-attribute">runner_id</span>": <span class="hljs-value"><span class="hljs-string">"production"</span></span>,
+          "<span class="hljs-attribute">statuses</span>": <span class="hljs-value">[
+            {
+              "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:45.882Z"</span></span>,
+              "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"SUBMITTED"</span>
+            </span>},
+            {
+              "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:49.076Z"</span></span>,
+              "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"STARTED"</span>
+            </span>},
+            {
+              "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-string">"2016-07-13T09:00:49.313Z"</span></span>,
+              "<span class="hljs-attribute">status</span>": <span class="hljs-value"><span class="hljs-string">"SUCCESS"</span>
+            </span>}
+          ]
+        </span>}
+      ]
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-instance-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow Instance</div><a href="#workflows-workflow-instance-get" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}/instances/{instance}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd><dt>instance</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>2016-07-13T08</span></span><p>Worfklow Instance parameter</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="workflows-workflow-state" class="resource"><h3 class="resource-heading">Workflow state <a href="#workflows-workflow-state" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/state</span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span></span>,
+  "<span class="hljs-attribute">next_natural_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+  "<span class="hljs-attribute">next_natural_offset_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T02:00:00Z"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-state-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow state</div><a href="#workflows-workflow-state-get" class="method get">GET</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}/state</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method patch">PATCH</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/workflows/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/state</span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"false"</span></span>,
+  "<span class="hljs-attribute">next_natural_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+  "<span class="hljs-attribute">next_natural_offset_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T02:00:00Z"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"false"</span></span>,
+  "<span class="hljs-attribute">next_natural_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+  "<span class="hljs-attribute">next_natural_offset_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T02:00:00Z"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="workflows-workflow-state-patch" class="action patch"><h4 class="action-heading"><div class="name">Set Workflow state</div><a href="#workflows-workflow-state-patch" class="method patch">PATCH</a><code class="uri">/{version}/workflows/{component_id}/{workflow_id}/state</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><section id="resources" class="resource-group"><h2 class="group-heading">Resources <a href="#resources" class="permalink">&para;</a></h2><p>Resources related to Styx Resources registered in the scheduler. Styx Resources
+can be used to limit the maximum concurrent executions for certain Workflows.</p>
+</section></div><div class="middle"><div id="resources-resources" class="resource"><h3 class="resource-heading">Resources <a href="#resources-resources" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/resources</span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="resources-resources-get" class="action get"><h4 class="action-heading"><div class="name">Get Resources</div><a href="#resources-resources-get" class="method get">GET</a><code class="uri">/{version}/resources</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/resources</span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-string">"20"</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="resources-resources-post" class="action post"><h4 class="action-heading"><div class="name">Create Resource</div><a href="#resources-resources-post" class="method post">POST</a><code class="uri">/{version}/resources</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd></dl></div></div></div><hr class="split"><div class="middle"><div id="resources-resource" class="resource"><h3 class="resource-heading">Resource <a href="#resources-resource" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/resources/<span class="hljs-attribute" title="resource">styx-canary-resource</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">resources</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+      "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="resources-resource-get" class="action get"><h4 class="action-heading"><div class="name">Get Resource</div><a href="#resources-resource-get" class="method get">GET</a><code class="uri">/{version}/resources/{resource}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>resource</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary-resource</span></span><p>Resource ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method delete">DELETE</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/resources/<span class="hljs-attribute" title="resource">styx-canary-resource</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">204</span></div><div class="tab"><div><div class="inner"><div class="description text-muted">This response has no content.</div><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="resources-resource-delete" class="action delete"><h4 class="action-heading"><div class="name">Delete Resource</div><a href="#resources-resource-delete" class="method delete">DELETE</a><code class="uri">/{version}/resources/{resource}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>resource</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary-resource</span></span><p>Resource ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method put">PUT</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/resources/<span class="hljs-attribute" title="resource">styx-canary-resource</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-string">"30"</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">30</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-resource"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="resources-resource-put" class="action put"><h4 class="action-heading"><div class="name">Modify Resource</div><a href="#resources-resource-put" class="method put">PUT</a><code class="uri">/{version}/resources/{resource}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>resource</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary-resource</span></span><p>Resource ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><section id="backfills" class="resource-group"><h2 class="group-heading">Backfills <a href="#backfills" class="permalink">&para;</a></h2><p>Resources related to the Backfills in Styx. This group allows to operate on
+Backfill entities registered in Styx and check detailed status of each single
+Workflow Instance belonging to a Backfill entity.</p>
+</section></div><div class="middle"><div id="backfills-backfills" class="resource"><h3 class="resource-heading">Backfills <a href="#backfills-backfills" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills?<span class="hljs-attribute">component=</span><span class="hljs-literal">styx-canary</span>&<span class="hljs-attribute">workflow=</span><span class="hljs-literal">StyxCanary</span>&<span class="hljs-attribute">status=</span><span class="hljs-literal">true</span>&<span class="hljs-attribute">showAll=</span><span class="hljs-literal">true</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">backfills</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">backfill</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
+        "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">10</span></span>,
+        "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+        "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span></span>,
+        "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+        "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+        "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+        "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+            "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+          </span>}
+        </span>}</span>,
+        "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+          "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">created</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+        "<span class="hljs-attribute">last_modified</span>": <span class="hljs-value"><span class="hljs-string">"2019-01-01T00:00:00Z"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">statuses</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">active_states</span>": <span class="hljs-value">[
+          {
+            "<span class="hljs-attribute">initial_timestamp</span>": <span class="hljs-value"><span class="hljs-number">1536838486145</span></span>,
+            "<span class="hljs-attribute">latest_timestamp</span>": <span class="hljs-value"><span class="hljs-number">1536838486185</span></span>,
+            "<span class="hljs-attribute">state</span>": <span class="hljs-value"><span class="hljs-string">"DONE"</span></span>,
+            "<span class="hljs-attribute">state_data</span>": <span class="hljs-value">{
+              "<span class="hljs-attribute">consecutive_failures</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+              "<span class="hljs-attribute">execution_description</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">commit_sha</span>": <span class="hljs-value"><span class="hljs-string">"f043333085fa87738ac24f04d64fb58ecc845111"</span></span>,
+                "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+                  <span class="hljs-string">"luigi"</span>,
+                  <span class="hljs-string">"--module"</span>,
+                  <span class="hljs-string">"canary_job"</span>,
+                  <span class="hljs-string">"CanaryJob"</span>
+                ]</span>,
+                "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-dummy:dummy"</span></span>,
+                "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
+              </span>}</span>,
+              "<span class="hljs-attribute">execution_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133"</span></span>,
+              "<span class="hljs-attribute">last_exit</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+              "<span class="hljs-attribute">messages</span>": <span class="hljs-value">[
+                {
+                  "<span class="hljs-attribute">level</span>": <span class="hljs-value"><span class="hljs-string">"INFO"</span></span>,
+                  "<span class="hljs-attribute">line</span>": <span class="hljs-value"><span class="hljs-string">"Exit code: 0"</span>
+                </span>}
+              ]</span>,
+              "<span class="hljs-attribute">retry_cost</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+              "<span class="hljs-attribute">retry_delay_millis</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+              "<span class="hljs-attribute">tries</span>": <span class="hljs-value"><span class="hljs-number">1</span></span>,
+              "<span class="hljs-attribute">trigger</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"backfill"</span></span>,
+                "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span>
+              </span>}</span>,
+              "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span>
+            </span>}</span>,
+            "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value">{
+              "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00"</span></span>,
+              "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+                "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+              </span>}
+            </span>}
+          </span>}
+        ]
+      </span>}
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="backfills-backfills-get" class="action get"><h4 class="action-heading"><div class="name">Get Backfills</div><a href="#backfills-backfills-get" class="method get">GET</a><code class="uri">/{version}/backfills{?component,workflow,status,showAll}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component</dt><dd><code>string</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component to filter with</p>
+</dd><dt>workflow</dt><dd><code>string</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID to filter with</p>
+</dd><dt>status</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>false</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>If to return the status list per backfill</p>
+</dd><dt>showAll</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>false</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>If to return also halted backfills and backfills whose instances have been all triggered</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills?<span class="hljs-attribute">allowFuture=</span><span class="hljs-literal">false</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-02T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">component</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-string">"10"</span></span>,
+    "<span class="hljs-attribute">reverse</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{"<span class="hljs-attribute">env</span>": <span class="hljs-value">{"<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span></span>}</span>}</span>,
+    "<span class="hljs-attribute">workflow</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span></span>,
+}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">10</span></span>,
+    "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-02-00T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
+    "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+    "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{"<span class="hljs-attribute">env</span>": <span class="hljs-value">{"<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span></span>}</span>}</span>,
+    "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">created</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">last_modified</span>": <span class="hljs-value"><span class="hljs-string">"2019-01-01T00:00:00Z"</span></span>,
+}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="backfills-backfills-post" class="action post"><h4 class="action-heading"><div class="name">Create Backfill</div><a href="#backfills-backfills-post" class="method post">POST</a><code class="uri">/{version}/backfills{?allowFuture}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>allowFuture</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>false</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>false</span></span><p>allow backfilling future partitions</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="backfills-backfill" class="resource"><h3 class="resource-heading">Backfill <a href="#backfills-backfill" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills/<span class="hljs-attribute" title="backfill_id">backfill-1489054446085-52684</span>?<span class="hljs-attribute">status=</span><span class="hljs-literal">true</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">backfill</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">true</span></span>,
+        "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">10</span></span>,
+        "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+        "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+        "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span></span>,
+        "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01:00:00Z"</span></span>,
+        "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+        "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+        "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{"<span class="hljs-attribute">env</span>": <span class="hljs-value">{"<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span></span>}</span>}</span>,
+        "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+            "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+            "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">created</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+        "<span class="hljs-attribute">last_modified</span>": <span class="hljs-value"><span class="hljs-string">"2019-01-01T00:00:00Z"</span></span>,
+    }</span>,
+    "<span class="hljs-attribute">statuses</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">active_states</span>": <span class="hljs-value">[{
+            "<span class="hljs-attribute">initial_timestamp</span>": <span class="hljs-value"><span class="hljs-number">1536838486145</span></span>,
+            "<span class="hljs-attribute">latest_timestamp</span>": <span class="hljs-value"><span class="hljs-number">1536838486185</span></span>,
+            "<span class="hljs-attribute">state</span>": <span class="hljs-value"><span class="hljs-string">"DONE"</span></span>,
+            "<span class="hljs-attribute">state_data</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">consecutive_failures</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+                "<span class="hljs-attribute">execution_description</span>": <span class="hljs-value">{
+                    "<span class="hljs-attribute">commit_sha</span>": <span class="hljs-value"><span class="hljs-string">"f043333085fa87738ac24f04d64fb58ecc845111"</span></span>,
+                    "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+                        <span class="hljs-string">"luigi"</span>,
+                        <span class="hljs-string">"--module"</span>,
+                        <span class="hljs-string">"canary_job"</span>,
+                        <span class="hljs-string">"CanaryJob"</span>
+                    ]</span>,
+                    "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-dummy:dummy"</span></span>,
+                    "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
+                </span>}</span>,
+                "<span class="hljs-attribute">execution_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b2133"</span></span>,
+                "<span class="hljs-attribute">last_exit</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+                "<span class="hljs-attribute">messages</span>": <span class="hljs-value">[
+                    {
+                        "<span class="hljs-attribute">level</span>": <span class="hljs-value"><span class="hljs-string">"INFO"</span></span>,
+                        "<span class="hljs-attribute">line</span>": <span class="hljs-value"><span class="hljs-string">"Exit code: 0"</span>
+                    </span>}
+                ]</span>,
+                "<span class="hljs-attribute">retry_cost</span>": <span class="hljs-value"><span class="hljs-number">0.0</span></span>,
+                "<span class="hljs-attribute">retry_delay_millis</span>": <span class="hljs-value"><span class="hljs-literal">null</span></span>,
+                "<span class="hljs-attribute">tries</span>": <span class="hljs-value"><span class="hljs-number">1</span></span>,
+                "<span class="hljs-attribute">trigger</span>": <span class="hljs-value">{
+                    "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"backfill"</span></span>,
+                    "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span>
+                </span>}</span>,
+                "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-53384"</span>
+            </span>}</span>,
+            "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00"</span></span>,
+                "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+                    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+                    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+                </span>}
+            </span>}
+        </span>}]
+    </span>}
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="backfills-backfill-get" class="action get"><h4 class="action-heading"><div class="name">Get Backfill</div><a href="#backfills-backfill-get" class="method get">GET</a><code class="uri">/{version}/backfills/{backfill_id}{?status}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>backfill_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>backfill-1489054446085-52684</span></span><p>Backfill ID</p>
+</dd><dt>status</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>true</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>If to return the status list per backfill</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method put">PUT</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills/<span class="hljs-attribute" title="backfill_id">backfill-1489054446085-52684</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
+}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+    "<span class="hljs-attribute">all_triggered</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">concurrency</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+    "<span class="hljs-attribute">end</span>": <span class="hljs-value"><span class="hljs-string">"2017-02-00T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"fixed bug and reproduce data"</span></span>,
+    "<span class="hljs-attribute">halted</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"backfill-1489054446085-52684"</span></span>,
+    "<span class="hljs-attribute">next_trigger</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">schedule</span>": <span class="hljs-value"><span class="hljs-string">"hours"</span></span>,
+    "<span class="hljs-attribute">start</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{"<span class="hljs-attribute">env</span>": <span class="hljs-value">{"<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span></span>}</span>}</span>,
+    "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+        "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">created</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T00:00:00Z"</span></span>,
+    "<span class="hljs-attribute">last_modified</span>": <span class="hljs-value"><span class="hljs-string">"2019-01-01T00:00:00Z"</span></span>,
+}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="backfills-backfill-put" class="action put"><h4 class="action-heading"><div class="name">Modify Backfill</div><a href="#backfills-backfill-put" class="method put">PUT</a><code class="uri">/{version}/backfills/{backfill_id}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>backfill_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>backfill-1489054446085-52684</span></span><p>Backfill ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method delete">DELETE</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/backfills/<span class="hljs-attribute" title="backfill_id">backfill-1489054446085-52684</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><div class="description text-muted">This response has no content.</div><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="backfills-backfill-delete" class="action delete"><h4 class="action-heading"><div class="name">Delete Backfill</div><a href="#backfills-backfill-delete" class="method delete">DELETE</a><code class="uri">/{version}/backfills/{backfill_id}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>backfill_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>backfill-1489054446085-52684</span></span><p>Backfill ID</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><section id="status" class="resource-group"><h2 class="group-heading">Status <a href="#status" class="permalink">&para;</a></h2><p>Resources related to inspect detailed status of Workflow Instances.</p>
+</section></div><div class="middle"><div id="status-active-states" class="resource"><h3 class="resource-heading">Active States <a href="#status-active-states" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/status/activeStates?<span class="hljs-attribute">component=</span><span class="hljs-literal">styx-canary</span>&<span class="hljs-attribute">workflow=</span><span class="hljs-literal">StyxCanary</span>&<span class="hljs-attribute">components=</span><span class="hljs-literal">styx-canary,styx-canary1,styx-canary3</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">active_states</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">latest_timestamp</span>": <span class="hljs-value"><span class="hljs-number">1536838486185</span></span>,
+      "<span class="hljs-attribute">state</span>": <span class="hljs-value"><span class="hljs-string">"RUNNING"</span></span>,
+      "<span class="hljs-attribute">state_data</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">consecutive_failures</span>": <span class="hljs-value"><span class="hljs-number">0</span></span>,
+        "<span class="hljs-attribute">execution_description</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">commit_sha</span>": <span class="hljs-value"><span class="hljs-string">"f043333085fa87738ac24f04d64fb58ecc845111"</span></span>,
+          "<span class="hljs-attribute">docker_args</span>": <span class="hljs-value">[
+            <span class="hljs-string">"luigi"</span>,
+            <span class="hljs-string">"--module"</span>,
+            <span class="hljs-string">"canary_job"</span>,
+            <span class="hljs-string">"CanaryJob"</span>
+          ]</span>,
+          "<span class="hljs-attribute">docker_image</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary-dummy:dummy"</span></span>,
+          "<span class="hljs-attribute">docker_termination_logging</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">execution_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-run-6b1962c6-23ba-4245-a13b-ec3baa4b21d5"</span></span>,
+        "<span class="hljs-attribute">last_exit</span>": <span class="hljs-value"><span class="hljs-number">20</span></span>,
+        "<span class="hljs-attribute">messages</span>": <span class="hljs-value">[
+          {
+            "<span class="hljs-attribute">level</span>": <span class="hljs-value"><span class="hljs-string">"WARNING"</span></span>,
+            "<span class="hljs-attribute">line</span>": <span class="hljs-value"><span class="hljs-string">"Exit code: 20"</span>
+          </span>}
+        ]</span>,
+        "<span class="hljs-attribute">retry_cost</span>": <span class="hljs-value"><span class="hljs-number">0.2</span></span>,
+        "<span class="hljs-attribute">retry_delay_millis</span>": <span class="hljs-value"><span class="hljs-number">600000</span></span>,
+        "<span class="hljs-attribute">tries</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
+        "<span class="hljs-attribute">trigger</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"natural"</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"natural-trigger"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01"</span></span>,
+        "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+          "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+        </span>}
+      </span>}
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="status-active-states-get" class="action get"><h4 class="action-heading"><div class="name">Get Active States</div><a href="#status-active-states-get" class="method get">GET</a><code class="uri">/{version}/status/activeStates{?component,workflow,components}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component</dt><dd><code>string</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Component ID</p>
+</dd><dt>workflow</dt><dd><code>string</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID - requires Component ID to also be specified</p>
+</dd><dt>components</dt><dd><code>string</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary,styx-canary1,styx-canary3</span></span><p>Component IDs, IDs should be comma
+separated. If provided, two other parameters will be ignored.</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="status-events" class="resource"><h3 class="resource-heading">Events <a href="#status-events" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/status/events/<span class="hljs-attribute" title="component_id">styx-canary</span>/<span class="hljs-attribute" title="workflow_id">StyxCanary</span>/<span class="hljs-attribute" title="instance">2017-01-01T01</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">events</span>": <span class="hljs-value">[
+    {
+      "<span class="hljs-attribute">event</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"triggerExecution"</span></span>,
+        "<span class="hljs-attribute">trigger</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"natural"</span>
+        </span>}</span>,
+        "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span></span>,
+        "<span class="hljs-attribute">parameters</span>": <span class="hljs-value">{
+          "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+            "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+          </span>}
+        </span>}
+      </span>}</span>,
+      "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-number">1483228800000</span>
+    </span>},
+    {
+      "<span class="hljs-attribute">event</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">@type</span>": <span class="hljs-value"><span class="hljs-string">"dequeue"</span></span>,
+        "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+      </span>}</span>,
+      "<span class="hljs-attribute">timestamp</span>": <span class="hljs-value"><span class="hljs-number">1483228800005</span>
+    </span>}
+  ]
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="status-events-get" class="action get"><h4 class="action-heading"><div class="name">Get Workflow Instance events</div><a href="#status-events-get" class="method get">GET</a><code class="uri">/{version}/status/events/{component_id}/{workflow_id}/{instance}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>component_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>styx-canary</span></span><p>Workflow Component</p>
+</dd><dt>workflow_id</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>StyxCanary</span></span><p>Workflow ID</p>
+</dd><dt>instance</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>2017-01-01T01</span></span><p>Worfklow Instance parameter</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><section id="scheduler" class="resource-group"><h2 class="group-heading">Scheduler <a href="#scheduler" class="permalink">&para;</a></h2><p>Resources related to operations that act on the current state of the scheduler.</p>
+</section></div><div class="middle"><div id="scheduler-retry" class="resource"><h3 class="resource-heading">Retry <a href="#scheduler-retry" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/scheduler/retry?<span class="hljs-attribute">delay=</span><span class="hljs-literal">0</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="scheduler-retry-post" class="action post"><h4 class="action-heading"><div class="name">Send Retry</div><a href="#scheduler-retry-post" class="method post">POST</a><code class="uri">/{version}/scheduler/retry{?delay}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>delay</dt><dd><code>long</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>0</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>0</span></span><p>The new delay value to set for the workflow instance</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><div id="scheduler-halt" class="resource"><h3 class="resource-heading">Halt <a href="#scheduler-halt" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/scheduler/halt</span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">workflow_instance</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary/StyxCanary/2017-01-01T01"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="scheduler-halt-post" class="action post"><h4 class="action-heading"><div class="name">Send Halt</div><a href="#scheduler-halt-post" class="method post">POST</a><code class="uri">/{version}/scheduler/halt</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd></dl></div></div></div><hr class="split"><div class="middle"><div id="scheduler-trigger" class="resource"><h3 class="resource-heading">Trigger <a href="#scheduler-trigger" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/scheduler/trigger?<span class="hljs-attribute">allowFuture=</span><span class="hljs-literal">false</span></span></div><div class="tabs"><div class="example-names"><span>Requests</span><span class="tab-button">example 1</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
+  "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+  </span>}
+</span>}</code></pre><div style="height: 1px;"></div></div></div><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">parameter</span>": <span class="hljs-value"><span class="hljs-string">"2017-01-01T01"</span></span>,
+  "<span class="hljs-attribute">trigger_parameters</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">env</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">FOO</span>": <span class="hljs-value"><span class="hljs-string">"bar"</span>
+    </span>}
+  </span>}</span>,
+  "<span class="hljs-attribute">workflow_id</span>": <span class="hljs-value">{
+    "<span class="hljs-attribute">component_id</span>": <span class="hljs-value"><span class="hljs-string">"styx-canary"</span></span>,
+    "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"StyxCanary"</span>
+  </span>}</span>,
+  "<span class="hljs-attribute">trigger_id</span>": <span class="hljs-value"><span class="hljs-string">"UNKNOWN"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div></div><div class="middle"><div id="scheduler-trigger-post" class="action post"><h4 class="action-heading"><div class="name">Trigger Workflow Instance</div><a href="#scheduler-trigger-post" class="method post">POST</a><code class="uri">/{version}/scheduler/trigger{?allowFuture}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>allowFuture</dt><dd><code>boolean</code>&nbsp;<span>(optional)</span>&nbsp;<span class="text-info default"><strong>Default:&nbsp;</strong><span>false</span></span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>false</span></span><p>allow triggering future partition</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><section id="styx-config" class="resource-group"><h2 class="group-heading">Styx Config <a href="#styx-config" class="permalink">&para;</a></h2><p>Resources related to global configurations for Styx.</p>
+</section></div><div class="middle"><div id="styx-config-global-enabled" class="resource"><h3 class="resource-heading">Global Enabled <a href="#styx-config-global-enabled" class="permalink">&para;</a></h3></div></div><div class="right"><div class="definition"><span class="method get">GET</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/config</span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="styx-config-global-enabled-get" class="action get"><h4 class="action-heading"><div class="name">Get Global Enabled</div><a href="#styx-config-global-enabled-get" class="method get">GET</a><code class="uri">/{version}/config</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd></dl></div></div></div><hr class="split"><div class="right"><div class="definition"><span class="method post">POST</span>&nbsp;<span class="uri"><span class="hostname"></span>/<span class="hljs-attribute" title="version">v3</span>/config?<span class="hljs-attribute">enabled=</span><span class="hljs-literal">true</span></span></div><div class="tabs"><div class="tabs"><div class="example-names"><span>Responses</span><span class="tab-button">200</span></div><div class="tab"><div><div class="inner"><h5>Headers</h5><pre><code><span class="hljs-attribute">Content-Type</span>: <span class="hljs-string">application/json</span></code></pre><div style="height: 1px;"></div><h5>Body</h5><pre><code>{
+  "<span class="hljs-attribute">enabled</span>": <span class="hljs-value"><span class="hljs-string">"true"</span>
+</span>}</code></pre><div style="height: 1px;"></div></div></div></div></div></div></div><div class="middle"><div id="styx-config-global-enabled-post" class="action post"><h4 class="action-heading"><div class="name">Set Global Enabled</div><a href="#styx-config-global-enabled-post" class="method post">POST</a><code class="uri">/{version}/config{?enabled}</code></h4><div class="title"><strong>URI Parameters</strong><div class="collapse-button show"><span class="close">Hide</span><span class="open">Show</span></div></div><div class="collapse-content"><dl class="inner"><dt>version</dt><dd><code>string</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>v3</span></span><p>API version</p>
+<p class="choices"><strong>Choices:&nbsp;</strong><code>v3</code> </p></dd><dt>enabled</dt><dd><code>boolean</code>&nbsp;<span class="required">(required)</span>&nbsp;<span class="text-muted example"><strong>Example:&nbsp;</strong><span>true</span></span><p>Global enabled value</p>
+</dd></dl></div></div></div><hr class="split"><div class="middle"><p style="text-align: center;" class="text-muted">Generated by&nbsp;<a href="https://github.com/danielgtaylor/aglio" class="aglio">aglio</a>&nbsp;on 12 Apr 2023</p></div></div></div></div><script>/* eslint-env browser */
+/* eslint quotes: [2, "single"] */
+'use strict';
+
+/*
+  Determine if a string ends with another string.
+*/
+function endsWith(str, suffix) {
+    return str.indexOf(suffix, str.length - suffix.length) !== -1;
+}
+
+/*
+  Get a list of direct child elements by class name.
+*/
+function childrenByClass(element, name) {
+  var filtered = [];
+
+  for (var i = 0; i < element.children.length; i++) {
+    var child = element.children[i];
+    var classNames = child.className.split(' ');
+    if (classNames.indexOf(name) !== -1) {
+      filtered.push(child);
+    }
+  }
+
+  return filtered;
+}
+
+/*
+  Get an array [width, height] of the window.
+*/
+function getWindowDimensions() {
+  var w = window,
+      d = document,
+      e = d.documentElement,
+      g = d.body,
+      x = w.innerWidth || e.clientWidth || g.clientWidth,
+      y = w.innerHeight || e.clientHeight || g.clientHeight;
+
+  return [x, y];
+}
+
+/*
+  Collapse or show a request/response example.
+*/
+function toggleCollapseButton(event) {
+    var button = event.target.parentNode;
+    var content = button.parentNode.nextSibling;
+    var inner = content.children[0];
+
+    if (button.className.indexOf('collapse-button') === -1) {
+      // Clicked without hitting the right element?
+      return;
+    }
+
+    if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+        // Currently showing, so let's hide it
+        button.className = 'collapse-button';
+        content.style.maxHeight = '0px';
+    } else {
+        // Currently hidden, so let's show it
+        button.className = 'collapse-button show';
+        content.style.maxHeight = inner.offsetHeight + 12 + 'px';
+    }
+}
+
+function toggleTabButton(event) {
+    var i, index;
+    var button = event.target;
+
+    // Get index of the current button.
+    var buttons = childrenByClass(button.parentNode, 'tab-button');
+    for (i = 0; i < buttons.length; i++) {
+        if (buttons[i] === button) {
+            index = i;
+            button.className = 'tab-button active';
+        } else {
+            buttons[i].className = 'tab-button';
+        }
+    }
+
+    // Hide other tabs and show this one.
+    var tabs = childrenByClass(button.parentNode.parentNode, 'tab');
+    for (i = 0; i < tabs.length; i++) {
+        if (i === index) {
+            tabs[i].style.display = 'block';
+        } else {
+            tabs[i].style.display = 'none';
+        }
+    }
+}
+
+/*
+  Collapse or show a navigation menu. It will not be hidden unless it
+  is currently selected or `force` has been passed.
+*/
+function toggleCollapseNav(event, force) {
+    var heading = event.target.parentNode;
+    var content = heading.nextSibling;
+    var inner = content.children[0];
+
+    if (heading.className.indexOf('heading') === -1) {
+      // Clicked without hitting the right element?
+      return;
+    }
+
+    if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+      // Currently showing, so let's hide it, but only if this nav item
+      // is already selected. This prevents newly selected items from
+      // collapsing in an annoying fashion.
+      if (force || window.location.hash && endsWith(event.target.href, window.location.hash)) {
+        content.style.maxHeight = '0px';
+      }
+    } else {
+      // Currently hidden, so let's show it
+      content.style.maxHeight = inner.offsetHeight + 12 + 'px';
+    }
+}
+
+/*
+  Refresh the page after a live update from the server. This only
+  works in live preview mode (using the `--server` parameter).
+*/
+function refresh(body) {
+    document.querySelector('body').className = 'preload';
+    document.body.innerHTML = body;
+
+    // Re-initialize the page
+    init();
+    autoCollapse();
+
+    document.querySelector('body').className = '';
+}
+
+/*
+  Determine which navigation items should be auto-collapsed to show as many
+  as possible on the screen, based on the current window height. This also
+  collapses them.
+*/
+function autoCollapse() {
+  var windowHeight = getWindowDimensions()[1];
+  var itemsHeight = 64; /* Account for some padding */
+  var itemsArray = Array.prototype.slice.call(
+    document.querySelectorAll('nav .resource-group .heading'));
+
+  // Get the total height of the navigation items
+  itemsArray.forEach(function (item) {
+    itemsHeight += item.parentNode.offsetHeight;
+  });
+
+  // Should we auto-collapse any nav items? Try to find the smallest item
+  // that can be collapsed to show all items on the screen. If not possible,
+  // then collapse the largest item and do it again. First, sort the items
+  // by height from smallest to largest.
+  var sortedItems = itemsArray.sort(function (a, b) {
+    return a.parentNode.offsetHeight - b.parentNode.offsetHeight;
+  });
+
+  while (sortedItems.length && itemsHeight > windowHeight) {
+    for (var i = 0; i < sortedItems.length; i++) {
+      // Will collapsing this item help?
+      var itemHeight = sortedItems[i].nextSibling.offsetHeight;
+      if ((itemsHeight - itemHeight <= windowHeight) || i === sortedItems.length - 1) {
+        // It will, so let's collapse it, remove its content height from
+        // our total and then remove it from our list of candidates
+        // that can be collapsed.
+        itemsHeight -= itemHeight;
+        toggleCollapseNav({target: sortedItems[i].children[0]}, true);
+        sortedItems.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+/*
+  Initialize the interactive functionality of the page.
+*/
+function init() {
+    var i, j;
+
+    // Make collapse buttons clickable
+    var buttons = document.querySelectorAll('.collapse-button');
+    for (i = 0; i < buttons.length; i++) {
+        buttons[i].onclick = toggleCollapseButton;
+
+        // Show by default? Then toggle now.
+        if (buttons[i].className.indexOf('show') !== -1) {
+            toggleCollapseButton({target: buttons[i].children[0]});
+        }
+    }
+
+    var responseCodes = document.querySelectorAll('.example-names');
+    for (i = 0; i < responseCodes.length; i++) {
+        var tabButtons = childrenByClass(responseCodes[i], 'tab-button');
+        for (j = 0; j < tabButtons.length; j++) {
+            tabButtons[j].onclick = toggleTabButton;
+
+            // Show by default?
+            if (j === 0) {
+                toggleTabButton({target: tabButtons[j]});
+            }
+        }
+    }
+
+    // Make nav items clickable to collapse/expand their content.
+    var navItems = document.querySelectorAll('nav .resource-group .heading');
+    for (i = 0; i < navItems.length; i++) {
+        navItems[i].onclick = toggleCollapseNav;
+
+        // Show all by default
+        toggleCollapseNav({target: navItems[i].children[0]});
+    }
+}
+
+// Initial call to set up buttons
+init();
+
+window.onload = function () {
+    autoCollapse();
+    // Remove the `preload` class to enable animations
+    document.querySelector('body').className = '';
+};
+</script></body></html>
