@@ -36,6 +36,7 @@ import io.grpc.ManagedChannelBuilder;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +46,7 @@ public class FlyteAdminClient {
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
   private static final int MAX_RETRY_ATTEMPTS = 3;
+  private static final int GRPC_CALL_DEADLINE_SECONDS = 5;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
@@ -53,9 +55,11 @@ public class FlyteAdminClient {
     this.stub = Objects.requireNonNull(stub, "stub");
   }
 
-  public static FlyteAdminClient create(String target, boolean insecure,
-                                        List<ClientInterceptor> interceptors,
-                                        final String serviceName) {
+  public static FlyteAdminClient create(
+      String target,
+      boolean insecure,
+      List<ClientInterceptor> interceptors,
+      final String serviceName) {
     var builder = ManagedChannelBuilder.forTarget(target);
 
     if (insecure) {
@@ -64,13 +68,11 @@ public class FlyteAdminClient {
     builder.intercept(GrpcClientMetadataInterceptor.create(serviceName));
     // Enable transparent retries:
     // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
-    var channel = builder
-        .enableRetry()
-        .maxRetryAttempts(MAX_RETRY_ATTEMPTS)
-        .intercept(interceptors)
-        .build();
+    var channel =
+        builder.enableRetry().maxRetryAttempts(MAX_RETRY_ATTEMPTS).intercept(interceptors).build();
 
-    return new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
+    return new FlyteAdminClient(
+        AdminServiceGrpc.newBlockingStub(channel).withDeadlineAfter(GRPC_CALL_DEADLINE_SECONDS, TimeUnit.SECONDS));
   }
 
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
@@ -101,12 +103,8 @@ public class FlyteAdminClient {
         ExecutionOuterClass.ExecutionSpec.newBuilder()
             .setLaunchPlan(launchPlanId)
             .setMetadata(metadata)
-            .setLabels(Common.Labels.newBuilder()
-                .putAllValues(labels)
-                .build())
-            .setAnnotations(Common.Annotations.newBuilder()
-                .putAllValues(annotations)
-                .build())
+            .setLabels(Common.Labels.newBuilder().putAllValues(labels).build())
+            .setAnnotations(Common.Annotations.newBuilder().putAllValues(annotations).build())
             .build();
 
     var response =
@@ -116,7 +114,8 @@ public class FlyteAdminClient {
                 .setProject(project)
                 .setName(name)
                 .setSpec(spec)
-                .setInputs(fillParameterInInputs(inputs, userDefinedInputs, styxVariables, triggerParams))
+                .setInputs(
+                    fillParameterInInputs(inputs, userDefinedInputs, styxVariables, triggerParams))
                 .build());
 
     verifyNotNull(
@@ -132,9 +131,7 @@ public class FlyteAdminClient {
 
   LaunchPlanOuterClass.LaunchPlan getLaunchPlan(IdentifierOuterClass.Identifier launchPlanId) {
     LOG.debug("getLaunchPlan {}", launchPlanId);
-    var request = Common.ObjectGetRequest.newBuilder()
-        .setId(launchPlanId)
-        .build();
+    var request = Common.ObjectGetRequest.newBuilder().setId(launchPlanId).build();
     return stub.getLaunchPlan(request);
   }
 
@@ -171,25 +168,21 @@ public class FlyteAdminClient {
   }
 
   public ExecutionOuterClass.ExecutionList listExecutions(
-      String project,
-      String domain,
-      int limit,
-      String token,
-      String filters) {
+      String project, String domain, int limit, String token, String filters) {
     LOG.debug("listExecutions {} {} {} {}", project, domain, limit, token);
 
-    final var request = Common.ResourceListRequest
-        .newBuilder()
-        .setId(Common.NamedEntityIdentifier
-            .newBuilder()
-            .setProject(project)
-            .setDomain(domain)
-            .build())
-        .setLimit(limit)
-        .setToken(nullToEmpty(token))
-        .setFilters(nullToEmpty(filters))
-        // TODO: .setSortBy()
-        .build();
+    final var request =
+        Common.ResourceListRequest.newBuilder()
+            .setId(
+                Common.NamedEntityIdentifier.newBuilder()
+                    .setProject(project)
+                    .setDomain(domain)
+                    .build())
+            .setLimit(limit)
+            .setToken(nullToEmpty(token))
+            .setFilters(nullToEmpty(filters))
+            // TODO: .setSortBy()
+            .build();
 
     return stub.listExecutions(request);
   }
