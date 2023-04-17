@@ -153,6 +153,6 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
-    assertThat(schedulerRequest.header("Host"), is("localhost"));
+    assertThat(schedulerRequest.header("Host"), is(Optional.of("localhost")));
   }
 }
