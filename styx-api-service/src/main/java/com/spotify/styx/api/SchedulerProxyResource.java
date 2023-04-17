@@ -31,6 +31,7 @@ import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
@@ -55,16 +56,8 @@ public class SchedulerProxyResource {
 
   public SchedulerProxyResource(String schedulerServiceBaseUrl, Client client) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
-    this.schedulerHost = getHost(schedulerServiceBaseUrl);
+    this.schedulerHost = URI.create(schedulerServiceBaseUrl).getHost();
     this.client = Objects.requireNonNull(client, "client");
-  }
-
-  private String getHost(String schedulerServiceBaseUrl) {
-    try {
-      return new URL(schedulerServiceBaseUrl).getHost();
-    } catch (MalformedURLException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
