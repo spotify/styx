@@ -29,6 +29,9 @@ import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -48,10 +51,20 @@ public class SchedulerProxyResource {
 
   private final String schedulerServiceBaseUrl;
   private final Client client;
+  private final String schedulerHost;
 
   public SchedulerProxyResource(String schedulerServiceBaseUrl, Client client) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
+    this.schedulerHost = getHost(schedulerServiceBaseUrl);
     this.client = Objects.requireNonNull(client, "client");
+  }
+
+  private String getHost(String schedulerServiceBaseUrl) {
+    try {
+      return new URL(schedulerServiceBaseUrl).getHost();
+    } catch (MalformedURLException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public Stream<Route<AsyncHandler<Response<ByteString>>>> routes() {
@@ -82,8 +95,11 @@ public class SchedulerProxyResource {
             .newBuilder();
     ImmutableSortedMap.copyOf(rc.request().parameters()).forEach((name, values) ->
         values.forEach(value -> builder.addQueryParameter(name, value)));
+    return client.send(withHost(withRequestId(rc.request().withUri(builder.build().toString()))));
+  }
 
-    return client.send(withRequestId(rc.request().withUri(builder.build().toString())));
+  private Request withHost(Request request) {
+    return request.withHeader("Host", schedulerHost);
   }
 
   private Request withRequestId(Request request) {

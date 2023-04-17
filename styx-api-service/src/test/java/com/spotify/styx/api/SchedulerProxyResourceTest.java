@@ -138,4 +138,21 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
     assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
   }
+
+  @Test
+  public void verifyReplaceHost() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+            .respond(Response.forStatus(Status.ACCEPTED))
+            .to(SCHEDULER_BASE + "/api/v0/trigger");
+
+    awaitResponse(serviceHelper.request(Request
+            .forUri(path("/trigger"), "POST")
+            .withHeader("Host", "styx-api")));
+
+    final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
+
+    assertThat(schedulerRequest.header("Host"), is("localhost"));
+  }
 }
