@@ -39,7 +39,10 @@ import org.slf4j.MDC;
 
 public class SchedulerProxyResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:12345";
+  private static final String SCHEDULER_PROTOCOL = "http";
+  private static final String SCHEDULER_HOST = "localhost";
+  private static final String SCHEDULER_PORT = "12345";
+  private static final String SCHEDULER_BASE = String.format("%s://%s:%s",SCHEDULER_PROTOCOL, SCHEDULER_HOST, SCHEDULER_PORT);
 
   public SchedulerProxyResourceTest(Api.Version version) {
     super(SchedulerProxyResource.BASE, version);
@@ -153,6 +156,6 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
-    assertThat(schedulerRequest.header("Host"), is(Optional.of("localhost")));
+    assertThat(schedulerRequest.header("Host"), is(Optional.of(SCHEDULER_HOST)));
   }
 }
