@@ -46,7 +46,6 @@ public class FlyteAdminClient {
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
   private static final int MAX_RETRY_ATTEMPTS = 3;
-  private static final int GRPC_CALL_DEADLINE_SECONDS = 5;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
@@ -58,8 +57,10 @@ public class FlyteAdminClient {
   public static FlyteAdminClient create(
       String target,
       boolean insecure,
+      Long grpcDeadlineSeconds,
       List<ClientInterceptor> interceptors,
       final String serviceName) {
+
     var builder = ManagedChannelBuilder.forTarget(target);
 
     if (insecure) {
@@ -72,7 +73,7 @@ public class FlyteAdminClient {
         builder.enableRetry().maxRetryAttempts(MAX_RETRY_ATTEMPTS).intercept(interceptors).build();
 
     return new FlyteAdminClient(
-        AdminServiceGrpc.newBlockingStub(channel).withDeadlineAfter(GRPC_CALL_DEADLINE_SECONDS, TimeUnit.SECONDS));
+        AdminServiceGrpc.newBlockingStub(channel).withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS));
   }
 
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
