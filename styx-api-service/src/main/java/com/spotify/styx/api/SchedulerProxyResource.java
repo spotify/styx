@@ -95,11 +95,7 @@ public class SchedulerProxyResource {
             .newBuilder();
     ImmutableSortedMap.copyOf(rc.request().parameters()).forEach((name, values) ->
         values.forEach(value -> builder.addQueryParameter(name, value)));
-    return client.send(withHost(withRequestId(rc.request().withUri(builder.build().toString()))));
-  }
-
-  private Request withHost(Request request) {
-    return request.withHeader("Host", schedulerHost);
+    return client.send(withRequestId(rc.request().withUri(builder.build().toString())).withHeader("Host", schedulerHost));
   }
 
   private Request withRequestId(Request request) {
