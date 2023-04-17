@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,6 +25,7 @@ import static com.google.common.base.Verify.verifyNotNull;
 import static com.spotify.styx.flyte.client.FlyteInputsUtils.fillParameterInInputs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.typesafe.config.Config;
 import flyteidl.admin.Common;
 import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
@@ -42,10 +43,15 @@ import org.slf4j.LoggerFactory;
 
 public class FlyteAdminClient {
 
+  private static final String FLYTEADMIN_HOST = "host";
+  private static final String FLYTEADMIN_PORT = "port";
+  private static final String FLYTEADMIN_INSECURE = "insecure";
+  private static final String FLYTEADMIN_GRPC_DEADLINE_SECONDS = "grpc.deadline-seconds";
+  private static final String FLYTEADMIN_MAX_RETRY_ATTEMPTS = "grpc.max-retry-attempts";
+
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClient.class);
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
-  private static final int MAX_RETRY_ATTEMPTS = 3;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
@@ -55,11 +61,14 @@ public class FlyteAdminClient {
   }
 
   public static FlyteAdminClient create(
-      String target,
-      boolean insecure,
-      Long grpcDeadlineSeconds,
+      Config config,
       List<ClientInterceptor> interceptors,
       final String serviceName) {
+
+    final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
+    final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
+    final var grpcDeadlineSeconds = config.getLong(FLYTEADMIN_GRPC_DEADLINE_SECONDS);
+    final var maxRetryAttempts = config.getInt(FLYTEADMIN_MAX_RETRY_ATTEMPTS);
 
     var builder = ManagedChannelBuilder.forTarget(target);
 
@@ -70,7 +79,7 @@ public class FlyteAdminClient {
     // Enable transparent retries:
     // https://github.com/grpc/proposal/blob/master/A6-client-retries.md#transparent-retries
     var channel =
-        builder.enableRetry().maxRetryAttempts(MAX_RETRY_ATTEMPTS).intercept(interceptors).build();
+        builder.enableRetry().maxRetryAttempts(maxRetryAttempts).intercept(interceptors).build();
 
     return new FlyteAdminClient(
         AdminServiceGrpc.newBlockingStub(channel)

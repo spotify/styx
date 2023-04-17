@@ -290,7 +290,9 @@ public class StyxSchedulerTest {
         .put("styx.flyte.admin.production.host", "localhost")
         .put("styx.flyte.admin.production.port", "81")
         .put("styx.flyte.admin.production.insecure", "true")
-        .put("styx.flyte.admin.production.grpc.deadline-seconds", "5");
+        .put("styx.flyte.admin.production.grpc.deadline-seconds", "5")
+        .put("styx.flyte.admin.production.grpc.max-retry-attempts", "3");
+
     var config = ConfigFactory.parseMap(configMap.build());
     final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("production", config, stateManager,
         FlyteAdminClientInterceptors.NOOP);

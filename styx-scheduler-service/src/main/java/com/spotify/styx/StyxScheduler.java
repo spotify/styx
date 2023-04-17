@@ -158,10 +158,6 @@ public class StyxScheduler implements AppInit {
 
   private static final String FLYTE_ENABLED = "styx.flyte.enabled";
   private static final String FLYTEADMIN_PATH = "styx.flyte.admin";
-  private static final String FLYTEADMIN_HOST = "host";
-  private static final String FLYTEADMIN_PORT = "port";
-  private static final String FLYTEADMIN_INSECURE = "insecure";
-  private static final String FLYTEADMIN_GRPC_DEADLINE_SECONDS = "grpc.deadline-seconds";
 
   private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -710,10 +706,7 @@ public class StyxScheduler implements AppInit {
     }
 
     var config = flyteAdminRootConfig.getConfig(runnerId);
-    final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
-    final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
-    final var grpcDeadlineSeconds = config.getLong(FLYTEADMIN_GRPC_DEADLINE_SECONDS);
-    return FlyteAdminClient.create(target, insecure, grpcDeadlineSeconds, flyteAdminClientInterceptors.interceptors(), SERVICE_NAME);
+    return FlyteAdminClient.create(config, flyteAdminClientInterceptors.interceptors(), SERVICE_NAME);
   }
 
   @VisibleForTesting
