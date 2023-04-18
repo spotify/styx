@@ -52,12 +52,16 @@ public class FlyteAdminClient {
   private static final Logger LOG = LoggerFactory.getLogger(FlyteAdminClient.class);
   private static final String TRIGGERING_PRINCIPAL = "styx";
   private static final int USER_TRIGGERED_EXECUTION_NESTING = 0;
+  private final long grpcDeadlineSeconds;
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
   @VisibleForTesting
-  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub) {
+  FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub,
+                   long grpcDeadlineSeconds
+                   ) {
     this.stub = Objects.requireNonNull(stub, "stub");
+    this.grpcDeadlineSeconds = grpcDeadlineSeconds;
   }
 
   public static FlyteAdminClient create(
@@ -82,8 +86,7 @@ public class FlyteAdminClient {
         builder.enableRetry().maxRetryAttempts(maxRetryAttempts).intercept(interceptors).build();
 
     return new FlyteAdminClient(
-        AdminServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS));
+        AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds);
   }
 
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
@@ -119,7 +122,7 @@ public class FlyteAdminClient {
             .build();
 
     var response =
-        stub.createExecution(
+        stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).createExecution(
             ExecutionOuterClass.ExecutionCreateRequest.newBuilder()
                 .setDomain(domain)
                 .setProject(project)
@@ -143,7 +146,7 @@ public class FlyteAdminClient {
   LaunchPlanOuterClass.LaunchPlan getLaunchPlan(IdentifierOuterClass.Identifier launchPlanId) {
     LOG.debug("getLaunchPlan {}", launchPlanId);
     var request = Common.ObjectGetRequest.newBuilder().setId(launchPlanId).build();
-    return stub.getLaunchPlan(request);
+    return stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).getLaunchPlan(request);
   }
 
   public ExecutionOuterClass.Execution getExecution(String project, String domain, String name) {
@@ -157,7 +160,7 @@ public class FlyteAdminClient {
                     .setName(name)
                     .build())
             .build();
-    return stub.getExecution(request);
+    return stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).getExecution(request);
   }
 
   public ExecutionOuterClass.ExecutionTerminateResponse terminateExecution(
@@ -175,7 +178,7 @@ public class FlyteAdminClient {
             .setCause(cause)
             .build();
 
-    return stub.terminateExecution(request);
+    return stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).terminateExecution(request);
   }
 
   public ExecutionOuterClass.ExecutionList listExecutions(
@@ -195,12 +198,12 @@ public class FlyteAdminClient {
             // TODO: .setSortBy()
             .build();
 
-    return stub.listExecutions(request);
+    return stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).listExecutions(request);
   }
 
   public ProjectOuterClass.Projects listProjects() {
     LOG.debug("listProjects");
 
-    return stub.listProjects(ProjectOuterClass.ProjectListRequest.getDefaultInstance());
+    return stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).listProjects(ProjectOuterClass.ProjectListRequest.getDefaultInstance());
   }
 }
