@@ -38,10 +38,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 
-import com.spotify.styx.model.Workflow;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+
+import com.spotify.styx.model.WorkflowWithState;
 import org.junit.Test;
 
 public class WorkflowFilteringTest {
@@ -74,8 +75,8 @@ public class WorkflowFilteringTest {
   @Test
   public void shouldReturnWorkflowsWithDeploymentType() {
 
-    Workflow validWorkflow = createWorkflowWithType("id1", "remote-foo");
-    Workflow invalidWorkflow = createWorkflowWithType("id2", ""); // Empty type
+    WorkflowWithState validWorkflow = createWorkflowWithType("id1", "remote-foo");
+    WorkflowWithState invalidWorkflow = createWorkflowWithType("id2", ""); // Empty type
 
     var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
@@ -91,8 +92,8 @@ public class WorkflowFilteringTest {
   @Test
   public void shouldReturnWorkflowsWithDeploymentTimeBefore() {
 
-    Workflow invalidWorkflow = createWorkflowWithType("id1", "remote-foo");
-    Workflow validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
+    WorkflowWithState invalidWorkflow = createWorkflowWithType("id1", "remote-foo");
+    WorkflowWithState validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
 
     var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
@@ -107,8 +108,8 @@ public class WorkflowFilteringTest {
 
   @Test
   public void shouldReturnWorkflowsWithDeploymentTimeAfter() {
-    Workflow validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_AFTER);
-    Workflow invalidWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
+    WorkflowWithState validWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_AFTER);
+    WorkflowWithState invalidWorkflow = createWorkflowWithTime("id2", QUERY_THRESHOLD_BEFORE);
 
     var workflowCollection = List.of(validWorkflow, invalidWorkflow);
 
@@ -127,8 +128,8 @@ public class WorkflowFilteringTest {
     var deploymentTimeBefore = "2022-01-01T10:15:32.00Z";
     var queryThresholdOutsideWindow = "2022-01-01T10:15:33.00Z";
 
-    Workflow validWorkflow = createWorkflowWithTypeAndTime("id1", "remote-foo", QUERY_THRESHOLD);
-    Workflow invalidWorkflow = createWorkflowWithTypeAndTime("id2", "remote-foo",
+    WorkflowWithState validWorkflow = createWorkflowWithTypeAndTime("id1", "remote-foo", QUERY_THRESHOLD);
+    WorkflowWithState invalidWorkflow = createWorkflowWithTypeAndTime("id2", "remote-foo",
         Instant.parse(queryThresholdOutsideWindow));
 
     var workflowCollection = List.of(validWorkflow, invalidWorkflow);

@@ -216,7 +216,7 @@ class StyxOkHttpClient implements StyxClient {
   @Override
   public CompletionStage<Void> deleteWorkflow(String componentId, String workflowId) {
     return execute(forUri(urlBuilder("workflows", componentId, workflowId), "DELETE"))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -270,7 +270,7 @@ class StyxOkHttpClient implements StyxClient {
     return execute(
         forUri(urlBuilder("scheduler", "trigger")
             .addQueryParameter("allowFuture", String.valueOf(allowFuture)), "POST", triggerRequest))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -282,7 +282,7 @@ class StyxOkHttpClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -294,7 +294,7 @@ class StyxOkHttpClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -378,7 +378,8 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Void> backfillHalt(String backfillId, boolean graceful) {
     var url = urlBuilder("backfills", backfillId);
     url.addQueryParameter("graceful", Boolean.toString(graceful));
-    return execute(forUri(url, "DELETE")).thenApply(response -> null);
+    return execute(forUri(url, "DELETE"))
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
