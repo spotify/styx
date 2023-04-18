@@ -57,6 +57,7 @@ public class FlyteAdminClientTest {
   static final Map<String, String> LABELS = ImmutableMap.of("label-key", "id");
   static final Map<String, String> ANNOTATIONS = ImmutableMap.of("annotation-key", "value");
   static final Map<String, String> EXTRA_DEFAULT_INPUTS = ImmutableMap.of(TestAdminService.EXTRA_PARAMETER_NAME, Instant.now().toString());
+  private static final long GRPC_DEADLINE_SECONDS = 10;
   private FlyteAdminClient flyteAdminClient;
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
@@ -84,7 +85,7 @@ public class FlyteAdminClientTest {
         .build();
 
     flyteAdminClient =
-        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), 10);
+        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), GRPC_DEADLINE_SECONDS);
 
     grpcCleanup.register(server.start());
     grpcCleanup.register(channel);
