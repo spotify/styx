@@ -84,7 +84,7 @@ public class FlyteAdminClientTest {
         .build();
 
     flyteAdminClient =
-        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel));
+        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), 10);
 
     grpcCleanup.register(server.start());
     grpcCleanup.register(channel);
