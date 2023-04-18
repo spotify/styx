@@ -331,8 +331,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                           || !isFlyteExecRelatedToRunState(annotatedId, runState.orElseThrow());
     if (shouldTerminate) {
       var id = annotatedId.identifier();
-      LOG.info("would have terminated: project=[{}], domain=[{}], name=[{}], cause=[{}]",
-          id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
+      LOG.info("would have terminated: project=[{}], domain=[{}], name=[{}], cause=[{}], runState=[{}]",
+          id.project(), id.domain(), id.name(), TERMINATE_CAUSE, runState);
       // flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
     }
   }
