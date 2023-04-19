@@ -332,9 +332,9 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     if (shouldTerminate) {
       var id = annotatedId.identifier();
       LOG.info(
-          "would have terminated: project=[{}], domain=[{}], name=[{}], cause=[{}], workflowInstance=[{}], runState=[{}]",
+          "terminating dangling flyte execution: project=[{}], domain=[{}], name=[{}], cause=[{}], workflowInstance=[{}], runState=[{}]",
           id.project(), id.domain(), id.name(), TERMINATE_CAUSE, workflowInstance, runState);
-      // flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
+      flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
     }
   }
 

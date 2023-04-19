@@ -67,7 +67,6 @@ import java.util.stream.Collectors;
 import junitparams.JUnitParamsRunner;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -76,7 +75,6 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.verification.VerificationMode;
 
 @RunWith(JUnitParamsRunner.class)
-@Ignore()
 public class FlyteAdminClientRunnerTerminateDanglingTest {
 
   private static final Duration TERMINATE_DANGLING_INTERVAL = Duration.ofSeconds(60);
