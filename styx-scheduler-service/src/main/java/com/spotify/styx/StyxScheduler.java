@@ -218,7 +218,7 @@ public class StyxScheduler implements AppInit {
 
   @FunctionalInterface
   interface FlyteRunnerFactory {
-    FlyteRunner create(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors);
+    FlyteRunner create(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors, Stats stats);
   }
 
   @FunctionalInterface
@@ -429,7 +429,7 @@ public class StyxScheduler implements AppInit {
         flyteAdminClientInterceptorsFactory.apply(environment);
     final Function<RunState, String> flyteRunnerId = RunnerId.flyteRunnerId(styxConfig);
     final FlyteRunner flyteRunner = FlyteRunner.routing(
-        id -> flyteRunnerFactory.create(id, environment.config(), stateManager, interceptors),
+        id -> flyteRunnerFactory.create(id, environment.config(), stateManager, interceptors, stats),
         flyteRunnerId
     );
 
@@ -690,13 +690,15 @@ public class StyxScheduler implements AppInit {
         ));
   }
 
-  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
+  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager,
+                                       FlyteAdminClientInterceptors flyteAdminClientInterceptors,
+                                       Stats stats) {
     if (!config.getBoolean(FLYTE_ENABLED)) {
       return FlyteRunner.noop();
     }
 
     var flyteAdminClient = getFlyteAdminClient(config, runnerId, flyteAdminClientInterceptors);
-    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
+    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager, stats);
   }
 
   private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {

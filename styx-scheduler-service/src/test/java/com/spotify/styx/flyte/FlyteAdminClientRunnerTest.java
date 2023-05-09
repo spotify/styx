@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -57,6 +58,7 @@ import com.spotify.styx.model.TriggerParametersBuilder;
 import com.spotify.styx.model.Workflow;
 import com.spotify.styx.model.WorkflowConfiguration;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
@@ -110,12 +112,13 @@ public class FlyteAdminClientRunnerTest {
   @Mock private FlyteAdminClient flyteAdminClient;
   @Mock private StateManager stateManager;
 
+  private final Stats stats = mock(Stats.class);
   private FlyteAdminClientRunner flyteRunner;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    flyteRunner = new FlyteAdminClientRunner(RUNNER_ID, flyteAdminClient, stateManager);
+    flyteRunner = new FlyteAdminClientRunner(RUNNER_ID, flyteAdminClient, stateManager, stats);
   }
 
   @Test
