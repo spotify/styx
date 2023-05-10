@@ -105,7 +105,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   private final Duration terminateDanglingFlyteExecInterval;
   private final ScheduledExecutorService scheduledExecutor;
   private final Time time;
-  private Stats stats;
+  private final Stats stats;
   private final Closer closer = Closer.create();
   private final ExecutorService executor;
 
