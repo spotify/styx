@@ -336,8 +336,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                           || !isFlyteExecRelatedToRunState(annotatedId, runState.orElseThrow());
     if (shouldTerminate) {
       var id = annotatedId.identifier();
-      stats.recordDanglingTerminatedFlyteExecution();
       flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
+      stats.recordDanglingTerminatedFlyteExecution();      
     }
   }
 
