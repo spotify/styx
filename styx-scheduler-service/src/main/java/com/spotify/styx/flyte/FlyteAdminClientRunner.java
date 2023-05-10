@@ -116,7 +116,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                          final Duration terminateDanglingFlyteExecInterval,
                          final ScheduledExecutorService scheduledExecutor,
                          final Time time,
-                         Stats stats) {
+                         final Stats stats) {
     this.runnerId = requireNonNull(runnerId, "runnerId");
     this.flyteAdminClient = requireNonNull(flyteAdminClient, "flyteAdminClient");
     this.stateManager = requireNonNull(stateManager, "stateManager");
