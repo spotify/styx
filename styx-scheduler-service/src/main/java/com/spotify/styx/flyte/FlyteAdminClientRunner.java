@@ -42,6 +42,7 @@ import com.spotify.styx.model.Event;
 import com.spotify.styx.model.FlyteExecConf;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
@@ -104,6 +105,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
   private final Duration terminateDanglingFlyteExecInterval;
   private final ScheduledExecutorService scheduledExecutor;
   private final Time time;
+  private final Stats stats;
   private final Closer closer = Closer.create();
   private final ExecutorService executor;
 
@@ -113,7 +115,8 @@ public class FlyteAdminClientRunner implements FlyteRunner {
                          final StateManager stateManager,
                          final Duration terminateDanglingFlyteExecInterval,
                          final ScheduledExecutorService scheduledExecutor,
-                         final Time time) {
+                         final Time time,
+                         final Stats stats) {
     this.runnerId = requireNonNull(runnerId, "runnerId");
     this.flyteAdminClient = requireNonNull(flyteAdminClient, "flyteAdminClient");
     this.stateManager = requireNonNull(stateManager, "stateManager");
@@ -123,6 +126,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
         "flyte-scheduled-executor"
     );
     this.time = requireNonNull(time, "time");
+    this.stats = requireNonNull(stats, "stats");;
 
     checkArgument(
         terminateDanglingFlyteExecInterval.compareTo(Duration.ZERO) > 0,
@@ -134,11 +138,12 @@ public class FlyteAdminClientRunner implements FlyteRunner {
 
   FlyteAdminClientRunner(final String runnerId,
                          final FlyteAdminClient flyteAdminClient,
-                         final StateManager stateManager) {
+                         final StateManager stateManager,
+                         final Stats stats) {
     this(runnerId, flyteAdminClient, stateManager,
         DEFAULT_TERMINATE_EXEC_INTERVAL,
         Executors.newSingleThreadScheduledExecutor(THREAD_FACTORY),
-        Instant::now);
+        Instant::now, stats);
   }
 
   @Override
@@ -332,6 +337,7 @@ public class FlyteAdminClientRunner implements FlyteRunner {
     if (shouldTerminate) {
       var id = annotatedId.identifier();
       flyteAdminClient.terminateExecution(id.project(), id.domain(), id.name(), TERMINATE_CAUSE);
+      stats.recordDanglingTerminatedFlyteExecution();      
     }
   }
 

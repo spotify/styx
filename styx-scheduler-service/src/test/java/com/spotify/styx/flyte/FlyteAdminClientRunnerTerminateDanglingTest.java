@@ -31,6 +31,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -42,6 +43,7 @@ import com.spotify.styx.QuietDeterministicScheduler;
 import com.spotify.styx.flyte.client.FlyteAdminClient;
 import com.spotify.styx.model.WorkflowId;
 import com.spotify.styx.model.WorkflowInstance;
+import com.spotify.styx.monitoring.Stats;
 import com.spotify.styx.state.RunState;
 import com.spotify.styx.state.StateData;
 import com.spotify.styx.state.StateManager;
@@ -100,6 +102,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
 
   @Mock private StateManager stateManager;
   @Mock private FlyteAdminClient adminClient;
+  private final Stats stats = mock(Stats.class);
 
   private final QuietDeterministicScheduler executor = spy(new QuietDeterministicScheduler());
   private final Set<WorkflowInstance> activeInstances = new LinkedHashSet<>();
@@ -111,7 +114,7 @@ public class FlyteAdminClientRunnerTerminateDanglingTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     runner = new FlyteAdminClientRunner(
-        "runnerId", adminClient, stateManager, TERMINATE_DANGLING_INTERVAL, executor, time);
+        "runnerId", adminClient, stateManager, TERMINATE_DANGLING_INTERVAL, executor, time, stats);
     when(adminClient.listProjects())
         .thenReturn(ProjectOuterClass.Projects.newBuilder()
             .addProjects(ProjectOuterClass.Project.newBuilder()
