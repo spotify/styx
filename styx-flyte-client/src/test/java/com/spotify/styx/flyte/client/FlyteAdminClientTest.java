@@ -33,10 +33,14 @@ import com.google.common.collect.ImmutableMap;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -85,7 +89,13 @@ public class FlyteAdminClientTest {
         .build();
 
     flyteAdminClient =
-        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), GRPC_DEADLINE_SECONDS);
+        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), GRPC_DEADLINE_SECONDS, Retry.of(
+                "flyteadmin-client",
+                RetryConfig.custom()
+                        .maxAttempts(2)
+                        .waitDuration(Duration.ofMillis(10))
+                        .retryExceptions(StatusRuntimeException.class)
+                        .build()));
 
     grpcCleanup.register(server.start());
     grpcCleanup.register(channel);

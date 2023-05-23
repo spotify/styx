@@ -31,13 +31,20 @@ import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
+import flyteidl.core.Interface;
 import flyteidl.service.AdminServiceGrpc;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import io.grpc.ClientInterceptor;
 import io.grpc.ManagedChannelBuilder;
+
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,12 +63,22 @@ public class FlyteAdminClient {
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
+  private static final RetryConfig RETRY_CONFIG =
+          RetryConfig.custom()
+                  .maxAttempts(5)
+                  .waitDuration(Duration.ofMillis(1000))
+                  .retryExceptions(StatusRuntimeException.class)
+                  .build();
+  private final Retry retry;
+
   @VisibleForTesting
   FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub,
-                   long grpcDeadlineSeconds
+                   long grpcDeadlineSeconds,
+                   Retry retry
                    ) {
     this.stub = Objects.requireNonNull(stub, "stub");
     this.grpcDeadlineSeconds = grpcDeadlineSeconds;
+    this.retry = Objects.requireNonNull(retry, "retry");
   }
 
   public static FlyteAdminClient create(
@@ -86,7 +103,7 @@ public class FlyteAdminClient {
         builder.enableRetry().maxRetryAttempts(maxRetryAttempts).intercept(interceptors).build();
 
     return new FlyteAdminClient(
-        AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds);
+        AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds, Retry.of("flyteadmin-client", RETRY_CONFIG));
   }
 
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
@@ -121,16 +138,15 @@ public class FlyteAdminClient {
             .setAnnotations(Common.Annotations.newBuilder().putAllValues(annotations).build())
             .build();
 
-    var response =
-        stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).createExecution(
+    var response = retry.executeSupplier(() -> stub.withDeadlineAfter(grpcDeadlineSeconds, TimeUnit.SECONDS).createExecution(
             ExecutionOuterClass.ExecutionCreateRequest.newBuilder()
-                .setDomain(domain)
-                .setProject(project)
-                .setName(name)
-                .setSpec(spec)
-                .setInputs(
-                    fillParameterInInputs(inputs, userDefinedInputs, styxVariables, triggerParams))
-                .build());
+                    .setDomain(domain)
+                    .setProject(project)
+                    .setName(name)
+                    .setSpec(spec)
+                    .setInputs(
+                            fillParameterInInputs(inputs, userDefinedInputs, styxVariables, triggerParams))
+                    .build()));
 
     verifyNotNull(
         response,
