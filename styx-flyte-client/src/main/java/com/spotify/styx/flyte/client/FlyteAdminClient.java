@@ -31,7 +31,6 @@ import flyteidl.admin.ExecutionOuterClass;
 import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.admin.ProjectOuterClass;
 import flyteidl.core.IdentifierOuterClass;
-import flyteidl.core.Interface;
 import flyteidl.service.AdminServiceGrpc;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
