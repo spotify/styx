@@ -20,6 +20,10 @@
 
 package com.spotify.styx.flyte.client;
 
+import flyteidl.admin.ExecutionOuterClass;
+import org.junit.runner.RunWith;
+
+import static com.spotify.styx.flyte.client.FlyteAdminClient.RETRY_CONFIG;
 import static com.spotify.styx.flyte.client.TestAdminService.EXEC_NAME_PREFIX;
 import static com.spotify.styx.flyte.client.TestAdminService.PAGE_SIZE;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -28,27 +32,35 @@ import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import flyteidl.admin.ExecutionOuterClass.ExecutionMetadata.ExecutionMode;
+import flyteidl.admin.LaunchPlanOuterClass;
 import flyteidl.core.IdentifierOuterClass;
 import flyteidl.service.AdminServiceGrpc;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class FlyteAdminClientTest {
 
   static final String PROJECT = "styx_flyte_test";
@@ -63,6 +75,7 @@ public class FlyteAdminClientTest {
   static final Map<String, String> EXTRA_DEFAULT_INPUTS = ImmutableMap.of(TestAdminService.EXTRA_PARAMETER_NAME, Instant.now().toString());
   private static final long GRPC_DEADLINE_SECONDS = 10;
   private FlyteAdminClient flyteAdminClient;
+
 
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
@@ -89,13 +102,7 @@ public class FlyteAdminClientTest {
         .build();
 
     flyteAdminClient =
-        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), GRPC_DEADLINE_SECONDS, Retry.of(
-                "flyteadmin-client",
-                RetryConfig.custom()
-                        .maxAttempts(2)
-                        .waitDuration(Duration.ofMillis(10))
-                        .retryExceptions(StatusRuntimeException.class)
-                        .build()));
+        new FlyteAdminClient(AdminServiceGrpc.newBlockingStub(channel), GRPC_DEADLINE_SECONDS, RETRY_CONFIG);
 
     grpcCleanup.register(server.start());
     grpcCleanup.register(channel);
@@ -111,6 +118,28 @@ public class FlyteAdminClientTest {
     assertThat(workflowExecution.getId().getDomain(), equalTo(DOMAIN));
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
   }
+
+
+  @Mock AdminServiceGrpc.AdminServiceBlockingStub stufb;
+
+  @Test
+  public void shouldRetry() {
+   var stub = mock(AdminServiceGrpc.AdminServiceBlockingStub.class);
+    flyteAdminClient =
+            new FlyteAdminClient(stub, GRPC_DEADLINE_SECONDS, RETRY_CONFIG);
+
+    when(stub.withDeadlineAfter(GRPC_DEADLINE_SECONDS, TimeUnit.SECONDS)).thenReturn(stub);
+    when(stub.getLaunchPlan(any())).thenReturn(LaunchPlanOuterClass.LaunchPlan.newBuilder().build());
+    when(stub.withDeadlineAfter(GRPC_DEADLINE_SECONDS, TimeUnit.SECONDS)).thenReturn(stub);
+    when(stub.createExecution(any())).thenThrow(new StatusRuntimeException(Status.INTERNAL)).thenReturn(ExecutionOuterClass.ExecutionCreateResponse.newBuilder().build());
+
+    flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
+                    ExecutionMode.SCHEDULED, Map.of(), Map.of(), Map.of(),
+                    Map.of(),Map.of());
+
+    verify(stub, times(2)).createExecution(any());
+  }
+
 
   @Test
   public void shouldPropagateLabelsAndAnnotationsOnCreateExecutionToStub() {

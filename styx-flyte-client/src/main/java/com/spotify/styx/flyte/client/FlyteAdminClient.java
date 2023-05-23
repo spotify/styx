@@ -62,7 +62,7 @@ public class FlyteAdminClient {
 
   private final AdminServiceGrpc.AdminServiceBlockingStub stub;
 
-  private static final RetryConfig RETRY_CONFIG =
+  static final RetryConfig RETRY_CONFIG =
           RetryConfig.custom()
                   .maxAttempts(5)
                   .waitDuration(Duration.ofMillis(1000))
@@ -73,11 +73,12 @@ public class FlyteAdminClient {
   @VisibleForTesting
   FlyteAdminClient(AdminServiceGrpc.AdminServiceBlockingStub stub,
                    long grpcDeadlineSeconds,
-                   Retry retry
+                   RetryConfig retry
                    ) {
     this.stub = Objects.requireNonNull(stub, "stub");
     this.grpcDeadlineSeconds = grpcDeadlineSeconds;
-    this.retry = Objects.requireNonNull(retry, "retry");
+    var retryConfig = Objects.requireNonNull(retry, "retry");
+    this.retry = Retry.of("flyteadmin-client", retryConfig);
   }
 
   public static FlyteAdminClient create(
@@ -102,7 +103,7 @@ public class FlyteAdminClient {
         builder.enableRetry().maxRetryAttempts(maxRetryAttempts).intercept(interceptors).build();
 
     return new FlyteAdminClient(
-        AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds, Retry.of("flyteadmin-client", RETRY_CONFIG));
+        AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds, RETRY_CONFIG);
   }
 
   public ExecutionOuterClass.ExecutionCreateResponse createExecution(
