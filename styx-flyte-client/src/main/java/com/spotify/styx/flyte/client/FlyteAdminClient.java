@@ -107,7 +107,7 @@ public class FlyteAdminClient {
     }
     builder.intercept(GrpcClientMetadataInterceptor.create(serviceName));
     var channel =
-        builder.intercept(interceptors).build();
+        builder.enableRetry().maxRetryAttempts(0).intercept(interceptors).build();
 
     return new FlyteAdminClient(
         AdminServiceGrpc.newBlockingStub(channel), grpcDeadlineSeconds, retryConfig);
