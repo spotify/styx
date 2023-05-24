@@ -122,7 +122,6 @@ public class FlyteAdminClientTest {
   }
 
 
-  @Mock AdminServiceGrpc.AdminServiceBlockingStub stufb;
 
   @Test
   public void shouldRetry() {
