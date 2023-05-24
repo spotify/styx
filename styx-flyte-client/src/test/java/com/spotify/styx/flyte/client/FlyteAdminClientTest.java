@@ -58,7 +58,6 @@ import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -121,8 +120,6 @@ public class FlyteAdminClientTest {
     assertThat(workflowExecution.getId().getName(), equalTo(NON_EXISTING_NAME));
   }
 
-
-
   @Test
   public void shouldRetry() {
    var stub = mock(AdminServiceGrpc.AdminServiceBlockingStub.class);
@@ -139,7 +136,6 @@ public class FlyteAdminClientTest {
 
     verify(stub, times(2)).createExecution(any());
   }
-
 
   @Test
   public void shouldPropagateLabelsAndAnnotationsOnCreateExecutionToStub() {
