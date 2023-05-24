@@ -21,9 +21,10 @@
 package com.spotify.styx.flyte.client;
 
 import flyteidl.admin.ExecutionOuterClass;
+import io.github.resilience4j.retry.RetryConfig;
 import org.junit.runner.RunWith;
 
-import static com.spotify.styx.flyte.client.FlyteAdminClient.RETRY_CONFIG;
+import static com.spotify.styx.flyte.client.FlyteAdminClient.getRetryConfig;
 import static com.spotify.styx.flyte.client.TestAdminService.EXEC_NAME_PREFIX;
 import static com.spotify.styx.flyte.client.TestAdminService.PAGE_SIZE;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -74,6 +75,7 @@ public class FlyteAdminClientTest {
   static final Map<String, String> ANNOTATIONS = ImmutableMap.of("annotation-key", "value");
   static final Map<String, String> EXTRA_DEFAULT_INPUTS = ImmutableMap.of(TestAdminService.EXTRA_PARAMETER_NAME, Instant.now().toString());
   private static final long GRPC_DEADLINE_SECONDS = 10;
+  private static final RetryConfig RETRY_CONFIG = getRetryConfig(3, 100, 2);
   private FlyteAdminClient flyteAdminClient;
 
 
@@ -130,7 +132,6 @@ public class FlyteAdminClientTest {
 
     when(stub.withDeadlineAfter(GRPC_DEADLINE_SECONDS, TimeUnit.SECONDS)).thenReturn(stub);
     when(stub.getLaunchPlan(any())).thenReturn(LaunchPlanOuterClass.LaunchPlan.newBuilder().build());
-    when(stub.withDeadlineAfter(GRPC_DEADLINE_SECONDS, TimeUnit.SECONDS)).thenReturn(stub);
     when(stub.createExecution(any())).thenThrow(new StatusRuntimeException(Status.INTERNAL)).thenReturn(ExecutionOuterClass.ExecutionCreateResponse.newBuilder().build());
 
     flyteAdminClient.createExecution(PROJECT, DOMAIN, NON_EXISTING_NAME, identifier(NON_EXISTING_NAME),
