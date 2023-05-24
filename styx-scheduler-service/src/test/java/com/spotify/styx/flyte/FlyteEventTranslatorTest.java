@@ -138,6 +138,19 @@ public class FlyteEventTranslatorTest {
         new Object[] { Execution.WorkflowExecution.Phase.FAILED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE },
         new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
         new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhaused|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhaused|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhaused|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhaused|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhaused|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhaused|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhaused|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhaused|USER:Persisted", SUCCESS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhaused|USER:Persisted", SUCCESS_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhaused|USER:Persisted", SUCCESS_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhaused|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhaused|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhaused|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
         };
   }
 
