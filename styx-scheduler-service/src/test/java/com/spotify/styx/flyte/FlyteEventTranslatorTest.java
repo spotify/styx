@@ -138,6 +138,19 @@ public class FlyteEventTranslatorTest {
         new Object[] { Execution.WorkflowExecution.Phase.FAILED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE },
         new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
         new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhausted|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhausted|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhausted|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhausted|USER:NotReady", MISSING_DEPS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhausted|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhausted|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhausted|USER:NotRetryable", UNRECOVERABLE_FAILURE_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhausted|USER:Persisted", SUCCESS_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhausted|USER:Persisted", SUCCESS_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhausted|USER:Persisted", SUCCESS_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.FAILED, "RetriesExhausted|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE },
+        new Object[] { Execution.WorkflowExecution.Phase.ABORTED, "RetriesExhausted|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
+        new Object[] { Execution.WorkflowExecution.Phase.TIMED_OUT, "RetriesExhausted|USER:AnythingElse", UNKNOWN_ERROR_EXIT_CODE},
         };
   }
 

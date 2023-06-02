@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 public class FlyteEventTranslator {
   private static final Logger LOG = LoggerFactory.getLogger(FlyteEventTranslator.class);
-
+  private static final String RETRIES_EXHAUSTED = "RetriesExhausted|";
   private static final String PERSISTED_CODE = "USER:Persisted";
   private static final String NOT_RETRYABLE_CODE = "USER:NotRetryable";
   private static final String NOT_READY_CODE = "USER:NotReady";
@@ -96,7 +96,7 @@ public class FlyteEventTranslator {
       case FAILED:
       case ABORTED:
       case TIMED_OUT:
-        final String flyteCode = execution.getClosure().getError().getCode();
+        final String flyteCode = execution.getClosure().getError().getCode().replace(RETRIES_EXHAUSTED,"");
         final int styxCode = KNOWN_ERROR_CODES.getOrDefault(flyteCode, UNKNOWN_ERROR_EXIT_CODE);
         LOG.info("Issue 'terminate' event for: " + runState.workflowInstance());
         generatedEvents.add(Event.terminate(runState.workflowInstance(), Optional.of(styxCode)));
