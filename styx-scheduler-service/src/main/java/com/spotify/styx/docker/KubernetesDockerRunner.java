@@ -684,7 +684,7 @@ class KubernetesDockerRunner implements DockerRunner {
         .orElse("N/A");
     final String status = readStatus(pod);
 
-    LOG.info("{}Pod event for {} ({}) at resource version {}, action: {}, workflow instance: {}, status: {}",
+    LOG.debug("{}Pod event for {} ({}) at resource version {}, action: {}, workflow instance: {}, status: {}",
              polled ? "Polled: " : "", podName, pod.getMetadata().getUid(), resourceVersion, action, workflowInstance,
              status);
   }
