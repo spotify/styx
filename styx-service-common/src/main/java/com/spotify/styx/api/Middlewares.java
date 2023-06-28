@@ -269,9 +269,10 @@ public final class Middlewares {
   }
 
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
-    return headers.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-        entry -> BLACKLISTED_HEADERS.contains(entry.getKey().toLowerCase(Locale.ROOT)) ? "<hidden>"
-                                                                                       : entry.getValue()));
+    return headers.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey,
+            entry -> BLACKLISTED_HEADERS.contains(entry.getKey().toLowerCase(Locale.ROOT)) ? "<hidden>"
+                                                                                           : entry.getValue()));
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
