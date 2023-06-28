@@ -70,7 +70,7 @@ public final class Middlewares {
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
 
   private static final String REQUEST_ID = "request-id";
-  private static final String X_REQUEST_ID = "X-Styx-Request-Id";
+  private static final String X_STYX_REQUEST_ID = "X-Styx-Request-Id";
 
   private Middlewares() {
     throw new UnsupportedOperationException();
@@ -124,7 +124,7 @@ public final class Middlewares {
     return innerHandler -> requestContext -> {
 
       // Accept the request id from the incoming request if present. Otherwise generate one.
-      final String requestIdHeader = requestContext.request().headers().get(X_REQUEST_ID);
+      final String requestIdHeader = requestContext.request().headers().get(X_STYX_REQUEST_ID);
       final String requestId = (requestIdHeader != null)
           ? requestIdHeader
           : UUID.randomUUID().toString().replace("-", ""); // UUID with no dashes, easier to deal with
@@ -143,17 +143,17 @@ public final class Middlewares {
           } else {
             response = r;
           }
-          return response.withHeader(X_REQUEST_ID, requestId);
+          return response.withHeader(X_STYX_REQUEST_ID, requestId);
         });
       } catch (ResponseException e) {
         return completedFuture(e.<T>getResponse()
-            .withHeader(X_REQUEST_ID, requestId));
+            .withHeader(X_STYX_REQUEST_ID, requestId));
       } catch (Throwable t) {
         var internalServerErrorReason = internalServerErrorReason(requestId, t);
         LOG.warn(internalServerErrorReason, t);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
             .withReasonPhrase(internalServerErrorReason))
-            .withHeader(X_REQUEST_ID, requestId));
+            .withHeader(X_STYX_REQUEST_ID, requestId));
       }
     };
   }
