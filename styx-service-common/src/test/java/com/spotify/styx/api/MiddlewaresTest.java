@@ -539,7 +539,8 @@ public class MiddlewaresTest {
     Request request = Request.forUri("/", "PUT")
         .withPayload(ByteString.encodeUtf8("hello"))
         .withHeader(HttpHeaders.AUTHORIZATION, "Bearer s3cr3tp455w0rd")
-        .withHeader("foo-service-identity", "Bearer s3cr3tp455w0rd");
+        .withHeader("foo-service-identity", "Bearer s3cr3tp455w0rd")
+        .withHeader("foo-bar", "foo-bar");
     when(requestContext.request()).thenReturn(request);
 
     String email = "foo@bar.net";
@@ -557,7 +558,7 @@ public class MiddlewaresTest {
         request.method(),
         request.uri(),
         email,
-        Map.of(HttpHeaders.AUTHORIZATION, "<hidden>", "foo-service-identity", "<hidden>"),
+        Map.of(HttpHeaders.AUTHORIZATION, "<hidden>", "foo-service-identity", "<hidden>", "foo-bar", "foo-bar"),
         Map.of(),
         request.payload().orElseThrow().utf8());
   }
