@@ -30,7 +30,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -70,7 +69,7 @@ public final class Middlewares {
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
   private static final List<String> BLACKLISTED_HEADERS =
-      ImmutableList.of(HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT), "service-identity");
+      List.of(HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT), "service-identity");
 
   private static final String REQUEST_ID = "request-id";
   private static final String X_STYX_REQUEST_ID = "X-Styx-Request-Id";
