@@ -70,7 +70,7 @@ public final class Middlewares {
   private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
 
   private static final String REQUEST_ID = "request-id";
-  private static final String X_REQUEST_ID = "X-Request-Id";
+  private static final String X_REQUEST_ID = "X-Styx-Request-Id";
 
   private Middlewares() {
     throw new UnsupportedOperationException();
