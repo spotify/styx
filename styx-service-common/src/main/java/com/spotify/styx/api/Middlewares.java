@@ -45,6 +45,7 @@ import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -67,7 +68,8 @@ public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
-  private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
+  private static final Set<String> BLACKLISTED_HEADERS =
+      ImmutableSet.of(HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT));
 
   private static final String REQUEST_ID = "request-id";
   private static final String X_STYX_REQUEST_ID = "X-Styx-Request-Id";
@@ -269,7 +271,8 @@ public final class Middlewares {
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
     return headers.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
-            entry -> BLACKLISTED_HEADERS.contains(entry.getKey()) ? "<hidden>" : entry.getValue()));
+            entry -> BLACKLISTED_HEADERS.contains(entry.getKey().toLowerCase(Locale.ROOT)) ? "<hidden>"
+                                                                                           : entry.getValue()));
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(
