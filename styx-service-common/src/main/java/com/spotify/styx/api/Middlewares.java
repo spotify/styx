@@ -45,6 +45,7 @@ import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -67,7 +68,7 @@ public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
-  private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
+  private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION, HttpHeaders.AUTHORIZATION.toLowerCase());
 
   private static final String REQUEST_ID = "request-id";
   private static final String X_REQUEST_ID = "X-Request-Id";
