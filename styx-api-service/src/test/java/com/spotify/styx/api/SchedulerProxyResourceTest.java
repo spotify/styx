@@ -112,14 +112,14 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
     awaitResponse(serviceHelper.request(Request
         .forUri(path("/trigger"), "POST")
         .withHeader("foo", "bar")
-        .withHeader("X-Request-Id", requestId)
+        .withHeader("X-Styx-Request-Id", requestId)
         .withHeader(HttpHeaders.AUTHORIZATION, "decafbad")));
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
     assertThat(schedulerRequest.header("foo"), is(Optional.of("bar")));
     assertThat(schedulerRequest.header(HttpHeaders.AUTHORIZATION), is(Optional.of("decafbad")));
-    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
+    assertThat(schedulerRequest.header("X-Styx-Request-Id"), is(Optional.of(requestId)));
   }
 
   @Test
@@ -139,7 +139,7 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
-    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
+    assertThat(schedulerRequest.header("X-Styx-Request-Id"), is(Optional.of(requestId)));
   }
 
   @Test

@@ -90,7 +90,7 @@ public class SchedulerProxyResource {
   }
 
   private Request withRequestId(Request request) {
-    if (request.headers().containsKey("X-Request-Id")) {
+    if (request.headers().containsKey("X-Styx-Request-Id")) {
       return request;
     }
     // Unfortunately it is not possible for middleware to set headers on
@@ -99,6 +99,6 @@ public class SchedulerProxyResource {
     if (requestId == null) {
       return request;
     }
-    return request.withHeader("X-Request-Id", requestId);
+    return request.withHeader("X-Styx-Request-Id", requestId);
   }
 }

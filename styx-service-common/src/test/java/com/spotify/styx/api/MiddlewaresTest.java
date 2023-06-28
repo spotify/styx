@@ -310,7 +310,7 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
 
@@ -335,7 +335,7 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(is(Status.IM_A_TEAPOT)));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
 
@@ -375,7 +375,7 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): " + expectedMessage))));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
 
@@ -401,7 +401,7 @@ public class MiddlewaresTest {
     assertThat(response, hasStatus(withCode(Status.INTERNAL_SERVER_ERROR)));
     assertThat(response, hasStatus(withReasonPhrase(is(
         "Internal Server Error (Request ID: " + requestId.get() + "): RuntimeException: fubar: IOException: deadbeef"))));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
 
@@ -423,7 +423,7 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId.get())));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId.get())));
     assertThat(requestId.get(), isValidUuid());
   }
   @Test
@@ -432,7 +432,7 @@ public class MiddlewaresTest {
     final RequestContext requestContext = mock(RequestContext.class);
     final String requestId = UUID.randomUUID().toString();
     final Request request = Request.forUri("/", "GET")
-        .withHeader("X-Request-Id", requestId);
+        .withHeader("X-Styx-Request-Id", requestId);
     final AtomicReference<String> propagatedRequestId = new AtomicReference<>();
     when(requestContext.request()).thenReturn(request);
 
@@ -446,7 +446,7 @@ public class MiddlewaresTest {
         .toCompletableFuture().get(5, SECONDS);
 
     assertThat(response, hasStatus(withCode(Status.OK)));
-    assertThat(response, hasHeader("X-Request-Id", is(requestId)));
+    assertThat(response, hasHeader("X-Styx-Request-Id", is(requestId)));
     assertThat(propagatedRequestId.get(), is(requestId));
   }
 

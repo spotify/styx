@@ -449,7 +449,7 @@ class StyxOkHttpClient implements StyxClient {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.url(), e);
       } else {
         final String effectiveRequestId;
-        final String responseRequestId = response.headers().get("X-Request-Id");
+        final String responseRequestId = response.headers().get("X-Styx-Request-Id");
         if (responseRequestId != null && !responseRequestId.equals(requestId)) {
           // If some proxy etc dropped our request ID header, we might get another one back.
           effectiveRequestId = responseRequestId;
@@ -470,7 +470,7 @@ class StyxOkHttpClient implements StyxClient {
     var builder = request
         .newBuilder()
         .addHeader("User-Agent", STYX_CLIENT_VERSION)
-        .addHeader("X-Request-Id", requestId);
+        .addHeader("X-Styx-Request-Id", requestId);
     authToken.ifPresent(t -> builder.addHeader("Authorization", "Bearer " + t));
     return builder.build();
   }

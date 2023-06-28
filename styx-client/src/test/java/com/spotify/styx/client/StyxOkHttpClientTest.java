@@ -742,7 +742,7 @@ public class StyxOkHttpClientTest {
         response(HTTP_OK, Collections.emptyList())));
     styx.workflows();
     final Request request = requestCaptor.getValue();
-    assertThat(request.header("X-Request-Id"), isValidUuid());
+    assertThat(request.header("X-Styx-Request-Id"), isValidUuid());
   }
 
   @Test
@@ -750,7 +750,7 @@ public class StyxOkHttpClientTest {
     final String responseRequestId = "foobar";
     when(client.send(any())).thenReturn(CompletableFuture.completedFuture(
         responseBuilder(HTTP_INTERNAL_ERROR, Collections.emptyList())
-            .addHeader("X-Request-Id", responseRequestId).build()));
+            .addHeader("X-Styx-Request-Id", responseRequestId).build()));
 
     try {
       styx.workflows().toCompletableFuture().get();
@@ -774,7 +774,7 @@ public class StyxOkHttpClientTest {
       assertThat(e.getCause(), instanceOf(ApiErrorException.class));
       final ApiErrorException apiError = (ApiErrorException) e.getCause();
       final Request request = requestCaptor.getValue();
-      assertThat(apiError.getRequestId(), is(request.header("X-Request-Id")));
+      assertThat(apiError.getRequestId(), is(request.header("X-Styx-Request-Id")));
     }
   }
 
