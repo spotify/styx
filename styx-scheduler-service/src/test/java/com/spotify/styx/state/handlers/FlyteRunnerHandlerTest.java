@@ -177,8 +177,9 @@ public class FlyteRunnerHandlerTest {
   }
 
   @Test
-  public void shouldTerminateExecutionsOnFailedState() {
-    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.FAILED, StateData.newBuilder()
+  @Parameters({"FAILED", "ERROR"})
+  public void shouldTerminateExecutionsOnFailedandErrorState(State state) {
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, state, StateData.newBuilder()
         .executionId(EXECUTION_ID)
         .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
         .build());
