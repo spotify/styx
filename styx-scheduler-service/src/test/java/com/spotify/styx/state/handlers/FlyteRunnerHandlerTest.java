@@ -138,6 +138,20 @@ public class FlyteRunnerHandlerTest {
     verify(eventRouter,  timeout(60_000)).receiveIgnoreClosed(Event.halt(WORKFLOW_INSTANCE), runState.counter());
   }
 
+  @Test
+  public void shouldNotHaltTransitionsWhenFlyteRunnerIsNotEnabledAndErrorState() throws Exception {
+    when(flyteRunner.isEnabled()).thenReturn(false);
+    RunState runState = RunState.create(WORKFLOW_INSTANCE, State.ERROR, StateData.newBuilder()
+        .executionId(EXECUTION_ID)
+        .executionDescription(FLYTE_EXECUTION_DESCRIPTION)
+        .build());
+
+    flyteRunnerHandler.transitionInto(runState, eventRouter);
+
+    verify(flyteRunner, never()).createExecution(any(), any(), any());
+    verifyNoInteractions(eventRouter);
+  }
+
 
   @Test()
   @Parameters({"SUBMITTING", "SUBMITTED", "RUNNING"})
