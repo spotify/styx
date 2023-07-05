@@ -70,7 +70,7 @@ abstract class AbstractRunnerHandler implements OutputHandler {
         }
         safeTransitionInto(state, eventRouter);
         break;
-
+      case ERROR:
       case FAILED:
         if (maybeExecutionId.isEmpty()
             || maybeExecutionDescription.isEmpty()

@@ -128,7 +128,7 @@ public class AbstractRunnerHandlerTest {
   private static RunState.State[] relevantRunnerHandlerStates() {
     return Stream.concat(
         Arrays.stream(execRunnerHandlerStates()),
-        Stream.of(RunState.State.FAILED)
+        Stream.of(RunState.State.FAILED, RunState.State.ERROR)
     ).toArray(RunState.State[]::new);
   }
 
@@ -139,7 +139,6 @@ public class AbstractRunnerHandlerTest {
         RunState.State.QUEUED,
         RunState.State.PREPARE,
         RunState.State.TERMINATED,
-        RunState.State.ERROR,
         RunState.State.DONE
     };
   }
