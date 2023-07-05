@@ -29,6 +29,8 @@ import com.spotify.apollo.RequestContext;
 import com.spotify.apollo.Response;
 import com.spotify.apollo.route.AsyncHandler;
 import com.spotify.apollo.route.Route;
+
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -48,9 +50,11 @@ public class SchedulerProxyResource {
 
   private final String schedulerServiceBaseUrl;
   private final Client client;
+  private final String schedulerHost;
 
   public SchedulerProxyResource(String schedulerServiceBaseUrl, Client client) {
     this.schedulerServiceBaseUrl = Objects.requireNonNull(schedulerServiceBaseUrl);
+    this.schedulerHost = URI.create(schedulerServiceBaseUrl).getHost();
     this.client = Objects.requireNonNull(client, "client");
   }
 
@@ -82,12 +86,11 @@ public class SchedulerProxyResource {
             .newBuilder();
     ImmutableSortedMap.copyOf(rc.request().parameters()).forEach((name, values) ->
         values.forEach(value -> builder.addQueryParameter(name, value)));
-
-    return client.send(withRequestId(rc.request().withUri(builder.build().toString())));
+    return client.send(withRequestId(rc.request().withUri(builder.build().toString())).withHeader("Host", schedulerHost));
   }
 
   private Request withRequestId(Request request) {
-    if (request.headers().containsKey("X-Request-Id")) {
+    if (request.headers().containsKey("X-Styx-Request-Id")) {
       return request;
     }
     // Unfortunately it is not possible for middleware to set headers on
@@ -96,6 +99,6 @@ public class SchedulerProxyResource {
     if (requestId == null) {
       return request;
     }
-    return request.withHeader("X-Request-Id", requestId);
+    return request.withHeader("X-Styx-Request-Id", requestId);
   }
 }

@@ -30,7 +30,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.spotify.apollo.Request;
 import com.spotify.apollo.RequestContext;
@@ -45,6 +44,8 @@ import io.norberg.automatter.AutoMatter;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracer;
 import java.net.URI;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -67,10 +68,11 @@ public final class Middlewares {
 
   private static final Logger LOG = LoggerFactory.getLogger(Middlewares.class);
 
-  private static final Set<String> BLACKLISTED_HEADERS = ImmutableSet.of(HttpHeaders.AUTHORIZATION);
+  private static final List<String> BLACKLISTED_HEADERS =
+      List.of(HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT), "service-identity");
 
   private static final String REQUEST_ID = "request-id";
-  private static final String X_REQUEST_ID = "X-Request-Id";
+  private static final String X_STYX_REQUEST_ID = "X-Styx-Request-Id";
 
   private Middlewares() {
     throw new UnsupportedOperationException();
@@ -124,7 +126,7 @@ public final class Middlewares {
     return innerHandler -> requestContext -> {
 
       // Accept the request id from the incoming request if present. Otherwise generate one.
-      final String requestIdHeader = requestContext.request().headers().get(X_REQUEST_ID);
+      final String requestIdHeader = requestContext.request().headers().get(X_STYX_REQUEST_ID);
       final String requestId = (requestIdHeader != null)
           ? requestIdHeader
           : UUID.randomUUID().toString().replace("-", ""); // UUID with no dashes, easier to deal with
@@ -143,17 +145,17 @@ public final class Middlewares {
           } else {
             response = r;
           }
-          return response.withHeader(X_REQUEST_ID, requestId);
+          return response.withHeader(X_STYX_REQUEST_ID, requestId);
         });
       } catch (ResponseException e) {
         return completedFuture(e.<T>getResponse()
-            .withHeader(X_REQUEST_ID, requestId));
+            .withHeader(X_STYX_REQUEST_ID, requestId));
       } catch (Throwable t) {
         var internalServerErrorReason = internalServerErrorReason(requestId, t);
         LOG.warn(internalServerErrorReason, t);
         return completedFuture(Response.<T>forStatus(INTERNAL_SERVER_ERROR
             .withReasonPhrase(internalServerErrorReason))
-            .withHeader(X_REQUEST_ID, requestId));
+            .withHeader(X_STYX_REQUEST_ID, requestId));
       }
     };
   }
@@ -269,7 +271,10 @@ public final class Middlewares {
   private static Map<String, String> hideSensitiveHeaders(Map<String, String> headers) {
     return headers.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
-            entry -> BLACKLISTED_HEADERS.contains(entry.getKey()) ? "<hidden>" : entry.getValue()));
+            entry -> BLACKLISTED_HEADERS.stream()
+                         .anyMatch(header -> entry.getKey().toLowerCase(Locale.ROOT).contains(header))
+                     ? "<hidden>"
+                     : entry.getValue()));
   }
 
   public static <T> Middleware<AsyncHandler<Response<T>>, AsyncHandler<Response<T>>> authenticator(

@@ -39,7 +39,10 @@ import org.slf4j.MDC;
 
 public class SchedulerProxyResourceTest extends VersionedApiTest {
 
-  private static final String SCHEDULER_BASE = "http://localhost:12345";
+  private static final String SCHEDULER_PROTOCOL = "http";
+  private static final String SCHEDULER_HOST = "localhost";
+  private static final String SCHEDULER_PORT = "12345";
+  private static final String SCHEDULER_BASE = String.format("%s://%s:%s",SCHEDULER_PROTOCOL, SCHEDULER_HOST, SCHEDULER_PORT);
 
   public SchedulerProxyResourceTest(Api.Version version) {
     super(SchedulerProxyResource.BASE, version);
@@ -109,14 +112,14 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
     awaitResponse(serviceHelper.request(Request
         .forUri(path("/trigger"), "POST")
         .withHeader("foo", "bar")
-        .withHeader("X-Request-Id", requestId)
+        .withHeader("X-Styx-Request-Id", requestId)
         .withHeader(HttpHeaders.AUTHORIZATION, "decafbad")));
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
     assertThat(schedulerRequest.header("foo"), is(Optional.of("bar")));
     assertThat(schedulerRequest.header(HttpHeaders.AUTHORIZATION), is(Optional.of("decafbad")));
-    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
+    assertThat(schedulerRequest.header("X-Styx-Request-Id"), is(Optional.of(requestId)));
   }
 
   @Test
@@ -136,6 +139,23 @@ public class SchedulerProxyResourceTest extends VersionedApiTest {
 
     final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
 
-    assertThat(schedulerRequest.header("X-Request-Id"), is(Optional.of(requestId)));
+    assertThat(schedulerRequest.header("X-Styx-Request-Id"), is(Optional.of(requestId)));
+  }
+
+  @Test
+  public void verifyReplaceHost() throws Exception {
+    sinceVersion(Api.Version.V3);
+
+    serviceHelper.stubClient()
+            .respond(Response.forStatus(Status.ACCEPTED))
+            .to(SCHEDULER_BASE + "/api/v0/trigger");
+
+    awaitResponse(serviceHelper.request(Request
+            .forUri(path("/trigger"), "POST")
+            .withHeader("Host", "styx-api")));
+
+    final Request schedulerRequest = Iterables.getOnlyElement(serviceHelper.stubClient().sentRequests());
+
+    assertThat(schedulerRequest.header("Host"), is(Optional.of(SCHEDULER_HOST)));
   }
 }

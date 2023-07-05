@@ -278,7 +278,7 @@ public class StyxSchedulerTest {
     var configMap = ImmutableMap.<String, String>builder()
         .put("styx.flyte.enabled", "false");
     var config = ConfigFactory.parseMap(configMap.build());
-    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager, FlyteAdminClientInterceptors.NOOP);
+    final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("runnerId", config, stateManager, FlyteAdminClientInterceptors.NOOP, stats);
 
     assertThat(flyteRunner, instanceOf(NoopFlyteRunner.class));
   }
@@ -289,10 +289,15 @@ public class StyxSchedulerTest {
         .put("styx.flyte.enabled", "true")
         .put("styx.flyte.admin.production.host", "localhost")
         .put("styx.flyte.admin.production.port", "81")
-        .put("styx.flyte.admin.production.insecure", "true");
+        .put("styx.flyte.admin.production.insecure", "true")
+        .put("styx.flyte.admin.production.grpc.deadline-seconds", "5")
+        .put("styx.flyte.admin.production.grpc.retry-initial-wait-duration", "5")
+        .put("styx.flyte.admin.production.grpc.retry-wait-duration-backoff-multiplier", "2")
+        .put("styx.flyte.admin.production.grpc.max-retry-attempts", "3");
+
     var config = ConfigFactory.parseMap(configMap.build());
     final FlyteRunner flyteRunner = StyxScheduler.createFlyteRunner("production", config, stateManager,
-        FlyteAdminClientInterceptors.NOOP);
+        FlyteAdminClientInterceptors.NOOP, stats);
 
     assertThat(flyteRunner.isEnabled(), is(true));
   }
@@ -308,7 +313,7 @@ public class StyxSchedulerTest {
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> StyxScheduler.createFlyteRunner("staging", config, stateManager, FlyteAdminClientInterceptors.NOOP)
+        () -> StyxScheduler.createFlyteRunner("staging", config, stateManager, FlyteAdminClientInterceptors.NOOP, stats)
     );
   }
 }

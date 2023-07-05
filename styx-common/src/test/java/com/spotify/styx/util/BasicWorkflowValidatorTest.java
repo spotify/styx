@@ -140,14 +140,14 @@ public class BasicWorkflowValidatorTest {
     final String offset = Strings.repeat("offset", 1024);
     final String commitSha = Strings.repeat("sha", 1024);
     final List<String> args = IntStream.range(0, 100).mapToObj(i -> "arg-" + i).collect(toList());
-    final String serviceAccount = Strings.repeat("account@abc.com", 1024);
+    final String serviceAccount = Strings.repeat("account@abc.com", 512);
     final List<String> resources = IntStream.range(0, 10)
         .mapToObj(i -> Strings.repeat("res-" + i, 100)).collect(toList());
     final Map<String, String> env = IntStream.range(0, 2000).boxed()
         .collect(toMap(i -> "env-var-" + i, i -> "env-val-" + i));
     final long envSize = env.entrySet().stream().mapToLong(e -> e.getKey().length() + e.getValue().length()).sum();
     final Duration runningTimeout = Duration.ofSeconds(59L);
-    var retryCondition = Strings.repeat("foo -> bar", 1024);
+    var retryCondition = Strings.repeat("foo -> bar", 512);
 
     final WorkflowConfiguration invalidConfiguration = WorkflowConfiguration.builder()
         .id(id)

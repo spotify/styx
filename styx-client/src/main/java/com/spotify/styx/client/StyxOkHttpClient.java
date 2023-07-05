@@ -216,7 +216,7 @@ class StyxOkHttpClient implements StyxClient {
   @Override
   public CompletionStage<Void> deleteWorkflow(String componentId, String workflowId) {
     return execute(forUri(urlBuilder("workflows", componentId, workflowId), "DELETE"))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -270,7 +270,7 @@ class StyxOkHttpClient implements StyxClient {
     return execute(
         forUri(urlBuilder("scheduler", "trigger")
             .addQueryParameter("allowFuture", String.valueOf(allowFuture)), "POST", triggerRequest))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -282,7 +282,7 @@ class StyxOkHttpClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -294,7 +294,7 @@ class StyxOkHttpClient implements StyxClient {
         WorkflowId.create(componentId, workflowId),
         parameter);
     return execute(forUri(url, "POST", workflowInstance))
-        .thenApply(response -> null);
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -378,7 +378,8 @@ class StyxOkHttpClient implements StyxClient {
   public CompletionStage<Void> backfillHalt(String backfillId, boolean graceful) {
     var url = urlBuilder("backfills", backfillId);
     url.addQueryParameter("graceful", Boolean.toString(graceful));
-    return execute(forUri(url, "DELETE")).thenApply(response -> null);
+    return execute(forUri(url, "DELETE"))
+        .thenAccept(response -> Optional.ofNullable(response.body()).ifPresent(ResponseBody::close));
   }
 
   @Override
@@ -448,7 +449,7 @@ class StyxOkHttpClient implements StyxClient {
         throw new ClientErrorException("Request failed: " + request.method() + " " + request.url(), e);
       } else {
         final String effectiveRequestId;
-        final String responseRequestId = response.headers().get("X-Request-Id");
+        final String responseRequestId = response.headers().get("X-Styx-Request-Id");
         if (responseRequestId != null && !responseRequestId.equals(requestId)) {
           // If some proxy etc dropped our request ID header, we might get another one back.
           effectiveRequestId = responseRequestId;
@@ -469,7 +470,7 @@ class StyxOkHttpClient implements StyxClient {
     var builder = request
         .newBuilder()
         .addHeader("User-Agent", STYX_CLIENT_VERSION)
-        .addHeader("X-Request-Id", requestId);
+        .addHeader("X-Styx-Request-Id", requestId);
     authToken.ifPresent(t -> builder.addHeader("Authorization", "Bearer " + t));
     return builder.build();
   }

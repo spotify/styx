@@ -21,6 +21,7 @@
 package com.spotify.styx.api.util;
 
 public enum QueryParams {
+  INCLUDE_STATES("full"),
   DEPLOYMENT_TYPE("deployment_type"),
   DEPLOYMENT_TIME_BEFORE("deployment_time_before"),
   DEPLOYMENT_TIME_AFTER("deployment_time_after");

@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.spotify</groupId>
     <artifactId>styx</artifactId>
-    <version>2.1.167-SNAPSHOT</version>
+    <version>2.1.176-SNAPSHOT</version>
   </parent>
 
 
@@ -20,6 +20,11 @@
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-retry</artifactId>
+      <version>1.7.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.auto.value</groupId>
@@ -38,6 +43,10 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.typesafe</groupId>
+      <artifactId>config</artifactId>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -66,12 +75,14 @@
         <artifactId>protobuf-maven-plugin</artifactId>
         <version>0.6.1</version>
         <configuration>
+          <!-- FIXME: temporarily separate name from arch to work around compiling on Apple silicon -->
           <protocArtifact>
-            com.google.protobuf:protoc:3.11.0:exe:${os.detected.classifier}
+            com.google.protobuf:protoc:3.11.0:exe:${os.detected.name}-${os.detected.arch}
           </protocArtifact>
           <pluginId>grpc-java</pluginId>
+          <!-- FIXME: temporarily separate name from arch to work around compiling on Apple silicon -->
           <pluginArtifact>
-            io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
+            io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.name}-${os.detected.arch}
           </pluginArtifact>
           <checkStaleness>true</checkStaleness>
         </configuration>

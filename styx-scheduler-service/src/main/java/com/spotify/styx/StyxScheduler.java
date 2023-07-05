@@ -158,9 +158,6 @@ public class StyxScheduler implements AppInit {
 
   private static final String FLYTE_ENABLED = "styx.flyte.enabled";
   private static final String FLYTEADMIN_PATH = "styx.flyte.admin";
-  private static final String FLYTEADMIN_HOST = "host";
-  private static final String FLYTEADMIN_PORT = "port";
-  private static final String FLYTEADMIN_INSECURE = "insecure";
 
   private static final int DEFAULT_STYX_STATE_PROCESSING_THREADS = 32;
   private static final int DEFAULT_STYX_SCHEDULER_THREADS = 32;
@@ -221,7 +218,7 @@ public class StyxScheduler implements AppInit {
 
   @FunctionalInterface
   interface FlyteRunnerFactory {
-    FlyteRunner create(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors);
+    FlyteRunner create(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors, Stats stats);
   }
 
   @FunctionalInterface
@@ -432,7 +429,7 @@ public class StyxScheduler implements AppInit {
         flyteAdminClientInterceptorsFactory.apply(environment);
     final Function<RunState, String> flyteRunnerId = RunnerId.flyteRunnerId(styxConfig);
     final FlyteRunner flyteRunner = FlyteRunner.routing(
-        id -> flyteRunnerFactory.create(id, environment.config(), stateManager, interceptors),
+        id -> flyteRunnerFactory.create(id, environment.config(), stateManager, interceptors, stats),
         flyteRunnerId
     );
 
@@ -693,13 +690,15 @@ public class StyxScheduler implements AppInit {
         ));
   }
 
-  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
+  static FlyteRunner createFlyteRunner(String runnerId, Config config, StateManager stateManager,
+                                       FlyteAdminClientInterceptors flyteAdminClientInterceptors,
+                                       Stats stats) {
     if (!config.getBoolean(FLYTE_ENABLED)) {
       return FlyteRunner.noop();
     }
 
     var flyteAdminClient = getFlyteAdminClient(config, runnerId, flyteAdminClientInterceptors);
-    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager);
+    return FlyteRunner.flyteAdmin(runnerId, flyteAdminClient, stateManager, stats);
   }
 
   private static FlyteAdminClient getFlyteAdminClient(Config rootConfig, String runnerId, FlyteAdminClientInterceptors flyteAdminClientInterceptors) {
@@ -709,9 +708,7 @@ public class StyxScheduler implements AppInit {
     }
 
     var config = flyteAdminRootConfig.getConfig(runnerId);
-    final var target = config.getString(FLYTEADMIN_HOST) + ":" + config.getInt(FLYTEADMIN_PORT);
-    final var insecure = config.getBoolean(FLYTEADMIN_INSECURE);
-    return FlyteAdminClient.create(target, insecure, flyteAdminClientInterceptors.interceptors(), SERVICE_NAME);
+    return FlyteAdminClient.create(config, flyteAdminClientInterceptors.interceptors(), SERVICE_NAME);
   }
 
   @VisibleForTesting

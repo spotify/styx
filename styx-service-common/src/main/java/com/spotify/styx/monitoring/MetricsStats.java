@@ -134,6 +134,10 @@ public final class MetricsStats implements Stats {
       .tagged("what", "natural-trigger-rate")
       .tagged("unit", "trigger");
 
+  static final MetricId DANGLING_TERMINATED_FLYTE_EXECUTIONS = BASE
+          .tagged("what", "dangling-terminated-flyte-executions")
+          .tagged("unit", "trigger");
+
   static final MetricId TERMINATION_LOG_MISSING = BASE
       .tagged("what", "termination-log-missing");
 
@@ -226,6 +230,7 @@ public final class MetricsStats implements Stats {
   private final ConcurrentMap<String, Meter> workflowConsumerMeters;
   private final ConcurrentMap<String, Histogram> tickHistograms;
   private final ConcurrentMap<Tuple2<String, String>, Meter> datastoreOperationMeters;
+  private final Meter danglingTerminatedFlyteExecutions;
 
   /**
    * Submission timestamps (nanotime) keyed on execution id.
@@ -269,6 +274,7 @@ public final class MetricsStats implements Stats {
     this.workflowConsumerMeters = new ConcurrentHashMap<>();
     this.tickHistograms = new ConcurrentHashMap<>();
     this.datastoreOperationMeters = new ConcurrentHashMap<>();
+    this.danglingTerminatedFlyteExecutions = registry.meter(DANGLING_TERMINATED_FLYTE_EXECUTIONS);
   }
 
   @Override
@@ -456,6 +462,11 @@ public final class MetricsStats implements Stats {
   @Override
   public void recordKubernetesOperationError(String operation, String type, int code) {
     kubernetesOpErrorMeter(operation, type, code).mark();
+  }
+
+  @Override
+  public void recordDanglingTerminatedFlyteExecution() {
+    danglingTerminatedFlyteExecutions.mark();
   }
 
   private void recordDatastoreOperations(String operation, String kind, int n) {

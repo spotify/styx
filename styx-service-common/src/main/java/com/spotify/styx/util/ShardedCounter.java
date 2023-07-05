@@ -292,7 +292,7 @@ public class ShardedCounter {
         throw new CounterCapacityException(message);
       }
       final String operation = delta > 0 ? "increment" : "decrement";
-      LOG.info("Updating counter shard ({}): {}-{}: capacity={}, value={}, delta={}, newValue={}",
+      LOG.debug("Updating counter shard ({}): {}-{}: capacity={}, value={}, delta={}, newValue={}",
           operation, counterId, shardIndex, shardCapacity, shard.get().value(), delta, newShardValue);
     } else {
       final String message =
