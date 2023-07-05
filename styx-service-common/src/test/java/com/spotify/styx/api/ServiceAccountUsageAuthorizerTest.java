@@ -22,6 +22,9 @@ package com.spotify.styx.api;
 
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.IM_A_TEAPOT;
+import static com.spotify.apollo.Status.INTERNAL_SERVER_ERROR;
+import static com.spotify.apollo.Status.NOT_FOUND;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -37,7 +40,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.rholder.retry.StopStrategies;
@@ -209,9 +212,9 @@ public class ServiceAccountUsageAuthorizerTest {
     var result = sut.checkServiceAccountUsageAuthorization(SERVICE_ACCOUNT, BLACKLISTED_SA_EMAIL);
     assertThat(result, is(expectedResult));
 
-    verifyZeroInteractions(iam);
-    verifyZeroInteractions(crm);
-    verifyZeroInteractions(directory);
+    verifyNoMoreInteractions(iam);
+    verifyNoMoreInteractions(crm);
+    verifyNoMoreInteractions(directory);
   }
 
 
@@ -280,9 +283,9 @@ public class ServiceAccountUsageAuthorizerTest {
       assertThat(repeated, is(response));
     }
 
-    verifyZeroInteractions(iam);
-    verifyZeroInteractions(crm);
-    verifyZeroInteractions(directory);
+    verifyNoMoreInteractions(iam);
+    verifyNoMoreInteractions(crm);
+    verifyNoMoreInteractions(directory);
   }
 
   @Test
@@ -295,7 +298,7 @@ public class ServiceAccountUsageAuthorizerTest {
 
   @Test
   public void shouldFailIfManagedServiceAccountLookupFailsWithGoogleException() throws IOException {
-    final Throwable cause = googleJsonResponseException(404);
+    final Throwable cause = googleJsonResponseException(NOT_FOUND.code());
     when((Object) iam.projects().serviceAccounts().get(any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, MANAGED_SERVICE_ACCOUNT, idToken));
@@ -360,7 +363,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldAuthorizeIfPrincipalIsAdminViaGroupEvenCheckRoleFails(String serviceAccount) throws IOException {
-    final Throwable cause = googleJsonResponseException(418);
+    final Throwable cause = googleJsonResponseException(IM_A_TEAPOT.code());
     var errorRequest = mock(Directory.Members.HasMember.class);
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
@@ -381,7 +384,7 @@ public class ServiceAccountUsageAuthorizerTest {
   public void shouldDenyAccessIfPrincipalHasUserRoleOnProjectViaNonexistGroup(String serviceAccount)
       throws IOException {
     var notFoundRequest = mock(Directory.Members.HasMember.class);
-    doThrow(googleJsonResponseException(404)).when(notFoundRequest).execute();
+    doThrow(googleJsonResponseException(NOT_FOUND.code())).when(notFoundRequest).execute();
     doReturn(notFoundRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
     final Response<?> response =
         assertThrowsResponseException(() -> sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
@@ -395,7 +398,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldDenyAccessIfGroupMemberCheckReturnClientError(String serviceAccount)
       throws IOException {
-    final Throwable cause = googleJsonResponseException(400);
+    final Throwable cause = googleJsonResponseException(BAD_REQUEST.code());
     var errorRequest = mock(Directory.Members.HasMember.class);
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
@@ -409,7 +412,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Test
   public void shouldFailIfGroupMemberCheckFails(String serviceAccount)
       throws IOException {
-    final Throwable cause = googleJsonResponseException(418);
+    final Throwable cause = googleJsonResponseException(IM_A_TEAPOT.code());
     var errorRequest = mock(Directory.Members.HasMember.class);
     doThrow(cause).when(errorRequest).execute();
     doReturn(errorRequest).when(members).hasMember(PROJECT_ADMINS_GROUP_EMAIL, PRINCIPAL_EMAIL);
@@ -446,7 +449,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldFailIfProjectDoesNotExist(String serviceAccount) throws IOException {
-    final Throwable cause = googleJsonResponseException(404);
+    final Throwable cause = googleJsonResponseException(FORBIDDEN.code());
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
@@ -457,7 +460,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldFailIfServiceAccountIamPolicyDoesNotExist(String serviceAccount) throws IOException {
-    final Throwable cause = googleJsonResponseException(404);
+    final Throwable cause = googleJsonResponseException(NOT_FOUND.code());
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     final Response<?> response = assertThrowsResponseException(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken));
@@ -468,7 +471,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldFailIfProjectRequestFailsWithGoogleException(String serviceAccount) throws IOException {
-    final Throwable cause = googleJsonResponseException(500);
+    final Throwable cause = googleJsonResponseException(INTERNAL_SERVER_ERROR.code());
     when((Object) getIamPolicy.execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
@@ -478,7 +481,7 @@ public class ServiceAccountUsageAuthorizerTest {
   @Parameters({SERVICE_ACCOUNT, MANAGED_SERVICE_ACCOUNT})
   @Test
   public void shouldFailIfServiceAccountIamPolicyRequestFailsWithGoogleException(String serviceAccount) throws IOException {
-    final Throwable cause = googleJsonResponseException(500);
+    final Throwable cause = googleJsonResponseException(INTERNAL_SERVER_ERROR.code());
     when((Object) iam.projects().serviceAccounts().getIamPolicy(any()).execute()).thenThrow(cause);
     assertThat(Throwables.getRootCause(Try.run(() ->
         sut.authorizeServiceAccountUsage(WORKFLOW_ID, serviceAccount, idToken)).getCause()), is(cause));
@@ -595,9 +598,9 @@ public class ServiceAccountUsageAuthorizerTest {
       r.run();
     }
 
-    verifyZeroInteractions(iam);
-    verifyZeroInteractions(crm);
-    verifyZeroInteractions(directory);
+    verifyNoMoreInteractions(iam);
+    verifyNoMoreInteractions(crm);
+    verifyNoMoreInteractions(directory);
   }
 
   private static Response<?> assertThrowsResponseException(Runnable r) {

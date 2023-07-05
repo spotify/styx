@@ -20,6 +20,8 @@
 
 package com.spotify.styx.api;
 
+import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.TOO_MANY_REQUESTS;
 import static com.spotify.styx.api.Authenticator.resourceId;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -37,7 +39,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.rholder.retry.StopStrategies;
@@ -58,6 +60,7 @@ import com.google.api.services.cloudresourcemanager.model.Project;
 import com.google.api.services.cloudresourcemanager.model.ResourceId;
 import com.google.api.services.iam.v1.Iam;
 import com.google.api.services.iam.v1.model.ServiceAccount;
+import com.spotify.apollo.Status;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
@@ -113,17 +116,17 @@ public class AuthenticatorTest {
 
   private static final GoogleJsonResponseException PERMISSION_DENIED =
       new GoogleJsonResponseException(
-          new HttpResponseException.Builder(403, "Forbidden", new HttpHeaders()),
+          new HttpResponseException.Builder(FORBIDDEN.code(), "Forbidden", new HttpHeaders()),
           new GoogleJsonError().set("status", "PERMISSION_DENIED"));
 
   private static final GoogleJsonResponseException NOT_FOUND =
       new GoogleJsonResponseException(
-          new HttpResponseException.Builder(404, "Not found", new HttpHeaders()),
+          new HttpResponseException.Builder(Status.NOT_FOUND.code(), "Not found", new HttpHeaders()),
           new GoogleJsonError().set("status", "NOT_FOUND"));
 
   private static final GoogleJsonResponseException QUOTA_EXHAUSTED =
       new GoogleJsonResponseException(
-          new HttpResponseException.Builder(429, "per-user search quota temporarily exhausted", new HttpHeaders()),
+          new HttpResponseException.Builder(TOO_MANY_REQUESTS.code(), "per-user search quota temporarily exhausted", new HttpHeaders()),
           new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
 
   private static final WaitStrategy RETRY_WAIT_STRATEGY = WaitStrategies.noWait();
@@ -220,9 +223,9 @@ public class AuthenticatorTest {
     when(verifier.verify(anyString())).thenThrow(new GeneralSecurityException());
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(idToken);
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(idToken);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -230,9 +233,9 @@ public class AuthenticatorTest {
     when(verifier.verify(anyString())).thenThrow(new IOException());
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(idToken);
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(idToken);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -240,8 +243,8 @@ public class AuthenticatorTest {
     idTokenPayload.setEmail("foo@example.com");
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -249,8 +252,8 @@ public class AuthenticatorTest {
     idTokenPayload.setEmail("example.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -266,8 +269,8 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(cloudResourceManager.projects(), never()).getAncestry(eq("foo"), any());
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -280,7 +283,7 @@ public class AuthenticatorTest {
 
     verify(cloudResourceManager.projects()).getAncestry(eq(UNCACHED_PROJECT.getProjectId()), any());
     verify(projectsGetAncestry).execute();
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(iam);
   }
 
   private static GetAncestryResponse ancestryResponse(ResourceId... ancestors) {
@@ -297,19 +300,19 @@ public class AuthenticatorTest {
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(iam);
     verify(projectsGetAncestry, times(3)).execute();
   }
 
   @Test
   public void shouldFailForNonExistProject() throws IOException {
-    doThrow(NOT_FOUND).when(projectsGetAncestry).execute();
+    doThrow(PERMISSION_DENIED).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(projectsGetAncestry).execute();
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -319,7 +322,7 @@ public class AuthenticatorTest {
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(iam);
     verify(projectsGetAncestry).execute();
   }
 
@@ -336,8 +339,8 @@ public class AuthenticatorTest {
     reset(projectsGetAncestry);
     assertThat(validator.authenticate("token"), is(idToken));
 
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -348,7 +351,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(idToken));
 
     verify(serviceAccountsGet).execute();
-    verifyZeroInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -358,7 +361,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(serviceAccountsGet, times(3)).execute();
-    verifyZeroInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -368,7 +371,7 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(serviceAccountsGet).execute();
-    verifyZeroInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(projectsGetAncestry);
   }
 
   @Test
@@ -378,23 +381,23 @@ public class AuthenticatorTest {
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verify(serviceAccountsGet).execute();
-    verifyZeroInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(projectsGetAncestry);
   }
 
   @Test
   public void shouldFailTokenWithNoEmail() {
     idTokenPayload.setEmail(null);
     assertThat(validator.authenticate("token"), is(nullValue()));
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
   public void shouldDenyWhitelistedEmailNonSA() {
     idTokenPayload.setEmail("foo@bar.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
@@ -402,8 +405,8 @@ public class AuthenticatorTest {
     idTokenPayload.setAudience("https://foo.example.net");
     idTokenPayload.setEmail("foo@foo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
-    verifyZeroInteractions(projectsGetAncestry);
-    verifyZeroInteractions(iam);
+    verifyNoMoreInteractions(projectsGetAncestry);
+    verifyNoMoreInteractions(iam);
   }
 
   @Test
