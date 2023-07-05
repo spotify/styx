@@ -316,14 +316,14 @@ public class AuthenticatorTest {
   }
 
   @Test
-  public void shouldFailIfNoPermissionGettingProject() throws IOException {
-    doThrow(PERMISSION_DENIED).when(projectsGetAncestry).execute();
+  public void shouldFailIfOtherErrorGettingProject() throws IOException {
+    doThrow(QUOTA_EXHAUSTED).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyNoMoreInteractions(iam);
-    verify(projectsGetAncestry).execute();
+    verify(projectsGetAncestry, times(3)).execute();
   }
 
   @Test
