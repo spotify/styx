@@ -129,6 +129,11 @@ public class AuthenticatorTest {
           new HttpResponseException.Builder(TOO_MANY_REQUESTS.code(), "per-user search quota temporarily exhausted", new HttpHeaders()),
           new GoogleJsonError().set("status", "RESOURCE_EXHAUSTED"));
 
+  private static final GoogleJsonResponseException IM_A_TEAPOT =
+      new GoogleJsonResponseException(
+          new HttpResponseException.Builder(Status.IM_A_TEAPOT.code(), "I'm a Teapot", new HttpHeaders()),
+          new GoogleJsonError().set("status", "IM_A_TEAPOT"));
+
   private static final WaitStrategy RETRY_WAIT_STRATEGY = WaitStrategies.noWait();
   private static final StopStrategy RETRY_STOP_STRATEGY = StopStrategies.stopAfterAttempt(3);
 
@@ -317,13 +322,13 @@ public class AuthenticatorTest {
 
   @Test
   public void shouldFailIfOtherErrorGettingProject() throws IOException {
-    doThrow(QUOTA_EXHAUSTED).when(projectsGetAncestry).execute();
+    doThrow(IM_A_TEAPOT).when(projectsGetAncestry).execute();
 
     idTokenPayload.setEmail("foo@barfoo.iam.gserviceaccount.com");
     assertThat(validator.authenticate("token"), is(nullValue()));
 
     verifyNoMoreInteractions(iam);
-    verify(projectsGetAncestry, times(3)).execute();
+    verify(projectsGetAncestry).execute();
   }
 
   @Test
