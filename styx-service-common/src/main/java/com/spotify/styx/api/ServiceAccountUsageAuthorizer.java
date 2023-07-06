@@ -25,6 +25,7 @@ import static com.github.rholder.retry.WaitStrategies.randomWait;
 import static com.google.api.services.directory.DirectoryScopes.ADMIN_DIRECTORY_GROUP_MEMBER_READONLY;
 import static com.spotify.apollo.Status.BAD_REQUEST;
 import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.styx.util.ConfigUtil.get;
 import static java.lang.Boolean.TRUE;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -63,6 +64,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import com.spotify.apollo.Environment;
 import com.spotify.apollo.Response;
+import com.spotify.apollo.StatusType.Family;
 import com.spotify.styx.model.WorkflowId;
 import com.typesafe.config.Config;
 import io.norberg.automatter.AutoMatter;
@@ -348,7 +350,7 @@ public interface ServiceAccountUsageAuthorizer {
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
         if (cause instanceof GoogleJsonResponseException
-            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
+            && ((GoogleJsonResponseException) cause).getStatusCode() == NOT_FOUND.code()) {
           log.debug("Service account {} doesn't exist", email, e);
           throw new ResponseException(Response.forStatus(
               BAD_REQUEST.withReasonPhrase("Service account does not exist: " + email)));
@@ -413,11 +415,11 @@ public interface ServiceAccountUsageAuthorizer {
           var statusCode = ((GoogleJsonResponseException) cause).getStatusCode();
           // hasMember API returns 404 if the group does not exist, while returning 400 if the principal
           // email does not exist or does not have the same domain as the group if it is enforced
-          if (statusCode == 400) {
+          if (statusCode == BAD_REQUEST.code()) {
             log.info("Principal {} does not exist or belongs to different domain than group {}",
                 principalEmail, group);
             return false;
-          } else if (statusCode == 404) {
+          } else if (statusCode == NOT_FOUND.code()) {
             log.info("Group {} does not exist", group);
             return false;
           }
@@ -436,9 +438,12 @@ public interface ServiceAccountUsageAuthorizer {
             .execute()));
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
+        // GCP returns 403 in case of project not found for security reason, but that makes it impossible
+        // to differentiate that from missing permission; we take the risk here assuming Styx service account does have
+        // proper permissions
         if (cause instanceof GoogleJsonResponseException
-            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
-          log.info("Project {} does not exist", projectId, cause);
+            && ((GoogleJsonResponseException) cause).getStatusCode() == FORBIDDEN.code()) {
+          log.info("Project {} does not exist or Styx lacks permissions", projectId, cause);
           return Optional.empty();
         }
         throw new RuntimeException(e);
@@ -455,7 +460,7 @@ public interface ServiceAccountUsageAuthorizer {
       } catch (ExecutionException e) {
         final Throwable cause = e.getCause();
         if (cause instanceof GoogleJsonResponseException
-            && ((GoogleJsonResponseException) cause).getStatusCode() == 404) {
+            && ((GoogleJsonResponseException) cause).getStatusCode() == NOT_FOUND.code()) {
           log.info("Service account {} does not exist", serviceAccount, cause);
           return Optional.empty();
         }
@@ -485,7 +490,7 @@ public interface ServiceAccountUsageAuthorizer {
     private static boolean isRetryableException(Throwable t) {
       if (t instanceof IOException) {
         if (t instanceof GoogleJsonResponseException) {
-          return ((GoogleJsonResponseException) t).getStatusCode() / 100 == 5;
+          return Family.familyOf(((GoogleJsonResponseException) t).getStatusCode()) == Family.SERVER_ERROR;
         }
         return true;
       }

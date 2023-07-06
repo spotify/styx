@@ -22,6 +22,8 @@ package com.spotify.styx.api;
 
 import static com.github.rholder.retry.StopStrategies.stopAfterDelay;
 import static com.github.rholder.retry.WaitStrategies.exponentialWait;
+import static com.spotify.apollo.Status.FORBIDDEN;
+import static com.spotify.apollo.Status.NOT_FOUND;
 import static com.spotify.styx.util.GoogleApiClientUtil.executeWithRetries;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -279,7 +281,7 @@ public class Authenticator {
       var serviceAccount = executeWithRetries(request, retryWaitStrategy, retryStopStrategy);
       return serviceAccount.getProjectId();
     } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 404) {
+      if (e.getStatusCode() == NOT_FOUND.code()) {
         logger.debug("Service account {} doesn't exist", email, e);
         return null;
       }
@@ -295,12 +297,14 @@ public class Authenticator {
     try {
       ancestry = executeWithRetries(request, retryWaitStrategy, retryStopStrategy);
     } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 404) {
-        logger.debug("Project {} doesn't exist", projectId, e);
-        return false;
+      // GCP returns 403 in case of project not found for security reason, but that makes it impossible
+      // to differentiate that from missing permission; we take the risk here assuming Styx service account does have
+      // proper permissions
+      if (e.getStatusCode() == FORBIDDEN.code()) {
+        logger.debug("Project {} doesn't exist or Styx lacks permissions", projectId, e);
+      } else {
+        logger.info("Cannot get project with id {}", projectId, e);
       }
-
-      logger.info("Cannot get project with id {}", projectId, e);
       return false;
     }
     if (ancestry.getAncestor() == null) {
