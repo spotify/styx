@@ -24,30 +24,111 @@ import static com.spotify.styx.util.ParameterUtil.parseBest;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
-
+import flyteidl.core.Types.LiteralType;
+import flyteidl.core.Types.LiteralType.TypeCase;
+import flyteidl.core.Types.SimpleType;
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-
 public class FlyteInputsUtils {
+
+  private static final Set<TypeCase> COMPLEX_TYPES =
+      Set.of(TypeCase.COLLECTION_TYPE, TypeCase.MAP_VALUE_TYPE);
+
+  private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
   }
 
   static Literals.Literal literalOf(String key, String value, Types.LiteralType literalType) {
-    if (literalType.getTypeCase() != Types.LiteralType.TypeCase.SIMPLE) {
-      var message = String.format("Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN is supported but got [%s]", key, literalType);
 
-      throw new UnsupportedOperationException(message);
+    switch (literalType.getTypeCase()) {
+      case SIMPLE:
+        return parseSimpleType(key, value, literalType.getSimple());
+      case COLLECTION_TYPE:
+        try {
+          return parseCollectionType(key, value, literalType.getCollectionType());
+        } catch (Exception ex) {
+          throw new UnsupportedOperationException(
+              String.format(
+                  "Collection could not be parsed for input [%s]. Reason: %s",
+                  key, ex.getMessage()));
+        }
+      case MAP_VALUE_TYPE:
+        try {
+          return parserMapType(key, value, literalType.getMapValueType());
+        } catch (Exception ex) {
+          throw new UnsupportedOperationException(
+              String.format(
+                  "Map could not be parsed for input [%s]. Reason: %s", key, ex.getMessage()));
+        }
+      default:
+        String message =
+            String.format(
+                "Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN/DURATION/INTEGER/FLOAT/MAP/COLLECTION is supported but got [%s]",
+                key, literalType.getSimple());
+
+        throw new UnsupportedOperationException(message);
+    }
+  }
+
+  private static Literals.Literal parserMapType(String key, String value, LiteralType innerType)
+      throws JsonProcessingException {
+    var mapBuilder = Literals.LiteralMap.newBuilder();
+
+    Map<String, Object> map = mapper.readValue(value, Map.class);
+    var containsComplexTypes = COMPLEX_TYPES.contains(innerType.getTypeCase());
+
+    for (var element : map.entrySet()) {
+      String result;
+
+      if (containsComplexTypes) {
+        result = mapper.writeValueAsString(element.getValue());
+      } else {
+        result = element.getValue().toString();
+      }
+
+      mapBuilder.putLiterals(element.getKey(), literalOf(key, result, innerType));
     }
 
-    switch (literalType.getSimple()) {
+    return Literals.Literal.newBuilder().setMap(mapBuilder.build()).build();
+  }
+
+  private static Literals.Literal parseCollectionType(
+      String key, String value, LiteralType innerType) throws JsonProcessingException {
+    var collectionBuilder = Literals.LiteralCollection.newBuilder();
+
+    List<Object> list = mapper.readValue(value, List.class);
+    var containsComplexTypes = COMPLEX_TYPES.contains(innerType.getTypeCase());
+
+    for (var element : list) {
+      String result;
+
+      if (containsComplexTypes) {
+        result = mapper.writeValueAsString(element);
+      } else {
+        result = element.toString();
+      }
+
+      collectionBuilder.addLiterals(literalOf(key, result, innerType));
+    }
+
+    return Literals.Literal.newBuilder().setCollection(collectionBuilder.build()).build();
+  }
+
+  private static Literals.Literal parseSimpleType(String key, String value, SimpleType type) {
+    switch (type) {
       case DATETIME:
         return datetimeLiteralOf(value);
 
@@ -57,16 +138,60 @@ public class FlyteInputsUtils {
       case BOOLEAN:
         return booleanLiteralOf(value);
 
+      case DURATION:
+        return durationLiteralOf(value);
+
+      case INTEGER:
+        return integerLiteralOf(value);
+
+      case FLOAT:
+        return floatLiteralOf(value);
+
       default:
-        String message = String.format("Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN is supported but got [%s]", key, literalType.getSimple());
+        String message =
+            String.format(
+                "Can't get default value for input [%s]. Only DATETIME/STRING/BOOLEAN/DURATION/INTEGER/FLOAT/MAP/COLLECTION is supported but got [%s]",
+                key, type);
 
         throw new UnsupportedOperationException(message);
     }
   }
 
-  static Literals.Literal datetimeLiteralOf(String value) {
+  static Literals.Literal floatLiteralOf(String value) {
     var primitive =
-        Literals.Primitive.newBuilder().setDatetime(parseBest(value)).build();
+        Literals.Primitive.newBuilder().setFloatValue(Double.parseDouble(value)).build();
+
+    return Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
+  }
+
+  static Literals.Literal integerLiteralOf(String value) {
+    var primitive = Literals.Primitive.newBuilder().setInteger(Long.parseLong(value)).build();
+
+    return Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
+  }
+
+  static Literals.Literal durationLiteralOf(String value) {
+    var duration = Duration.parse(value);
+    var primitive =
+        Literals.Primitive.newBuilder()
+            .setDuration(
+                com.google.protobuf.Duration.newBuilder()
+                    .setSeconds(duration.getSeconds())
+                    .setNanos(duration.getNano())
+                    .build())
+            .build();
+
+    return Literals.Literal.newBuilder()
+        .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
+        .build();
+  }
+
+  static Literals.Literal datetimeLiteralOf(String value) {
+    var primitive = Literals.Primitive.newBuilder().setDatetime(parseBest(value)).build();
 
     return Literals.Literal.newBuilder()
         .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
@@ -74,8 +199,7 @@ public class FlyteInputsUtils {
   }
 
   static Literals.Literal booleanLiteralOf(String value) {
-    var primitive =
-        Literals.Primitive.newBuilder().setBoolean(Boolean.parseBoolean(value)).build();
+    var primitive = Literals.Primitive.newBuilder().setBoolean(Boolean.parseBoolean(value)).build();
 
     return Literals.Literal.newBuilder()
         .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
@@ -83,18 +207,18 @@ public class FlyteInputsUtils {
   }
 
   static Literals.Literal stringLiteralOf(String value) {
-    var primitive =
-        Literals.Primitive.newBuilder().setStringValue(value).build();
+    var primitive = Literals.Primitive.newBuilder().setStringValue(value).build();
 
     return Literals.Literal.newBuilder()
         .setScalar(Literals.Scalar.newBuilder().setPrimitive(primitive).build())
         .build();
   }
 
-  static Literals.Literal getDefaultValue(String key,
-                                          Interface.Parameter parameter,
-                                          Map<String, String> extraDefaultInputs,
-                                          Map<String, String> triggerParameters) {
+  static Literals.Literal getDefaultValue(
+      String key,
+      Interface.Parameter parameter,
+      Map<String, String> extraDefaultInputs,
+      Map<String, String> triggerParameters) {
     var lowerCaseKey = key.toLowerCase();
     var lowerWithSnakeRemoved = noSnake(lowerCaseKey);
 
@@ -112,12 +236,12 @@ public class FlyteInputsUtils {
       return parameter.getDefault();
     }
 
-    throw new UnsupportedOperationException("Can't find default value for launch plan input: " + key);
+    throw new UnsupportedOperationException(
+        "Can't find default value for launch plan input: " + key);
   }
 
   private static Optional<String> getMultiKeys(Map<String, String> map, String key1, String key2) {
-    return Optional.ofNullable(map.get(key1))
-        .or(() -> Optional.ofNullable(map.get(key2)));
+    return Optional.ofNullable(map.get(key1)).or(() -> Optional.ofNullable(map.get(key2)));
   }
 
   static Literals.LiteralMap fillParameterInInputs(
@@ -130,29 +254,33 @@ public class FlyteInputsUtils {
     var lowerNoSnakeParamsKeys = getLowerNoSnakeKeys(parameterMap.getParametersMap());
     var lowerNoSnakeInputKeys = getLowerNoSnakeKeys(userDefinedInputs);
     if (!lowerNoSnakeParamsKeys.containsAll(lowerNoSnakeInputKeys)) {
-      var unMatchedInputKeys = userDefinedInputs.keySet().stream()
-          .filter(key -> !lowerNoSnakeParamsKeys.contains(key.toLowerCase())
-              && !lowerNoSnakeParamsKeys.contains(noSnake(key.toLowerCase())))
-          .collect(toList());
-      throw new UnsupportedOperationException("Inputs don't correspond with launch plans inputs:"
-                                              + " " + unMatchedInputKeys);
+      var unMatchedInputKeys =
+          userDefinedInputs.keySet().stream()
+              .filter(
+                  key ->
+                      !lowerNoSnakeParamsKeys.contains(key.toLowerCase())
+                          && !lowerNoSnakeParamsKeys.contains(noSnake(key.toLowerCase())))
+              .collect(toList());
+      throw new UnsupportedOperationException(
+          "Inputs don't correspond with launch plans inputs:" + " " + unMatchedInputKeys);
     }
-
 
     var literalMapBuilder = Literals.LiteralMap.newBuilder();
 
-    var multiCaseDefaultValues = FlyteInputsUtils.combineMapsWithPreference(
-        toMultiCaseMap(userDefinedInputs),
-        toMultiCaseMap(styxVariables));
+    var multiCaseDefaultValues =
+        FlyteInputsUtils.combineMapsWithPreference(
+            toMultiCaseMap(userDefinedInputs), toMultiCaseMap(styxVariables));
 
     var multiCaseTriggerParams = toMultiCaseMap(triggerParams);
 
     parameterMap
         .getParametersMap()
         .forEach(
-            (key, parameter) -> literalMapBuilder.putLiterals(
-                key,
-                getDefaultValue(key, parameter, multiCaseDefaultValues, multiCaseTriggerParams)));
+            (key, parameter) ->
+                literalMapBuilder.putLiterals(
+                    key,
+                    getDefaultValue(
+                        key, parameter, multiCaseDefaultValues, multiCaseTriggerParams)));
 
     return literalMapBuilder.build();
   }
@@ -165,8 +293,7 @@ public class FlyteInputsUtils {
   }
 
   private static Map<String, String> combineMapsWithPreference(
-      final Map<String, String> map1,
-      final Map<String, String> map2) {
+      final Map<String, String> map1, final Map<String, String> map2) {
     Map<String, String> combinedMap = new HashMap<>();
     combinedMap.putAll(map1);
     combinedMap.putAll(map2);
@@ -175,11 +302,12 @@ public class FlyteInputsUtils {
 
   private static Map<String, String> toMultiCaseMap(Map<String, String> map) {
     var multiCaseMap = new HashMap<String, String>();
-    map.forEach((varName, value) -> {
-      String lowerCase = varName.toLowerCase();
-      multiCaseMap.put(lowerCase, value);
-      multiCaseMap.put(noSnake(lowerCase), value);
-    });
+    map.forEach(
+        (varName, value) -> {
+          String lowerCase = varName.toLowerCase();
+          multiCaseMap.put(lowerCase, value);
+          multiCaseMap.put(noSnake(lowerCase), value);
+        });
     return multiCaseMap;
   }
 
