@@ -25,7 +25,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spotify.styx.serialization.Json;
 import flyteidl.core.Interface;
 import flyteidl.core.Literals;
@@ -45,8 +44,6 @@ public class FlyteInputsUtils {
   private static final Set<TypeCase> COMPLEX_TYPES =
       Set.of(TypeCase.COLLECTION_TYPE, TypeCase.MAP_VALUE_TYPE);
 
-  private static final ObjectMapper mapper = Json.YAML_MAPPER;
-
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
   }
@@ -62,8 +59,8 @@ public class FlyteInputsUtils {
         } catch (Exception ex) {
           throw new UnsupportedOperationException(
               String.format(
-                  "Collection could not be parsed for input [%s]. Reason: %s",
-                  key, ex.getMessage()), ex);
+                  "Collection could not be parsed for input [%s].",
+                  key), ex);
         }
       case MAP_VALUE_TYPE:
         try {
@@ -71,7 +68,7 @@ public class FlyteInputsUtils {
         } catch (Exception ex) {
           throw new UnsupportedOperationException(
               String.format(
-                  "Map could not be parsed for input [%s]. Reason: %s", key, ex.getMessage()), ex);
+                  "Map could not be parsed for input [%s].", key), ex);
         }
       default:
         String message =
@@ -87,14 +84,14 @@ public class FlyteInputsUtils {
       throws JsonProcessingException {
     var mapBuilder = Literals.LiteralMap.newBuilder();
 
-    Map<String, Object> map = mapper.readValue(value, Map.class);
+    Map<String, Object> map = Json.YAML_MAPPER.readValue(value, Map.class);
     var containsComplexTypes = COMPLEX_TYPES.contains(innerType.getTypeCase());
 
     for (var element : map.entrySet()) {
       String result;
 
       if (containsComplexTypes) {
-        result = mapper.writeValueAsString(element.getValue());
+        result = Json.YAML_MAPPER.writeValueAsString(element.getValue());
       } else {
         result = element.getValue().toString();
       }
@@ -109,14 +106,14 @@ public class FlyteInputsUtils {
       String key, String value, LiteralType innerType) throws JsonProcessingException {
     var collectionBuilder = Literals.LiteralCollection.newBuilder();
 
-    List<Object> list = mapper.readValue(value, List.class);
+    List<Object> list = Json.YAML_MAPPER.readValue(value, List.class);
     var containsComplexTypes = COMPLEX_TYPES.contains(innerType.getTypeCase());
 
     for (var element : list) {
       String result;
 
       if (containsComplexTypes) {
-        result = mapper.writeValueAsString(element);
+        result = Json.YAML_MAPPER.writeValueAsString(element);
       } else {
         result = element.toString();
       }
