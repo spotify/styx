@@ -26,7 +26,8 @@ import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spotify.styx.serialization.Json;import flyteidl.core.Interface;
+import com.spotify.styx.serialization.Json;
+import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 import flyteidl.core.Types.LiteralType;
