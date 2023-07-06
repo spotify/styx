@@ -443,7 +443,7 @@ public interface ServiceAccountUsageAuthorizer {
         // proper permissions
         if (cause instanceof GoogleJsonResponseException
             && ((GoogleJsonResponseException) cause).getStatusCode() == FORBIDDEN.code()) {
-          log.info("Project {} does not exist", projectId, cause);
+          log.info("Project {} does not exist or no permission to check", projectId, cause);
           return Optional.empty();
         }
         throw new RuntimeException(e);
