@@ -26,8 +26,7 @@ import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import flyteidl.core.Interface;
+import com.spotify.styx.serialization.Json;import flyteidl.core.Interface;
 import flyteidl.core.Literals;
 import flyteidl.core.Types;
 import flyteidl.core.Types.LiteralType;
@@ -45,7 +44,7 @@ public class FlyteInputsUtils {
   private static final Set<TypeCase> COMPLEX_TYPES =
       Set.of(TypeCase.COLLECTION_TYPE, TypeCase.MAP_VALUE_TYPE);
 
-  private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+  private static final ObjectMapper mapper = Json.YAML_MAPPER;
 
   private FlyteInputsUtils() {
     throw new UnsupportedOperationException();
@@ -63,7 +62,7 @@ public class FlyteInputsUtils {
           throw new UnsupportedOperationException(
               String.format(
                   "Collection could not be parsed for input [%s]. Reason: %s",
-                  key, ex.getMessage()));
+                  key, ex.getMessage()), ex);
         }
       case MAP_VALUE_TYPE:
         try {
@@ -71,7 +70,7 @@ public class FlyteInputsUtils {
         } catch (Exception ex) {
           throw new UnsupportedOperationException(
               String.format(
-                  "Map could not be parsed for input [%s]. Reason: %s", key, ex.getMessage()));
+                  "Map could not be parsed for input [%s]. Reason: %s", key, ex.getMessage()), ex);
         }
       default:
         String message =
