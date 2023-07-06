@@ -301,7 +301,7 @@ public class Authenticator {
       // to differentiate that from missing permission; we take the risk here assuming Styx service account does have
       // proper permissions
       if (e.getStatusCode() == FORBIDDEN.code()) {
-        logger.debug("Project {} doesn't exist or no permission to check", projectId, e);
+        logger.debug("Project {} doesn't exist or Styx lacks permissions", projectId, e);
       } else {
         logger.info("Cannot get project with id {}", projectId, e);
       }
