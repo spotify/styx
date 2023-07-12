@@ -1,3 +1,6 @@
+# This repo was archived! 
+We decided to discontinue the Styx oss repo.
+
 # Styx
 
 [![CircleCI](https://circleci.com/gh/spotify/styx/tree/master.svg?style=shield)](https://circleci.com/gh/spotify/styx)
