@@ -501,7 +501,7 @@
       <dependency>
         <groupId>com.google.cloud.bigtable</groupId>
         <artifactId>bigtable-hbase-1.x</artifactId>
-        <version>1.11.0</version>
+        <version>1.28.0</version>
         <exclusions>
           <exclusion>
             <groupId>log4j</groupId>
