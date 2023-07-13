@@ -28,6 +28,8 @@ import com.spotify.styx.MissingRequiredPropertyException;
 import com.spotify.styx.model.Event;
 import com.spotify.styx.model.ExecutionDescription;
 import com.spotify.styx.model.FlyteExecConf;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.RequestsResource;
 import com.spotify.styx.model.WorkflowInstance;
 import com.spotify.styx.state.EventRouter;
 import com.spotify.styx.state.OutputHandler;
@@ -143,6 +145,8 @@ public class ExecutionDescriptionHandler implements OutputHandler {
     final Optional<String> dockerImage = workflow.configuration().dockerImage();
     final List<String> dockerArgs = workflow.configuration().dockerArgs()
         .orElse(Collections.emptyList());
+    final Optional<RequestsResource> requests = workflow.configuration().requests();
+    final Optional<LimitsResource> limits = workflow.configuration().limits();
     final List<String> command = argsReplace(dockerArgs, workflowInstance.parameter());
     final Optional<FlyteExecConf> flyteExecConf = workflow.configuration().flyteExecConf();
 
@@ -162,6 +166,8 @@ public class ExecutionDescriptionHandler implements OutputHandler {
         .retryCondition(workflow.configuration().retryCondition())
         .flyteExecConf(flyteExecConf)
         .flyteExecutionId(Optional.of(flyteExecutionId))
+        .requests(requests)
+        .limits(limits)
         .build();
   }
 

@@ -48,6 +48,7 @@ import com.spotify.styx.client.ClientErrorException;
 import com.spotify.styx.client.StyxClient;
 import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
+import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
 import com.spotify.styx.model.Workflow;
@@ -1017,6 +1018,34 @@ public class CliMainTest {
   public void testDebugOptionIsGlobal(final String argLine) {
     when(client.workflows()).thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     assertThat(Try.run(() -> CliMain.run(cliContext, argLine.split(" "))).isSuccess(), is(true));
+  }
+
+  @Test
+  public void testCreateResource() {
+    final String resourceId = "test-comp-id";
+    final int concurrency = 2;
+
+    when(client.resourceCreate(resourceId, concurrency, null, null, null, null))
+        .thenReturn(CompletableFuture.completedFuture(Resource.create(resourceId, concurrency)));
+
+    CliMain.run(cliContext, "resource", "create", resourceId, Integer.toString(concurrency));
+    verify(client).resourceCreate(resourceId, concurrency, null, null, null, null);
+  }
+
+  @Test
+  public void testCreateResourceWithMemoryAndCPU() {
+    final String resourceId = "test-comp-id";
+    final int concurrency = 2;
+
+    when(client.resourceCreate(resourceId, concurrency, "1Gi", 1D, "2Gi", 2D))
+        .thenReturn(CompletableFuture.completedFuture(Resource.create(resourceId, concurrency)));
+
+    CliMain.run(cliContext, "resource", "create", resourceId, Integer.toString(concurrency),
+        "--requestsMemory", "1Gi",
+        "--requestsCpu", "1",
+        "--limitsMemory", "2Gi",
+        "--limitsCpu", "2");
+    verify(client).resourceCreate(resourceId, concurrency, "1Gi", 1D, "2Gi", 2D);
   }
 
   @Test

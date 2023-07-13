@@ -576,18 +576,28 @@ public final class CliMain {
   private void resourceCreate() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.resourceCreateId.getDest());
     final int concurrency = namespace.getInt(parser.resourceCreateConcurrency.getDest());
+    final String requestsMemory = namespace.getString(parser.resourceCreateRequestsMemory.getDest());
+    final Double requestsCpu = namespace.getDouble(parser.resourceCreateRequestsCpu.getDest());
+    final String limitsMemory = namespace.getString(parser.resourceCreateLimitsMemory.getDest());
+    final Double limitsCpu = namespace.getDouble(parser.resourceCreateLimitsCpu.getDest());
 
     final Resource resource =
-        styxClient.resourceCreate(id, concurrency).toCompletableFuture().get();
+        styxClient.resourceCreate(id, concurrency, requestsMemory, requestsCpu,
+            limitsMemory, limitsCpu).toCompletableFuture().get();
     cliOutput.printResources(Collections.singletonList(resource));
   }
 
   private void resourceEdit() throws ExecutionException, InterruptedException {
     final String id = namespace.getString(parser.resourceEditId.getDest());
     final Integer concurrency = namespace.getInt(parser.resourceEditConcurrency.getDest());
+    final String requestsMemory = namespace.getString(parser.resourceEditRequestsMemory.getDest());
+    final Double requestsCpu = namespace.getDouble(parser.resourceEditRequestsCpu.getDest());
+    final String limitsMemory = namespace.getString(parser.resourceEditLimitsMemory.getDest());
+    final Double limitsCpu = namespace.getDouble(parser.resourceEditLimitsCpu.getDest());
 
     if (concurrency != null) {
-      Resource resource = styxClient.resourceEdit(id, concurrency).toCompletableFuture().get();
+      Resource resource = styxClient.resourceEdit(id, concurrency,
+          requestsMemory, requestsCpu, limitsMemory, limitsCpu).toCompletableFuture().get();
       cliOutput.printResources(Collections.singletonList(resource));
     }
   }
@@ -793,6 +803,22 @@ public final class CliMain {
         resourceEdit.addArgument("--concurrency")
             .help("set the concurrency value for the resource")
             .type(Integer.class);
+    final Argument resourceEditRequestsMemory =
+        resourceEdit.addArgument("--requestsMemory")
+            .help("set the requests memory value for the resource")
+            .type(String.class);
+    final Argument resourceEditRequestsCpu =
+        resourceEdit.addArgument("--requestsCpu")
+            .help("set the requests cpu value for the resource")
+            .type(Double.class);
+    final Argument resourceEditLimitsMemory =
+        resourceEdit.addArgument("--limitsMemory")
+            .help("set the limits memory value for the resource")
+            .type(String.class);
+    final Argument resourceEditLimitsCpu =
+        resourceEdit.addArgument("--limitsCpu")
+            .help("set the limits cpu value for the resource")
+            .type(Double.class);
 
     final Subparser resourceList = ResourceCommand.LIST.parser(resourceParser, cliContext);
 
@@ -803,6 +829,27 @@ public final class CliMain {
         resourceCreate.addArgument("concurrency")
             .help("The concurrency of this resource")
             .type(Integer.class);
+    final Argument resourceCreateRequestsMemory =
+        resourceCreate.addArgument("--requestsMemory")
+            .help("The requests memory for this resource")
+            .type(String.class)
+            .required(false)/*
+            .setDefault(Optional.of("1Gi"))*/;
+    final Argument resourceCreateRequestsCpu =
+        resourceCreate.addArgument("--requestsCpu")
+            .help("The requests cpu for this resource")
+            .type(Double.class)
+            .required(false);
+    final Argument resourceCreateLimitsMemory =
+        resourceCreate.addArgument("--limitsMemory")
+            .help("The limits memory for this resource")
+            .type(String.class)
+            .required(false);
+    final Argument resourceCreateLimitsCpu =
+        resourceCreate.addArgument("--limitsCpu")
+            .help("The limits cpu for this resource")
+            .type(Double.class)
+            .required(false);
 
     final Subparsers workflowParser =
         Command.WORKFLOW.parser(subCommands, cliContext)

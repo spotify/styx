@@ -39,6 +39,8 @@ public interface ExecutionDescription {
   Optional<String> retryCondition();
   Optional<FlyteExecConf> flyteExecConf();
   Optional<String> flyteExecutionId();
+  Optional<RequestsResource> requests();
+  Optional<LimitsResource> limits();
 
   static ExecutionDescriptionBuilder builder() {
     return new ExecutionDescriptionBuilder();

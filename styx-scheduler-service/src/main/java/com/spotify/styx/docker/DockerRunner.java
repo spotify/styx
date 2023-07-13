@@ -85,6 +85,10 @@ public interface DockerRunner extends Closeable {
 
     Optional<String> memLimit();
 
+    Optional<String> cpuRequest();
+
+    Optional<String> cpuLimit();
+
     Map<String, String> env();
 
     static RunSpecBuilder builder() {

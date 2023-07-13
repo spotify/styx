@@ -54,6 +54,10 @@ import com.spotify.styx.model.Backfill;
 import com.spotify.styx.model.BackfillInput;
 import com.spotify.styx.model.EditableBackfillInput;
 import com.spotify.styx.model.Event;
+import com.spotify.styx.model.LimitsResource;
+import com.spotify.styx.model.LimitsResourceBuilder;
+import com.spotify.styx.model.RequestsResource;
+import com.spotify.styx.model.RequestsResourceBuilder;
 import com.spotify.styx.model.Resource;
 import com.spotify.styx.model.Schedule;
 import com.spotify.styx.model.TriggerParameters;
@@ -97,6 +101,9 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnitParamsRunner.class)
 public class StyxOkHttpClientTest {
 
+  private static final LimitsResource LIMITS_RESOURCE = new LimitsResourceBuilder().cpu("1").memory("1Gi").build();
+  private static final RequestsResource REQUESTS_RESOURCE = new RequestsResourceBuilder().cpu("1").memory("1Gi").build();
+
   private static final WorkflowConfiguration WORKFLOW_CONFIGURATION_1 = WorkflowConfiguration.builder()
       .id("bar-wf_1")
       .dockerImage("busybox")
@@ -109,6 +116,8 @@ public class StyxOkHttpClientTest {
       .dockerImage("busybox")
       .dockerArgs(Arrays.asList("echo", "hello world"))
       .schedule(Schedule.DAYS)
+      .limits(LIMITS_RESOURCE)
+      .requests(REQUESTS_RESOURCE)
       .build();
 
   private static final Workflow WORKFLOW_1 = Workflow.create("f[ ]o-cmp", WORKFLOW_CONFIGURATION_1);
@@ -320,7 +329,8 @@ public class StyxOkHttpClientTest {
     when(client.send(any(Request.class)))
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK, resource)));
     final CompletableFuture<Resource> r =
-        styx.resourceEdit("resource", 3).toCompletableFuture();
+        styx.resourceEdit("resource", 3,
+            "1Gi", 1D, "2Gi", 2D).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();
@@ -338,7 +348,7 @@ public class StyxOkHttpClientTest {
         .thenReturn(CompletableFuture.completedFuture(response(HTTP_OK,
                                                                resource)));
     final CompletableFuture<Resource> r =
-        styx.resourceCreate("resource", 3).toCompletableFuture();
+        styx.resourceCreate("resource", 3, "1Gi", 1D, "2Gi", 2D).toCompletableFuture();
     verify(client, timeout(30_000)).send(requestCaptor.capture());
     assertThat(r.isDone(), is(true));
     final Request request = requestCaptor.getValue();

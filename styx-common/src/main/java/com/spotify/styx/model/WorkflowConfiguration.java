@@ -48,6 +48,10 @@ public interface WorkflowConfiguration {
 
   Optional<List<String>> dockerArgs();
 
+  Optional<RequestsResource> requests();
+
+  Optional<LimitsResource> limits();
+
   /**
    * Toggles behavior to reliably report exit status from the Docker container, via
    * https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/#writing-and-reading-a-termination-message

@@ -588,18 +588,24 @@ public class KubernetesDockerRunnerTest {
   @Test
   public void shouldConfigureResourceRequirements() {
     final String memRequest = "17Mi";
+    final String cpuRequest = "1";
     final String memLimit = "4711Mi";
+    final String cpuLimit = "2";
     final Pod pod = createPod(WORKFLOW_INSTANCE, RunSpec.builder()
         .executionId("eid1")
         .imageName("busybox")
         .memRequest(memRequest)
         .memLimit(memLimit)
+        .cpuRequest(cpuRequest)
+        .cpuLimit(cpuLimit)
         .build(),
         EMPTY_SECRET_SPEC);
 
     final ResourceRequirements resourceReqs = pod.getSpec().getContainers().get(0).getResources();
     assertThat(resourceReqs.getRequests().get("memory"), is(new Quantity(memRequest)));
+    assertThat(resourceReqs.getRequests().get("cpu"), is(new Quantity(cpuRequest)));
     assertThat(resourceReqs.getLimits().get("memory"), is(new Quantity(memLimit)));
+    assertThat(resourceReqs.getLimits().get("cpu"), is(new Quantity(cpuLimit)));
   }
 
   @Test

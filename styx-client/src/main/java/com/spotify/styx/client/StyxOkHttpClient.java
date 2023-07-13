@@ -298,14 +298,18 @@ class StyxOkHttpClient implements StyxClient {
   }
 
   @Override
-  public CompletionStage<Resource> resourceCreate(String resourceId, int concurrency) {
+  public CompletionStage<Resource> resourceCreate(String resourceId, int concurrency,
+                                                  String requestsMemory, Double requestsCpu,
+                                                  String limitsMemory, Double limitsCpu) {
     final Resource resource = Resource.create(resourceId, concurrency);
     return execute(forUri(urlBuilder("resources"), "POST", resource),
                    Resource.class);
   }
 
   @Override
-  public CompletionStage<Resource> resourceEdit(String resourceId, int concurrency) {
+  public CompletionStage<Resource> resourceEdit(String resourceId, int concurrency,
+                                                String requestsMemory, Double requestsCpu,
+                                                String limitsMemory, Double limitsCpu) {
     final Resource resource = Resource.create(resourceId, concurrency);
     return execute(forUri(urlBuilder("resources", resourceId), "PUT", resource),
                    Resource.class);

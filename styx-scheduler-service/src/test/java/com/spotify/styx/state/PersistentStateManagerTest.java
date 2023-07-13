@@ -105,7 +105,6 @@ public class PersistentStateManagerTest {
   private static final RunState INSTANCE_QUEUED_STATE =
       INSTANCE_NEW_STATE.transition(Event.triggerExecution(INSTANCE, TRIGGER1, PARAMETERS), () -> NOW);
 
-
   private final ExecutorService executor = Executors.newWorkStealingPool();
   private final ExecutorService eventConsumerExecutor = Executors.newSingleThreadExecutor();
 
